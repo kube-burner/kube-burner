@@ -1,0 +1,9 @@
+metrics:
+  - node_memory_Committed_AS_bytes
+  - node_memory_MemAvailable_bytes
+  - node_memory_Active_bytes
+  - node_memory_MemFree_bytes
+  - node_memory_MemTotal_bytes
+  - node_memory_Slab_bytes
+  - node_cpu_seconds_total   
+  - sum(kube_pod_info)

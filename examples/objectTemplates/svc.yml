@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sleep-service-{{ .Iteration }}-{{ .Replica }}-{{ .foo }}
+  labels:
+    name: my-svc-{{ .Iteration }}-{{ .Replica }}
+spec:
+  selector:
+    app: sleep-app-{{ .Iteration }}-{{ .Replica }}
+  ports:
+  - name: serviceport
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,54 @@
+---
+ 
+global:
+  writeToFile: true
+  metricsDirectory: collected-metrics
+  measurements:
+    - name: podLatency
+      esIndex: kube-burner-podlatency
+
+  indexerConfig:
+    enabled: true
+    esServers: [https://es-instance.example.org:9200]
+    tlsVerify: false
+    index: kube-burner
+    type: elastic
+
+jobs:
+  - name: kube-burner-job
+    jobIterations: 5
+    qps: 10
+    namespacedIterations: true
+    cleanup: true
+    namespace: kube-burner-job-ns
+    podWait: true
+    jobIterationDelay: 0
+    jobPause: 1000
+    objects:
+
+      - objectTemplate: objectTemplates/svc.yml
+        replicas: 1
+
+      - objectTemplate: objectTemplates/deployment.yml
+        replicas: 20
+        inputVars:
+          containerPort: 8081
+
+      - objectTemplate: objectTemplates/route.yml
+        replicas: 2
+  
+  - name: second-job
+    jobIterations: 5
+    qps: 20
+    namespacedIterations: true
+    jobPause: 0
+    cleanup: true
+    namespace: second-job
+    podWait: true
+    jobIterationDelay: 0
+    objects:
+
+      - objectTemplate: objectTemplates/deployment.yml
+        replicas: 5
+        inputVars:
+          containerPort: 8080
