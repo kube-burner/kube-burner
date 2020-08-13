@@ -165,7 +165,7 @@ metrics:
   - node_cpu_seconds_total
 ```
 
-Indexed metrics have the following shape:
+The indexed metrics have the following shape:
 
 ```json
 $ cat collected-metrics/kube-burner-job-node_memory_Committed_AS_bytes.json
@@ -203,7 +203,6 @@ $ cat collected-metrics/kube-burner-job-node_memory_Committed_AS_bytes.json
 etc
 ```
 
-This will genera
 
 ## Indexers
 
@@ -221,7 +220,7 @@ The following indexers are currently supported:
 
 - Elasticsearch 7
 
-In addition, each indexer has its own configuration parameters as documented in each Indexer's section.
+In addition, each indexer has its own configuration parameters.
 
 ### Elasticsearch
 
