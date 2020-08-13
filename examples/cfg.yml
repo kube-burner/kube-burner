@@ -10,7 +10,7 @@ global:
   indexerConfig:
     enabled: true
     esServers: [https://es-instance.example.org:9200]
-    tlsVerify: false
+    insecureSkipVerify: false
     index: kube-burner
     type: elastic
 
@@ -50,5 +50,3 @@ jobs:
 
       - objectTemplate: objectTemplates/deployment.yml
         replicas: 5
-        inputVars:
-          containerPort: 8080

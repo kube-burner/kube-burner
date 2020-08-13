@@ -45,7 +45,7 @@ func (esIndexer *Elastic) new(esConfig config.IndexerConfig) {
 		Addresses: esConfig.ESServers,
 		Username:  esConfig.Username,
 		Password:  esConfig.Password,
-		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: esConfig.TLSVerify}},
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: esConfig.InsecureSkipVerify}},
 	}
 	ESClient, err := elasticsearch.NewClient(cfg)
 	if err != nil {
@@ -53,7 +53,7 @@ func (esIndexer *Elastic) new(esConfig config.IndexerConfig) {
 	}
 	_, err = ESClient.Ping()
 	if err != nil {
-		log.Fatalf("Unknown ES error: %s", err)
+		log.Fatalf("ES connection error: %s", err)
 	}
 	esIndexer.client = ESClient
 }

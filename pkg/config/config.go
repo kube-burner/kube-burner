@@ -27,14 +27,14 @@ type ConfigSpec struct {
 }
 
 type IndexerConfig struct {
-	Enabled   bool     `yaml:"enabled"`
-	Type      string   `yaml:"type"`
-	ESServers []string `yaml:"esServers"`
-	Index     string   `yaml:"index"`
-	Port      int      `yaml:"port"`
-	Username  string   `yaml:"username"`
-	Password  string   `yaml:"password"`
-	TLSVerify bool     `yaml:"tlsVerify"`
+	Enabled            bool     `yaml:"enabled"`
+	Type               string   `yaml:"type"`
+	ESServers          []string `yaml:"esServers"`
+	Index              string   `yaml:"index"`
+	Port               int      `yaml:"port"`
+	Username           string   `yaml:"username"`
+	Password           string   `yaml:"password"`
+	InsecureSkipVerify bool     `yaml:"insecureSkipVerify"`
 }
 
 type Measurements struct {
