@@ -10,6 +10,8 @@ Kube-burner is a tool aimed to stress a kubernetes cluster. A 1000 feet overview
 - Collect desired on-cluster prometheus metrics.
 - Write and/or index them to the configured TSDB.
 
+[![asciicast](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp.svg)](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp)
+
 
 ## Getting started
 
@@ -231,7 +233,7 @@ The `Elasticsearch 7` indexer supports the following options:
 | index                | Index name to send the prometheus metrics into | String      | kube-burner                              | ""      | 
 | username             | Elasticsearch username                         | String      | 10                                       | ""      |
 | password             | Elasticsearch password                         | String      | -                                        | ""      |
-| tlsVerify            | TLS certificate verification                   | Boolean     | true                                     | false   |
+| insecureSkipVerify   | TLS certificate verification                   | Boolean     | true                                     | false   |
 
 
 ## Measurements
