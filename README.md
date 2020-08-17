@@ -29,6 +29,7 @@ Usage:
   kube-burner [command]
 
 Available Commands:
+  destroy     Destroy old namespaces described in the config file
   help        Help about any command
   init        Launch test
   version     Print the version number of kube-burner

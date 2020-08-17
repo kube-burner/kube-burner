@@ -64,7 +64,23 @@ func initCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.MarkFlagRequired("config")
 	cmd.MarkFlagRequired("uuid")
+	return cmd
+}
 
+func destroyCmd() *cobra.Command {
+	var c string
+	cmd := &cobra.Command{
+		Use:   "destroy",
+		Short: "Destroy old namespaces described in the config file",
+		Run: func(cmd *cobra.Command, args []string) {
+			executorList := burner.NewExecutorList(c)
+			for _, ex := range executorList {
+				ex.Cleanup()
+			}
+		},
+	}
+	cmd.Flags().StringVarP(&c, "config", "c", "", "Config file path")
+	cmd.MarkFlagRequired("config")
 	return cmd
 }
 
@@ -87,6 +103,7 @@ func Execute() {
 
 func init() {
 	rootCmd.AddCommand(initCmd())
+	rootCmd.AddCommand(destroyCmd())
 	for _, c := range rootCmd.Commands() {
 		logLevel := c.Flags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 		c.PreRun = func(cmd *cobra.Command, args []string) {
