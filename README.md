@@ -199,8 +199,8 @@ $ cat collected-metrics/kube-burner-job-node_memory_Committed_AS_bytes.json
     },
     "uuid": "60e952c0-4d23-4266-bbf0-fc11cfe1afaa",
     "jobName": "kube-burner-job1"
-  },
-etc
+  }
+]
 ```
 
 
@@ -237,7 +237,19 @@ The `Elasticsearch 7` indexer supports the following options:
 
 ## Measurements
 
-*TODO*
+Apart from prometheus metrics collection, `kube-burner` allows to get further metrics using other mechanisms or data sources such as the 
+own kubernetes API, these mechanisms are called measurements.
+Measurements are enabled by the measurements section of the configuration file. This section contains a list of measurements and their options.
+All measurements support the esIndex option that describe the ES index where metrics will be indexed.
+'kube-burner' supports the following measurements so far:
+
+* pod-latency: It collects pod startup phases latency metrics. This measurement can be enabled with:
+
+```yaml
+    measurements:
+    - name: podLatency
+      esIndex: kube-burner-podlatency
+```
 
 ## Contributing to kube-burner
 ### Requirements
