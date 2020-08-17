@@ -4,9 +4,9 @@
 
 # kube-burner
 
-Kube-burner is a tool aimed to stress a kubernetes cluster. A 1000 feet overview of its behaviour can be described with three simple steps:
+Kube-burner is a tool aimed to stress a kubernetes cluster. An overview of its behaviour can be summarized with these three steps:
 
-- Perform the actions declared in the jobs.
+- Create the objects declared in the jobs.
 - Collect desired on-cluster prometheus metrics.
 - Write and/or index them to the configured TSDB.
 
@@ -166,9 +166,8 @@ metrics:
 ```
 
 The indexed metrics have the following shape:
-
+> $ cat collected-metrics/kube-burner-job-node_memory_Committed_AS_bytes.json
 ```json
-$ cat collected-metrics/kube-burner-job-node_memory_Committed_AS_bytes.json
 [
   {
     "Timestamp": "2020-08-12T10:02:21.042+02:00",
@@ -258,7 +257,7 @@ All measurements support the esIndex option that describe the ES index where met
 - make
 
 ### Buiding
-To build kube-burner just execute `make build`, the built binary be at `./bin/kube-burner`
+To build kube-burner just execute `make build`, once finished `kube-burner`'s binary should be available at `./bin/kube-burner`
 
 ```console
 $ make build
