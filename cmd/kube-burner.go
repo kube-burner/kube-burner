@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/rsevilla87/kube-burner/pkg/indexers"
 	"github.com/rsevilla87/kube-burner/pkg/measurements"
 	"github.com/rsevilla87/kube-burner/pkg/prometheus"
+	"github.com/rsevilla87/kube-burner/pkg/util"
 
 	"github.com/spf13/cobra"
 )
@@ -68,19 +70,21 @@ func initCmd() *cobra.Command {
 }
 
 func destroyCmd() *cobra.Command {
-	var c string
+	var c, uuid string
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy old namespaces described in the config file",
 		Run: func(cmd *cobra.Command, args []string) {
-			executorList := burner.NewExecutorList(c)
-			for _, ex := range executorList {
-				ex.Cleanup()
-			}
+			selector := util.NewSelector()
+			burner.ReadConfig(c)
+			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
+			burner.CleanupNamespaces(burner.ClientSet, selector)
 		},
 	}
+	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
 	cmd.Flags().StringVarP(&c, "config", "c", "", "Config file path")
 	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
 
@@ -92,9 +96,6 @@ var rootCmd = &cobra.Command{
 	
 It not only provides some similar features as other tools like cluster-loader, but also
 adds other features subh as simplified simplified usage, metrics collection and indexing capabilities`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-
-	},
 }
 
 func Execute() {
@@ -128,7 +129,7 @@ func steps(uuid, config string, p *prometheus.Prometheus) {
 		measurements.Register(burner.Cfg.GlobalConfig.Measurements)
 		measurements.Start()
 		// Run execution
-		ex.Run()
+		ex.Run(uuid)
 		log.Infof("Job %s took %.2f seconds", ex.Config.Name, ex.End.Sub(ex.Start).Seconds())
 		if p != nil {
 			log.Info("🔍 Scraping prometheus metrics")

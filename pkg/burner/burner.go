@@ -52,6 +52,7 @@ type object struct {
 	inputVars    map[string]string
 }
 
+// Executor contains the information required to execute a job
 type Executor struct {
 	objects          []object
 	Start            time.Time
@@ -68,17 +69,28 @@ const (
 	jobName      = "JobName"
 	replica      = "Replica"
 	jobIteration = "Iteration"
+	uuid         = "UUID"
 )
 
 var Cfg config.ConfigSpec
 var ClientSet *kubernetes.Clientset
 var RestConfig *rest.Config
 
+// NewExecutorList Returns a list of executors
 func NewExecutorList(configFile string) []Executor {
-	var err error
 	var executorList []Executor
+	ReadConfig(configFile)
+	for _, job := range Cfg.Jobs {
+		ex := getExecutor(job)
+		executorList = append(executorList, ex)
+	}
+	return executorList
+}
+
+// ReadConfig Condfigures kube-burner with the given parameters
+func ReadConfig(configFile string) {
 	var kubeconfig string
-	err = config.Parse(configFile, &Cfg)
+	err := config.Parse(configFile, &Cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -91,42 +103,31 @@ func NewExecutorList(configFile string) []Executor {
 			kubeconfig = Cfg.GlobalConfig.Kubeconfig
 		}
 	}
-	RestConfig = getClientConfig(kubeconfig)
+	log.Info("Using kubeconfig ", kubeconfig)
+	RestConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		log.Fatalf("Error configuring kube-burner: %s", err)
+	}
 	ClientSet, err = kubernetes.NewForConfig(RestConfig)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error configuring kube-burner: %s", err)
 	}
-	dynamicInterface, err := dynamic.NewForConfig(RestConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, job := range Cfg.Jobs {
-		ex := getExecutor(job)
-		ex.dynamicInterface = dynamicInterface
-		ex.selector.Configure("", fmt.Sprintf("kube-burner=%s", job.Name), "")
-		executorList = append(executorList, ex)
-	}
-	return executorList
-}
-
-func getClientConfig(kubeconfig string) *rest.Config {
-	log.Info("Using kubeconfig ", kubeconfig)
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return config
 }
 
 func getExecutor(jobConfig config.Job) Executor {
 	var empty interface{}
 	limiter := rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.QPS)
 	selector := util.NewSelector()
+	dynamicInterface, err := dynamic.NewForConfig(RestConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 	selector.Configure("", fmt.Sprintf("kube-burner=%s", jobConfig.Name), "")
 	ex := Executor{
-		Config:   jobConfig,
-		selector: selector,
-		limiter:  limiter,
+		Config:           jobConfig,
+		selector:         selector,
+		limiter:          limiter,
+		dynamicInterface: dynamicInterface,
 	}
 	for _, o := range jobConfig.Objects {
 		if o.Replicas < 1 {
@@ -190,27 +191,27 @@ func findGVR(gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
 
 func (ex *Executor) Cleanup() {
 	if ex.Config.Cleanup {
-		if err := cleanupNamespaces(ClientSet, ex.selector); err != nil {
+		if err := CleanupNamespaces(ClientSet, ex.selector); err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-func (ex *Executor) Run() {
+func (ex *Executor) Run(uuid string) {
 	var podWG sync.WaitGroup
 	var wg sync.WaitGroup
 	ns := fmt.Sprintf("%s-1", ex.Config.Namespace)
 	ex.Start = time.Now().UTC()
 	// if ex.Config.Namespaced {
 	// }
-	createNamespaces(ClientSet, ex.Config)
+	createNamespaces(ClientSet, ex.Config, uuid)
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 		}
 		for _, obj := range ex.objects {
 			wg.Add(1)
-			go ex.replicaHandler(obj, ns, i, ex.limiter, &wg)
+			go ex.replicaHandler(obj, ns, i, ex.limiter, uuid, &wg)
 		}
 		if ex.Config.PodWait {
 			// If podWait is enabled, first wait for all replicaHandlers to finish
@@ -242,11 +243,12 @@ func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Objec
 	return o, gvr
 }
 
-func (ex *Executor) replicaHandler(obj object, ns string, iteration int, limiter *rate.Limiter, wg *sync.WaitGroup) {
+func (ex *Executor) replicaHandler(obj object, ns string, iteration int, limiter *rate.Limiter, uuid string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	tData := map[string]interface{}{
 		jobName:      ex.Config.Name,
 		jobIteration: iteration,
+		uuid:         uuid,
 	}
 	for k, v := range obj.inputVars {
 		tData[k] = v

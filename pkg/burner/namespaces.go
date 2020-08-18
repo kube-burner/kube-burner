@@ -28,8 +28,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func createNamespaces(clientset *kubernetes.Clientset, config config.Job) {
-	labels := map[string]string{"kube-burner": config.Name}
+func createNamespaces(clientset *kubernetes.Clientset, config config.Job, uuid string) {
+	labels := map[string]string{
+		"kube-burner":      config.Name,
+		"kube-burner-uuid": uuid,
+	}
 	for i := 1; i <= config.JobIterations; i++ {
 		ns := v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-%d", config.Namespace, i), Labels: labels},
@@ -46,7 +49,8 @@ func createNamespaces(clientset *kubernetes.Clientset, config config.Job) {
 	}
 }
 
-func cleanupNamespaces(clientset *kubernetes.Clientset, s *util.Selector) error {
+// CleanupNamespaces deletes namespaces with the given selector
+func CleanupNamespaces(clientset *kubernetes.Clientset, s *util.Selector) error {
 	log.Infof("Deleting namespaces with label %s", s.LabelSelector)
 	ns, _ := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: s.LabelSelector})
 	if len(ns.Items) > 0 {
