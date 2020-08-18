@@ -86,11 +86,3 @@ func waitForDeleteNamespaces(clientset *kubernetes.Clientset, s *util.Selector) 
 		time.Sleep(1 * time.Second)
 	}
 }
-
-func isDeleted(clientset *kubernetes.Clientset, name string) bool {
-	_, err := clientset.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		return true
-	}
-	return true
-}

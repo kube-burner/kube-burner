@@ -69,7 +69,7 @@ const (
 	jobName      = "JobName"
 	replica      = "Replica"
 	jobIteration = "Iteration"
-	uuid         = "UUID"
+	UUID         = "UUID"
 )
 
 var Cfg config.ConfigSpec
@@ -248,7 +248,7 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, limiter
 	tData := map[string]interface{}{
 		jobName:      ex.Config.Name,
 		jobIteration: iteration,
-		uuid:         uuid,
+		UUID:         uuid,
 	}
 	for k, v := range obj.inputVars {
 		tData[k] = v

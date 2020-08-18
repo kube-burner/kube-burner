@@ -29,5 +29,11 @@ $(BIN_DIR)/$(BIN_NAME): $(SOURCES)
 	@echo "GOPATH=${GOPATH}"
 	CGO_ENABLED=$(CGO) go build -ldflags "-X github.com/rsevilla87/kube-burner/version.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X github.com/rsevilla87/kube-burner/version.BuildDate=${BUILD_DATE}" -o $(BIN_DIR)/${BIN_NAME}
 
+lint:
+	./bin/golangci-lint run
+
 clean:
-	@test ! -e bin/${BIN_NAME} || rm $(BIN_DIR)/${BIN_NAME}
+	test ! -e bin/${BIN_NAME} || rm $(BIN_DIR)/${BIN_NAME}
+
+vendor:
+	go mod vendor

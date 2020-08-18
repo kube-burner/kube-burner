@@ -148,7 +148,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, 
 			log.Debugf("Writing to %s", filename)
 			f, err := os.Create(filename)
 			if err != nil {
-				log.Error("Error creating metrics file %s: %s", filename, err)
+				log.Errorf("Error creating metrics file %s: %s", filename, err)
 			}
 			jsonEnc := json.NewEncoder(f)
 			jsonEnc.SetIndent("", "  ")
