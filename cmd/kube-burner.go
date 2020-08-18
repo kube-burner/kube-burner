@@ -32,6 +32,21 @@ import (
 
 var binName = filepath.Base(os.Args[0])
 
+var completionCmd = &cobra.Command{
+	Use:   "completion",
+	Short: "Generates completion scripts for the specified bash shell",
+	Long: `To load completion run
+	. <(kube-burner completion)
+	To configure your bash shell to load completions for each session execute:
+
+	# kube-burner completion > /etc/bash_completion.d/kube-burner
+	`,
+	Args: cobra.MaximumNArgs(0),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return rootCmd.GenBashCompletion(os.Stdout)
+	},
+}
+
 func initCmd() *cobra.Command {
 	var c, url, metricsProfile string
 	var username, password, uuid, token string
@@ -39,8 +54,10 @@ func initCmd() *cobra.Command {
 	var prometheusStep time.Duration
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Launch test",
+		Short: "Launch benchmark",
+		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
+			log.Info("🔥 Starting kube-burner")
 			var p *prometheus.Prometheus
 			_, err := os.Stat(c)
 			if os.IsNotExist(err) {
@@ -64,6 +81,8 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yaml", "Metrics profile file")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
+	cmd.MarkFlagFilename(c)
+	cmd.MarkFlagFilename(metricsProfile)
 	cmd.MarkFlagRequired("config")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
@@ -73,7 +92,8 @@ func destroyCmd() *cobra.Command {
 	var c, uuid string
 	cmd := &cobra.Command{
 		Use:   "destroy",
-		Short: "Destroy old namespaces described in the config file",
+		Short: "Destroy old namespaces labeled with the given UUID.",
+		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			selector := util.NewSelector()
 			burner.ReadConfig(c)
@@ -103,8 +123,11 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.AddCommand(initCmd())
-	rootCmd.AddCommand(destroyCmd())
+	rootCmd.AddCommand(
+		initCmd(),
+		destroyCmd(),
+		completionCmd,
+	)
 	for _, c := range rootCmd.Commands() {
 		logLevel := c.Flags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 		c.PreRun = func(cmd *cobra.Command, args []string) {
@@ -112,7 +135,6 @@ func init() {
 			log.SetLogLevel(*logLevel)
 		}
 	}
-	log.Info("🔥 Starting kube-burner")
 	cobra.OnInitialize()
 }
 
