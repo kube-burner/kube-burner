@@ -29,9 +29,10 @@ Usage:
   kube-burner [command]
 
 Available Commands:
-  destroy     Destroy old namespaces described in the config file
+  completion  Generates completion scripts for the specified bash shell
+  destroy     Destroy old namespaces labeled with the given UUID.
   help        Help about any command
-  init        Launch test
+  init        Launch benchmark
   version     Print the version number of kube-burner
 
 Flags:
@@ -41,18 +42,17 @@ Use "kube-burner [command] --help" for more information about a command.
 
 ```
 
-The `init` option supports the following flags:
-
-- config: Path to a valid configuration file.
-- log-level: Logging level. Default `info`
-- prometheus-url Prometheus full URL. i.e. `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
-- metrics-profile: Path to a valid metrics profile file. Default `metrics.yaml`
-- token: Prometheus Bearer token.
-- username: Prometheus username for basic authentication.
-- password: Prometheus password for basic authentication.
-- skip-tls-verify: Skip TLS verification for prometheus. Default `true`
-- step: Prometheus step size. Default `30s`
-- UUID: Benchmark UUID.
+- The **init** option supports the following flags:
+  - config: Path to a valid configuration file.
+  - log-level: Logging level. Default `info`
+  - prometheus-url Prometheus full URL. i.e. `https://  prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
+  - metrics-profile: Path to a valid metrics profile file. Default `metrics.yaml`
+  - token: Prometheus Bearer token.
+  - username: Prometheus username for basic authentication.
+  - password: Prometheus password for basic authentication.
+  - skip-tls-verify: Skip TLS verification for prometheus. Default `true`
+  - step: Prometheus step size. Default `30s`
+  - UUID: Benchmark UUID.
 
 **Note**: Both basic authentication and Bearer authentication need credentials able to query given Prometheus API.
 
@@ -67,6 +67,12 @@ kube-burner can also be launched w/o any prometheus endpoint, so these metrics w
 ```console
 $ kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
+
+- The **destroy** option requires the above `config` and `UUID` flags to destroy all namespaces labeled with `kube-burner-uuid=<UUID>`.
+
+- The **completion** option generates bash a completion script that can be imported with:
+  - `. <(kube-burner completion)` 
+  - `kube-burner completion > /etc/bash_completion.d/kube-burner`
 
 ## Configuration
 
