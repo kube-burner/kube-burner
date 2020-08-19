@@ -1,6 +1,7 @@
-FROM registry.access.redhat.com/ubi8/go-toolset:latest as builder
+FROM registry.access.redhat.com/ubi8:latest as builder
 
 COPY . /root/kube-burner
+RUN dnf install -y golang make
 RUN make clean -C /root/kube-burner && make build -C /root/kube-burner
 
 FROM registry.access.redhat.com/ubi8:latest
