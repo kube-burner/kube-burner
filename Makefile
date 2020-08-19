@@ -8,9 +8,10 @@ CGO=0
 
 VERSION := $(shell grep "const Version " version/version.go | sed -E 's/.*"(.+)"$$/\1/')
 GIT_COMMIT = $(shell git rev-parse HEAD)
-GIT_DIRTY = $(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
+GIT_BRANCH = $(shell git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
+KUBE_BURNER_PACKAGE = github.com/rsevilla87/kube-burner
 
 all: build
 
@@ -27,7 +28,7 @@ build: $(BIN_DIR)/$(BIN_NAME)
 $(BIN_DIR)/$(BIN_NAME): $(SOURCES)
 	@echo "building ${BIN_NAME} ${VERSION}"
 	@echo "GOPATH=${GOPATH}"
-	CGO_ENABLED=$(CGO) go build -ldflags "-X github.com/rsevilla87/kube-burner/version.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X github.com/rsevilla87/kube-burner/version.BuildDate=${BUILD_DATE}" -o $(BIN_DIR)/${BIN_NAME}
+	CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X ${KUBE_BURNER_PACKAGE}/version.GitCommit=${GIT_COMMIT} -X ${KUBE_BURNER_PACKAGE}/version.BuildDate=${BUILD_DATE} -X ${KUBE_BURNER_PACKAGE}/version.GitBranch=${GIT_BRANCH}" -o $(BIN_DIR)/${BIN_NAME}
 
 lint:
 	./bin/golangci-lint run
