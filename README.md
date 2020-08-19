@@ -13,10 +13,27 @@ Kube-burner is a tool aimed to stress a kubernetes cluster. An overview of its b
 [![asciicast](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp.svg)](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp)
 
 
+## Quick start
+
+You can find the binaries at the [releases section](https://github.com/rsevilla87/kube-burner/releases).
+There's also a container image available at `quay.io/rsevilla/kube-burner:latest`.
+A valid example of a configuration file can be found at [./examples/cfg.yml](./examples/cfg.yml)
+
+
+## Buiding
+
+To build kube-burner just execute `make build`, once finished `kube-burner`'s binary should be available at `./bin/kube-burner`
+
+```console
+$ make build
+building kube-burner 0.1.0
+GOPATH=/home/rsevilla/go
+CGO_ENABLED=0 go build -v -mod vendor -ldflags "-X github.com/rsevilla87/kube-burner/version.GitCommit=d91c8cc35cb458a4b80a5050704a51c7c6e35076 -X github.com/rsevilla87/kube-burner/version.BuildDate=2020-08-19-19:10:09 -X github.com/rsevilla87/kube-burner/version.GitBranch=master" -o bin/kube-burner
+```
+
 ## Getting started
 
-kube-burner is basically a binary client with currently the following options. You can find the binaries at the [releases section](https://github.com/rsevilla87/kube-burner/releases).
-There's also a container image available at `quay.io/rsevilla/kube-burner:latest`.
+kube-burner is basically a binary client with currently the following options.
 
 ```console
 ./bin/kube-burner help
@@ -263,14 +280,3 @@ All measurements support the esIndex option that describe the ES index where met
 
 - `golang >= 1.13`
 - `make`
-
-### Buiding
-To build kube-burner just execute `make build`, once finished `kube-burner`'s binary should be available at `./bin/kube-burner`
-
-```console
-$ make build
-building kube-burner 0.1.0
-GOPATH=/home/rsevilla/go
-CGO_ENABLED=0 go build -ldflags "-X github.com/rsevilla87/kube-burner/version.GitCommit=c72f562ca948bb3cda45a9d510214db0feb0e70b+CHANGES -X github.com/rsevilla87/kube-burner/version.BuildDate=2020-08-11-14:01:52" -o bin/kube-burner
-```
-

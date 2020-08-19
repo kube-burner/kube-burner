@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/go-toolset:lates:latestt as builder
+FROM registry.access.redhat.com/ubi8/go-toolset:latest as builder
 
 COPY . /root/kube-burner
 RUN make clean -C /root/kube-burner && make build -C /root/kube-burner
