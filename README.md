@@ -106,7 +106,7 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | measurements     | List of measurements. Detailed in the [measurements section](#Measurements)                                   | List    | -              | []          |
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section](#Indexers)                                | Object  | -              | -           |
 
-* jobs: This section contains a list of jobs that `kube-burner` wil execute. Each job can hold the following parameters.
+* jobs: This section contains a list of jobs that `kube-burner` will execute. Each job can hold the following parameters.
 
 | Option               | Description                                                                      | Type    | Example  | Default |
 |----------------------|----------------------------------------------------------------------------------|---------|----------|---------|
@@ -119,7 +119,9 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | jobIterationDelay    | How many milliseconds to wait between each job iteration                         | Integer | 2000     | false   |
 | jobPause             | How many milliseconds to pause after finishing the job                           | Integer | 10000    | -       |
 | qps                  | Limit object creation queries per second.                                        | Integer | 25       | 0       |
+| burst                | Maximum burst for throttle                                                       | Integer | 50       | 0       |
 | objects              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | -        | []      |
+
 
 A valid example of a configuration file can be found at [./examples/cfg.yml](./examples/cfg.yml)
 

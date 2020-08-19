@@ -60,8 +60,8 @@ type Executor struct {
 	Elapsed          time.Time
 	Config           config.Job
 	selector         *util.Selector
+	uuid             string
 	limiter          *rate.Limiter
-	ClientSet        *kubernetes.Clientset
 	dynamicInterface dynamic.Interface
 }
 
@@ -77,11 +77,12 @@ var ClientSet *kubernetes.Clientset
 var RestConfig *rest.Config
 
 // NewExecutorList Returns a list of executors
-func NewExecutorList(configFile string) []Executor {
+func NewExecutorList(configFile, uuid string) []Executor {
 	var executorList []Executor
 	ReadConfig(configFile)
 	for _, job := range Cfg.Jobs {
 		ex := getExecutor(job)
+		ex.uuid = uuid
 		executorList = append(executorList, ex)
 	}
 	return executorList
@@ -116,8 +117,11 @@ func ReadConfig(configFile string) {
 
 func getExecutor(jobConfig config.Job) Executor {
 	var empty interface{}
+	// Limits the number of workers to QPS
 	limiter := rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.QPS)
 	selector := util.NewSelector()
+	RestConfig.QPS = float32(jobConfig.QPS)
+	RestConfig.Burst = jobConfig.Burst
 	dynamicInterface, err := dynamic.NewForConfig(RestConfig)
 	if err != nil {
 		log.Fatal(err)
@@ -131,7 +135,7 @@ func getExecutor(jobConfig config.Job) Executor {
 	}
 	for _, o := range jobConfig.Objects {
 		if o.Replicas < 1 {
-			log.Warnf("Object template %s has replicas < 1, skipping", o.ObjectTemplate, o.Replicas)
+			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
 		}
 		log.Debugf("Processing template: %s", o.ObjectTemplate)
@@ -147,7 +151,7 @@ func getExecutor(jobConfig config.Job) Executor {
 		uns := &unstructured.Unstructured{}
 		renderedObj := renderTemplate(t, empty)
 		_, gvk := yamlToUnstructured(renderedObj, uns)
-		restMapping, err := findGVR(gvk)
+		restMapping, err := getGVR(*RestConfig, gvk)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -179,9 +183,11 @@ func getExecutor(jobConfig config.Job) Executor {
 }
 
 // find the corresponding GVR (available in *meta.RESTMapping) for gvk
-func findGVR(gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
+func getGVR(restConfig rest.Config, gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
+	// see https://github.com/kubernetes/kubernetes/issues/86149
+	restConfig.Burst = 0
 	// DiscoveryClient queries API server about the resources
-	dc, err := discovery.NewDiscoveryClientForConfig(RestConfig)
+	dc, err := discovery.NewDiscoveryClientForConfig(&restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -189,6 +195,7 @@ func findGVR(gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
 	return mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 }
 
+// Cleanup deletes old namespaces from a given job
 func (ex *Executor) Cleanup() {
 	if ex.Config.Cleanup {
 		if err := CleanupNamespaces(ClientSet, ex.selector); err != nil {
@@ -197,21 +204,22 @@ func (ex *Executor) Cleanup() {
 	}
 }
 
-func (ex *Executor) Run(uuid string) {
+// Run executes the job with the given UUID
+func (ex *Executor) Run() {
 	var podWG sync.WaitGroup
 	var wg sync.WaitGroup
 	ns := fmt.Sprintf("%s-1", ex.Config.Namespace)
 	ex.Start = time.Now().UTC()
 	// if ex.Config.Namespaced {
 	// }
-	createNamespaces(ClientSet, ex.Config, uuid)
+	createNamespaces(ClientSet, ex.Config, ex.uuid)
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 		}
 		for _, obj := range ex.objects {
 			wg.Add(1)
-			go ex.replicaHandler(obj, ns, i, ex.limiter, uuid, &wg)
+			go ex.replicaHandler(obj, ns, i, &wg)
 		}
 		if ex.Config.PodWait {
 			// If podWait is enabled, first wait for all replicaHandlers to finish
@@ -243,12 +251,12 @@ func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Objec
 	return o, gvr
 }
 
-func (ex *Executor) replicaHandler(obj object, ns string, iteration int, limiter *rate.Limiter, uuid string, wg *sync.WaitGroup) {
+func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	tData := map[string]interface{}{
 		jobName:      ex.Config.Name,
 		jobIteration: iteration,
-		UUID:         uuid,
+		UUID:         ex.uuid,
 	}
 	for k, v := range obj.inputVars {
 		tData[k] = v
@@ -263,7 +271,7 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, limiter
 			// We are using the same wait group in this inner gorouting, maybe we should start using a new one
 			defer wg.Done()
 			wg.Add(1)
-			limiter.Wait(context.TODO())
+			ex.limiter.Wait(context.TODO())
 			log.Infof("Creating %s %s on %s", newObject.GetKind(), newObject.GetName(), ns)
 			_, err := ex.dynamicInterface.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
 			if err != nil {

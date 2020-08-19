@@ -83,6 +83,8 @@ type Job struct {
 	Objects []Object `yaml:"objects"`
 	// Max number of queries per second
 	QPS int `yaml:"qps"`
+	// Maximum burst for throttle
+	Burst int `yaml:"burst"`
 }
 
 func Parse(c string, cfg *ConfigSpec) error {

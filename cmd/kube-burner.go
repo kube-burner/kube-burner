@@ -140,30 +140,30 @@ func init() {
 
 func steps(uuid, config string, p *prometheus.Prometheus) {
 	var indexer *indexers.Indexer
-	executorList := burner.NewExecutorList(config)
+	executorList := burner.NewExecutorList(config, uuid)
 	if burner.Cfg.GlobalConfig.IndexerConfig.Enabled {
 		indexer = indexers.NewIndexer(burner.Cfg.GlobalConfig.IndexerConfig)
 	}
-	for _, ex := range executorList {
-		log.Infof("Triggering job: %s with UUID %s", ex.Config.Name, uuid)
-		ex.Cleanup()
-		measurements.NewMeasurementFactory(burner.ClientSet, burner.Cfg.GlobalConfig, ex.Config, uuid, indexer)
+	for _, job := range executorList {
+		log.Infof("Triggering job: %s with UUID %s", job.Config.Name, uuid)
+		job.Cleanup()
+		measurements.NewMeasurementFactory(burner.ClientSet, burner.Cfg.GlobalConfig, job.Config, uuid, indexer)
 		measurements.Register(burner.Cfg.GlobalConfig.Measurements)
 		measurements.Start()
 		// Run execution
-		ex.Run(uuid)
-		log.Infof("Job %s took %.2f seconds", ex.Config.Name, ex.End.Sub(ex.Start).Seconds())
+		job.Run()
+		log.Infof("Job %s took %.2f seconds", job.Config.Name, job.End.Sub(job.Start).Seconds())
 		if p != nil {
 			log.Info("🔍 Scraping prometheus metrics")
-			if err := p.ScrapeMetrics(ex.Start, ex.End, burner.Cfg, ex.Config.Name, indexer); err != nil {
+			if err := p.ScrapeMetrics(job.Start, job.End, burner.Cfg, job.Config.Name, indexer); err != nil {
 				log.Error(err)
 			}
 		}
 		measurements.Stop()
 		measurements.Index()
-		if ex.Config.JobPause > 0 {
-			log.Infof("Pausing for %d milliseconds before next job", ex.Config.JobPause)
-			time.Sleep(time.Millisecond * time.Duration(ex.Config.JobPause))
+		if job.Config.JobPause > 0 {
+			log.Infof("Pausing for %d milliseconds before next job", job.Config.JobPause)
+			time.Sleep(time.Millisecond * time.Duration(job.Config.JobPause))
 		}
 	}
 }

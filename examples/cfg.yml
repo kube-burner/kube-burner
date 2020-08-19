@@ -17,7 +17,8 @@ global:
 jobs:
   - name: kube-burner-job
     jobIterations: 5
-    qps: 10
+    qps: 20
+    burst: 40
     namespacedIterations: true
     cleanup: true
     namespace: kube-burner-job-ns
@@ -39,7 +40,8 @@ jobs:
   
   - name: second-job
     jobIterations: 5
-    qps: 20
+    qps: 10
+    burst: 20
     namespacedIterations: true
     jobPause: 0
     cleanup: true
@@ -48,5 +50,5 @@ jobs:
     jobIterationDelay: 0
     objects:
 
-      - objectTemplate: objectTemplates/deployment.yml
+      - objectTemplate: objectTemplates/deployment2.yml
         replicas: 5
