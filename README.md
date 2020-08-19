@@ -15,7 +15,8 @@ Kube-burner is a tool aimed to stress a kubernetes cluster. An overview of its b
 
 ## Getting started
 
-kube-burner is basically a binary client with currently the following options.
+kube-burner is basically a binary client with currently the following options. You can find the binaries at the [releases section](https://github.com/rsevilla87/kube-burner/releases).
+There's also a container image available at `quay.io/rsevilla/kube-burner:latest`.
 
 ```console
 ./bin/kube-burner help
