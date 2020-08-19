@@ -114,8 +114,8 @@ var rootCmd = &cobra.Command{
 	Short: "Stress a kubernetes cluster",
 	Long: `kube-burner is a tool that aims to stress a kubernetes cluster.
 	
-It not only provides some similar features as other tools like cluster-loader, but also
-adds other features subh as simplified simplified usage, metrics collection and indexing capabilities`,
+It doesn’t only provide some similar features as other tools like cluster-loader, but also
+adds other features such as a simplified simplified usage, metrics collection and indexing capabilities`,
 }
 
 func Execute() {

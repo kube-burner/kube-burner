@@ -22,8 +22,8 @@ kube-burner is basically a binary client with currently the following options.
 INFO[2020-08-11 12:37:30] 🔥 Starting kube-burner                       
 kube-burner is a tool that aims to stress a kubernetes cluster.
 
-It not only provides some similar features as other tools like cluster-loader, but also
-adds other features subh as simplified simplified usage, metrics collection and indexing capabilities
+It doesn’t only provide similar features as other tools like cluster-loader, but also
+adds other features such as simplified simplified usage, metrics collection and indexing capabilities
 
 Usage:
   kube-burner [command]
@@ -123,8 +123,8 @@ Object templates are injected a series of variables by default:
 
 - Iteration: Job iteration number.
 - Replica: Object replica number. Keep in mind that this number is reset to 1 with each job iteration.
-- JobName: Job name
-
+- JobName: Job name.
+- UUID: Benchmark UUID.
 
 In addition, you can also inject your own custom variables with the option inputVars from the objectTemplate object:
 
@@ -212,7 +212,7 @@ The indexed metrics have the following shape:
 
 ## Indexers
 
-`kube-burner` is able to index the collected metrics into a given Indexer. 
+`kube-burner` is able to **index the collected prometheus metrics** into a given Indexer. 
 The indexer configuration is described in the `indexerConfig` section and can be configured with the following parameters:
 
 
@@ -224,20 +224,20 @@ The indexer configuration is described in the `indexerConfig` section and can be
 
 The following indexers are currently supported:
 
-- Elasticsearch 7
+- `elastic`: Index documents in Elasticsearch 7 instances.
 
 In addition, each indexer has its own configuration parameters.
 
-### Elasticsearch
+----
 
-The `Elasticsearch 7` indexer supports the following options:
+The `elastic` indexer is configured by the parameters below:
 
 | Option               | Description                                    | Type        | Example                                  | Default |
 |----------------------|------------------------------------------------|-------------|------------------------------------------|---------|
 | esServers            | List of ES instances                           | List        | [https://elastic.apps.rsevilla.org:9200] | ""      |
 | index                | Index name to send the prometheus metrics into | String      | kube-burner                              | ""      | 
-| username             | Elasticsearch username                         | String      | 10                                       | ""      |
-| password             | Elasticsearch password                         | String      | -                                        | ""      |
+| username             | Elasticsearch username                         | String      | user                                     | ""      |
+| password             | Elasticsearch password                         | String      | secret                                   | ""      |
 | insecureSkipVerify   | TLS certificate verification                   | Boolean     | true                                     | false   |
 
 
@@ -260,8 +260,8 @@ All measurements support the esIndex option that describe the ES index where met
 ## Contributing to kube-burner
 ### Requirements
 
-- golang >= 1.13
-- make
+- `golang >= 1.13`
+- `make`
 
 ### Buiding
 To build kube-burner just execute `make build`, once finished `kube-burner`'s binary should be available at `./bin/kube-burner`
