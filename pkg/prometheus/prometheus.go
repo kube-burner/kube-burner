@@ -60,6 +60,7 @@ type metric struct {
 	Labels    map[string]string
 	UUID      string `json:"uuid"`
 	JobName   string `json:"jobName"`
+	Query     string `json:"query`
 }
 
 func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -106,7 +107,7 @@ func NewPrometheusClient(url, token, username, password, metricsProfile, uuid st
 func (p *Prometheus) verifyConnection() error {
 	_, err := p.api.Config(context.TODO())
 	if err != nil {
-		return err
+		return prometheusError(err)
 	}
 	log.Debug("Prometheus endpoint verified")
 	return nil
@@ -119,11 +120,12 @@ func (p *Prometheus) readProfile(metricsFile string) error {
 	}
 	yamlDec := yaml.NewDecoder(f)
 	if err = yamlDec.Decode(&p.metricsProfile); err != nil {
-		return err
+		return fmt.Errorf("Error decoding metrics profile %s: %s", metricsFile, err)
 	}
 	return nil
 }
 
+// ScrapeMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, jobName string, indexer *indexers.Indexer) error {
 	r := apiv1.Range{Start: start, End: end, Step: p.step}
 	metrics := []metric{}
@@ -133,7 +135,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, 
 		if err != nil {
 			return prometheusError(err)
 		}
-		if err := p.parseResponse(jobName, v, &metrics); err != nil {
+		if err := p.parseResponse(query, jobName, v, &metrics); err != nil {
 			return err
 		}
 		if cfg.GlobalConfig.WriteToFile {
@@ -145,7 +147,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, 
 				}
 				filename = path.Join(cfg.GlobalConfig.MetricsDirectory, filename)
 			}
-			log.Debugf("Writing to %s", filename)
+			log.Debugf("Writing to: %s", filename)
 			f, err := os.Create(filename)
 			if err != nil {
 				log.Errorf("Error creating metrics file %s: %s", filename, err)
@@ -169,7 +171,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, 
 	return nil
 }
 
-func (p *Prometheus) parseResponse(jobName string, value model.Value, metrics *[]metric) error {
+func (p *Prometheus) parseResponse(query, jobName string, value model.Value, metrics *[]metric) error {
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
@@ -180,6 +182,7 @@ func (p *Prometheus) parseResponse(jobName string, value model.Value, metrics *[
 				Labels:  make(map[string]string),
 				UUID:    p.uuid,
 				JobName: jobName,
+				Query:   query,
 			}
 			for k, v := range v.Metric {
 				m.Labels[string(k)] = string(v)
