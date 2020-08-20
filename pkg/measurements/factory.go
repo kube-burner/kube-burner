@@ -25,12 +25,12 @@ type measurementFactory struct {
 	globalConfig config.GlobalConfig
 	config       config.Job
 	clientSet    *kubernetes.Clientset
-	createFuncs  map[string]Measurement
+	createFuncs  map[string]measurement
 	indexer      *indexers.Indexer
 	uuid         string
 }
 
-type Measurement interface {
+type measurement interface {
 	Start(measurementFactory)
 	SetMetadata(string)
 	Index()
@@ -40,7 +40,7 @@ type Measurement interface {
 }
 
 var factory measurementFactory
-var measurementMap = make(map[string]Measurement)
+var measurementMap = make(map[string]measurement)
 
 // NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(clientSet *kubernetes.Clientset, globalConfig config.GlobalConfig, config config.Job, uuid string, indexer *indexers.Indexer) {
@@ -49,13 +49,13 @@ func NewMeasurementFactory(clientSet *kubernetes.Clientset, globalConfig config.
 		globalConfig: globalConfig,
 		config:       config,
 		clientSet:    clientSet,
-		createFuncs:  make(map[string]Measurement),
+		createFuncs:  make(map[string]measurement),
 		indexer:      indexer,
 		uuid:         uuid,
 	}
 }
 
-func (mf *measurementFactory) register(methodName string, indexName string, measurementFunc Measurement) {
+func (mf *measurementFactory) register(methodName string, indexName string, measurementFunc measurement) {
 	if _, exists := mf.createFuncs[methodName]; exists {
 		log.Warnf("Measurement already registered: %s", methodName)
 	} else {
