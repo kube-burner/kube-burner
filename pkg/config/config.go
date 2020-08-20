@@ -15,10 +15,10 @@
 package config
 
 import (
-	"io/ioutil"
+	"fmt"
 	"os"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type ConfigSpec struct {
@@ -30,7 +30,7 @@ type IndexerConfig struct {
 	Enabled            bool     `yaml:"enabled"`
 	Type               string   `yaml:"type"`
 	ESServers          []string `yaml:"esServers"`
-	Index              string   `yaml:"index"`
+	DefaultIndex       string   `yaml:"defaultIndex"`
 	Port               int      `yaml:"port"`
 	Username           string   `yaml:"username"`
 	Password           string   `yaml:"password"`
@@ -92,12 +92,10 @@ func Parse(c string, cfg *ConfigSpec) error {
 	if err != nil {
 		return err
 	}
-	rawCfg, err := ioutil.ReadAll(f)
-	if err != nil {
-		return err
-	}
-	if err := yaml.UnmarshalStrict(rawCfg, cfg); err != nil {
-		return err
+	yamlDec := yaml.NewDecoder(f)
+	yamlDec.KnownFields(true)
+	if err = yamlDec.Decode(cfg); err != nil {
+		return fmt.Errorf("Error decoding configuration file %s: %s", c, err)
 	}
 	return nil
 }

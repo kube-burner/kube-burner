@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	api "github.com/prometheus/client_golang/api"
@@ -33,8 +34,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Prometheus describes the prometheus connection
 type Prometheus struct {
-	status         chan string
 	api            apiv1.API
 	metricsProfile MetricsProfile
 	step           time.Duration
@@ -50,8 +51,14 @@ type authTransport struct {
 	password  string
 }
 
+type metricDefinition struct {
+	Query     string `yaml:"query"`
+	IndexName string `yaml:"indexName"`
+}
+
+// MetricProfile describes what metrics kube-burner collects
 type MetricsProfile struct {
-	Metrics []string
+	Metrics []metricDefinition `yaml:"metrics"`
 }
 
 type metric struct {
@@ -60,7 +67,7 @@ type metric struct {
 	Labels    map[string]string
 	UUID      string `json:"uuid"`
 	JobName   string `json:"jobName"`
-	Query     string `json:"query`
+	Query     string `json:"query"`
 }
 
 func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -116,9 +123,10 @@ func (p *Prometheus) verifyConnection() error {
 func (p *Prometheus) readProfile(metricsFile string) error {
 	f, err := os.Open(metricsFile)
 	if err != nil {
-		os.Exit(1)
+		log.Fatalf("Error reading metrics profile %s: %s", metricsFile, err)
 	}
 	yamlDec := yaml.NewDecoder(f)
+	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&p.metricsProfile); err != nil {
 		return fmt.Errorf("Error decoding metrics profile %s: %s", metricsFile, err)
 	}
@@ -129,17 +137,17 @@ func (p *Prometheus) readProfile(metricsFile string) error {
 func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, jobName string, indexer *indexers.Indexer) error {
 	r := apiv1.Range{Start: start, End: end, Step: p.step}
 	metrics := []metric{}
-	for _, query := range p.metricsProfile.Metrics {
-		log.Infof("Quering %s", query)
-		v, _, err := p.api.QueryRange(context.TODO(), query, r)
+	for _, md := range p.metricsProfile.Metrics {
+		log.Infof("Quering %s", md.Query)
+		v, _, err := p.api.QueryRange(context.TODO(), md.Query, r)
 		if err != nil {
 			return prometheusError(err)
 		}
-		if err := p.parseResponse(query, jobName, v, &metrics); err != nil {
+		if err := p.parseResponse(md.Query, jobName, v, &metrics); err != nil {
 			return err
 		}
 		if cfg.GlobalConfig.WriteToFile {
-			filename := fmt.Sprintf("%s-%s.json", jobName, query)
+			filename := fmt.Sprintf("%s-%s.json", jobName, md.Query)
 			if cfg.GlobalConfig.MetricsDirectory != "" {
 				err := os.MkdirAll(cfg.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
@@ -160,13 +168,17 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, 
 			}
 			f.Close()
 		}
-	}
-	promMetrics := make([]interface{}, len(metrics))
-	for _, metric := range metrics {
-		promMetrics = append(promMetrics, metric)
-	}
-	if cfg.GlobalConfig.IndexerConfig.Enabled {
-		(*indexer).Index(cfg.GlobalConfig.IndexerConfig.Index, promMetrics)
+		if cfg.GlobalConfig.IndexerConfig.Enabled {
+			indexName := cfg.GlobalConfig.IndexerConfig.DefaultIndex
+			if md.IndexName != "" {
+				indexName = strings.ToLower(md.IndexName)
+			}
+			promMetrics := make([]interface{}, len(metrics))
+			for _, metric := range metrics {
+				promMetrics = append(promMetrics, metric)
+			}
+			(*indexer).Index(indexName, promMetrics)
+		}
 	}
 	return nil
 }

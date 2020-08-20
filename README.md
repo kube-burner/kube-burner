@@ -47,7 +47,7 @@ Usage:
   kube-burner [command]
 
 Available Commands:
-  completion  Generates completion scripts for the specified bash shell
+  completion  Generates completion scripts for bash shell
   destroy     Destroy old namespaces labeled with the given UUID.
   help        Help about any command
   init        Launch benchmark
@@ -180,20 +180,24 @@ spec:
 
 ## Metrics profile
 
-The metrics-profile flag points to a valid YAML file containing a list of the prometheus metrics we want to collect.
-When `kube-burner` finishes each job it queries the metrics for the range of time the job lasted and the given step size.
+The metrics-profile flag points to a YAML file containing a list of the prometheus queries kube-burner will collect for each job.
+As soon one of job finishes, `kube-burner` makes a range query for each query described in this file, and indexes it in the index configured by the parameter `defaultIndex`.
+We can use the parameter `indexName` in a metrics-profile file to make `kube-burner` to index the resulting metrics to a different index.
 An example of a valid metrics profile file is shown below:
 
 ```yaml
 metrics:
-  - node_memory_Committed_AS_bytes
-  - node_memory_MemAvailable_bytes
-  - node_memory_MemFree_bytes
-  - node_memory_MemTotal_bytes
-  - node_cpu_seconds_total
+  - query: node_memory_Committed_AS_bytes
+    indexName: node_memory_Committed_AS_bytes
+  - query: node_memory_MemAvailable_bytes
+    indexName: my-custom-index
+  - query: node_memory_Active_bytes
+  - query: node_memory_MemFree_bytes
+  - query: node_cpu_seconds_total
+  - query: sum(kube_pod_info)
 ```
 
-The indexed metrics have the following shape:
+Indexed metrics look like:
 > $ cat collected-metrics/kube-burner-job-node_memory_Committed_AS_bytes.json
 ```json
 [
@@ -210,7 +214,8 @@ The indexed metrics have the following shape:
       "service": "node-exporter"
     },
     "uuid": "60e952c0-4d23-4266-bbf0-fc11cfe1afaa",
-    "jobName": "kube-burner-job1"
+    "jobName": "kube-burner-job1",
+    "query": "node_memory_Committed_AS_bytes",
   },
   {
     "Timestamp": "2020-08-12T10:02:51.042+02:00",
@@ -225,7 +230,8 @@ The indexed metrics have the following shape:
       "service": "node-exporter"
     },
     "uuid": "60e952c0-4d23-4266-bbf0-fc11cfe1afaa",
-    "jobName": "kube-burner-job1"
+    "jobName": "kube-burner-job1",
+    "query": "node_memory_Committed_AS_bytes"
   }
 ]
 ```
@@ -253,13 +259,13 @@ In addition, each indexer has its own configuration parameters.
 
 The `elastic` indexer is configured by the parameters below:
 
-| Option               | Description                                    | Type        | Example                                  | Default |
-|----------------------|------------------------------------------------|-------------|------------------------------------------|---------|
-| esServers            | List of ES instances                           | List        | [https://elastic.apps.rsevilla.org:9200] | ""      |
-| index                | Index name to send the prometheus metrics into | String      | kube-burner                              | ""      | 
-| username             | Elasticsearch username                         | String      | user                                     | ""      |
-| password             | Elasticsearch password                         | String      | secret                                   | ""      |
-| insecureSkipVerify   | TLS certificate verification                   | Boolean     | true                                     | false   |
+| Option               | Description                                       | Type        | Example                                  | Default |
+|----------------------|---------------------------------------------------|-------------|------------------------------------------|---------|
+| esServers            | List of ES instances                              | List        | [https://elastic.apps.rsevilla.org:9200] | ""      |
+| defaultIndex         | Default index to send the prometheus metrics into | String      | kube-burner                              | ""      | 
+| username             | Elasticsearch username                            | String      | user                                     | ""      |
+| password             | Elasticsearch password                            | String      | secret                                   | ""      |
+| insecureSkipVerify   | TLS certificate verification                      | Boolean     | true                                     | false   |
 
 
 ## Measurements

@@ -10,8 +10,8 @@ global:
   indexerConfig:
     enabled: true
     esServers: [https://es-instance.example.org:9200]
-    insecureSkipVerify: false
-    index: kube-burner
+    insecureSkipVerify: true
+    defaultIndex: kube-burner
     type: elastic
 
 jobs:

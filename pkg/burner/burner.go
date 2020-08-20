@@ -57,7 +57,6 @@ type Executor struct {
 	objects          []object
 	Start            time.Time
 	End              time.Time
-	Elapsed          time.Time
 	Config           config.Job
 	selector         *util.Selector
 	uuid             string
@@ -268,7 +267,7 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 		// Re-decode rendered object
 		yamlToUnstructured(renderedObj, newObject)
 		go func(r int) {
-			// We are using the same wait group in this inner gorouting, maybe we should start using a new one
+			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
 			defer wg.Done()
 			wg.Add(1)
 			ex.limiter.Wait(context.TODO())

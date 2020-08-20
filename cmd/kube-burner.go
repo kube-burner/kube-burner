@@ -34,7 +34,7 @@ var binName = filepath.Base(os.Args[0])
 
 var completionCmd = &cobra.Command{
 	Use:   "completion",
-	Short: "Generates completion scripts for the specified bash shell",
+	Short: "Generates completion scripts for bash shell",
 	Long: `To load completion run
 	. <(kube-burner completion)
 	To configure your bash shell to load completions for each session execute:
@@ -98,7 +98,9 @@ func destroyCmd() *cobra.Command {
 			selector := util.NewSelector()
 			burner.ReadConfig(c)
 			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
-			burner.CleanupNamespaces(burner.ClientSet, selector)
+			if err := burner.CleanupNamespaces(burner.ClientSet, selector); err != nil {
+				log.Fatal(err)
+			}
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")

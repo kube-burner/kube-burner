@@ -103,6 +103,7 @@ func (p *podLatency) SetMetadata(indexName string) {
 	p.indexName = indexName
 }
 
+// Index sends metrics to the configured indexer
 func (p *podLatency) Index() {
 	podMetricsinterface := make([]interface{}, len(podMetrics))
 	for _, metric := range podMetrics {
@@ -139,7 +140,7 @@ func (p *podLatency) writeToFile() error {
 	return nil
 }
 
-// StartAndSync starts informer and waits for it to be synced.
+// startAndSync starts informer and waits for it to be synced.
 func (p *podLatency) startAndSync() error {
 	go p.informer.Run(p.stopChannel)
 	timeoutCh := make(chan struct{})
@@ -153,6 +154,7 @@ func (p *podLatency) startAndSync() error {
 	return nil
 }
 
+// Stop stops podLatency measurement
 func (p *podLatency) Stop() error {
 	defer close(p.stopChannel)
 	timeoutCh := make(chan struct{})
