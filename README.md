@@ -127,7 +127,7 @@ A valid example of a configuration file can be found at [./examples/cfg.yml](./e
 
 ### Objects
 
-The Objects created by `kube-burner` are rendered using the out of the box golang's [template library](https://golang.org/pkg/text/template/)
+The objects created by `kube-burner` are rendered using the default golang's [template library](https://golang.org/pkg/text/template/).
 Each object element supports the following parameters:
 
 | Option               | Description                                                       | Type    | Example        | Default |
@@ -139,7 +139,8 @@ Each object element supports the following parameters:
 ----
 
 ## Injected variables
-Object templates are injected a series of variables by default:
+
+All object templates are injected a series of variables by default:
 
 - Iteration: Job iteration number.
 - Replica: Object replica number. Keep in mind that this number is reset to 1 with each job iteration.

@@ -42,6 +42,7 @@ type Measurement interface {
 var factory measurementFactory
 var measurementMap = make(map[string]Measurement)
 
+// NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(clientSet *kubernetes.Clientset, globalConfig config.GlobalConfig, config config.Job, uuid string, indexer *indexers.Indexer) {
 	log.Info("📈 Creating measurement factory")
 	factory = measurementFactory{
@@ -64,6 +65,7 @@ func (mf *measurementFactory) register(methodName string, indexName string, meas
 	}
 }
 
+// Register registers the given list of measurements
 func Register(measurementList []config.Measurements) {
 	for _, measurement := range measurementList {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
@@ -74,6 +76,7 @@ func Register(measurementList []config.Measurements) {
 	}
 }
 
+// Start starts registered measurements
 func Start() {
 	factory.start()
 }
@@ -85,6 +88,7 @@ func (mf *measurementFactory) start() {
 	}
 }
 
+// Stop stops registered measurements
 func Stop() {
 	for name, measurement := range factory.createFuncs {
 		if err := measurement.Stop(); err != nil {
@@ -104,6 +108,7 @@ func (mf *measurementFactory) index() {
 	}
 }
 
+// Index index measurements metrics
 func Index() {
 	if factory.globalConfig.IndexerConfig.Enabled {
 		factory.index()

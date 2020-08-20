@@ -6,7 +6,7 @@ metadata:
     name: my-svc-{{ .Iteration }}-{{ .Replica }}
 spec:
   selector:
-    app: sleep-app-{{ .Iteration }}-{{ .Replica }}
+    app: sleep-app-{{ .Iteration }}-1
   ports:
   - name: serviceport
     protocol: TCP

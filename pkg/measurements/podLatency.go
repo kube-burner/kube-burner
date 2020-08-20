@@ -47,7 +47,6 @@ const (
 type podLatency struct {
 	indexName   string
 	uuid        string
-	factory     measurementFactory
 	informer    cache.SharedInformer
 	stopChannel chan struct{}
 }
@@ -82,9 +81,9 @@ func (p *podLatency) updatePod(obj interface{}) {
 
 var ready = make(chan bool)
 
+// Start starts podLatency measurement
 func (p *podLatency) Start(factory measurementFactory) {
 	podMetrics = []podMetric{}
-	p.factory = factory
 	log.Infof("Creating Pod latency informer for %s", factory.config.Name)
 	podListWatcher := cache.NewFilteredListWatchFromClient(factory.clientSet.CoreV1().RESTClient(), "pods", v1.NamespaceAll, func(options *metav1.ListOptions) {})
 	p.informer = cache.NewSharedInformer(podListWatcher, nil, 0)
@@ -110,20 +109,21 @@ func (p *podLatency) Index() {
 		metric.UUID = p.uuid
 		podMetricsinterface = append(podMetricsinterface, metric)
 	}
-	(*p.factory.indexer).Index(p.indexName, podMetricsinterface)
+	(*factory.indexer).Index(p.indexName, podMetricsinterface)
 }
+
 func (p *podLatency) waitForReady() {
 	<-ready
 }
 
 func (p *podLatency) writeToFile() error {
 	filename := fmt.Sprintf("%s-podLatency.json", factory.config.Name)
-	if p.factory.globalConfig.MetricsDirectory != "" {
-		err := os.MkdirAll(p.factory.globalConfig.MetricsDirectory, 0744)
+	if factory.globalConfig.MetricsDirectory != "" {
+		err := os.MkdirAll(factory.globalConfig.MetricsDirectory, 0744)
 		if err != nil {
 			return fmt.Errorf("Error creating metrics directory %s: ", err)
 		}
-		filename = path.Join(p.factory.globalConfig.MetricsDirectory, filename)
+		filename = path.Join(factory.globalConfig.MetricsDirectory, filename)
 	}
 	f, err := os.Create(filename)
 	defer f.Close()
@@ -154,8 +154,14 @@ func (p *podLatency) startAndSync() error {
 }
 
 func (p *podLatency) Stop() error {
-	time.AfterFunc(1*time.Second, func() {
-		close(p.stopChannel)
+	defer close(p.stopChannel)
+	timeoutCh := make(chan struct{})
+	timeoutTimer := time.AfterFunc(informerTimeout, func() {
+		close(timeoutCh)
 	})
+	defer timeoutTimer.Stop()
+	if !cache.WaitForCacheSync(timeoutCh, p.informer.HasSynced) {
+		return fmt.Errorf("Pod-latency: Timed out waiting for caches to sync")
+	}
 	return nil
 }
