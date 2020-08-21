@@ -1,4 +1,4 @@
-![Build Status](https://github.com/rsevilla87/kube-burner/workflows/Go/badge.svg?branch=master)
+[![Build Status](https://github.com/rsevilla87/kube-burner/workflows/Go/badge.svg?branch=master)](https://github.com/rsevilla87/kube-burner/actions?query=workflow%3AGo)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rsevilla87/kube-burner)](https://goreportcard.com/report/github.com/rsevilla87/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
