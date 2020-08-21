@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/rsevilla87/kube-burner.svg?branch=master)](https://travis-ci.org/rsevilla87/kube-burner)
+![Build Status](https://github.com/rsevilla87/kube-burner/workflows/Go/badge.svg?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rsevilla87/kube-burner)](https://goreportcard.com/report/github.com/rsevilla87/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
