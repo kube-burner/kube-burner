@@ -25,8 +25,8 @@ var GitCommit string
 // BuildDate returns the date the binary was built
 var BuildDate = ""
 
-// GitBranch returns the git branch that was compiled. This will be filled in by the compiler.
-var GitBranch = ""
+// Version returns the git tag that was compiled. This will be filled in by the compiler.
+var Version = ""
 
 // GoVersion returns the version of the go runtime used to compile the binary
 var GoVersion = runtime.Version()
