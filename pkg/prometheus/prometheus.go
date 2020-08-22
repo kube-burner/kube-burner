@@ -62,12 +62,12 @@ type MetricsProfile struct {
 }
 
 type metric struct {
-	Timestamp time.Time
-	Value     float64
-	Labels    map[string]string
-	UUID      string `json:"uuid"`
-	JobName   string `json:"jobName"`
-	Query     string `json:"query"`
+	Timestamp time.Time         `json:"timestamp"`
+	Labels    map[string]string `json:"labels"`
+	Value     float64           `json:"value"`
+	UUID      string            `json:"uuid"`
+	JobName   string            `json:"jobName"`
+	Query     string            `json:"query"`
 }
 
 func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -134,7 +134,7 @@ func (p *Prometheus) readProfile(metricsFile string) error {
 }
 
 // ScrapeMetrics gets all prometheus metrics required and handles them
-func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, jobName string, indexer *indexers.Indexer) error {
+func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobName string, indexer *indexers.Indexer) error {
 	r := apiv1.Range{Start: start, End: end, Step: p.step}
 	for _, md := range p.metricsProfile.Metrics {
 		metrics := []metric{}
@@ -155,7 +155,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.ConfigSpec, 
 				}
 				filename = path.Join(cfg.GlobalConfig.MetricsDirectory, filename)
 			}
-			log.Debugf("Writing to: %s", filename)
+			log.Infof("Writing to: %s", filename)
 			f, err := os.Create(filename)
 			if err != nil {
 				log.Errorf("Error creating metrics file %s: %s", filename, err)

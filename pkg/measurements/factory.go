@@ -66,7 +66,7 @@ func (mf *measurementFactory) register(methodName string, indexName string, meas
 }
 
 // Register registers the given list of measurements
-func Register(measurementList []config.Measurements) {
+func Register(measurementList []config.Measurement) {
 	for _, measurement := range measurementList {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
 			factory.register(measurement.Name, measurement.ESIndex, measurementFunc)

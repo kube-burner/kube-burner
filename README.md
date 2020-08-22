@@ -15,9 +15,11 @@ Kube-burner is a tool aimed to stress a kubernetes cluster. An overview of its b
 
 ## Quick start
 
-You can find the binaries at the [releases section](https://github.com/rsevilla87/kube-burner/releases).
-There's also a container image available at `quay.io/rsevilla/kube-burner:latest`.
-A valid example of a configuration file can be found at [./examples/cfg.yml](./examples/cfg.yml)
+In case you want to start tinkering with `kube-burner` now:
+
+- You can find the binaries in the [releases section of this repository](https://github.com/rsevilla87/kube-burner/releases).
+- There's also a container image available at [quay](https://quay.io/repository/rsevilla/kube-burner?tab=tags).
+- A valid example of a configuration file can be found at [./examples/cfg.yml](./examples/cfg.yml)
 
 
 ## Buiding
@@ -98,13 +100,13 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 
 * global: This section describes the global job configuration, it holds the following parameters:
 
-| Option           | Description                                                                                                   | Type    | Example        | Default     |
-|------------------|---------------------------------------------------------------------------------------------------------------|---------|----------------|-------------|
-| kubeconfig       | Points to a valid kubeconfig file. This parameter can be omitted if using the KUBECONFIG environment variable | String  | ~/mykubeconfig | -           |
-| writeToFile      | Whether to dump collected metrics to files                                                                    | Boolean | true           | false       |
-| metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously      | String  | ./metrics      | Current dir |
-| measurements     | List of measurements. Detailed in the [measurements section](#Measurements)                                   | List    | -              | []          |
-| indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section](#Indexers)                                | Object  | -              | -           |
+| Option           | Description                                                                                              | Type           | Example        | Default     |
+|------------------|----------------------------------------------------------------------------------------------------------|----------------|----------------|-------------|
+| kubeconfig       | Points to a valid kubeconfig file. Can be omitted if using the KUBECONFIG environment variable | String  | ~/mykubeconfig | ~/.kube/config |             |
+| writeToFile      | Whether to dump collected metrics to files                                                               | Boolean        | true           | true        |
+| metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics | 
+| measurements     | List of measurements. Detailed in the [measurements section](#Measurements)                              | List           | -              | []          |
+| indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section](#Indexers)                           | Object         | -              | -           |
 
 * jobs: This section contains a list of jobs that `kube-burner` will execute. Each job can hold the following parameters.
 
@@ -113,9 +115,9 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | name                 | Job name                                                                         | String  | myjob    | ""      |
 | jobIterations        | How many times to execute the job                                                | Integer | 10       | -       |
 | namespace            | Namespace base name to use                                                       | String  | firstjob | ""      |
-| namespacedIterations | Whether to create a namespace per job iteration                                  | Boolean | true     | false   |
-| cleanup              | Cleanup clean up old namespaces                                                  | Boolean | true     | false   |
-| podWait              | Wait for all pods to be running before moving forward to the next job iteration. | Object  | true     | false   |
+| namespacedIterations | Whether to create a namespace per job iteration                                  | Boolean | true     | true    |
+| cleanup              | Cleanup clean up old namespaces                                                  | Boolean | true     | true    |
+| podWait              | Wait for all pods to be running before moving forward to the next job iteration. | Object  | true     | true    |
 | jobIterationDelay    | How many milliseconds to wait between each job iteration                         | Integer | 2000     | false   |
 | jobPause             | How many milliseconds to pause after finishing the job                           | Integer | 10000    | -       |
 | qps                  | Limit object creation queries per second.                                        | Integer | 25       | 0       |
@@ -176,6 +178,19 @@ spec:
     port: "{{ .port }}"
     targetPort: "{{ .targetPort }}"
   type: ClusterIP
+```
+
+It's worth to say that you can also more advanced [golang template semantics](https://golang.org/pkg/text/template/) on your objectTemplate files.
+
+```yaml
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  name: {{.prefix}}-{{.Replica}}
+spec:
+{{ if .image }}
+  dockerImageRepository: {{.image}}
+{{ end }}
 ```
 
 ## Metrics profile

@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -71,15 +70,14 @@ const (
 	UUID         = "UUID"
 )
 
-var Cfg config.ConfigSpec
 var ClientSet *kubernetes.Clientset
 var RestConfig *rest.Config
 
 // NewExecutorList Returns a list of executors
-func NewExecutorList(configFile, uuid string) []Executor {
+func NewExecutorList(uuid string) []Executor {
 	var executorList []Executor
-	ReadConfig(configFile)
-	for _, job := range Cfg.Jobs {
+	ReadConfig()
+	for _, job := range config.ConfigSpec.Jobs {
 		ex := getExecutor(job)
 		ex.uuid = uuid
 		executorList = append(executorList, ex)
@@ -88,22 +86,15 @@ func NewExecutorList(configFile, uuid string) []Executor {
 }
 
 // ReadConfig Condfigures kube-burner with the given parameters
-func ReadConfig(configFile string) {
+func ReadConfig() {
+	var err error
 	var kubeconfig string
-	err := config.Parse(configFile, &Cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
 	} else {
-		if Cfg.GlobalConfig.Kubeconfig == "" {
-			kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
-		} else {
-			kubeconfig = Cfg.GlobalConfig.Kubeconfig
-		}
+		kubeconfig = config.ConfigSpec.GlobalConfig.Kubeconfig
 	}
-	log.Info("Using kubeconfig ", kubeconfig)
+	log.Infof("Using kubeconfig: %s", kubeconfig)
 	RestConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		log.Fatalf("Error configuring kube-burner: %s", err)
@@ -116,11 +107,15 @@ func ReadConfig(configFile string) {
 
 func getExecutor(jobConfig config.Job) Executor {
 	var empty interface{}
-	// Limits the number of workers to QPS
-	limiter := rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.QPS)
+	// Limits the number of workers to QPS and Burst
+	limiter := rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	selector := util.NewSelector()
-	RestConfig.QPS = float32(jobConfig.QPS)
-	RestConfig.Burst = jobConfig.Burst
+	if jobConfig.QPS != 0 {
+		RestConfig.QPS = float32(jobConfig.QPS)
+	}
+	if jobConfig.Burst != 0 {
+		RestConfig.Burst = jobConfig.Burst
+	}
 	dynamicInterface, err := dynamic.NewForConfig(RestConfig)
 	if err != nil {
 		log.Fatal(err)

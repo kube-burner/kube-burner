@@ -22,6 +22,8 @@ import (
 
 	"github.com/rsevilla87/kube-burner/log"
 	"github.com/rsevilla87/kube-burner/pkg/burner"
+	"github.com/rsevilla87/kube-burner/pkg/config"
+
 	"github.com/rsevilla87/kube-burner/pkg/indexers"
 	"github.com/rsevilla87/kube-burner/pkg/measurements"
 	"github.com/rsevilla87/kube-burner/pkg/prometheus"
@@ -48,7 +50,7 @@ var completionCmd = &cobra.Command{
 }
 
 func initCmd() *cobra.Command {
-	var c, url, metricsProfile string
+	var url, metricsProfile string
 	var username, password, uuid, token string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
@@ -59,20 +61,16 @@ func initCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Info("🔥 Starting kube-burner")
 			var p *prometheus.Prometheus
-			_, err := os.Stat(c)
-			if os.IsNotExist(err) {
-				log.Fatalf(err.Error())
-			}
+			var err error
 			if url != "" {
 				p, err = prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
 				if err != nil {
 					log.Fatal(err)
 				}
 			}
-			steps(uuid, c, p)
+			steps(uuid, p)
 		},
 	}
-	cmd.Flags().StringVarP(&c, "config", "c", "", "Config file path")
 	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
@@ -81,22 +79,20 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yaml", "Metrics profile file")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
-	cmd.MarkFlagFilename(c)
 	cmd.MarkFlagFilename(metricsProfile)
-	cmd.MarkFlagRequired("config")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
 
 func destroyCmd() *cobra.Command {
-	var c, uuid string
+	var uuid string
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy old namespaces labeled with the given UUID.",
 		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			selector := util.NewSelector()
-			burner.ReadConfig(c)
+			burner.ReadConfig()
 			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
 			if err := burner.CleanupNamespaces(burner.ClientSet, selector); err != nil {
 				log.Fatal(err)
@@ -104,8 +100,6 @@ func destroyCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
-	cmd.Flags().StringVarP(&c, "config", "c", "", "Config file path")
-	cmd.MarkFlagRequired("config")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
@@ -128,36 +122,43 @@ func init() {
 	rootCmd.AddCommand(
 		initCmd(),
 		destroyCmd(),
-		completionCmd,
 	)
 	for _, c := range rootCmd.Commands() {
 		logLevel := c.Flags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
+		configFile := c.Flags().StringP("config", "c", "", "Config file path")
 		c.PreRun = func(cmd *cobra.Command, args []string) {
 			log.Infof("Setting log level to %s", *logLevel)
 			log.SetLogLevel(*logLevel)
+			err := config.Parse(*configFile)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
+		c.MarkFlagRequired("config")
+		c.MarkFlagFilename("config")
 	}
+	rootCmd.AddCommand(completionCmd)
 	cobra.OnInitialize()
 }
 
-func steps(uuid, config string, p *prometheus.Prometheus) {
+func steps(uuid string, p *prometheus.Prometheus) {
 	var indexer *indexers.Indexer
-	executorList := burner.NewExecutorList(config, uuid)
-	if burner.Cfg.GlobalConfig.IndexerConfig.Enabled {
-		indexer = indexers.NewIndexer(burner.Cfg.GlobalConfig.IndexerConfig)
+	executorList := burner.NewExecutorList(uuid)
+	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
+		indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
 	}
 	for _, job := range executorList {
 		log.Infof("Triggering job: %s with UUID %s", job.Config.Name, uuid)
 		job.Cleanup()
-		measurements.NewMeasurementFactory(burner.ClientSet, burner.Cfg.GlobalConfig, job.Config, uuid, indexer)
-		measurements.Register(burner.Cfg.GlobalConfig.Measurements)
+		measurements.NewMeasurementFactory(burner.ClientSet, config.ConfigSpec.GlobalConfig, job.Config, uuid, indexer)
+		measurements.Register(config.ConfigSpec.GlobalConfig.Measurements)
 		measurements.Start()
 		// Run execution
 		job.Run()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, job.End.Sub(job.Start).Seconds())
 		if p != nil {
 			log.Info("🔍 Scraping prometheus metrics")
-			if err := p.ScrapeMetrics(job.Start, job.End, burner.Cfg, job.Config.Name, indexer); err != nil {
+			if err := p.ScrapeMetrics(job.Start, job.End, config.ConfigSpec, job.Config.Name, indexer); err != nil {
 				log.Error(err)
 			}
 		}
