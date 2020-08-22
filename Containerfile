@@ -1,6 +1,6 @@
 FROM registry.access.redhat.com/ubi8:latest as builder
 
-RUN dnf install -y golang make
+RUN dnf install -y golang make git
 COPY . /root/kube-burner
 RUN make clean -C /root/kube-burner && make build -C /root/kube-burner
 
