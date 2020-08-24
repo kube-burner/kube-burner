@@ -161,7 +161,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobNam
 				log.Errorf("Error creating metrics file %s: %s", filename, err)
 			}
 			jsonEnc := json.NewEncoder(f)
-			jsonEnc.SetIndent("", "  ")
+			jsonEnc.SetIndent("", "    ")
 			err = jsonEnc.Encode(metrics)
 			if err != nil {
 				log.Errorf("JSON encoding error: %s", err)

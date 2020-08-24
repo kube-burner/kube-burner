@@ -104,13 +104,13 @@ func (mf *measurementFactory) index() {
 				log.Errorf("Error writing measurement %s: %s", name, err)
 			}
 		}
-		measurement.Index()
+		if factory.globalConfig.IndexerConfig.Enabled {
+			measurement.Index()
+		}
 	}
 }
 
 // Index index measurements metrics
 func Index() {
-	if factory.globalConfig.IndexerConfig.Enabled {
-		factory.index()
-	}
+	factory.index()
 }

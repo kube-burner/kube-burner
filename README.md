@@ -291,12 +291,49 @@ Measurements are enabled by the measurements section of the configuration file. 
 All measurements support the esIndex option that describe the ES index where metrics will be indexed.
 'kube-burner' supports the following measurements so far:
 
-* pod-latency: It collects pod startup phases latency metrics. This measurement can be enabled with:
+* pod-latency: It collects pod startup phases **latency metrics in ms**. This measurement can be enabled with:
 
 ```yaml
     measurements:
     - name: podLatency
       esIndex: kube-burner-podlatency
+```
+
+This measurement send its metrics to two different indexes, <esIndex> is used to save the latency histograms and '<esIndex>-summary' is used to save
+the measurement quantiles P99, P95 and P50.
+
+Pod latency sample:
+```json
+{
+    "namespace": "second-job-5",
+    "uuid": "363073c1-5752-4a36-8e0a-1311fa7663f8",
+    "podName": "sleep-app-5-5-second-job-7b7c88f5df-cmzzf",
+    "jobName": "second-job",
+    "created": "2020-08-24T19:05:49.316913942+02:00",
+    "schedulingLatency": 8,
+    "initializedLatency": 82,
+    "containersReadyLatency": 82,
+    "podReadyLatency": 82
+}
+```
+
+Pod latency quantile sample:
+
+```json
+{
+    "quantileName": "initialized",
+    "uuid": "363073c1-5752-4a36-8e0a-1311fa7663f8",
+    "P99": 76543,
+    "P95": 72702,
+    "P50": 336
+},
+{
+    "quantileName": "podReady",
+    "uuid": "363073c1-5752-4a36-8e0a-1311fa7663f8",
+    "P99": 76543,
+    "P95": 72702,
+    "P50": 336
+}
 ```
 
 ## Contributing to kube-burner
