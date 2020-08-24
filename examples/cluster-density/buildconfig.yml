@@ -1,0 +1,28 @@
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: {{.JobName}}-{{.Replica}}
+spec:
+  triggers:
+  - type: GitHub
+    github:
+      secret: {{.JobName}}-{{.Replica}}
+  - type: ImageChange
+  source:
+    type: Git
+    git:
+      uri: {{.gitUri}}
+    dockerfile: |-
+      FROM quay.io/openshift-scale/mastervertical-build
+      USER 1001
+  strategy:
+    type: Source
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: {{.from}}-{{.Replica}}:latest
+  output:
+    to:
+      kind: ImageStreamTag
+      name: {{.to}}-{{.Replica}}:latest
