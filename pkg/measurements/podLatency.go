@@ -46,12 +46,14 @@ type podMetric struct {
 	PodReadyLatency        int64 `json:"podReadyLatency"`
 }
 type podLatencyQuantiles struct {
-	Name    string `json:"quantileName"`
-	JobName string `json:"jobName"`
-	UUID    string `json:"uuid"`
-	P99     int    `json:"P99"`
-	P95     int    `json:"P95"`
-	P50     int    `json:"P50"`
+	Name    string  `json:"quantileName"`
+	JobName string  `json:"jobName"`
+	UUID    string  `json:"uuid"`
+	P99     int     `json:"P99"`
+	P95     int     `json:"P95"`
+	P50     int     `json:"P50"`
+	Max     int     `json:"max"`
+	Avg     float64 `json:"avg"`
 }
 
 var podQuantiles []podLatencyQuantiles
@@ -249,9 +251,15 @@ func calcQuantiles() {
 		sort.Ints(v)
 		length := len(v)
 		for _, quantile := range quantiles {
-			qValue := v[int(math.Ceil(float64(length)*quantile))]
+			qValue := v[int(math.Ceil(float64(length)*quantile))-1]
 			podQ.setQuantile(quantile, qValue)
 		}
+		podQ.Max = v[length-1]
+		sum := 0
+		for _, n := range v {
+			sum += n
+		}
+		podQ.Avg = math.Round(100*float64(sum)/float64(length)) / 100
 		podQuantiles = append(podQuantiles, podQ)
 	}
 }

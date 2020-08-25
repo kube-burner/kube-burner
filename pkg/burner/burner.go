@@ -70,7 +70,10 @@ const (
 	UUID         = "UUID"
 )
 
+// ClientSet kubernetes clientset
 var ClientSet *kubernetes.Clientset
+
+// RestConfig clieng-go rest configuration
 var RestConfig *rest.Config
 
 // NewExecutorList Returns a list of executors
@@ -110,12 +113,8 @@ func getExecutor(jobConfig config.Job) Executor {
 	// Limits the number of workers to QPS and Burst
 	limiter := rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	selector := util.NewSelector()
-	if jobConfig.QPS != 0 {
-		RestConfig.QPS = float32(jobConfig.QPS)
-	}
-	if jobConfig.Burst != 0 {
-		RestConfig.Burst = jobConfig.Burst
-	}
+	RestConfig.QPS = float32(jobConfig.QPS)
+	RestConfig.Burst = jobConfig.Burst
 	dynamicInterface, err := dynamic.NewForConfig(RestConfig)
 	if err != nil {
 		log.Fatal(err)

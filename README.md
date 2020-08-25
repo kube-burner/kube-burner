@@ -326,6 +326,8 @@ Pod latency quantile sample:
     "P99": 76543,
     "P95": 72702,
     "P50": 336
+    "Max": 84523,
+    "Avg": 53131 
 },
 {
     "quantileName": "podReady",
@@ -333,6 +335,8 @@ Pod latency quantile sample:
     "P99": 76543,
     "P95": 72702,
     "P50": 336
+    "Max": 82522,
+    "Avg": 54153 
 }
 ```
 
