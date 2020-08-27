@@ -63,5 +63,8 @@ func Parse(c string) error {
 	if err = yamlDec.Decode(&ConfigSpec); err != nil {
 		return fmt.Errorf("Error decoding configuration file %s: %s", c, err)
 	}
+	if len(ConfigSpec.Jobs) <= 0 {
+		return fmt.Errorf("No jobs found at configuration file")
+	}
 	return nil
 }

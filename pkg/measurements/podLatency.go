@@ -46,14 +46,15 @@ type podMetric struct {
 	PodReadyLatency        int64 `json:"podReadyLatency"`
 }
 type podLatencyQuantiles struct {
-	Name    string  `json:"quantileName"`
-	JobName string  `json:"jobName"`
-	UUID    string  `json:"uuid"`
-	P99     int     `json:"P99"`
-	P95     int     `json:"P95"`
-	P50     int     `json:"P50"`
-	Max     int     `json:"max"`
-	Avg     float64 `json:"avg"`
+	Name      string    `json:"quantileName"`
+	JobName   string    `json:"jobName"`
+	UUID      string    `json:"uuid"`
+	P99       int       `json:"P99"`
+	P95       int       `json:"P95"`
+	P50       int       `json:"P50"`
+	Max       int       `json:"max"`
+	Avg       float64   `json:"avg"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 var podQuantiles []podLatencyQuantiles
@@ -244,9 +245,10 @@ func calcQuantiles() {
 	}
 	for k, v := range quantileMap {
 		podQ := podLatencyQuantiles{
-			Name:    k,
-			UUID:    factory.uuid,
-			JobName: factory.config.Name,
+			Name:      k,
+			UUID:      factory.uuid,
+			JobName:   factory.config.Name,
+			Timestamp: time.Now(),
 		}
 		sort.Ints(v)
 		length := len(v)

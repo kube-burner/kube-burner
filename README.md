@@ -217,9 +217,9 @@ Indexed metrics look like:
 ```json
 [
   {
-    "Timestamp": "2020-08-12T10:02:21.042+02:00",
-    "Value": 24482177024,
-    "Labels": {
+    "timestamp": "2020-08-12T10:02:21.042+02:00",
+    "value": 24482177024,
+    "labels": {
       "__name__": "node_memory_Committed_AS_bytes",
       "endpoint": "https",
       "instance": "ip-10-0-128-40.eu-west-2.compute.internal",
@@ -233,9 +233,9 @@ Indexed metrics look like:
     "query": "node_memory_Committed_AS_bytes",
   },
   {
-    "Timestamp": "2020-08-12T10:02:51.042+02:00",
-    "Value": 29052592128,
-    "Labels": {
+    "timestamp": "2020-08-12T10:02:51.042+02:00",
+    "value": 29052592128,
+    "labels": {
       "__name__": "node_memory_Committed_AS_bytes",
       "endpoint": "https",
       "instance": "ip-10-0-128-40.eu-west-2.compute.internal",
@@ -327,7 +327,8 @@ Pod latency quantile sample:
     "P95": 72702,
     "P50": 336,
     "Max": 84523,
-    "Avg": 53131 
+    "Avg": 53131,
+    "timestamp": "2020-08-27T01:13:24.091110065+02:00",
 },
 {
     "quantileName": "podReady",
@@ -336,7 +337,8 @@ Pod latency quantile sample:
     "P95": 72702,
     "P50": 336,
     "Max": 82522,
-    "Avg": 54153 
+    "Avg": 54153,
+    "timestamp": "2020-08-27T01:13:24.091110483+02:00",
 }
 ```
 
