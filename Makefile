@@ -25,15 +25,18 @@ help:
 build: $(BIN_DIR)/$(BIN_NAME)
 
 $(BIN_DIR)/$(BIN_NAME): $(SOURCES)
-	@echo "Building ${BIN_NAME}"
-	@echo "GOPATH=${GOPATH}"
-	CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X ${KUBE_BURNER_PACKAGE}/version.GitCommit=${GIT_COMMIT} -X ${KUBE_BURNER_PACKAGE}/version.BuildDate=${BUILD_DATE} -X ${KUBE_BURNER_PACKAGE}/version.Version=${GIT_BRANCH}" -o $(BIN_DIR)/${BIN_NAME}
+	@echo "Building $(BIN_NAME)"
+	@echo "GOPATH=$(GOPATH)"
+	CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X $(KUBE_BURNER_PACKAGE)/version.GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_PACKAGE)/version.BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_PACKAGE)/version.Version=$(GIT_BRANCH)" -o $(BIN_DIR)/$(BIN_NAME)
 
 lint:
 	./bin/golangci-lint run
 
 clean:
-	test ! -e bin/${BIN_NAME} || rm $(BIN_DIR)/${BIN_NAME}
+	test ! -e bin/$(BIN_NAME) || rm $(BIN_DIR)/$(BIN_NAME)
 
 vendor:
 	go mod vendor
+
+install:
+	cp $(BIN_DIR)/$(BIN_NAME) /usr/bin/$(BIN_NAME)
