@@ -1,0 +1,18 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: perfapp-{{.Replica}}-{{.Iteration}}
+spec:
+  selector:
+    name: perfapp-{{.Replica}}-{{.Iteration}}
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+  portalIP: ''
+  type: ClusterIP
+  sessionAffinity: None
+status:
+  loadBalancer: {}
+
+  

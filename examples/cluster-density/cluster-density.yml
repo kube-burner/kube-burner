@@ -1,5 +1,4 @@
 ---
- 
 global:
   writeToFile: true
   metricsDirectory: collected-metrics
@@ -9,6 +8,9 @@ global:
     insecureSkipVerify: true
     defaultIndex: kube-burner
     type: elastic
+  measurements:
+    - name: podLatency
+      esIndex: kube-burner-podlatency
 
 jobs:
   - name: cluster-density

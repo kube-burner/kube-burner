@@ -1,0 +1,15 @@
+metrics:
+  - query: sum(kube_pod_info)
+    indexName: pod_sum
+  - query: process_cpu_seconds_total{service="kubelet",job="kubelet"}
+    indexName: kubelet-cpu
+  - query: process_resident_memory_bytes{job=~"kubelet|crio"}
+    indexName: kubelet-memory
+  - query: node_memory_MemAvailable_bytes
+    indexName: node-memory
+  - query: node_memory_MemTotal_bytes
+    indexName: node-memory
+  - query: node_memory_Cached_bytes
+    indexName: node-memory
+  - query: node_memory_Buffers_bytes
+    indexName: node-memory
