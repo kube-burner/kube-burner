@@ -175,10 +175,10 @@ func (p *podLatency) writeToFile() error {
 			filename = path.Join(factory.globalConfig.MetricsDirectory, filename)
 		}
 		f, err := os.Create(filename)
-		defer f.Close()
 		if err != nil {
 			return fmt.Errorf("Error creating pod-latency metrics file %s: %s", filename, err)
 		}
+		defer f.Close()
 		jsonEnc := json.NewEncoder(f)
 		jsonEnc.SetIndent("", "    ")
 		log.Infof("Writing pod latency metrics in %s", filename)

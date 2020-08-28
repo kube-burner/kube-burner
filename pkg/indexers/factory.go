@@ -19,6 +19,7 @@ import (
 	"github.com/rsevilla87/kube-burner/pkg/config"
 )
 
+// Indexer indexer interface
 type Indexer interface {
 	Index(string, []interface{})
 	new(config.IndexerConfig)
@@ -26,6 +27,7 @@ type Indexer interface {
 
 var indexerMap = make(map[string]Indexer)
 
+// NewIndexer creates a new Indexer with the specified IndexerConfig
 func NewIndexer(cfg config.IndexerConfig) *Indexer {
 	var indexer Indexer
 	var exists bool

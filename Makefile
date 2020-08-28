@@ -30,7 +30,7 @@ $(BIN_DIR)/$(BIN_NAME): $(SOURCES)
 	CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X $(KUBE_BURNER_PACKAGE)/version.GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_PACKAGE)/version.BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_PACKAGE)/version.Version=$(GIT_BRANCH)" -o $(BIN_DIR)/$(BIN_NAME)
 
 lint:
-	./bin/golangci-lint run
+	golangci-lint run
 
 clean:
 	test ! -e bin/$(BIN_NAME) || rm $(BIN_DIR)/$(BIN_NAME)

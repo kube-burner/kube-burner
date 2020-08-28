@@ -52,10 +52,10 @@ type Logger interface {
 var defaultLogger *logrus.Logger
 
 func init() {
-	defaultLogger = newLogrusLogger("info")
+	defaultLogger = newLogrusLogger()
 }
 
-// NewLogger returns a configured logrus instance
+// SetLogLevel sets log level
 func SetLogLevel(logLevel string) {
 	switch logLevel {
 	case "debug":
@@ -73,7 +73,7 @@ func SetLogLevel(logLevel string) {
 	}
 }
 
-func newLogrusLogger(logLevel string) *logrus.Logger {
+func newLogrusLogger() *logrus.Logger {
 	l := logrus.New()
 	l.Out = os.Stderr
 	customFormatter := new(logrus.TextFormatter)

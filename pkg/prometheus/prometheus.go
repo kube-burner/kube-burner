@@ -56,7 +56,7 @@ type metricDefinition struct {
 	IndexName string `yaml:"indexName"`
 }
 
-// MetricProfile describes what metrics kube-burner collects
+// MetricsProfile describes what metrics kube-burner collects
 type MetricsProfile struct {
 	Metrics []metricDefinition `yaml:"metrics"`
 }
@@ -82,6 +82,7 @@ func prometheusError(err error) error {
 	return fmt.Errorf("Prometheus error: %s", err.Error())
 }
 
+// NewPrometheusClient creates a prometheus struct instance with the given parameters
 func NewPrometheusClient(url, token, username, password, metricsProfile, uuid string, tlsVerify bool, prometheusStep time.Duration) (*Prometheus, error) {
 	var p Prometheus = Prometheus{
 		step: prometheusStep,

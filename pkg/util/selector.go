@@ -16,6 +16,7 @@ package util
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// Selector instance
 type Selector struct {
 	Namespace     string
 	LabelSelector string
@@ -23,12 +24,14 @@ type Selector struct {
 	ListOptions   metav1.ListOptions
 }
 
+// NewSelector creates a new Selector instance
 func NewSelector() *Selector {
 	return &Selector{
 		Namespace: metav1.NamespaceAll,
 	}
 }
 
+// Configure configures the Selector instance
 func (s *Selector) Configure(namespace, labelSelector, fieldSelector string) {
 	if namespace != "" {
 		s.Namespace = namespace

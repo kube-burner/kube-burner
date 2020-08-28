@@ -32,6 +32,7 @@ import (
 
 const elastic = "elastic"
 
+// Elastic ElasticSearch instance
 type Elastic struct {
 	client *elasticsearch.Client
 }
@@ -58,6 +59,7 @@ func (esIndexer *Elastic) new(esConfig config.IndexerConfig) {
 	esIndexer.client = ESClient
 }
 
+// Index uses bulkIndexer to index the documents in the given index
 func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Client:     esIndexer.client,

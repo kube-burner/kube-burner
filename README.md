@@ -113,14 +113,14 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | Option               | Description                                                                      | Type    | Example  | Default |
 |----------------------|----------------------------------------------------------------------------------|---------|----------|---------|
 | name                 | Job name                                                                         | String  | myjob    | ""      |
-| jobIterations        | How many times to execute the job                                                | Integer | 10       | -       |
+| jobIterations        | How many times to execute the job                                                | Integer | 10       | 0       |
 | namespace            | Namespace base name to use                                                       | String  | firstjob | ""      |
 | namespacedIterations | Whether to create a namespace per job iteration                                  | Boolean | true     | true    |
 | cleanup              | Cleanup clean up old namespaces                                                  | Boolean | true     | true    |
-| podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Object  | true     | true    |
+| podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | true     | true    |
 | waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | false   |
 | jobIterationDelay    | How many milliseconds to wait between each job iteration                         | Integer | 2000     | false   |
-| jobPause             | How many milliseconds to pause after finishing the job                           | Integer | 10000    | -       |
+| jobPause             | How many milliseconds to pause after finishing the job                           | Integer | 10000    | 0       |
 | qps                  | Limit object creation queries per second.                                        | Integer | 25       | 0       |
 | burst                | Maximum burst for throttle                                                       | Integer | 50       | 0       |
 | objects              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | -        | []      |
