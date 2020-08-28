@@ -215,15 +215,7 @@ func (ex *Executor) Run() {
 		if ex.Config.PodWait {
 			// If podWait is enabled, first wait for all replicaHandlers to finish
 			wg.Wait()
-			for _, obj := range ex.objects {
-				// If the object has a wait Function, execute it in its own goroutine
-				if obj.waitFunc != nil {
-					podWG.Add(1)
-					go obj.waitFunc(ns, &podWG)
-				}
-			}
-			log.Info("Waiting for pods to be ready")
-			podWG.Wait()
+			waitForObjects(ex.objects, ns, &podWG)
 		}
 		if ex.Config.JobIterationDelay > 0 {
 			wg.Wait()
@@ -239,15 +231,10 @@ func (ex *Executor) Run() {
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			}
-			for _, obj := range ex.objects {
-				// If the object has a wait Function, execute it in its own goroutine
-				if obj.waitFunc != nil {
-					podWG.Add(1)
-					go obj.waitFunc(ns, &podWG)
-				}
+			waitForObjects(ex.objects, ns, &podWG)
+			if !ex.Config.NamespacedIterations {
+				break
 			}
-			log.Infof("Waiting for pods in namespace %s to be ready", ns)
-			podWG.Wait()
 		}
 	}
 	ex.End = time.Now().UTC()
@@ -288,5 +275,21 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 				log.Fatal(err)
 			}
 		}()
+	}
+}
+
+func waitForObjects(objects []object, ns string, podWG *sync.WaitGroup) {
+	var waiting bool = false
+	for _, obj := range objects {
+		// If the object has a wait Function, execute it in its own goroutine
+		if obj.waitFunc != nil {
+			podWG.Add(1)
+			waiting = true
+			go obj.waitFunc(ns, podWG)
+		}
+	}
+	if waiting {
+		log.Infof("Waiting for pods in namespace %s to be ready", ns)
+		podWG.Wait()
 	}
 }
