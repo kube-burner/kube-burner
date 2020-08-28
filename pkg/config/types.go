@@ -24,8 +24,7 @@ type Spec struct {
 
 // IndexerConfig holds the indexer configuration
 type IndexerConfig struct {
-	// Enabled enable indexer
-	Enabled bool `yaml:"enabled"`
+
 	// Type type of indexer
 	Type string `yaml:"type"`
 	// ESServers List of ElasticSearch instances
@@ -37,6 +36,8 @@ type IndexerConfig struct {
 	Password     string `yaml:"password"`
 	// InsecureSkipVerify disable TLS ceriticate verification
 	InsecureSkipVerify bool `yaml:"insecureSkipVerify"`
+	// Enabled enable indexer
+	Enabled bool `yaml:"enabled"`
 }
 
 // Measurement holds the measurement configuration
@@ -80,18 +81,8 @@ type Job struct {
 	JobIterations int `yaml:"jobIterations"`
 	// IterationDelay how many milliseconds to wait between each job iteration
 	JobIterationDelay int `yaml:"jobIterationDelay"`
-	// IterationPause how many milliseconds to pause after finishing the job
+	// JobPause how many milliseconds to pause after finishing the job
 	JobPause int `yaml:"jobPause"`
-	// PodWait wait for all pods to be running before moving forward to the next iteration
-	PodWait bool `yaml:"podWait"`
-	// Cleanup clean up old namespaces
-	Cleanup bool `yaml:"cleanup"`
-	// Namespace namespace base name to use
-	Namespace string `yaml:"namespace"`
-	// whether to create namespaces or not with each iteration
-	Namespaced bool `yaml:"namespaced"`
-	// NamespacedIterations create a namespace per iteration
-	NamespacedIterations bool `yaml:"namespacedIterations"`
 	// Name name of the iteration
 	Name string `yaml:"name"`
 	// Objects list of objects
@@ -100,4 +91,16 @@ type Job struct {
 	QPS int `yaml:"qps"`
 	// Maximum burst for throttle
 	Burst int `yaml:"burst"`
+	// Namespace namespace base name to use
+	Namespace string `yaml:"namespace"`
+	// PodWait wait for all pods to be running before moving forward to the next iteration
+	PodWait bool `yaml:"podWait"`
+	// WaitWhenFinished Wait for pods to be running when all iterations are completed
+	WaitWhenFinished bool `yaml:"waitWhenFinished"`
+	// Cleanup clean up old namespaces
+	Cleanup bool `yaml:"cleanup"`
+	// whether to create namespaces or not with each iteration
+	Namespaced bool `yaml:"namespaced"`
+	// NamespacedIterations create a namespace per iteration
+	NamespacedIterations bool `yaml:"namespacedIterations"`
 }

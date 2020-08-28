@@ -67,7 +67,7 @@ const (
 	jobName      = "JobName"
 	replica      = "Replica"
 	jobIteration = "Iteration"
-	UUID         = "UUID"
+	jobUUID      = "UUID"
 )
 
 // ClientSet kubernetes clientset
@@ -203,8 +203,6 @@ func (ex *Executor) Run() {
 	var wg sync.WaitGroup
 	ns := fmt.Sprintf("%s-1", ex.Config.Namespace)
 	ex.Start = time.Now().UTC()
-	// if ex.Config.Namespaced {
-	// }
 	createNamespaces(ClientSet, ex.Config, ex.uuid)
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		if ex.Config.NamespacedIterations {
@@ -228,11 +226,30 @@ func (ex *Executor) Run() {
 			podWG.Wait()
 		}
 		if ex.Config.JobIterationDelay > 0 {
+			wg.Wait()
 			log.Infof("Sleeping for %d ms", ex.Config.JobIterationDelay)
 			time.Sleep(time.Millisecond * time.Duration(ex.Config.JobIterationDelay))
 		}
 	}
+	// Wait for all replicaHandlers to finish
 	wg.Wait()
+	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {
+		ns = fmt.Sprintf("%s-1", ex.Config.Namespace)
+		for i := 1; i <= ex.Config.JobIterations; i++ {
+			if ex.Config.NamespacedIterations {
+				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+			}
+			for _, obj := range ex.objects {
+				// If the object has a wait Function, execute it in its own goroutine
+				if obj.waitFunc != nil {
+					podWG.Add(1)
+					go obj.waitFunc(ns, &podWG)
+				}
+			}
+			log.Infof("Waiting for pods in namespace %s to be ready", ns)
+			podWG.Wait()
+		}
+	}
 	ex.End = time.Now().UTC()
 }
 
@@ -249,7 +266,7 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 	tData := map[string]interface{}{
 		jobName:      ex.Config.Name,
 		jobIteration: iteration,
-		UUID:         ex.uuid,
+		jobUUID:      ex.uuid,
 	}
 	for k, v := range obj.inputVars {
 		tData[k] = v
@@ -260,7 +277,7 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 		renderedObj := renderTemplate(obj.objectSpec, tData)
 		// Re-decode rendered object
 		yamlToUnstructured(renderedObj, newObject)
-		go func(r int) {
+		go func() {
 			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
 			defer wg.Done()
 			wg.Add(1)
@@ -270,6 +287,6 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 			if err != nil {
 				log.Fatal(err)
 			}
-		}(r)
+		}()
 	}
 }
