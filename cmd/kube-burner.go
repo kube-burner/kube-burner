@@ -92,8 +92,8 @@ func destroyCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			selector := util.NewSelector()
-			burner.ReadConfig()
 			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
+			burner.ReadConfig(0, 0)
 			if err := burner.CleanupNamespaces(burner.ClientSet, selector); err != nil {
 				log.Fatal(err)
 			}

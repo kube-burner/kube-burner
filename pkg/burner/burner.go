@@ -47,20 +47,19 @@ type object struct {
 	objectSpec   []byte
 	replicas     int
 	unstructured *unstructured.Unstructured
-	waitFunc     func(string, *sync.WaitGroup)
+	waitFunc     func(string, *sync.WaitGroup, object)
 	inputVars    map[string]string
 }
 
 // Executor contains the information required to execute a job
 type Executor struct {
-	objects          []object
-	Start            time.Time
-	End              time.Time
-	Config           config.Job
-	selector         *util.Selector
-	uuid             string
-	limiter          *rate.Limiter
-	dynamicInterface dynamic.Interface
+	objects  []object
+	Start    time.Time
+	End      time.Time
+	Config   config.Job
+	selector *util.Selector
+	uuid     string
+	limiter  *rate.Limiter
 }
 
 const (
@@ -73,13 +72,15 @@ const (
 // ClientSet kubernetes clientset
 var ClientSet *kubernetes.Clientset
 
+var dynamicClient dynamic.Interface
+
 // RestConfig clieng-go rest configuration
 var RestConfig *rest.Config
 
 // NewExecutorList Returns a list of executors
 func NewExecutorList(uuid string) []Executor {
 	var executorList []Executor
-	ReadConfig()
+	ReadConfig(0, 0)
 	for _, job := range config.ConfigSpec.Jobs {
 		ex := getExecutor(job)
 		ex.uuid = uuid
@@ -89,7 +90,7 @@ func NewExecutorList(uuid string) []Executor {
 }
 
 // ReadConfig Condfigures kube-burner with the given parameters
-func ReadConfig() {
+func ReadConfig(QPS, burst int) {
 	var err error
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
@@ -99,6 +100,8 @@ func ReadConfig() {
 	}
 	log.Infof("Using kubeconfig: %s", kubeconfig)
 	RestConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	RestConfig.QPS = float32(QPS)
+	RestConfig.Burst = burst
 	if err != nil {
 		log.Fatalf("Error configuring kube-burner: %s", err)
 	}
@@ -113,18 +116,12 @@ func getExecutor(jobConfig config.Job) Executor {
 	// Limits the number of workers to QPS and Burst
 	limiter := rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	selector := util.NewSelector()
-	RestConfig.QPS = float32(jobConfig.QPS)
-	RestConfig.Burst = jobConfig.Burst
-	dynamicInterface, err := dynamic.NewForConfig(RestConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
+
 	selector.Configure("", fmt.Sprintf("kube-burner=%s", jobConfig.Name), "")
 	ex := Executor{
-		Config:           jobConfig,
-		selector:         selector,
-		limiter:          limiter,
-		dynamicInterface: dynamicInterface,
+		Config:   jobConfig,
+		selector: selector,
+		limiter:  limiter,
 	}
 	for _, o := range jobConfig.Objects {
 		if o.Replicas < 1 {
@@ -166,6 +163,8 @@ func getExecutor(jobConfig config.Job) Executor {
 			obj.waitFunc = waitForDS
 		case "Pod":
 			obj.waitFunc = waitForPod
+		case "Build":
+			obj.waitFunc = waitForBuild
 		default:
 			log.Infof("Resource of kind %s has no wait function", kind)
 		}
@@ -201,6 +200,12 @@ func (ex *Executor) Cleanup() {
 func (ex *Executor) Run() {
 	var podWG sync.WaitGroup
 	var wg sync.WaitGroup
+	var err error
+	ReadConfig(ex.Config.QPS, ex.Config.Burst)
+	dynamicClient, err = dynamic.NewForConfig(RestConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ns := fmt.Sprintf("%s-1", ex.Config.Namespace)
 	ex.Start = time.Now().UTC()
 	createNamespaces(ClientSet, ex.Config, ex.uuid)
@@ -264,13 +269,13 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 		renderedObj := renderTemplate(obj.objectSpec, tData)
 		// Re-decode rendered object
 		yamlToUnstructured(renderedObj, newObject)
+		wg.Add(1)
 		go func() {
 			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
 			defer wg.Done()
-			wg.Add(1)
 			ex.limiter.Wait(context.TODO())
-			log.Infof("Creating %s %s on %s", newObject.GetKind(), newObject.GetName(), ns)
-			_, err := ex.dynamicInterface.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
+			_, err := dynamicClient.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
+			log.Infof("Created %s %s on %s", newObject.GetKind(), newObject.GetName(), ns)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -281,15 +286,15 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 func waitForObjects(objects []object, ns string, podWG *sync.WaitGroup) {
 	var waiting bool = false
 	for _, obj := range objects {
-		// If the object has a wait Function, execute it in its own goroutine
+		// If the object has a wait function, execute it in its own goroutine
 		if obj.waitFunc != nil {
 			podWG.Add(1)
 			waiting = true
-			go obj.waitFunc(ns, podWG)
+			go obj.waitFunc(ns, podWG, obj)
 		}
 	}
 	if waiting {
-		log.Infof("Waiting for pods in namespace %s to be ready", ns)
+		log.Infof("Waiting for actions in namespace %s to be completed", ns)
 		podWG.Wait()
 	}
 }

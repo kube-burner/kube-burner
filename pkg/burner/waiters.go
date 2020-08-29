@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func waitForDeployments(ns string, wg *sync.WaitGroup) {
+func waitForDeployments(ns string, wg *sync.WaitGroup, obj object) {
 	defer wg.Done()
 	err := wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
 		deps, err := ClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
@@ -47,7 +47,7 @@ func waitForDeployments(ns string, wg *sync.WaitGroup) {
 	}
 }
 
-func waitForRS(ns string, wg *sync.WaitGroup) {
+func waitForRS(ns string, wg *sync.WaitGroup, obj object) {
 	defer wg.Done()
 	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
 		rss, err := ClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
@@ -64,7 +64,7 @@ func waitForRS(ns string, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForRC(ns string, wg *sync.WaitGroup) {
+func waitForRC(ns string, wg *sync.WaitGroup, obj object) {
 	defer wg.Done()
 	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
 		rcs, err := ClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
@@ -81,7 +81,7 @@ func waitForRC(ns string, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForDS(ns string, wg *sync.WaitGroup) {
+func waitForDS(ns string, wg *sync.WaitGroup, obj object) {
 	defer wg.Done()
 	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
 		dss, err := ClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
@@ -98,7 +98,7 @@ func waitForDS(ns string, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForPod(ns string, wg *sync.WaitGroup) {
+func waitForPod(ns string, wg *sync.WaitGroup, obj object) {
 	defer wg.Done()
 	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
 		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
