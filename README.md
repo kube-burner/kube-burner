@@ -52,6 +52,7 @@ Available Commands:
   completion  Generates completion scripts for bash shell
   destroy     Destroy old namespaces labeled with the given UUID.
   help        Help about any command
+  index       Index metrics from the given time range
   init        Launch benchmark
   version     Print the version number of kube-burner
 
@@ -82,11 +83,15 @@ With the above, triggering kube-burner would be as simple as:
 $ kube-burner init -c cfg.yml -u https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
-kube-burner can also be launched w/o any prometheus endpoint, so these metrics will not be collected.
+If you have no interest in collecting prometheus metrics, kube-burner can also be launched w/o any prometheus endpoint.
 
 ```console
 $ kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
+
+- The **index** option can be used to collect and index the metrics from a given time range. This option supports the same flags as the **init** option. The time range is given by:
+  - start: Epoch start time. Defaults to one hour before the current time.
+  - End: Epoch end time. Defaults to the current time.
 
 - The **destroy** option requires the above `config` and `UUID` flags to destroy all namespaces labeled with `kube-burner-uuid=<UUID>`.
 

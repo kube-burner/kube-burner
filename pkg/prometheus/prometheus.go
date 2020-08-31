@@ -136,6 +136,7 @@ func (p *Prometheus) readProfile(metricsFile string) error {
 
 // ScrapeMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobName string, indexer *indexers.Indexer) error {
+	log.Infof("🔍 Scraping prometheus metrics for job %s", jobName)
 	r := apiv1.Range{Start: start, End: end, Step: p.step}
 	for _, md := range p.metricsProfile.Metrics {
 		metrics := []metric{}
