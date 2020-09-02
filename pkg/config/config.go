@@ -17,7 +17,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -25,7 +24,6 @@ import (
 // ConfigSpec configuration object
 var ConfigSpec Spec = Spec{
 	GlobalConfig: GlobalConfig{
-		Kubeconfig:       filepath.Join(os.Getenv("HOME"), ".kube", "config"),
 		MetricsDirectory: "collected-metrics",
 		WriteToFile:      true,
 		Measurements:     []Measurement{},

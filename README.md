@@ -66,7 +66,7 @@ Use "kube-burner [command] --help" for more information about a command.
 - The **init** option supports the following flags:
   - config: Path to a valid configuration file.
   - log-level: Logging level. Default `info`
-  - prometheus-url Prometheus full URL. i.e. `https://  prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
+  - prometheus-url: Prometheus full URL. i.e. `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
   - metrics-profile: Path to a valid metrics profile file. Default `metrics.yaml`
   - token: Prometheus Bearer token.
   - username: Prometheus username for basic authentication.
@@ -107,7 +107,7 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 
 | Option           | Description                                                                                              | Type           | Example        | Default     |
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|----------------|-------------|
-| kubeconfig       | Points to a valid kubeconfig file. Can be omitted if using the KUBECONFIG environment variable | String  | ~/mykubeconfig | ~/.kube/config |             |
+| kubeconfig       | Points to a valid kubeconfig file. Can be omitted if using the KUBECONFIG environment variable | String  | ~/mykubeconfig | in-cluster |             |
 | writeToFile      | Whether to dump collected metrics to files                                                               | Boolean        | true           | true        |
 | metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics | 
 | measurements     | List of measurements. Detailed in the [measurements section](#Measurements)                              | List           | -              | []          |
@@ -126,7 +126,7 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | false   |
 | jobIterationDelay    | How many milliseconds to wait between each job iteration                         | Integer | 2000     | false   |
 | jobPause             | How many milliseconds to pause after finishing the job                           | Integer | 10000    | 0       |
-| qps                  | Limit object creation queries per second.                                        | Integer | 25       | 0       |
+| qps                  | Limit object creation queries per second                                         | Integer | 25       | 0       |
 | burst                | Maximum burst for throttle                                                       | Integer | 50       | 0       |
 | objects              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | -        | []      |
 

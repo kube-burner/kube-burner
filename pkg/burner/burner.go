@@ -103,6 +103,7 @@ func ReadConfig(QPS, burst int) {
 		log.Infof("Using kubeconfig: %s", kubeconfig)
 		RestConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	} else {
+		log.Info("Using in-cluster configuration")
 		RestConfig, err = rest.InClusterConfig()
 	}
 	if err != nil {
@@ -121,7 +122,6 @@ func getExecutor(jobConfig config.Job) Executor {
 	// Limits the number of workers to QPS and Burst
 	limiter := rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	selector := util.NewSelector()
-
 	selector.Configure("", fmt.Sprintf("kube-burner=%s", jobConfig.Name), "")
 	ex := Executor{
 		Config:   jobConfig,
@@ -282,7 +282,7 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 			_, err := dynamicClient.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
 			log.Infof("Created %s %s on %s", newObject.GetKind(), newObject.GetName(), ns)
 			if err != nil {
-				log.Fatal(err)
+				log.Errorf("Error creating object: %s", err)
 			}
 		}()
 	}
