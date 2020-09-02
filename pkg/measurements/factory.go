@@ -15,9 +15,9 @@
 package measurements
 
 import (
-	"github.com/rsevilla87/kube-burner/log"
-	"github.com/rsevilla87/kube-burner/pkg/config"
-	"github.com/rsevilla87/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"k8s.io/client-go/kubernetes"
 )
 

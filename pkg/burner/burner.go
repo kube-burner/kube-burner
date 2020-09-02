@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rsevilla87/kube-burner/log"
-	"github.com/rsevilla87/kube-burner/pkg/config"
-	"github.com/rsevilla87/kube-burner/pkg/util"
+	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

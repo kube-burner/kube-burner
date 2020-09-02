@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/rsevilla87/kube-burner/cmd"
+	"github.com/cloud-bulldozer/kube-burner/cmd"
 )
 
 func main() {

@@ -15,8 +15,8 @@
 package indexers
 
 import (
-	"github.com/rsevilla87/kube-burner/log"
-	"github.com/rsevilla87/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 )
 
 // Indexer indexer interface

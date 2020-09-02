@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rsevilla87/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/log"
 
 	corev1 "k8s.io/api/core/v1"
 

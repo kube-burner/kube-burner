@@ -17,7 +17,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/rsevilla87/kube-burner/version"
+	"github.com/cloud-bulldozer/kube-burner/version"
 	"github.com/spf13/cobra"
 )
 

@@ -10,7 +10,7 @@ GIT_COMMIT = $(shell git rev-parse HEAD)
 GIT_BRANCH = $(shell git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
-KUBE_BURNER_PACKAGE = github.com/rsevilla87/kube-burner
+KUBE_BURNER_PACKAGE = github.com/cloud-bulldozer/kube-burner
 
 all: build
 

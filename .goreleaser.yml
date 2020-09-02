@@ -14,7 +14,7 @@ builds:
       - arm64
       - ppc64
     ldflags:
-      - -X github.com/rsevilla87/kube-burner/version.GitCommit={{.Commit}} -X github.com/rsevilla87/kube-burner/version.BuildDate={{.Date}} -X github.com/rsevilla87/kube-burner/version.Version={{.Version}}
+      - -X github.com/cloud-bulldozer/kube-burner/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/kube-burner/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/kube-burner/version.Version={{.Version}}
 archives:
   - name_template: "{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}"
     format: tar.gz

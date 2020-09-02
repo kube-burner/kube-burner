@@ -1,5 +1,5 @@
-[![Build Status](https://github.com/rsevilla87/kube-burner/workflows/Go/badge.svg?branch=master)](https://github.com/rsevilla87/kube-burner/actions?query=workflow%3AGo)
-[![Go Report Card](https://goreportcard.com/badge/github.com/rsevilla87/kube-burner)](https://goreportcard.com/report/github.com/rsevilla87/kube-burner)
+[![Build Status](https://github.com/cloud-bulldozer/kube-burner/workflows/Go/badge.svg?branch=master)](https://github.com/cloud-bulldozer/kube-burner/actions?query=workflow%3AGo)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cloud-bulldozer/kube-burner)](https://goreportcard.com/report/github.com/cloud-bulldozer/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # kube-burner
@@ -17,7 +17,7 @@ Kube-burner is a tool aimed to stress a kubernetes cluster. An overview of its b
 
 In case you want to start tinkering with `kube-burner` now:
 
-- You can find the binaries in the [releases section of this repository](https://github.com/rsevilla87/kube-burner/releases).
+- You can find the binaries in the [releases section of this repository](https://github.com/cloud-bulldozer/kube-burner/releases).
 - There's also a container image available at [quay](https://quay.io/repository/rsevilla/kube-burner?tab=tags).
 - A valid example of a configuration file can be found at [./examples/cfg.yml](./examples/cfg.yml)
 
@@ -30,7 +30,7 @@ To build kube-burner just execute `make build`, once finished `kube-burner`'s bi
 $ make build
 building kube-burner 0.1.0
 GOPATH=/home/rsevilla/go
-CGO_ENABLED=0 go build -v -mod vendor -ldflags "-X github.com/rsevilla87/kube-burner/version.GitCommit=d91c8cc35cb458a4b80a5050704a51c7c6e35076 -X github.com/rsevilla87/kube-burner/version.BuildDate=2020-08-19-19:10:09 -X github.com/rsevilla87/kube-burner/version.GitBranch=master" -o bin/kube-burner
+CGO_ENABLED=0 go build -v -mod vendor -ldflags "-X github.com/cloud-bulldozer/kube-burner/version.GitCommit=d91c8cc35cb458a4b80a5050704a51c7c6e35076 -X github.com/cloud-bulldozer/kube-burner/version.BuildDate=2020-08-19-19:10:09 -X github.com/cloud-bulldozer/kube-burner/version.GitBranch=master" -o bin/kube-burner
 ```
 
 ## Getting started

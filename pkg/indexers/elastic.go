@@ -23,8 +23,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/rsevilla87/kube-burner/log"
-	"github.com/rsevilla87/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esutil"

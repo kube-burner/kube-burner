@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rsevilla87/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/log"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )

@@ -1,4 +1,4 @@
-module github.com/rsevilla87/kube-burner
+module github.com/cloud-bulldozer/kube-burner
 
 go 1.14
 

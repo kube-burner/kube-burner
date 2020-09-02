@@ -2,7 +2,7 @@
 
 ## Development Lead
 
-- Raúl Sevilla Cañavate [rsevilla87](https://github.com/rsevilla87)
+- Raúl Sevilla Cañavate [cloud-bulldozer](https://github.com/rsevilla87)
 
 ## Contributors
 

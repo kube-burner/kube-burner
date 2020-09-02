@@ -20,14 +20,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/rsevilla87/kube-burner/log"
-	"github.com/rsevilla87/kube-burner/pkg/burner"
-	"github.com/rsevilla87/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 
-	"github.com/rsevilla87/kube-burner/pkg/indexers"
-	"github.com/rsevilla87/kube-burner/pkg/measurements"
-	"github.com/rsevilla87/kube-burner/pkg/prometheus"
-	"github.com/rsevilla87/kube-burner/pkg/util"
+	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
+	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 
 	"github.com/spf13/cobra"
 )
