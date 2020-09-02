@@ -45,7 +45,7 @@ func waitForBuild(ns string, wg *sync.WaitGroup, obj object) {
 		for _, b := range builds.Items {
 			jsonBuild, err := b.MarshalJSON()
 			if err != nil {
-				log.Fatalf("Error decoding Build object: %s", err)
+				log.Errorf("Error decoding Build object: %s", err)
 			}
 			_ = json.Unmarshal(jsonBuild, &build)
 			for _, bs := range buildStatus {
@@ -58,6 +58,6 @@ func waitForBuild(ns string, wg *sync.WaitGroup, obj object) {
 		return true, nil
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Errorf("Error waiting for builds: %s", err)
 	}
 }
