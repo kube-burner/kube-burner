@@ -95,16 +95,21 @@ func ReadConfig(QPS, burst int) {
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
-	} else {
+	}
+	if config.ConfigSpec.GlobalConfig.Kubeconfig != "" {
 		kubeconfig = config.ConfigSpec.GlobalConfig.Kubeconfig
 	}
-	log.Infof("Using kubeconfig: %s", kubeconfig)
-	RestConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	RestConfig.QPS = float32(QPS)
-	RestConfig.Burst = burst
+	if kubeconfig != "" {
+		log.Infof("Using kubeconfig: %s", kubeconfig)
+		RestConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	} else {
+		RestConfig, err = rest.InClusterConfig()
+	}
 	if err != nil {
 		log.Fatalf("Error configuring kube-burner: %s", err)
 	}
+	RestConfig.QPS = float32(QPS)
+	RestConfig.Burst = burst
 	ClientSet, err = kubernetes.NewForConfig(RestConfig)
 	if err != nil {
 		log.Fatalf("Error configuring kube-burner: %s", err)
