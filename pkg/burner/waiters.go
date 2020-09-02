@@ -29,7 +29,7 @@ import (
 
 func waitForDeployments(ns string, wg *sync.WaitGroup, obj object) {
 	defer wg.Done()
-	err := wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
 		deps, err := ClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -42,9 +42,6 @@ func waitForDeployments(ns string, wg *sync.WaitGroup, obj object) {
 		}
 		return true, nil
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 func waitForRS(ns string, wg *sync.WaitGroup, obj object) {
