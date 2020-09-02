@@ -1,11 +1,13 @@
 metrics:
-  - query: node_memory_Committed_AS_bytes
-    indexName: node_memory_Committed_AS_bytes
+  - query: sum(irate(node_cpu_seconds_total[2m])) by (mode,instance)
+    indexName: node-cpu
+    metricName: average_cpu_usage_per_instance
   - query: node_memory_MemAvailable_bytes
-    indexName: broza
+    indexName: node-memory
+    metricName: avg_memory_available_bytes
   - query: node_memory_Active_bytes
-  - query: node_memory_MemFree_bytes
-  - query: node_memory_MemTotal_bytes
-  - query: node_memory_Slab_bytes
-  - query: node_cpu_seconds_total
-  - query: sum(kube_pod_info)
+    indexName: node-memory
+    metricName: avg_memory_active_bytes
+  - query:  Average_Memory_Usage_Cached_Buffers
+    indexName: node-memory
+    metricName: avg_memory_cached_bytes

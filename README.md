@@ -205,58 +205,23 @@ The metrics-profile flag points to a YAML file containing a list of the promethe
 As soon one of job finishes, `kube-burner` makes a range query for each query described in this file, and indexes it in the index configured by the parameter `defaultIndex`.
 We can use the parameter `indexName` in a metrics-profile file to make `kube-burner` to index the resulting metrics to a different index.
 An example of a valid metrics profile file is shown below:
+It's very recommended to use the **metricName** parameter in complex queries, since it will allow us to identify them easely.
 
 ```yaml
 metrics:
-  - query: node_memory_Committed_AS_bytes
-    indexName: node_memory_Committed_AS_bytes
+  - query: sum(irate(node_cpu_seconds_total[1m])) by (mode,instance)
+    indexName: node-cpu
+    metricName: average_cpu_usage_per_instance
   - query: node_memory_MemAvailable_bytes
-    indexName: my-custom-index
+    indexName: node-memory
+    metricName: avg_memory_available_bytes
   - query: node_memory_Active_bytes
-  - query: node_memory_MemFree_bytes
-  - query: node_cpu_seconds_total
-  - query: sum(kube_pod_info)
+    indexName: node-memory
+    metricName: avg_memory_active_bytes
+  - query:  Average_Memory_Usage_Cached_Buffers
+    indexName: node-memory
+    metricName: avg_memory_cached_bytes
 ```
-
-Indexed metrics look like:
-> $ cat collected-metrics/kube-burner-job-node_memory_Committed_AS_bytes.json
-```json
-[
-  {
-    "timestamp": "2020-08-12T10:02:21.042+02:00",
-    "value": 24482177024,
-    "labels": {
-      "__name__": "node_memory_Committed_AS_bytes",
-      "endpoint": "https",
-      "instance": "ip-10-0-128-40.eu-west-2.compute.internal",
-      "job": "node-exporter",
-      "namespace": "openshift-monitoring",
-      "pod": "node-exporter-jlv24",
-      "service": "node-exporter"
-    },
-    "uuid": "60e952c0-4d23-4266-bbf0-fc11cfe1afaa",
-    "jobName": "kube-burner-job1",
-    "query": "node_memory_Committed_AS_bytes",
-  },
-  {
-    "timestamp": "2020-08-12T10:02:51.042+02:00",
-    "value": 29052592128,
-    "labels": {
-      "__name__": "node_memory_Committed_AS_bytes",
-      "endpoint": "https",
-      "instance": "ip-10-0-128-40.eu-west-2.compute.internal",
-      "job": "node-exporter",
-      "namespace": "openshift-monitoring",
-      "pod": "node-exporter-jlv24",
-      "service": "node-exporter"
-    },
-    "uuid": "60e952c0-4d23-4266-bbf0-fc11cfe1afaa",
-    "jobName": "kube-burner-job1",
-    "query": "node_memory_Committed_AS_bytes"
-  }
-]
-```
-
 
 ## Indexers
 

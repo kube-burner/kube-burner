@@ -1,5 +1,0 @@
-metrics:
-  - query: node_memory_Committed_AS_bytes
-    indexName: node_memory_Committed_AS_bytes
-  - query: sum(kube_pod_info)
-    indexName: pod_sum

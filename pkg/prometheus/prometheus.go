@@ -52,8 +52,9 @@ type authTransport struct {
 }
 
 type metricDefinition struct {
-	Query     string `yaml:"query"`
-	IndexName string `yaml:"indexName"`
+	Query      string `yaml:"query"`
+	MetricName string `yaml:"metricName"`
+	IndexName  string `yaml:"indexName"`
 }
 
 // MetricsProfile describes what metrics kube-burner collects
@@ -62,12 +63,13 @@ type MetricsProfile struct {
 }
 
 type metric struct {
-	Timestamp time.Time         `json:"timestamp"`
-	Labels    map[string]string `json:"labels"`
-	Value     float64           `json:"value"`
-	UUID      string            `json:"uuid"`
-	JobName   string            `json:"jobName"`
-	Query     string            `json:"query"`
+	Timestamp  time.Time         `json:"timestamp"`
+	Labels     map[string]string `json:"labels"`
+	Value      float64           `json:"value"`
+	UUID       string            `json:"uuid"`
+	JobName    string            `json:"jobName"`
+	Query      string            `json:"query"`
+	MetricName string            `json:"metricName"`
 }
 
 func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -136,6 +138,7 @@ func (p *Prometheus) readProfile(metricsFile string) error {
 
 // ScrapeMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobName string, indexer *indexers.Indexer) error {
+	var filename string
 	log.Infof("🔍 Scraping prometheus metrics for job %s", jobName)
 	r := apiv1.Range{Start: start, End: end, Step: p.step}
 	for _, md := range p.metricsProfile.Metrics {
@@ -145,11 +148,15 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobNam
 		if err != nil {
 			return prometheusError(err)
 		}
-		if err := p.parseResponse(md.Query, jobName, v, &metrics); err != nil {
+		if err := p.parseResponse(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
 			return err
 		}
 		if cfg.GlobalConfig.WriteToFile {
-			filename := fmt.Sprintf("%s-%s.json", jobName, md.Query)
+			if md.MetricName != "" {
+				filename = fmt.Sprintf("%s-%s.json", jobName, md.MetricName)
+			} else {
+				filename = fmt.Sprintf("%s-%s.json", jobName, md.Query)
+			}
 			if cfg.GlobalConfig.MetricsDirectory != "" {
 				err := os.MkdirAll(cfg.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
@@ -185,7 +192,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobNam
 	return nil
 }
 
-func (p *Prometheus) parseResponse(query, jobName string, value model.Value, metrics *[]metric) error {
+func (p *Prometheus) parseResponse(metricName, query, jobName string, value model.Value, metrics *[]metric) error {
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
@@ -193,10 +200,11 @@ func (p *Prometheus) parseResponse(query, jobName string, value model.Value, met
 	for _, v := range data {
 		for _, val := range v.Values {
 			m := metric{
-				Labels:  make(map[string]string),
-				UUID:    p.uuid,
-				JobName: jobName,
-				Query:   query,
+				Labels:     make(map[string]string),
+				UUID:       p.uuid,
+				JobName:    jobName,
+				Query:      query,
+				MetricName: metricName,
 			}
 			for k, v := range v.Metric {
 				m.Labels[string(k)] = string(v)
