@@ -157,21 +157,37 @@ func getExecutor(jobConfig config.Job) Executor {
 			unstructured: uns,
 			inputVars:    o.InputVars,
 		}
-		switch kind := obj.unstructured.GetKind(); kind {
-		case "Deployment":
-			obj.waitFunc = waitForDeployments
-		case "ReplicaSet":
-			obj.waitFunc = waitForRS
-		case "ReplicationController":
-			obj.waitFunc = waitForRC
-		case "DaemonSet":
-			obj.waitFunc = waitForDS
-		case "Pod":
-			obj.waitFunc = waitForPod
-		case "Build":
-			obj.waitFunc = waitForBuild
-		default:
-			log.Infof("Resource of kind %s has no wait function", kind)
+		if jobConfig.PodWait || jobConfig.WaitWhenFinished {
+			waitFor := true
+			if len(jobConfig.WaitFor) > 0 {
+				waitFor = false
+				for _, kind := range jobConfig.WaitFor {
+					if obj.unstructured.GetKind() == kind {
+						waitFor = true
+						break
+					}
+				}
+			}
+			if waitFor {
+				kind := obj.unstructured.GetKind()
+				switch kind {
+				case "Deployment":
+					obj.waitFunc = waitForDeployments
+				case "ReplicaSet":
+					obj.waitFunc = waitForRS
+				case "ReplicationController":
+					obj.waitFunc = waitForRC
+				case "DaemonSet":
+					obj.waitFunc = waitForDS
+				case "Pod":
+					obj.waitFunc = waitForPod
+				case "Build":
+					obj.waitFunc = waitForBuild
+				}
+				if obj.waitFunc != nil {
+					log.Debugf("Added wait function for %s", kind)
+				}
+			}
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, restMapping.GroupVersionKind.Kind)
 		ex.objects = append(ex.objects, obj)

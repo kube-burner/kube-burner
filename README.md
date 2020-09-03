@@ -124,6 +124,7 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | cleanup              | Cleanup clean up old namespaces                                                  | Boolean | true     | true    |
 | podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | true     | true    |
 | waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | false   |
+| waitFor              | List containing the objects Kind wait for. Wait for all if empty                 | List    | ["Deployments", "Build"]| []      |
 | jobIterationDelay    | How many milliseconds to wait between each job iteration                         | Integer | 2000     | false   |
 | jobPause             | How many milliseconds to pause after finishing the job                           | Integer | 10000    | 0       |
 | qps                  | Limit object creation queries per second                                         | Integer | 25       | 0       |

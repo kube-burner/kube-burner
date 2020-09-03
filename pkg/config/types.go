@@ -97,6 +97,8 @@ type Job struct {
 	PodWait bool `yaml:"podWait"`
 	// WaitWhenFinished Wait for pods to be running when all iterations are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished"`
+	// WaitFor list of objects to wait for, if not specified wait for all
+	WaitFor []string `yaml:"waitFor"`
 	// Cleanup clean up old namespaces
 	Cleanup bool `yaml:"cleanup"`
 	// whether to create namespaces or not with each iteration
