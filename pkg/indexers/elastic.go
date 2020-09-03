@@ -52,9 +52,9 @@ func (esIndexer *Elastic) new(esConfig config.IndexerConfig) {
 	if err != nil {
 		log.Errorf("Error creating the ES client: %s", err)
 	}
-	_, err = ESClient.Ping()
-	if err != nil {
-		log.Fatalf("ES connection error: %s", err)
+	r, err := ESClient.Ping()
+	if err != nil || r.StatusCode != 200 {
+		log.Fatalf("ES connection error: %s %d", err, r.StatusCode)
 	}
 	esIndexer.client = ESClient
 }
