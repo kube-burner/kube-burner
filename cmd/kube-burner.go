@@ -187,10 +187,10 @@ func init() {
 
 func steps(uuid string, p *prometheus.Prometheus) {
 	var indexer *indexers.Indexer
-	executorList := burner.NewExecutorList(uuid)
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
 	}
+	executorList := burner.NewExecutorList(uuid)
 	for _, job := range executorList {
 		log.Infof("Triggering job: %s with UUID %s", job.Config.Name, uuid)
 		job.Cleanup()
