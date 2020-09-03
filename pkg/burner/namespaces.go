@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -67,22 +68,22 @@ func CleanupNamespaces(clientset *kubernetes.Clientset, s *util.Selector) error 
 	}
 	ns, _ = clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: s.LabelSelector})
 	if len(ns.Items) > 0 {
-		return waitForDeleteNamespaces(clientset, s)
+		waitForDeleteNamespaces(clientset, s)
 	}
 	return nil
 }
 
-func waitForDeleteNamespaces(clientset *kubernetes.Clientset, s *util.Selector) error {
+func waitForDeleteNamespaces(clientset *kubernetes.Clientset, s *util.Selector) {
 	log.Info("Waiting for namespaces to be definitely deleted")
-	for {
+	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
 		ns, err := clientset.CoreV1().Namespaces().List(context.TODO(), s.ListOptions)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if len(ns.Items) == 0 {
-			return nil
+			return true, nil
 		}
 		log.Debugf("Waiting for %d namespaces labeled with %s to be deleted", len(ns.Items), s.LabelSelector)
-		time.Sleep(1 * time.Second)
-	}
+		return false, nil
+	})
 }
