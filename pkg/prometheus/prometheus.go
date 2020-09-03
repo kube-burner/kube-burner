@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/prometheus/client_golang/api"
-	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
-	"github.com/prometheus/common/model"
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	api "github.com/prometheus/client_golang/api"
+	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 	"gopkg.in/yaml.v3"
 )
 
@@ -90,7 +90,7 @@ func NewPrometheusClient(url, token, username, password, metricsProfile, uuid st
 		step: prometheusStep,
 		uuid: uuid,
 	}
-	log.Info("Initializing prometheus client")
+	log.Info("👽 Initializing prometheus client")
 	cfg := api.Config{
 		Address: url,
 		RoundTripper: authTransport{

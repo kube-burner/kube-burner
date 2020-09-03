@@ -18,7 +18,7 @@ Kube-burner is a tool aimed to stress a kubernetes cluster. An overview of its b
 In case you want to start tinkering with `kube-burner` now:
 
 - You can find the binaries in the [releases section of this repository](https://github.com/cloud-bulldozer/kube-burner/releases).
-- There's also a container image available at [quay](https://quay.io/repository/rsevilla/kube-burner?tab=tags).
+- There's also a container image available at [quay](https://quay.io/repository/cloud-bulldozer/kube-burner?tab=tags).
 - A valid example of a configuration file can be found at [./examples/cfg.yml](./examples/cfg.yml)
 
 
