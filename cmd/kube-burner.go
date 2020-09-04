@@ -65,10 +65,10 @@ func initCmd() *cobra.Command {
 			if url != "" {
 				p, err = prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
 				if err != nil {
-					log.Fatal(err)
+					log.Fatalf("Error setting up Prometheus client: %s", err)
 				}
 			}
-			steps(uuid, p)
+			steps(uuid, p, prometheusStep)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID")
@@ -185,7 +185,7 @@ func init() {
 	cobra.OnInitialize()
 }
 
-func steps(uuid string, p *prometheus.Prometheus) {
+func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) {
 	var indexer *indexers.Indexer
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
@@ -199,14 +199,16 @@ func steps(uuid string, p *prometheus.Prometheus) {
 		measurements.Start()
 		// Run execution
 		job.Run()
+		measurements.Stop()
+		measurements.Index()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, job.End.Sub(job.Start).Seconds())
 		if p != nil {
-			if err := p.ScrapeMetrics(job.Start, job.End, config.ConfigSpec, job.Config.Name, indexer); err != nil {
+			log.Infof("Waiting extra %v before scraping prometheus metrics", prometheusStep*2)
+			time.Sleep(prometheusStep * 2)
+			if err := p.ScrapeMetrics(job.Start, job.End.Add(2*prometheusStep), config.ConfigSpec, job.Config.Name, indexer); err != nil {
 				log.Error(err)
 			}
 		}
-		measurements.Stop()
-		measurements.Index()
 		if job.Config.JobPause > 0 {
 			log.Infof("Pausing for %d milliseconds before next job", job.Config.JobPause)
 			time.Sleep(time.Millisecond * time.Duration(job.Config.JobPause))
