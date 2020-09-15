@@ -22,7 +22,11 @@ jobs:
     namespacedIterations: true
     cleanup: true
     namespace: kube-burner-job-ns
-    podWait: true
+    podWait: false
+    waitWhenFinished: true
+    waitFor: ["Deployment"]
+    verifyObjects: true
+    errorOnVerify: false
     jobIterationDelay: 0
     jobPause: 1000
     objects:

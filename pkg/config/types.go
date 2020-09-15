@@ -95,14 +95,18 @@ type Job struct {
 	Namespace string `yaml:"namespace"`
 	// PodWait wait for all pods to be running before moving forward to the next iteration
 	PodWait bool `yaml:"podWait"`
-	// WaitWhenFinished Wait for pods to be running when all iterations are completed
+	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished"`
 	// WaitFor list of objects to wait for, if not specified wait for all
 	WaitFor []string `yaml:"waitFor"`
 	// Cleanup clean up old namespaces
 	Cleanup bool `yaml:"cleanup"`
-	// whether to create namespaces or not with each iteration
+	// whether to create namespaces or not with each job iteration
 	Namespaced bool `yaml:"namespaced"`
-	// NamespacedIterations create a namespace per iteration
+	// NamespacedIterations create a namespace per job iteration
 	NamespacedIterations bool `yaml:"namespacedIterations"`
+	// VerifyObjects verify object count after running the job
+	VerifyObjects bool `yaml:"verifyObjects"`
+	// ErrorOnVerify exit when verification fails
+	ErrorOnVerify bool `yaml:"errorOnVerify"`
 }

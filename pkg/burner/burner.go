@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -234,9 +235,9 @@ func (ex *Executor) Run() {
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 		}
-		for _, obj := range ex.objects {
+		for objectPosition, obj := range ex.objects {
 			wg.Add(1)
-			go ex.replicaHandler(obj, ns, i, &wg)
+			go ex.replicaHandler(objectPosition, obj, ns, i, &wg)
 		}
 		if ex.Config.PodWait {
 			// If podWait is enabled, first wait for all replicaHandlers to finish
@@ -266,6 +267,29 @@ func (ex *Executor) Run() {
 	ex.End = time.Now().UTC()
 }
 
+// Verify verifies the number of created objects
+func (ex *Executor) Verify() bool {
+	success := true
+	log.Info("Verifying created objects")
+	for objectPosition, obj := range ex.objects {
+		listOptions := metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("kube-burner=%s,objectPosition=%d", ex.uuid, objectPosition),
+		}
+		objList, err := dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
+		if err != nil {
+			log.Errorf("Error verifying object: %s", err)
+		}
+		objectsExpected := ex.Config.JobIterations * obj.replicas
+		if len(objList.Items) != objectsExpected {
+			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, len(objList.Items), objectsExpected)
+			success = false
+		} else {
+			log.Infof("%s found: %d Expected: %d", obj.gvr.Resource, len(objList.Items), objectsExpected)
+		}
+	}
+	return success
+}
+
 func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
 	o, gvr, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
 	if err != nil {
@@ -274,7 +298,11 @@ func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Objec
 	return o, gvr
 }
 
-func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *sync.WaitGroup) {
+func (ex *Executor) replicaHandler(objectPosition int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
+	label := map[string]string{
+		"kube-burner":    ex.uuid,
+		"objectPosition": strconv.Itoa(objectPosition),
+	}
 	defer wg.Done()
 	tData := map[string]interface{}{
 		jobName:      ex.Config.Name,
@@ -290,15 +318,17 @@ func (ex *Executor) replicaHandler(obj object, ns string, iteration int, wg *syn
 		renderedObj := renderTemplate(obj.objectSpec, tData)
 		// Re-decode rendered object
 		yamlToUnstructured(renderedObj, newObject)
+		newObject.SetLabels(label)
 		wg.Add(1)
 		go func() {
 			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
 			defer wg.Done()
 			ex.limiter.Wait(context.TODO())
 			_, err := dynamicClient.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
-			log.Infof("Created %s %s on %s", newObject.GetKind(), newObject.GetName(), ns)
 			if err != nil {
 				log.Errorf("Error creating object: %s", err)
+			} else {
+				log.Infof("Created %s %s on %s", newObject.GetKind(), newObject.GetName(), ns)
 			}
 		}()
 	}
