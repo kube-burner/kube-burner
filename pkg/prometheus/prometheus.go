@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path"
@@ -209,7 +210,11 @@ func (p *Prometheus) parseResponse(metricName, query, jobName string, value mode
 			for k, v := range v.Metric {
 				m.Labels[string(k)] = string(v)
 			}
-			m.Value = float64(val.Value)
+			if math.IsNaN(float64(val.Value)) {
+				m.Value = 0
+			} else {
+				m.Value = float64(val.Value)
+			}
 			m.Timestamp = val.Timestamp.Time()
 			*metrics = append(*metrics, m)
 		}
