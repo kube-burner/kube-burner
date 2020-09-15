@@ -42,6 +42,8 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		NamespacedIterations: true,
 		PodWait:              true,
 		WaitWhenFinished:     false,
+		VerifyObjects:        true,
+		ErrorOnVerify:        false,
 	}
 	if err := unmarshal(&raw); err != nil {
 		return err

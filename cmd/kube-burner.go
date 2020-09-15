@@ -186,6 +186,7 @@ func init() {
 }
 
 func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) {
+	verification := true
 	var indexer *indexers.Indexer
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
@@ -200,14 +201,26 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 		// Run execution
 		job.Run()
 		measurements.Stop()
-		measurements.Index()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, job.End.Sub(job.Start).Seconds())
+		if job.Config.VerifyObjects {
+			verification = job.Verify()
+			// If verification failed and ErrorOnVerify is enabled. Exit with error, otherwise continue
+			if !verification && job.Config.ErrorOnVerify {
+				log.Fatal("Object verification failed. Exiting")
+			}
+		}
+		measurements.Index()
+		// If prometheus is enabled
 		if p != nil {
 			log.Infof("Waiting extra %v before scraping prometheus metrics", prometheusStep*2)
 			time.Sleep(prometheusStep * 2)
 			if err := p.ScrapeMetrics(job.Start, job.End.Add(2*prometheusStep), config.ConfigSpec, job.Config.Name, indexer); err != nil {
 				log.Error(err)
 			}
+		}
+		// Exit if verification failed
+		if job.Config.VerifyObjects && !verification {
+			log.Fatal("Object verification failed")
 		}
 		if job.Config.JobPause > 0 {
 			log.Infof("Pausing for %d milliseconds before next job", job.Config.JobPause)

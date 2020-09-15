@@ -124,12 +124,14 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | cleanup              | Cleanup clean up old namespaces                                                  | Boolean | true     | true    |
 | podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | true     | true    |
 | waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | false   |
-| waitFor              | List containing the objects Kind wait for. Wait for all if empty                 | List    | ["Deployments", "Build"]| []      |
+| waitFor              | List containing the objects Kind wait for. Wait for all if empty                 | List    | ["Deployment", "Build", "DaemonSet"]| []      |
 | jobIterationDelay    | How many milliseconds to wait between each job iteration                         | Integer | 2000     | false   |
 | jobPause             | How many milliseconds to pause after finishing the job                           | Integer | 10000    | 0       |
 | qps                  | Limit object creation queries per second                                         | Integer | 25       | 0       |
 | burst                | Maximum burst for throttle                                                       | Integer | 50       | 0       |
 | objects              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | -        | []      |
+| verifyObjects        | Verify object count after running each job. Return code will be 1 if failed      | Boolean | true     | true    |
+| errorOnVerify        | Exit with rc 1 before indexing when objects verification fails                   | Boolean | true     | false   |
 
 
 A valid example of a configuration file can be found at [./examples/cfg.yml](./examples/cfg.yml)
@@ -156,7 +158,7 @@ All object templates are injected a series of variables by default:
 - JobName: Job name.
 - UUID: Benchmark UUID.
 
-In addition, you can also inject your own custom variables with the option inputVars from the objectTemplate object:
+In addition, you can also inject arbitrary variables with the option inputVars from the objectTemplate object:
 
 ```yaml
     - objectTemplate: service.yml
@@ -166,7 +168,7 @@ In addition, you can also inject your own custom variables with the option input
         targetPort: 8080
 ```
 
-The following code snippet constains an example of a k8s service using these variables:
+The following code snippet shows an example of a k8s service using these variables:
 
 
 ```yaml
@@ -263,7 +265,7 @@ Measurements are enabled by the measurements section of the configuration file. 
 All measurements support the esIndex option that describe the ES index where metrics will be indexed.
 'kube-burner' supports the following measurements so far:
 
-* pod-latency: It collects pod startup phases **latency metrics in ms**. This measurement can be enabled with:
+* pod-latency: It collects pod startup phases, these **latency metrics are in ms**. Can be enabled with:
 
 ```yaml
     measurements:
@@ -271,7 +273,7 @@ All measurements support the esIndex option that describe the ES index where met
       esIndex: kube-burner-podlatency
 ```
 
-This measurement send its metrics to two different indexes, <esIndex> is used to save the latency histograms and '<esIndex>-summary' is used to save
+This measurement sends its metrics to two different indexes, <esIndex> is used to save the latency histograms and '<esIndex>-summary' is used to save
 the measurement quantiles P99, P95 and P50.
 
 Pod latency sample:
