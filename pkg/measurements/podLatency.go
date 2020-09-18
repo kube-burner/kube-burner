@@ -45,6 +45,7 @@ type podMetric struct {
 	podReady               time.Time
 	PodReadyLatency        int64 `json:"podReadyLatency"`
 }
+
 type podLatencyQuantiles struct {
 	Name      string    `json:"quantileName"`
 	JobName   string    `json:"jobName"`

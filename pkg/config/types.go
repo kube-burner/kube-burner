@@ -14,6 +14,16 @@
 
 package config
 
+// JobType type of job
+type JobType string
+
+const (
+	// CreationJob used to create objects
+	CreationJob JobType = "create"
+	// DeletionJob used to delete objects
+	DeletionJob JobType = "delete"
+)
+
 // Spec configuration root
 type Spec struct {
 	// GlobalConfig defines global configuration parameters
@@ -24,7 +34,6 @@ type Spec struct {
 
 // IndexerConfig holds the indexer configuration
 type IndexerConfig struct {
-
 	// Type type of indexer
 	Type string `yaml:"type"`
 	// ESServers List of ElasticSearch instances
@@ -73,6 +82,12 @@ type Object struct {
 	// InputVars contains a map of arbitrary input variables
 	// that can be introduced by the users
 	InputVars map[string]string `yaml:"inputVars"`
+	// Kind object kind to delete
+	Kind string `yaml:"kind"`
+	// APIVersion apiVersion of the object to remove
+	APIVersion string `yaml:"apiVersion"`
+	// labelSelector objects with this labels will be removed
+	LabelSelector map[string]string `yaml:"labelSelector"`
 }
 
 // Job defines a kube-burner job
@@ -87,18 +102,22 @@ type Job struct {
 	Name string `yaml:"name"`
 	// Objects list of objects
 	Objects []Object `yaml:"objects"`
+	// JobType type of job
+	JobType JobType `yaml:"jobType"`
 	// Max number of queries per second
 	QPS int `yaml:"qps"`
 	// Maximum burst for throttle
 	Burst int `yaml:"burst"`
 	// Namespace namespace base name to use
 	Namespace string `yaml:"namespace"`
+	// WaitFor list of objects to wait for, if not specified wait for all
+	WaitFor []string `yaml:"waitFor"`
 	// PodWait wait for all pods to be running before moving forward to the next iteration
 	PodWait bool `yaml:"podWait"`
 	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished"`
-	// WaitFor list of objects to wait for, if not specified wait for all
-	WaitFor []string `yaml:"waitFor"`
+	// WaitForDeletion wait for objects to be definitively deleted
+	WaitForDeletion bool `yaml:"waitForDeletion"`
 	// Cleanup clean up old namespaces
 	Cleanup bool `yaml:"cleanup"`
 	// whether to create namespaces or not with each job iteration

@@ -4,6 +4,25 @@
 
 # kube-burner
 
+- [kube-burner](#kube-burner)
+  - [What's this?](#whats-this)
+  - [Quick start](#quick-start)
+  - [Building](#building)
+  - [Getting started](#getting-started)
+  - [Configuration](#configuration)
+    - [Objects](#objects)
+    - [Job types](#job-types)
+    - [Injected variables](#injected-variables)
+    - [Metrics profile](#metrics-profile)
+    - [Indexers](#indexers)
+    - [Measurements](#measurements)
+  - [Contributing to kube-burner](#contributing-to-kube-burner)
+    - [Requirements](#requirements)
+
+
+
+## What's this?
+
 Kube-burner is a tool aimed to stress a kubernetes cluster. An overview of its behaviour can be summarized with these three steps:
 
 - Create the objects declared in the jobs.
@@ -22,7 +41,7 @@ In case you want to start tinkering with `kube-burner` now:
 - A valid example of a configuration file can be found at [./examples/cfg.yml](./examples/cfg.yml)
 
 
-## Buiding
+## Building
 
 To build kube-burner just execute `make build`, once finished `kube-burner`'s binary should be available at `./bin/kube-burner`
 
@@ -39,7 +58,6 @@ kube-burner is basically a binary client with currently the following options.
 
 ```console
 ./bin/kube-burner help
-INFO[2020-08-11 12:37:30] 🔥 Starting kube-burner                       
 kube-burner is a tool that aims to stress a kubernetes cluster.
 
 It doesn’t only provide similar features as other tools like cluster-loader, but also
@@ -118,6 +136,7 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | Option               | Description                                                                      | Type    | Example  | Default |
 |----------------------|----------------------------------------------------------------------------------|---------|----------|---------|
 | name                 | Job name                                                                         | String  | myjob    | ""      |
+| jobType              | Type of job to execute. More details at [job types](#job-types)                  | string  | create   | create  |
 | jobIterations        | How many times to execute the job                                                | Integer | 10       | 0       |
 | namespace            | Namespace base name to use                                                       | String  | firstjob | ""      |
 | namespacedIterations | Whether to create a namespace per job iteration                                  | Boolean | true     | true    |
@@ -147,9 +166,62 @@ Each object element supports the following parameters:
 | replicas             | How replicas of this object to create per job iteration           | Integer | 10             | -       |
 | inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -              | -       |
 
-----
+It's important to note that all objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`
 
-## Injected variables
+
+### Job types
+
+kube-burner support two types of jobs with different parameters each. The default job type is __create__. Which basically creates objects as described in the section [objects](#objects).
+
+The other type is __delete__, this type of job deletes objects described in the objects list. Using delete as job type the objects list would have the following structure.
+
+```yaml
+objects:
+- kind: Deployment
+  labelSelector: {kube-burner-job: cluster-density}
+  apiVersion: apps/v1
+
+- kind: Secret
+  labelSelector: {kube-burner-job: cluster-density}
+```
+Where:
+- kind: Object kind of the k8s object to delete.
+- labelSelector: Map with the labelSelector.
+- apiVersion: API version from the k8s object.
+
+As mentioned previously, all objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. Thanks to this we could design a workload with one job to create objects and another one able to remove the objects created by the previous
+
+```yaml
+jobs:
+- name: create-objects
+  namespace: job-namespace
+  jobIterations: 100
+  objects:
+  - objectTemplate: deployment.yml
+    replicas: 10
+
+  - objectTemplate: service.yml
+    replicas: 10
+
+- name: remove-objects
+  jobType: delete
+  objects:
+  - kind: Deployment
+    labelSelector: {kube-burner-job: create-objects}
+    apiVersion: apps/v1
+
+  - kind: Secret
+    labelSelector: {kube-burner-job: create-objects}
+```
+
+This job type supports the some of the same parameters as the create job type:
+- **waitForDeletion**: Wait for objects to be deleted before finishing the job. Defaults to true
+- name
+- qps
+- burst
+- jobPause
+
+### Injected variables
 
 All object templates are injected a series of variables by default:
 
@@ -202,7 +274,7 @@ spec:
 {{ end }}
 ```
 
-## Metrics profile
+### Metrics profile
 
 The metrics-profile flag points to a YAML file containing a list of the prometheus queries kube-burner will collect for each job.
 As soon one of job finishes, `kube-burner` makes a range query for each query described in this file, and indexes it in the index configured by the parameter `defaultIndex`.
@@ -212,21 +284,17 @@ It's very recommended to use the **metricName** parameter in complex queries, si
 
 ```yaml
 metrics:
-  - query: sum(irate(node_cpu_seconds_total[1m])) by (mode,instance)
-    indexName: node-cpu
-    metricName: average_cpu_usage_per_instance
-  - query: node_memory_MemAvailable_bytes
-    indexName: node-memory
-    metricName: avg_memory_available_bytes
-  - query: node_memory_Active_bytes
-    indexName: node-memory
-    metricName: avg_memory_active_bytes
-  - query:  Average_Memory_Usage_Cached_Buffers
-    indexName: node-memory
-    metricName: avg_memory_cached_bytes
+  - query: irate(process_cpu_seconds_total{job=~".*(crio|etcd|controller-manager|apiserver|scheduler).*"}[2m])
+    metricName: controlPlaneCPU
+
+  - query: process_resident_memory_bytes{job=~".*(crio|etcd|controller-manager|apiserver|scheduler).*"}
+    metricName: controlPlaneMemory
+
+  - query: sum(irate(node_cpu_seconds_total[2m])) by (mode,instance)
+    metricName: nodeCPU
 ```
 
-## Indexers
+### Indexers
 
 `kube-burner` is able to **index the collected prometheus metrics** into a given Indexer. 
 The indexer configuration is described in the `indexerConfig` section and can be configured with the following parameters:
@@ -257,7 +325,7 @@ The `elastic` indexer is configured by the parameters below:
 | insecureSkipVerify   | TLS certificate verification                      | Boolean     | true                                     | false   |
 
 
-## Measurements
+### Measurements
 
 Apart from prometheus metrics collection, `kube-burner` allows to get further metrics using other mechanisms or data sources such as the 
 own kubernetes API, these mechanisms are called measurements.

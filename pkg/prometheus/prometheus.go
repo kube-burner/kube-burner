@@ -68,7 +68,6 @@ type metric struct {
 	Labels     map[string]string `json:"labels"`
 	Value      float64           `json:"value"`
 	UUID       string            `json:"uuid"`
-	JobName    string            `json:"jobName"`
 	Query      string            `json:"query"`
 	MetricName string            `json:"metricName"`
 }
@@ -138,10 +137,10 @@ func (p *Prometheus) readProfile(metricsFile string) error {
 }
 
 // ScrapeMetrics gets all prometheus metrics required and handles them
-func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobName string, indexer *indexers.Indexer) error {
+func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexer *indexers.Indexer) error {
 	var filename string
-	log.Infof("🔍 Scraping prometheus metrics for job %s", jobName)
 	r := apiv1.Range{Start: start, End: end, Step: p.step}
+	log.Infof("🔍 Scraping prometheus metrics from %s to %s", start, end)
 	for _, md := range p.metricsProfile.Metrics {
 		metrics := []metric{}
 		log.Infof("Quering %s", md.Query)
@@ -149,14 +148,14 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobNam
 		if err != nil {
 			return prometheusError(err)
 		}
-		if err := p.parseResponse(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
+		if err := p.parseResponse(md.MetricName, md.Query, v, &metrics); err != nil {
 			return err
 		}
 		if cfg.GlobalConfig.WriteToFile {
 			if md.MetricName != "" {
-				filename = fmt.Sprintf("%s-%s.json", jobName, md.MetricName)
+				filename = fmt.Sprintf("%s-%s.json", md.MetricName, p.uuid)
 			} else {
-				filename = fmt.Sprintf("%s-%s.json", jobName, md.Query)
+				filename = fmt.Sprintf("%s-%s.json", md.Query, p.uuid)
 			}
 			if cfg.GlobalConfig.MetricsDirectory != "" {
 				err := os.MkdirAll(cfg.GlobalConfig.MetricsDirectory, 0744)
@@ -193,7 +192,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, jobNam
 	return nil
 }
 
-func (p *Prometheus) parseResponse(metricName, query, jobName string, value model.Value, metrics *[]metric) error {
+func (p *Prometheus) parseResponse(metricName, query string, value model.Value, metrics *[]metric) error {
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
@@ -203,7 +202,6 @@ func (p *Prometheus) parseResponse(metricName, query, jobName string, value mode
 			m := metric{
 				Labels:     make(map[string]string),
 				UUID:       p.uuid,
-				JobName:    jobName,
 				Query:      query,
 				MetricName: metricName,
 			}

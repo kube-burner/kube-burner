@@ -59,7 +59,7 @@ func initCmd() *cobra.Command {
 		Short: "Launch benchmark",
 		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			log.Info("🔥 Starting kube-burner")
+			log.Infof("🔥 Starting kube-burner with UUID %s", uuid)
 			var p *prometheus.Prometheus
 			var err error
 			if url != "" {
@@ -121,12 +121,12 @@ func indexCmd() *cobra.Command {
 			}
 			p, err := prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Error setting up Prometheus client: %s", err)
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			for _, j := range config.ConfigSpec.Jobs {
-				p.ScrapeMetrics(startTime, endTime, config.ConfigSpec, j.Name, indexer)
+			if err := p.ScrapeMetrics(startTime, endTime, config.ConfigSpec, indexer); err != nil {
+				log.Error(err)
 			}
 		},
 	}
@@ -186,45 +186,56 @@ func init() {
 }
 
 func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) {
+	start := time.Now().UTC()
 	verification := true
+	var rc int
 	var indexer *indexers.Indexer
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
 	}
 	executorList := burner.NewExecutorList(uuid)
 	for _, job := range executorList {
-		log.Infof("Triggering job: %s with UUID %s", job.Config.Name, uuid)
-		job.Cleanup()
-		measurements.NewMeasurementFactory(burner.ClientSet, config.ConfigSpec.GlobalConfig, job.Config, uuid, indexer)
-		measurements.Register(config.ConfigSpec.GlobalConfig.Measurements)
-		measurements.Start()
+		log.Infof("Triggering job: %s", job.Config.Name)
 		// Run execution
-		job.Run()
-		measurements.Stop()
+		switch job.Config.JobType {
+		case config.CreationJob:
+			job.Cleanup()
+			measurements.NewMeasurementFactory(burner.ClientSet, config.ConfigSpec.GlobalConfig, job.Config, uuid, indexer)
+			measurements.Register(config.ConfigSpec.GlobalConfig.Measurements)
+			measurements.Start()
+			job.RunCreateJob()
+			measurements.Stop()
+			if job.Config.VerifyObjects {
+				verification = job.Verify()
+				// If verification failed and ErrorOnVerify is enabled. Exit with error, otherwise continue
+				if !verification && job.Config.ErrorOnVerify {
+					log.Fatal("Object verification failed. Exiting")
+				}
+			}
+			// We index measurements per job
+			measurements.Index()
+			// Verification failed
+			if job.Config.VerifyObjects && !verification {
+				log.Error("Object verification failed")
+				rc = 1
+			}
+		case config.DeletionJob:
+			job.RunDeleteJob()
+		}
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, job.End.Sub(job.Start).Seconds())
-		if job.Config.VerifyObjects {
-			verification = job.Verify()
-			// If verification failed and ErrorOnVerify is enabled. Exit with error, otherwise continue
-			if !verification && job.Config.ErrorOnVerify {
-				log.Fatal("Object verification failed. Exiting")
-			}
-		}
-		measurements.Index()
-		// If prometheus is enabled
-		if p != nil {
-			log.Infof("Waiting extra %v before scraping prometheus metrics", prometheusStep*2)
-			time.Sleep(prometheusStep * 2)
-			if err := p.ScrapeMetrics(job.Start, job.End.Add(2*prometheusStep), config.ConfigSpec, job.Config.Name, indexer); err != nil {
-				log.Error(err)
-			}
-		}
-		// Exit if verification failed
-		if job.Config.VerifyObjects && !verification {
-			log.Fatal("Object verification failed")
-		}
 		if job.Config.JobPause > 0 {
 			log.Infof("Pausing for %d milliseconds before next job", job.Config.JobPause)
 			time.Sleep(time.Millisecond * time.Duration(job.Config.JobPause))
 		}
 	}
+	// If prometheus is enabled query metrics from the start of the first job to the end of the last one
+	if p != nil {
+		log.Infof("Waiting an extra %v before scraping prometheus metrics", prometheusStep*4)
+		time.Sleep(prometheusStep * 4)
+		if err := p.ScrapeMetrics(start, time.Now().UTC(), config.ConfigSpec, indexer); err != nil {
+			log.Error(err)
+		}
+	}
+	log.Info("👋 Exiting kube-burner")
+	os.Exit(rc)
 }

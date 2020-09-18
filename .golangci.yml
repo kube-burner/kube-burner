@@ -1,4 +1,8 @@
+linters-settings:
+  misspell:
+    locale: US
 linters:
+  disable-all: true
   enable:
     - nakedret
     - interfacer
@@ -10,7 +14,6 @@ linters:
     - ineffassign
     - goconst
     - goimports
-    - errcheck
     - dupl
     - unparam
     - golint
