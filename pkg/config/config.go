@@ -44,6 +44,8 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		WaitWhenFinished:     false,
 		VerifyObjects:        true,
 		ErrorOnVerify:        false,
+		JobType:              CreationJob,
+		WaitForDeletion:      true,
 	}
 	if err := unmarshal(&raw); err != nil {
 		return err

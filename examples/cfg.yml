@@ -16,6 +16,7 @@ global:
 
 jobs:
   - name: kube-burner-job
+    jobType: create
     jobIterations: 5
     qps: 20
     burst: 40
@@ -43,16 +44,19 @@ jobs:
         replicas: 2
   
   - name: second-job
-    jobIterations: 5
+    jobType: delete
+    waitForDeletion: true
     qps: 10
     burst: 20
-    namespacedIterations: true
-    jobPause: 0
-    cleanup: true
-    namespace: second-job
-    podWait: true
-    jobIterationDelay: 0
     objects:
 
-      - objectTemplate: objectTemplates/deployment2.yml
-        replicas: 5
+    - kind: Deployment
+      labelSelector: {job: kube-burner-job}
+      apiVersion: apps/v1
+
+    - kind: Secret
+      labelSelector: {job: kube-burner-job}
+
+    - kind: Secret
+      labelSelector: {job: kube-burner-job}
+      apiVersion: route.openshift.io/v1

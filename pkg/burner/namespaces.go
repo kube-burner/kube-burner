@@ -31,7 +31,7 @@ import (
 
 func createNamespaces(clientset *kubernetes.Clientset, config config.Job, uuid string) {
 	labels := map[string]string{
-		"kube-burner":      config.Name,
+		"kube-burner-job":  config.Name,
 		"kube-burner-uuid": uuid,
 	}
 	for i := 1; i <= config.JobIterations; i++ {
