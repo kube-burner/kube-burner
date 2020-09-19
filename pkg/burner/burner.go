@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -102,6 +103,9 @@ func ReadConfig(QPS, burst int) {
 	}
 	if config.ConfigSpec.GlobalConfig.Kubeconfig != "" {
 		kubeconfig = config.ConfigSpec.GlobalConfig.Kubeconfig
+	}
+	if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	}
 	if kubeconfig != "" {
 		log.Infof("Using kubeconfig: %s", kubeconfig)

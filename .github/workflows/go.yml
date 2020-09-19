@@ -3,26 +3,59 @@ name: Go
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+    - "**.md"
+    - "examples/**"
+    - "hack/**"
   pull_request:
     branches: [ master ]
+    paths-ignore:
+    - "**.md"
+    - "examples/**"
+    - "hack/**"
 
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        golang-version: [1.14, 1.15]
+        image-versions:
+        - kindest/node:v1.19
+        - kindest/node:v1.18
+        - kindest/node:v1.17
     steps:
 
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
-        go-version: ^1.13
+        go-version: ${{matrix.golang-version}}
       id: go
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
+    - uses: actions/cache@v2
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
     - name: Build
       run: make build
+
+    - name: Setup kinD
+      uses: engineerd/setup-kind@v0.4.0
+      with:
+        config: test/kind.yml 
+        omage: ${{matrix.image-versions}}
+        version: "v0.7.0"
+  
+    - name: Execute kube-burner test
+      working-directory: test
+      run: ../bin/kube-burner init -c kube-burner.yml --uuid my-uuid      
 
   lint:     
     name: Run golangci-lint
@@ -48,5 +81,13 @@ jobs:
         # the token is used for fetching patch of a pull request to show only new issues
         #github-token: # default is ${{ github.token }}
 
+  build-container:
+    name: Build container image
+    runs-on: ubuntu-latest
+    steps:
 
-    
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - run: make images
+

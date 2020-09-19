@@ -51,12 +51,9 @@ jobs:
     objects:
 
     - kind: Deployment
-      labelSelector: {job: kube-burner-job}
+      labelSelector: {kube-burner-job: kube-burner-job}
       apiVersion: apps/v1
 
     - kind: Secret
-      labelSelector: {job: kube-burner-job}
+      labelSelector: {kube-burner-job: kube-burner-job}
 
-    - kind: Secret
-      labelSelector: {job: kube-burner-job}
-      apiVersion: route.openshift.io/v1

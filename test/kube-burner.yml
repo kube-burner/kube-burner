@@ -1,0 +1,64 @@
+---
+ 
+global:
+  writeToFile: true
+  metricsDirectory: collected-metrics
+  measurements:
+    - name: podLatency
+      esIndex: kube-burner-podlatency
+
+  indexerConfig:
+    enabled: false
+
+jobs:
+  - name: create-job
+    jobType: create
+    jobIterations: 2
+    qps: 5
+    burst: 15
+    namespacedIterations: true
+    cleanup: true
+    namespace: my-ns
+    podWait: false
+    waitWhenFinished: true
+    verifyObjects: true
+    errorOnVerify: true
+    objects:
+    
+    - objectTemplate: objectTemplates/deployment.yml
+      replicas: 1
+      inputVars:
+        containerImage: gcr.io/google_containers/pause-amd64:3.0
+
+  - name: create-job-2
+    jobType: create
+    jobIterations: 2
+    qps: 5
+    burst: 15
+    namespacedIterations: true
+    cleanup: true
+    namespace: my-ns
+    podWait: true
+    waitWhenFinished: false
+    verifyObjects: true
+    errorOnVerify: true
+    jobIterationDelay: 1000
+    objects:
+    
+    - objectTemplate: objectTemplates/deployment.yml
+      replicas: 1
+      inputVars:
+        containerImage: gcr.io/google_containers/pause-amd64:3.0
+    
+     
+  - name: delete-job
+    jobType: delete
+    waitForDeletion: true
+    qps: 10
+    burst: 20
+    jobPause: 1
+    objects:
+
+    - kind: Deployment
+      labelSelector: {kube-burner-job: create-job-2}
+      apiVersion: apps/v1

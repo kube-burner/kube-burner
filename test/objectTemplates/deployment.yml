@@ -1,0 +1,21 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sleep-app-{{ .Iteration }}-{{ .Replica }}-{{.JobName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sleep-app-{{ .Iteration }}-{{ .Replica }}
+  template:
+    metadata:
+      labels:
+        app: sleep-app-{{ .Iteration }}-{{ .Replica }}
+    spec:
+      containers:
+      - args:
+        - sleep
+        - infinity
+        image: {{.containerImage}}
+        name: ci-app
