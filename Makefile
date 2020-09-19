@@ -12,6 +12,12 @@ SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
 KUBE_BURNER_PACKAGE = github.com/cloud-bulldozer/kube-burner
 
+ifeq (, $(shell command -v docker))
+  ENGINE := podman
+else
+  ENGINE := docker
+endif
+
 all: build
 
 help:
@@ -40,3 +46,6 @@ vendor:
 
 install:
 	cp $(BIN_DIR)/$(BIN_NAME) /usr/bin/$(BIN_NAME)
+
+images:
+	$(ENGINE) build -f Containerfile . -t kube-burner:latest
