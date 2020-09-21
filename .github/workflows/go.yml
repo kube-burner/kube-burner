@@ -50,7 +50,7 @@ jobs:
       uses: engineerd/setup-kind@v0.4.0
       with:
         config: test/kind.yml 
-        omage: ${{matrix.image-versions}}
+        image: ${{matrix.image-versions}}
         version: "v0.7.0"
   
     - name: Execute kube-burner test
