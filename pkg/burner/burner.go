@@ -392,11 +392,12 @@ func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Objec
 }
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
-	label := map[string]string{
+	labels := map[string]string{
 		"kube-burner-uuid":  ex.uuid,
 		"kube-burner-job":   ex.Config.Name,
 		"kube-burner-index": strconv.Itoa(objectIndex),
 	}
+
 	defer wg.Done()
 	tData := map[string]interface{}{
 		jobName:      ex.Config.Name,
@@ -412,7 +413,10 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 		renderedObj := renderTemplate(obj.objectSpec, tData)
 		// Re-decode rendered object
 		yamlToUnstructured(renderedObj, newObject)
-		newObject.SetLabels(label)
+		for k, v := range newObject.GetLabels() {
+			labels[k] = v
+		}
+		newObject.SetLabels(labels)
 		wg.Add(1)
 		go func() {
 			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
