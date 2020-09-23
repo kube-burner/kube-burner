@@ -5,7 +5,7 @@ global:
   metricsDirectory: collected-metrics
   measurements:
     - name: podLatency
-      esIndex: kube-burner-podlatency
+      esIndex: kube-burner
 
   indexerConfig:
     enabled: false

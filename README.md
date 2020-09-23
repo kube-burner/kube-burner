@@ -330,10 +330,10 @@ The `elastic` indexer is configured by the parameters below:
 Apart from prometheus metrics collection, `kube-burner` allows to get further metrics using other mechanisms or data sources such as the 
 own kubernetes API, these mechanisms are called measurements.
 Measurements are enabled by the measurements section of the configuration file. This section contains a list of measurements and their options.
-All measurements support the esIndex option that describe the ES index where metrics will be indexed.
+All measurements support the __esIndex__ option that configures the ES index where metrics will be indexed.
 'kube-burner' supports the following measurements so far:
 
-* pod-latency: It collects pod startup phases, these **latency metrics are in ms**. Can be enabled with:
+* pod-latency: It collects latencies from the different pod startup phases, these **latency metrics are in ms**. Can be enabled with:
 
 ```yaml
     measurements:
@@ -341,21 +341,18 @@ All measurements support the esIndex option that describe the ES index where met
       esIndex: kube-burner-podlatency
 ```
 
-This measurement sends its metrics to two different indexes, <esIndex> is used to save the latency histograms and '<esIndex>-summary' is used to save
-the measurement quantiles P99, P95 and P50.
+This measurement sends its metrics to the index configured by *esIndex*. The metrics collected are pod latency histograms and pod latency quantiles P99, P95 and P50.
 
 Pod latency sample:
 ```json
 {
-    "namespace": "second-job-5",
     "uuid": "363073c1-5752-4a36-8e0a-1311fa7663f8",
-    "podName": "sleep-app-5-5-second-job-7b7c88f5df-cmzzf",
-    "jobName": "second-job",
-    "created": "2020-08-24T19:05:49.316913942+02:00",
+    "timestamp": "2020-08-24T19:05:49.316913942+02:00",
     "schedulingLatency": 8,
     "initializedLatency": 82,
     "containersReadyLatency": 82,
-    "podReadyLatency": 82
+    "podReadyLatency": 82,
+    "metricName": "podLatencyMeasurement"
 }
 ```
 
@@ -371,6 +368,7 @@ Pod latency quantile sample:
     "Max": 84523,
     "Avg": 53131,
     "timestamp": "2020-08-27T01:13:24.091110065+02:00",
+    "metricName": "podLatencyQuantilesMeasurement"
 },
 {
     "quantileName": "podReady",
@@ -381,6 +379,7 @@ Pod latency quantile sample:
     "Max": 82522,
     "Avg": 54153,
     "timestamp": "2020-08-27T01:13:24.091110483+02:00",
+    "metricName": "podLatencyQuantilesMeasurement"
 }
 ```
 
