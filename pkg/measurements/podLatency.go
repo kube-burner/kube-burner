@@ -41,6 +41,7 @@ type podMetric struct {
 	podReady               time.Time
 	PodReadyLatency        int64  `json:"podReadyLatency"`
 	MetricName             string `json:"metricName"`
+	UUID                   string `json:"uuid"`
 }
 
 type podLatencyQuantiles struct {
@@ -80,6 +81,7 @@ func (p *podLatency) createPod(obj interface{}) {
 			podMetrics[string(pod.UID)] = podMetric{
 				Timestamp:  time.Now(),
 				MetricName: "podLatencyMeasurement",
+				UUID:       factory.uuid,
 			}
 		}
 	}
