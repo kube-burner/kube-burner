@@ -31,11 +31,7 @@ import (
 )
 
 type podMetric struct {
-	Namespace              string    `json:"namespace"`
-	UUID                   string    `json:"uuid"`
-	Name                   string    `json:"podName"`
-	JobName                string    `json:"jobName"`
-	Creation               time.Time `json:"created"`
+	Timestamp              time.Time `json:"timestamp"`
 	scheduled              time.Time
 	SchedulingLatency      int64 `json:"schedulingLatency"`
 	initialized            time.Time
@@ -43,19 +39,20 @@ type podMetric struct {
 	containersReady        time.Time
 	ContainersReadyLatency int64 `json:"containersReadyLatency"`
 	podReady               time.Time
-	PodReadyLatency        int64 `json:"podReadyLatency"`
+	PodReadyLatency        int64  `json:"podReadyLatency"`
+	MetricName             string `json:"metricName"`
 }
 
 type podLatencyQuantiles struct {
-	Name      string    `json:"quantileName"`
-	JobName   string    `json:"jobName"`
-	UUID      string    `json:"uuid"`
-	P99       int       `json:"P99"`
-	P95       int       `json:"P95"`
-	P50       int       `json:"P50"`
-	Max       int       `json:"max"`
-	Avg       float64   `json:"avg"`
-	Timestamp time.Time `json:"timestamp"`
+	QuantileName string    `json:"quantileName"`
+	UUID         string    `json:"uuid"`
+	P99          int       `json:"P99"`
+	P95          int       `json:"P95"`
+	P50          int       `json:"P50"`
+	Max          int       `json:"max"`
+	Avg          float64   `json:"avg"`
+	Timestamp    time.Time `json:"timestamp"`
+	MetricName   string    `json:"metricName"`
 }
 
 var podQuantiles []podLatencyQuantiles
@@ -81,11 +78,8 @@ func (p *podLatency) createPod(obj interface{}) {
 	if _, exists := podMetrics[string(pod.UID)]; !exists {
 		if strings.Contains(pod.Namespace, factory.config.Namespace) {
 			podMetrics[string(pod.UID)] = podMetric{
-				Namespace: pod.Namespace,
-				Name:      pod.Name,
-				JobName:   factory.config.Name,
-				UUID:      factory.uuid,
-				Creation:  time.Now(),
+				Timestamp:  time.Now(),
+				MetricName: "podLatencyMeasurement",
 			}
 		}
 	}
@@ -154,8 +148,7 @@ func (p *podLatency) Index() {
 	for _, podQuantile := range podQuantiles {
 		podQuantilesinterface = append(podQuantilesinterface, podQuantile)
 	}
-	indexName := fmt.Sprintf("%s-summary", p.indexName)
-	(*factory.indexer).Index(indexName, podQuantilesinterface)
+	(*factory.indexer).Index(p.indexName, podQuantilesinterface)
 }
 
 func (p *podLatency) waitForReady() {
@@ -222,10 +215,10 @@ func (p *podLatency) Stop() error {
 
 func normalizeMetrics() {
 	for _, m := range podMetrics {
-		m.SchedulingLatency = m.scheduled.Sub(m.Creation).Milliseconds()
-		m.ContainersReadyLatency = m.containersReady.Sub(m.Creation).Milliseconds()
-		m.InitializedLatency = m.initialized.Sub(m.Creation).Milliseconds()
-		m.PodReadyLatency = m.podReady.Sub(m.Creation).Milliseconds()
+		m.SchedulingLatency = m.scheduled.Sub(m.Timestamp).Milliseconds()
+		m.ContainersReadyLatency = m.containersReady.Sub(m.Timestamp).Milliseconds()
+		m.InitializedLatency = m.initialized.Sub(m.Timestamp).Milliseconds()
+		m.PodReadyLatency = m.podReady.Sub(m.Timestamp).Milliseconds()
 		normLatencies = append(normLatencies, m)
 	}
 }
@@ -244,12 +237,12 @@ func calcQuantiles() {
 		quantileMap["initialized"] = append(quantileMap["initialized"], int(l.InitializedLatency))
 		quantileMap["podReady"] = append(quantileMap["podReady"], int(l.PodReadyLatency))
 	}
-	for k, v := range quantileMap {
+	for quantileName, v := range quantileMap {
 		podQ := podLatencyQuantiles{
-			Name:      k,
-			UUID:      factory.uuid,
-			JobName:   factory.config.Name,
-			Timestamp: time.Now(),
+			QuantileName: quantileName,
+			UUID:         factory.uuid,
+			Timestamp:    time.Now(),
+			MetricName:   "podLatencyQuantilesMeasurement",
 		}
 		sort.Ints(v)
 		length := len(v)
