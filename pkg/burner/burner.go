@@ -205,6 +205,8 @@ func setupCreateJob(jobConfig config.Job) Executor {
 					obj.waitFunc = waitForPod
 				case "Build":
 					obj.waitFunc = waitForBuild
+				case "BuildConfig":
+					obj.waitFunc = waitForBuild
 				}
 				if obj.waitFunc != nil {
 					log.Debugf("Added wait function for %s", kind)
