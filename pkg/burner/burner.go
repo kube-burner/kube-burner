@@ -51,7 +51,7 @@ type object struct {
 	objectSpec    []byte
 	replicas      int
 	unstructured  *unstructured.Unstructured
-	waitFunc      func(string, *sync.WaitGroup, object)
+	waitFunc      func(string, *sync.WaitGroup, object, int64)
 	inputVars     map[string]string
 	labelSelector map[string]string
 }
@@ -287,7 +287,7 @@ func (ex *Executor) RunCreateJob() {
 		if ex.Config.PodWait {
 			// If podWait is enabled, first wait for all replicaHandlers to finish
 			wg.Wait()
-			waitForObjects(ex.objects, ns, &podWG)
+			waitForObjects(ex.objects, ns, &podWG, ex.Config.MaxWaitTimeout)
 		}
 		if ex.Config.JobIterationDelay > 0 {
 			wg.Wait()
@@ -303,7 +303,7 @@ func (ex *Executor) RunCreateJob() {
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			}
-			waitForObjects(ex.objects, ns, &podWG)
+			waitForObjects(ex.objects, ns, &podWG, ex.Config.MaxWaitTimeout)
 			if !ex.Config.NamespacedIterations {
 				break
 			}
@@ -434,18 +434,18 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 	}
 }
 
-func waitForObjects(objects []object, ns string, podWG *sync.WaitGroup) {
+func waitForObjects(objects []object, ns string, podWG *sync.WaitGroup, maxWaitTimeout int64) {
 	var waiting bool = false
 	for _, obj := range objects {
 		// If the object has a wait function, execute it in its own goroutine
 		if obj.waitFunc != nil {
 			podWG.Add(1)
 			waiting = true
-			go obj.waitFunc(ns, podWG, obj)
+			go obj.waitFunc(ns, podWG, obj, maxWaitTimeout)
 		}
 	}
 	if waiting {
-		log.Infof("Waiting for actions in namespace %s to be completed", ns)
+		log.Infof("Waiting %d seconds for actions in namespace %s to be completed", maxWaitTimeout, ns)
 		podWG.Wait()
 	}
 }

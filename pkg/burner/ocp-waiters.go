@@ -33,11 +33,12 @@ type Build struct {
 	} `json:"status"`
 }
 
-func waitForBuild(ns string, wg *sync.WaitGroup, obj object) {
+func waitForBuild(ns string, wg *sync.WaitGroup, obj object, maxWaitTimeout int64) {
 	defer wg.Done()
 	buildStatus := []string{"New", "Pending", "Running"}
 	var build Build
-	err := wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+	timeout := time.Duration(maxWaitTimeout) * time.Second
+	wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		builds, err := dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), v1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -57,7 +58,4 @@ func waitForBuild(ns string, wg *sync.WaitGroup, obj object) {
 		}
 		return true, nil
 	})
-	if err != nil {
-		log.Errorf("Error waiting for builds: %s", err)
-	}
 }
