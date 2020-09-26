@@ -116,6 +116,8 @@ type Job struct {
 	PodWait bool `yaml:"podWait"`
 	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished"`
+	// MaxWaitTimeout maximum wait period
+	MaxWaitTimeout int64 `yaml:"maxWaitTimeout"`
 	// WaitForDeletion wait for objects to be definitively deleted
 	WaitForDeletion bool `yaml:"waitForDeletion"`
 	// Cleanup clean up old namespaces

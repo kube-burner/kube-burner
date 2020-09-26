@@ -27,9 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func waitForDeployments(ns string, wg *sync.WaitGroup, obj object) {
+func waitForDeployments(ns string, wg *sync.WaitGroup, obj object, maxWaitTimeout int64) {
 	defer wg.Done()
-	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+	timeout := time.Duration(maxWaitTimeout) * time.Second
+	wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		deps, err := ClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -44,9 +45,10 @@ func waitForDeployments(ns string, wg *sync.WaitGroup, obj object) {
 	})
 }
 
-func waitForRS(ns string, wg *sync.WaitGroup, obj object) {
+func waitForRS(ns string, wg *sync.WaitGroup, obj object, maxWaitTimeout int64) {
 	defer wg.Done()
-	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+	timeout := time.Duration(maxWaitTimeout) * time.Second
+	wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		rss, err := ClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -61,9 +63,10 @@ func waitForRS(ns string, wg *sync.WaitGroup, obj object) {
 	})
 }
 
-func waitForRC(ns string, wg *sync.WaitGroup, obj object) {
+func waitForRC(ns string, wg *sync.WaitGroup, obj object, maxWaitTimeout int64) {
 	defer wg.Done()
-	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+	timeout := time.Duration(maxWaitTimeout) * time.Second
+	wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		rcs, err := ClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -78,9 +81,10 @@ func waitForRC(ns string, wg *sync.WaitGroup, obj object) {
 	})
 }
 
-func waitForDS(ns string, wg *sync.WaitGroup, obj object) {
+func waitForDS(ns string, wg *sync.WaitGroup, obj object, maxWaitTimeout int64) {
 	defer wg.Done()
-	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+	timeout := time.Duration(maxWaitTimeout) * time.Second
+	wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		dss, err := ClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -95,9 +99,10 @@ func waitForDS(ns string, wg *sync.WaitGroup, obj object) {
 	})
 }
 
-func waitForPod(ns string, wg *sync.WaitGroup, obj object) {
+func waitForPod(ns string, wg *sync.WaitGroup, obj object, maxWaitTimeout int64) {
 	defer wg.Done()
-	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+	timeout := time.Duration(maxWaitTimeout) * time.Second
+	wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
