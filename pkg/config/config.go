@@ -19,6 +19,7 @@ import (
 	"os"
 
 	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // ConfigSpec configuration object
@@ -46,6 +47,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ErrorOnVerify:        false,
 		JobType:              CreationJob,
 		WaitForDeletion:      true,
+		MaxWaitTimeout:       43200,
 	}
 	if err := unmarshal(&raw); err != nil {
 		return err
@@ -68,6 +70,21 @@ func Parse(c string) error {
 	}
 	if len(ConfigSpec.Jobs) <= 0 {
 		return fmt.Errorf("No jobs found at configuration file")
+	}
+	if err := validateDNS1123(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateDNS1123() error {
+	for _, job := range ConfigSpec.Jobs {
+		if errs := validation.IsDNS1123Subdomain(job.Name); len(errs) > 0 {
+			return fmt.Errorf("Job %s name validation error: %s", job.Name, fmt.Sprint(errs))
+		}
+		if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
+			return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, fmt.Sprint(errs))
+		}
 	}
 	return nil
 }
