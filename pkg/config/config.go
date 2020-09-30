@@ -58,7 +58,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Parse parses configuration file
-func Parse(c string) error {
+func Parse(c string, jobsRequired bool) error {
 	f, err := os.Open(c)
 	if err != nil {
 		return err
@@ -68,11 +68,13 @@ func Parse(c string) error {
 	if err = yamlDec.Decode(&ConfigSpec); err != nil {
 		return fmt.Errorf("Error decoding configuration file %s: %s", c, err)
 	}
-	if len(ConfigSpec.Jobs) <= 0 {
-		return fmt.Errorf("No jobs found at configuration file")
-	}
-	if err := validateDNS1123(); err != nil {
-		return err
+	if jobsRequired {
+		if len(ConfigSpec.Jobs) <= 0 {
+			return fmt.Errorf("No jobs found at configuration file")
+		}
+		if err := validateDNS1123(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
