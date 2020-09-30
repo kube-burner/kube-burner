@@ -112,14 +112,14 @@ type Job struct {
 	Namespace string `yaml:"namespace"`
 	// WaitFor list of objects to wait for, if not specified wait for all
 	WaitFor []string `yaml:"waitFor"`
-	// PodWait wait for all pods to be running before moving forward to the next iteration
-	PodWait bool `yaml:"podWait"`
-	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
-	WaitWhenFinished bool `yaml:"waitWhenFinished"`
 	// MaxWaitTimeout maximum wait period
 	MaxWaitTimeout int64 `yaml:"maxWaitTimeout"`
 	// WaitForDeletion wait for objects to be definitively deleted
 	WaitForDeletion bool `yaml:"waitForDeletion"`
+	// PodWait wait for all pods to be running before moving forward to the next iteration
+	PodWait bool `yaml:"podWait"`
+	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
+	WaitWhenFinished bool `yaml:"waitWhenFinished"`
 	// Cleanup clean up old namespaces
 	Cleanup bool `yaml:"cleanup"`
 	// whether to create namespaces or not with each job iteration

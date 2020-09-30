@@ -50,7 +50,7 @@ var completionCmd = &cobra.Command{
 }
 
 func initCmd() *cobra.Command {
-	var url, metricsProfile string
+	var url, metricsProfile, configFile string
 	var username, password, uuid, token string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
@@ -60,8 +60,11 @@ func initCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Infof("🔥 Starting kube-burner with UUID %s", uuid)
+			err := config.Parse(configFile, true)
+			if err != nil {
+				log.Fatal(err)
+			}
 			var p *prometheus.Prometheus
-			var err error
 			if url != "" {
 				p, err = prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
 				if err != nil {
@@ -79,17 +82,24 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yaml", "Metrics profile file")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path")
+	cmd.MarkFlagFilename("config")
+	cmd.MarkFlagRequired("config")
 	cmd.MarkFlagFilename("metrics-profile")
 	return cmd
 }
 
 func destroyCmd() *cobra.Command {
-	var uuid string
+	var uuid, configFile string
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy old namespaces labeled with the given UUID.",
 		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
+			err := config.Parse(configFile, false)
+			if err != nil {
+				log.Fatal(err)
+			}
 			selector := util.NewSelector()
 			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
 			burner.ReadConfig(0, 0)
@@ -99,11 +109,12 @@ func destroyCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path")
 	return cmd
 }
 
 func indexCmd() *cobra.Command {
-	var url, metricsProfile string
+	var url, metricsProfile, configFile string
 	var start, end int64
 	var username, password, uuid, token string
 	var skipTLSVerify bool
@@ -113,6 +124,10 @@ func indexCmd() *cobra.Command {
 		Short: "Index metrics from the given time range",
 		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
+			err := config.Parse(configFile, false)
+			if err != nil {
+				log.Fatal(err)
+			}
 			var indexer *indexers.Indexer
 			if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 				indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
@@ -140,8 +155,11 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path")
 	cmd.MarkFlagFilename("metrics-profile")
 	cmd.MarkFlagRequired("prometheus-url")
+	cmd.MarkFlagFilename("config")
+	cmd.MarkFlagRequired("config")
 	return cmd
 }
 
@@ -168,18 +186,11 @@ func init() {
 	)
 	for _, c := range rootCmd.Commands() {
 		logLevel := c.Flags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-		configFile := c.Flags().StringP("config", "c", "", "Config file path")
 		c.PreRun = func(cmd *cobra.Command, args []string) {
 			log.Infof("Setting log level to %s", *logLevel)
 			log.SetLogLevel(*logLevel)
-			err := config.Parse(*configFile)
-			if err != nil {
-				log.Fatal(err)
-			}
 		}
 		c.MarkFlagRequired("uuid")
-		c.MarkFlagRequired("config")
-		c.MarkFlagFilename("config")
 	}
 	rootCmd.AddCommand(completionCmd)
 	cobra.OnInitialize()
