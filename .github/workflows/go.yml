@@ -55,9 +55,9 @@ jobs:
   
     - name: Execute kube-burner test
       working-directory: test
-      run: ../bin/kube-burner init -c kube-burner.yml --uuid my-uuid      
+      run: ../bin/kube-burner init -c kube-burner.yml --uuid my-uuid --log-level=debug
 
-  lint:     
+  lint:
     name: Run golangci-lint
     runs-on: ubuntu-latest
     steps:
