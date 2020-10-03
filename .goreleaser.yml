@@ -16,7 +16,7 @@ builds:
     ldflags:
       - -X github.com/cloud-bulldozer/kube-burner/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/kube-burner/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/kube-burner/version.Version={{.Version}}
 archives:
-  - name_template: "{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}"
+  - name_template: "kube-burner-{{.Version}}-{{.Os}}-{{.Arch}}"
     format: tar.gz
     format_overrides:
     - goos: windows
@@ -29,8 +29,6 @@ archives:
       amd64: x86_64
     files:
       - LICENSE
-snapshot:
-  name_template: "{{ .Tag }}-SNAPSHOT"
 changelog:
   sort: asc
   filters:
@@ -38,4 +36,4 @@ changelog:
       - '^docs:'
       - '^test:'
 checksum:
-  name_template: "{{ .ProjectName }}-checksums.txt"
+  name_template: "kube-burner-checksums.txt"
