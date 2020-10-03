@@ -11,14 +11,14 @@ global:
     enabled: false
 
 jobs:
-  - name: create-job
+  - name: namespaced
     jobType: create
     jobIterations: 2
     qps: 5
     burst: 15
     namespacedIterations: true
     cleanup: true
-    namespace: my-ns
+    namespace: namespaced
     podWait: false
     waitWhenFinished: true
     verifyObjects: true
@@ -30,14 +30,14 @@ jobs:
       inputVars:
         containerImage: gcr.io/google_containers/pause-amd64:3.0
 
-  - name: create-job-2
+  - name: not-namespaced
     jobType: create
     jobIterations: 2
     qps: 5
     burst: 15
-    namespacedIterations: true
+    namespacedIterations: false
     cleanup: true
-    namespace: my-ns
+    namespace: not-namespaced
     podWait: true
     waitWhenFinished: false
     verifyObjects: true
@@ -60,5 +60,5 @@ jobs:
     objects:
 
     - kind: Deployment
-      labelSelector: {kube-burner-job: create-job-2}
+      labelSelector: {kube-burner-job: not-namespaced}
       apiVersion: apps/v1

@@ -16,7 +16,6 @@ package burner
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -29,24 +28,18 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func createNamespaces(clientset *kubernetes.Clientset, config config.Job, uuid string) {
+func createNamespace(clientset *kubernetes.Clientset, namespaceName string, config config.Job, uuid string) {
 	labels := map[string]string{
 		"kube-burner-job":  config.Name,
 		"kube-burner-uuid": uuid,
 	}
-	for i := 1; i <= config.JobIterations; i++ {
-		ns := v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-%d", config.Namespace, i), Labels: labels},
-		}
-		log.Infof("Creating namespace %s", ns.Name)
-		_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
-		if errors.IsAlreadyExists(err) {
-			log.Warnf("Namespace %s already exists", ns.Name)
-		}
-		// If !ex.Config.NamespacedIterations we create only one namespace
-		if !config.NamespacedIterations {
-			break
-		}
+	ns := v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: labels},
+	}
+	log.Infof("Creating namespace %s", ns.Name)
+	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
+	if errors.IsAlreadyExists(err) {
+		log.Warnf("Namespace %s already exists", ns.Name)
 	}
 }
 
@@ -75,7 +68,7 @@ func CleanupNamespaces(clientset *kubernetes.Clientset, s *util.Selector) error 
 
 func waitForDeleteNamespaces(clientset *kubernetes.Clientset, s *util.Selector) {
 	log.Info("Waiting for namespaces to be definitely deleted")
-	wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
+	wait.PollImmediateInfinite(time.Second, func() (bool, error) {
 		ns, err := clientset.CoreV1().Namespaces().List(context.TODO(), s.ListOptions)
 		if err != nil {
 			return false, err

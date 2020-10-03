@@ -268,37 +268,37 @@ func (ex *Executor) RunCreateJob() {
 	ex.Start = time.Now().UTC()
 	var podWG sync.WaitGroup
 	var wg sync.WaitGroup
+	var ns string
 	var err error
 	ReadConfig(ex.Config.QPS, ex.Config.Burst)
 	dynamicClient, err = dynamic.NewForConfig(RestConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ns := fmt.Sprintf("%s-1", ex.Config.Namespace)
-	createNamespaces(ClientSet, ex.Config, ex.uuid)
+	if !ex.Config.NamespacedIterations {
+		ns = ex.Config.Namespace
+		createNamespace(ClientSet, ns, ex.Config, ex.uuid)
+	}
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+			createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), ex.Config, ex.uuid)
 		}
 		for objectIndex, obj := range ex.objects {
 			wg.Add(1)
 			go ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
+		// Wait for all replicaHandlers to finish before move forward to the next interation
+		wg.Wait()
 		if ex.Config.PodWait {
-			// If podWait is enabled, first wait for all replicaHandlers to finish
-			wg.Wait()
 			waitForObjects(ex.objects, ns, &podWG, ex.Config.MaxWaitTimeout)
 		}
 		if ex.Config.JobIterationDelay > 0 {
-			wg.Wait()
 			log.Infof("Sleeping for %d ms", ex.Config.JobIterationDelay)
 			time.Sleep(time.Millisecond * time.Duration(ex.Config.JobIterationDelay))
 		}
 	}
-	// Wait for all replicaHandlers to finish
-	wg.Wait()
 	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {
-		ns = fmt.Sprintf("%s-1", ex.Config.Namespace)
 		for i := 1; i <= ex.Config.JobIterations; i++ {
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
@@ -394,13 +394,12 @@ func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Objec
 }
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
+	defer wg.Done()
 	labels := map[string]string{
 		"kube-burner-uuid":  ex.uuid,
 		"kube-burner-job":   ex.Config.Name,
 		"kube-burner-index": strconv.Itoa(objectIndex),
 	}
-
-	defer wg.Done()
 	tData := map[string]interface{}{
 		jobName:      ex.Config.Name,
 		jobIteration: iteration,
