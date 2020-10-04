@@ -143,10 +143,10 @@ All the magic `kube-burner` does is described in the configuration file. This fi
 | cleanup              | Cleanup clean up old namespaces                                                  | Boolean | true     | true    |
 | podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | true     | true    |
 | waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | false   |
-| maxWaitTimeout       | Maximum wait timeout in seconds. (If podWait is enabled this timeout will be reseted with each iteration) | Integer | 3600     | 43200 (12 hours) |
+| maxWaitTimeout       | Maximum wait timeout in seconds. (If podWait is enabled this timeout will be reseted with each iteration) | Integer | 1h     | 12h |
 | waitFor              | List containing the objects Kind wait for. Wait for all if empty                 | List    | ["Deployment", "Build", "DaemonSet"]| []      |
-| jobIterationDelay    | How many milliseconds to wait between each job iteration                         | Integer | 2000     | false   |
-| jobPause             | How many milliseconds to pause after finishing the job                           | Integer | 10000    | 0       |
+| jobIterationDelay    | How long to wait between each job iteration                                      | Duration| 2s       | 0s      |
+| jobPause             | How long to pause after finishing the job                                        | Duration| 10s      | 0s      |
 | qps                  | Limit object creation queries per second                                         | Integer | 25       | 0       |
 | burst                | Maximum burst for throttle                                                       | Integer | 50       | 0       |
 | objects              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | -        | []      |

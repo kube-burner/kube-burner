@@ -235,8 +235,8 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 		}
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, job.End.Sub(job.Start).Seconds())
 		if job.Config.JobPause > 0 {
-			log.Infof("Pausing for %d milliseconds before next job", job.Config.JobPause)
-			time.Sleep(time.Millisecond * time.Duration(job.Config.JobPause))
+			log.Infof("Pausing for %v before next job", job.Config.JobPause)
+			time.Sleep(job.Config.JobPause)
 		}
 	}
 	// If prometheus is enabled query metrics from the start of the first job to the end of the last one

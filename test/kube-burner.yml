@@ -42,7 +42,7 @@ jobs:
     waitWhenFinished: false
     verifyObjects: true
     errorOnVerify: true
-    jobIterationDelay: 1000
+    jobIterationDelay: 1s
     objects:
     
     - objectTemplate: objectTemplates/deployment.yml
@@ -56,7 +56,7 @@ jobs:
     waitForDeletion: true
     qps: 10
     burst: 20
-    jobPause: 1
+    jobPause: 1ms
     objects:
 
     - kind: Deployment

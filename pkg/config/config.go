@@ -17,6 +17,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -47,7 +48,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ErrorOnVerify:        false,
 		JobType:              CreationJob,
 		WaitForDeletion:      true,
-		MaxWaitTimeout:       43200,
+		MaxWaitTimeout:       12 * time.Hour,
 	}
 	if err := unmarshal(&raw); err != nil {
 		return err
