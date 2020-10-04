@@ -14,6 +14,8 @@
 
 package config
 
+import "time"
+
 // JobType type of job
 type JobType string
 
@@ -94,10 +96,10 @@ type Object struct {
 type Job struct {
 	// IterationCount how many times to execute the job
 	JobIterations int `yaml:"jobIterations"`
-	// IterationDelay how many milliseconds to wait between each job iteration
-	JobIterationDelay int `yaml:"jobIterationDelay"`
-	// JobPause how many milliseconds to pause after finishing the job
-	JobPause int `yaml:"jobPause"`
+	// IterationDelay how much time to wait between each job iteration
+	JobIterationDelay time.Duration `yaml:"jobIterationDelay"`
+	// JobPause how much time to pause after finishing the job
+	JobPause time.Duration `yaml:"jobPause"`
 	// Name name of the iteration
 	Name string `yaml:"name"`
 	// Objects list of objects
@@ -113,7 +115,7 @@ type Job struct {
 	// WaitFor list of objects to wait for, if not specified wait for all
 	WaitFor []string `yaml:"waitFor"`
 	// MaxWaitTimeout maximum wait period
-	MaxWaitTimeout int64 `yaml:"maxWaitTimeout"`
+	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout"`
 	// WaitForDeletion wait for objects to be definitively deleted
 	WaitForDeletion bool `yaml:"waitForDeletion"`
 	// PodWait wait for all pods to be running before moving forward to the next iteration

@@ -258,8 +258,8 @@ func (ex *Executor) RunCreateJob() {
 			ex.waitForObjects(ns)
 		}
 		if ex.Config.JobIterationDelay > 0 {
-			log.Infof("Sleeping for %d ms", ex.Config.JobIterationDelay)
-			time.Sleep(time.Millisecond * time.Duration(ex.Config.JobIterationDelay))
+			log.Infof("Sleeping for %v", ex.Config.JobIterationDelay)
+			time.Sleep(ex.Config.JobIterationDelay)
 		}
 	}
 	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {

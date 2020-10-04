@@ -28,8 +28,8 @@ jobs:
     waitFor: ["Deployment"]
     verifyObjects: true
     errorOnVerify: false
-    jobIterationDelay: 0
-    jobPause: 1000
+    jobIterationDelay: 0s
+    jobPause: 1s
     objects:
 
       - objectTemplate: objectTemplates/svc.yml

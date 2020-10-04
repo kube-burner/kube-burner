@@ -41,7 +41,6 @@ func (ex *Executor) waitForObjects(ns string) {
 	waiting := false
 	waitFor := true
 	var podWG sync.WaitGroup
-	timeout := time.Duration(ex.Config.MaxWaitTimeout) * time.Second
 	for _, obj := range ex.objects {
 		if len(ex.Config.WaitFor) > 0 {
 			waitFor = false
@@ -59,25 +58,25 @@ func (ex *Executor) waitForObjects(ns string) {
 				defer podWG.Done()
 				switch obj.unstructured.GetKind() {
 				case "Deployment":
-					waitForDeployments(ns, timeout)
+					waitForDeployments(ns, ex.Config.MaxWaitTimeout)
 				case "ReplicaSet":
-					waitForRS(ns, timeout)
+					waitForRS(ns, ex.Config.MaxWaitTimeout)
 				case "ReplicationController":
-					waitForRC(ns, timeout)
+					waitForRC(ns, ex.Config.MaxWaitTimeout)
 				case "DaemonSet":
-					waitForDS(ns, timeout)
+					waitForDS(ns, ex.Config.MaxWaitTimeout)
 				case "Pod":
-					waitForPod(ns, timeout)
+					waitForPod(ns, ex.Config.MaxWaitTimeout)
 				case "Build":
-					waitForBuild(ns, obj, timeout)
+					waitForBuild(ns, obj, ex.Config.MaxWaitTimeout)
 				case "BuildConfig":
-					waitForBuild(ns, obj, timeout)
+					waitForBuild(ns, obj, ex.Config.MaxWaitTimeout)
 				}
 			}()
 		}
 	}
 	if waiting {
-		log.Infof("Waiting %s for actions in namespace %s to be completed", timeout, ns)
+		log.Infof("Waiting %s for actions in namespace %v to be completed", ex.Config.MaxWaitTimeout, ns)
 		podWG.Wait()
 	}
 }
