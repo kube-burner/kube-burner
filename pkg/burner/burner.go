@@ -51,7 +51,6 @@ type object struct {
 	objectSpec    []byte
 	replicas      int
 	unstructured  *unstructured.Unstructured
-	waitFunc      func(string, *sync.WaitGroup, object, int64)
 	inputVars     map[string]string
 	labelSelector map[string]string
 }
@@ -179,40 +178,6 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			unstructured: uns,
 			inputVars:    o.InputVars,
 		}
-		if jobConfig.PodWait || jobConfig.WaitWhenFinished {
-			waitFor := true
-			if len(jobConfig.WaitFor) > 0 {
-				waitFor = false
-				for _, kind := range jobConfig.WaitFor {
-					if obj.unstructured.GetKind() == kind {
-						waitFor = true
-						break
-					}
-				}
-			}
-			if waitFor {
-				kind := obj.unstructured.GetKind()
-				switch kind {
-				case "Deployment":
-					obj.waitFunc = waitForDeployments
-				case "ReplicaSet":
-					obj.waitFunc = waitForRS
-				case "ReplicationController":
-					obj.waitFunc = waitForRC
-				case "DaemonSet":
-					obj.waitFunc = waitForDS
-				case "Pod":
-					obj.waitFunc = waitForPod
-				case "Build":
-					obj.waitFunc = waitForBuild
-				case "BuildConfig":
-					obj.waitFunc = waitForBuild
-				}
-				if obj.waitFunc != nil {
-					log.Debugf("Added wait function for %s", kind)
-				}
-			}
-		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, restMapping.GroupVersionKind.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
@@ -266,7 +231,6 @@ func (ex *Executor) Cleanup() {
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob() {
 	ex.Start = time.Now().UTC()
-	var podWG sync.WaitGroup
 	var wg sync.WaitGroup
 	var ns string
 	var err error
@@ -291,7 +255,7 @@ func (ex *Executor) RunCreateJob() {
 		// Wait for all replicaHandlers to finish before move forward to the next interation
 		wg.Wait()
 		if ex.Config.PodWait {
-			waitForObjects(ex.objects, ns, &podWG, ex.Config.MaxWaitTimeout)
+			ex.waitForObjects(ns)
 		}
 		if ex.Config.JobIterationDelay > 0 {
 			log.Infof("Sleeping for %d ms", ex.Config.JobIterationDelay)
@@ -303,7 +267,7 @@ func (ex *Executor) RunCreateJob() {
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			}
-			waitForObjects(ex.objects, ns, &podWG, ex.Config.MaxWaitTimeout)
+			ex.waitForObjects(ns)
 			if !ex.Config.NamespacedIterations {
 				break
 			}
@@ -430,21 +394,5 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				log.Infof("Created %s %s on %s", newObject.GetKind(), newObject.GetName(), ns)
 			}
 		}()
-	}
-}
-
-func waitForObjects(objects []object, ns string, podWG *sync.WaitGroup, maxWaitTimeout int64) {
-	var waiting bool = false
-	for _, obj := range objects {
-		// If the object has a wait function, execute it in its own goroutine
-		if obj.waitFunc != nil {
-			podWG.Add(1)
-			waiting = true
-			go obj.waitFunc(ns, podWG, obj, maxWaitTimeout)
-		}
-	}
-	if waiting {
-		log.Infof("Waiting %d seconds for actions in namespace %s to be completed", maxWaitTimeout, ns)
-		podWG.Wait()
 	}
 }
