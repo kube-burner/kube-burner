@@ -206,6 +206,9 @@ func (p *Prometheus) parseResponse(metricName, query string, value model.Value, 
 				MetricName: metricName,
 			}
 			for k, v := range v.Metric {
+				if k == "__name__" {
+					continue
+				}
 				m.Labels[string(k)] = string(v)
 			}
 			if math.IsNaN(float64(val.Value)) {
