@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -40,7 +41,7 @@ type Build struct {
 func (ex *Executor) waitForObjects(ns string) {
 	waiting := false
 	waitFor := true
-	var podWG sync.WaitGroup
+	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
 		if len(ex.Config.WaitFor) > 0 {
 			waitFor = false
@@ -53,35 +54,35 @@ func (ex *Executor) waitForObjects(ns string) {
 		}
 		if waitFor {
 			waiting = true
-			podWG.Add(1)
-			go func() {
-				defer podWG.Done()
-				switch obj.unstructured.GetKind() {
-				case "Deployment":
-					waitForDeployments(ns, ex.Config.MaxWaitTimeout)
-				case "ReplicaSet":
-					waitForRS(ns, ex.Config.MaxWaitTimeout)
-				case "ReplicationController":
-					waitForRC(ns, ex.Config.MaxWaitTimeout)
-				case "DaemonSet":
-					waitForDS(ns, ex.Config.MaxWaitTimeout)
-				case "Pod":
-					waitForPod(ns, ex.Config.MaxWaitTimeout)
-				case "Build":
-					waitForBuild(ns, obj, ex.Config.MaxWaitTimeout)
-				case "BuildConfig":
-					waitForBuild(ns, obj, ex.Config.MaxWaitTimeout)
-				}
-			}()
+			wg.Add(1)
+			switch obj.unstructured.GetKind() {
+			case "Deployment":
+				go waitForDeployments(ns, ex.Config.MaxWaitTimeout, &wg)
+			case "ReplicaSet":
+				go waitForRS(ns, ex.Config.MaxWaitTimeout, &wg)
+			case "ReplicationController":
+				go waitForRC(ns, ex.Config.MaxWaitTimeout, &wg)
+			case "DaemonSet":
+				go waitForDS(ns, ex.Config.MaxWaitTimeout, &wg)
+			case "Pod":
+				go waitForPod(ns, ex.Config.MaxWaitTimeout, &wg)
+			case "Build":
+				go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
+			case "BuildConfig":
+				go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
+			default:
+				wg.Done()
+			}
 		}
 	}
 	if waiting {
 		log.Infof("Waiting %s for actions in namespace %v to be completed", ex.Config.MaxWaitTimeout, ns)
-		podWG.Wait()
+		wg.Wait()
 	}
 }
 
-func waitForDeployments(ns string, maxWaitTimeout time.Duration) {
+func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+	defer wg.Done()
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
 		deps, err := ClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -97,7 +98,8 @@ func waitForDeployments(ns string, maxWaitTimeout time.Duration) {
 	})
 }
 
-func waitForRS(ns string, maxWaitTimeout time.Duration) {
+func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+	defer wg.Done()
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
 		rss, err := ClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -113,7 +115,8 @@ func waitForRS(ns string, maxWaitTimeout time.Duration) {
 	})
 }
 
-func waitForRC(ns string, maxWaitTimeout time.Duration) {
+func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+	defer wg.Done()
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
 		rcs, err := ClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -129,7 +132,8 @@ func waitForRC(ns string, maxWaitTimeout time.Duration) {
 	})
 }
 
-func waitForDS(ns string, maxWaitTimeout time.Duration) {
+func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+	defer wg.Done()
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
 		dss, err := ClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -145,7 +149,8 @@ func waitForDS(ns string, maxWaitTimeout time.Duration) {
 	})
 }
 
-func waitForPod(ns string, maxWaitTimeout time.Duration) {
+func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+	defer wg.Done()
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
 		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -161,12 +166,22 @@ func waitForPod(ns string, maxWaitTimeout time.Duration) {
 	})
 }
 
-func waitForBuild(ns string, obj object, maxWaitTimeout time.Duration) {
+func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *sync.WaitGroup) {
+	defer wg.Done()
 	buildStatus := []string{"New", "Pending", "Running"}
 	var build Build
+	gvr := schema.GroupVersionResource{
+		Group:    "build.openshift.io",
+		Version:  "v1",
+		Resource: "builds",
+	}
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
-		builds, err := dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), v1.ListOptions{})
+		builds, err := dynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), v1.ListOptions{})
 		if err != nil {
+			return false, err
+		}
+		if len(builds.Items) < expected {
+			log.Debugf("Waiting for Builds in ns %s to be completed", ns)
 			return false, err
 		}
 		for _, b := range builds.Items {
@@ -176,7 +191,7 @@ func waitForBuild(ns string, obj object, maxWaitTimeout time.Duration) {
 			}
 			_ = json.Unmarshal(jsonBuild, &build)
 			for _, bs := range buildStatus {
-				if build.Status.Phase == bs {
+				if build.Status.Phase == "" || build.Status.Phase == bs {
 					log.Debugf("Waiting for Builds in ns %s to be completed", ns)
 					return false, err
 				}
