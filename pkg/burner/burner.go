@@ -235,6 +235,8 @@ func (ex *Executor) RunCreateJob() {
 	var ns string
 	var err error
 	ReadConfig(ex.Config.QPS, ex.Config.Burst)
+	log.Infof("QPS: %v", RestConfig.QPS)
+	log.Infof("Burst: %v", RestConfig.Burst)
 	dynamicClient, err = dynamic.NewForConfig(RestConfig)
 	if err != nil {
 		log.Fatal(err)
@@ -252,9 +254,12 @@ func (ex *Executor) RunCreateJob() {
 			wg.Add(1)
 			go ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
-		// Wait for all replicaHandlers to finish before move forward to the next interation
-		wg.Wait()
+		// Wait for all replicaHandlers to finish before move forward to the next interation, only when using namespaced iterations
+		if ex.Config.NamespacedIterations {
+			wg.Wait()
+		}
 		if ex.Config.PodWait {
+			wg.Wait()
 			ex.waitForObjects(ns)
 		}
 		if ex.Config.JobIterationDelay > 0 {
@@ -263,6 +268,7 @@ func (ex *Executor) RunCreateJob() {
 		}
 	}
 	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {
+		wg.Wait()
 		for i := 1; i <= ex.Config.JobIterations; i++ {
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
