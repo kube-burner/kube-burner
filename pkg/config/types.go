@@ -51,6 +51,20 @@ type IndexerConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+// PProftargets pprof targets to collect
+type PProftarget struct {
+	// Name pprof target name
+	Name string `yaml:"name"`
+	// Namespace pod namespace
+	Namespace string `yaml:"namespace"`
+	// LabelSelector get pprof from pods with these labels
+	LabelSelector map[string]string `yaml:"labelSelector"`
+	// BearerToken bearer token
+	BearerToken string `yaml:"bearerToken"`
+	// URL Target URL
+	URL string `yaml:"url"`
+}
+
 // Measurement holds the measurement configuration
 type Measurement struct {
 	// Name is the name the measurement
@@ -58,6 +72,10 @@ type Measurement struct {
 	// ESIndex contains the ElasticSearch index used to
 	// index the metrics
 	ESIndex string `yaml:"esIndex"`
+	// PPRof config
+	PProfTargets []PProftarget `yaml:"pprofTargets"`
+	// PPRof interval
+	PProfInterval time.Duration `yaml:"pprofInterval"`
 }
 
 // GlobalConfig holds the global configuration
@@ -88,7 +106,7 @@ type Object struct {
 	Kind string `yaml:"kind"`
 	// APIVersion apiVersion of the object to remove
 	APIVersion string `yaml:"apiVersion"`
-	// labelSelector objects with this labels will be removed
+	// LabelSelector objects with this labels will be removed
 	LabelSelector map[string]string `yaml:"labelSelector"`
 }
 
@@ -100,7 +118,7 @@ type Job struct {
 	JobIterationDelay time.Duration `yaml:"jobIterationDelay"`
 	// JobPause how much time to pause after finishing the job
 	JobPause time.Duration `yaml:"jobPause"`
-	// Name name of the iteration
+	// Name job name
 	Name string `yaml:"name"`
 	// Objects list of objects
 	Objects []Object `yaml:"objects"`

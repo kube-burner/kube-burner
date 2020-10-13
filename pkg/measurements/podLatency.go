@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -65,9 +66,9 @@ const (
 )
 
 type podLatency struct {
-	indexName   string
 	informer    cache.SharedInformer
 	stopChannel chan struct{}
+	config      config.Measurement
 }
 
 func init() {
@@ -114,10 +115,12 @@ func (p *podLatency) updatePod(obj interface{}) {
 	}
 }
 
-var ready = make(chan bool)
+func (p *podLatency) setConfig(cfg config.Measurement) {
+	p.config = cfg
+}
 
 // Start starts podLatency measurement
-func (p *podLatency) Start(factory measurementFactory) {
+func (p *podLatency) start() {
 	podMetrics = make(map[string]podMetric)
 	log.Infof("Creating Pod latency informer for %s", factory.config.Name)
 	podListWatcher := cache.NewFilteredListWatchFromClient(factory.clientSet.CoreV1().RESTClient(), "pods", v1.NamespaceAll, func(options *metav1.ListOptions) {})
@@ -132,29 +135,6 @@ func (p *podLatency) Start(factory measurementFactory) {
 	if err := p.startAndSync(); err != nil {
 		log.Errorf("Pod Latency measurement error: %s", err)
 	}
-	ready <- true
-}
-
-func (p *podLatency) SetMetadata(indexName string) {
-	p.indexName = indexName
-}
-
-// Index sends metrics to the configured indexer
-func (p *podLatency) Index() {
-	podMetricsinterface := make([]interface{}, len(normLatencies))
-	for _, podLatency := range normLatencies {
-		podMetricsinterface = append(podMetricsinterface, podLatency)
-	}
-	(*factory.indexer).Index(p.indexName, podMetricsinterface)
-	podQuantilesinterface := make([]interface{}, len(podQuantiles))
-	for _, podQuantile := range podQuantiles {
-		podQuantilesinterface = append(podQuantilesinterface, podQuantile)
-	}
-	(*factory.indexer).Index(p.indexName, podQuantilesinterface)
-}
-
-func (p *podLatency) waitForReady() {
-	<-ready
 }
 
 func (p *podLatency) writeToFile() error {
@@ -200,7 +180,7 @@ func (p *podLatency) startAndSync() error {
 }
 
 // Stop stops podLatency measurement
-func (p *podLatency) Stop() error {
+func (p *podLatency) stop() error {
 	normalizeMetrics()
 	calcQuantiles()
 	defer close(p.stopChannel)
@@ -212,7 +192,29 @@ func (p *podLatency) Stop() error {
 	if !cache.WaitForCacheSync(timeoutCh, p.informer.HasSynced) {
 		return fmt.Errorf("Pod-latency: Timed out waiting for caches to sync")
 	}
+	if factory.globalConfig.WriteToFile {
+		if err := p.writeToFile(); err != nil {
+			log.Errorf("Error writing measurement podLatency: %s", err)
+		}
+	}
+	if factory.globalConfig.IndexerConfig.Enabled {
+		p.index()
+	}
 	return nil
+}
+
+// index sends metrics to the configured indexer
+func (p *podLatency) index() {
+	podMetricsinterface := make([]interface{}, len(normLatencies))
+	for _, podLatency := range normLatencies {
+		podMetricsinterface = append(podMetricsinterface, podLatency)
+	}
+	(*factory.indexer).Index(p.config.ESIndex, podMetricsinterface)
+	podQuantilesinterface := make([]interface{}, len(podQuantiles))
+	for _, podQuantile := range podQuantiles {
+		podQuantilesinterface = append(podQuantilesinterface, podQuantile)
+	}
+	(*factory.indexer).Index(p.config.ESIndex, podQuantilesinterface)
 }
 
 func normalizeMetrics() {

@@ -19,49 +19,50 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type measurementFactory struct {
 	globalConfig config.GlobalConfig
 	config       config.Job
 	clientSet    *kubernetes.Clientset
+	restConfig   *rest.Config
 	createFuncs  map[string]measurement
 	indexer      *indexers.Indexer
 	uuid         string
 }
 
 type measurement interface {
-	Start(measurementFactory)
-	SetMetadata(string)
-	Index()
-	writeToFile() error
-	waitForReady()
-	Stop() error
+	start()
+	stop() error
+	setConfig(config.Measurement)
 }
 
 var factory measurementFactory
 var measurementMap = make(map[string]measurement)
 
 // NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(clientSet *kubernetes.Clientset, globalConfig config.GlobalConfig, config config.Job, uuid string, indexer *indexers.Indexer) {
+func NewMeasurementFactory(restConfig *rest.Config, globalConfig config.GlobalConfig, config config.Job, uuid string, indexer *indexers.Indexer) {
 	log.Info("📈 Creating measurement factory")
+	clientSet := kubernetes.NewForConfigOrDie(restConfig)
 	factory = measurementFactory{
 		globalConfig: globalConfig,
 		config:       config,
 		clientSet:    clientSet,
+		restConfig:   restConfig,
 		createFuncs:  make(map[string]measurement),
 		indexer:      indexer,
 		uuid:         uuid,
 	}
 }
 
-func (mf *measurementFactory) register(methodName string, indexName string, measurementFunc measurement) {
-	if _, exists := mf.createFuncs[methodName]; exists {
-		log.Warnf("Measurement already registered: %s", methodName)
+func (mf *measurementFactory) register(measure config.Measurement, measurementFunc measurement) {
+	if _, exists := mf.createFuncs[measure.Name]; exists {
+		log.Warnf("Measurement already registered: %s", measure.Name)
 	} else {
-		measurementFunc.SetMetadata(indexName)
-		mf.createFuncs[methodName] = measurementFunc
-		log.Infof("Registered measurement %s", methodName)
+		measurementFunc.setConfig(measure)
+		mf.createFuncs[measure.Name] = measurementFunc
+		log.Infof("Registered measurement: %s", measure.Name)
 	}
 }
 
@@ -69,7 +70,7 @@ func (mf *measurementFactory) register(methodName string, indexName string, meas
 func Register(measurementList []config.Measurement) {
 	for _, measurement := range measurementList {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
-			factory.register(measurement.Name, measurement.ESIndex, measurementFunc)
+			factory.register(measurement, measurementFunc)
 		} else {
 			log.Warnf("Measurement not found: %s", measurement.Name)
 		}
@@ -78,39 +79,16 @@ func Register(measurementList []config.Measurement) {
 
 // Start starts registered measurements
 func Start() {
-	factory.start()
-}
-
-func (mf *measurementFactory) start() {
-	for _, measurement := range mf.createFuncs {
-		go measurement.Start(factory)
-		measurement.waitForReady()
+	for _, measurement := range factory.createFuncs {
+		go measurement.start()
 	}
 }
 
 // Stop stops registered measurements
 func Stop() {
 	for name, measurement := range factory.createFuncs {
-		if err := measurement.Stop(); err != nil {
+		if err := measurement.stop(); err != nil {
 			log.Errorf("Error stopping measurement %s: %s", name, err)
 		}
 	}
-}
-
-func (mf *measurementFactory) index() {
-	for name, measurement := range mf.createFuncs {
-		if mf.globalConfig.WriteToFile {
-			if err := measurement.writeToFile(); err != nil {
-				log.Errorf("Error writing measurement %s: %s", name, err)
-			}
-		}
-		if factory.globalConfig.IndexerConfig.Enabled {
-			measurement.Index()
-		}
-	}
-}
-
-// Index index measurements metrics
-func Index() {
-	factory.index()
 }
