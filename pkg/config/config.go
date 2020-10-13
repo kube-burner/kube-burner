@@ -17,10 +17,14 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/cloud-bulldozer/kube-burner/log"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // ConfigSpec configuration object
@@ -90,4 +94,33 @@ func validateDNS1123() error {
 		}
 	}
 	return nil
+}
+
+// GetRestConfig returns restConfig with the given QPS and burst
+func GetRestConfig(QPS, burst int) (*rest.Config, error) {
+	var err error
+	var restConfig *rest.Config
+	var kubeconfig string
+	if os.Getenv("KUBECONFIG") != "" {
+		kubeconfig = os.Getenv("KUBECONFIG")
+	}
+	if ConfigSpec.GlobalConfig.Kubeconfig != "" {
+		kubeconfig = ConfigSpec.GlobalConfig.Kubeconfig
+	}
+	if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
+	if kubeconfig != "" {
+		log.Infof("Using kubeconfig: %s", kubeconfig)
+		restConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	} else {
+		log.Info("Using in-cluster configuration")
+		restConfig, err = rest.InClusterConfig()
+	}
+	if err != nil {
+		return restConfig, err
+	}
+	restConfig.QPS = float32(QPS)
+	restConfig.Burst = burst
+	return restConfig, nil
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
@@ -102,9 +103,16 @@ func destroyCmd() *cobra.Command {
 			}
 			selector := util.NewSelector()
 			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
-			burner.ReadConfig(0, 0)
-			if err := burner.CleanupNamespaces(burner.ClientSet, selector); err != nil {
-				log.Fatalf("Error cleaning up namespaces: %s", err)
+			restConfig, err := config.GetRestConfig(0, 0)
+			if err != nil {
+				log.Fatalf("Error creating restConfig for kube-burner: %s", err)
+			}
+			clientSet, err := kubernetes.NewForConfig(restConfig)
+			if err != nil {
+				log.Fatalf("Error creating ClientSet for kube-burner: %s", err)
+			}
+			if err := burner.CleanupNamespaces(clientSet, selector); err != nil {
+				log.Fatal(err)
 			}
 		},
 	}
@@ -206,16 +214,14 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 	}
 	executorList := burner.NewExecutorList(uuid)
 	for _, job := range executorList {
-		log.Infof("Triggering job: %s", job.Config.Name)
 		// Run execution
 		switch job.Config.JobType {
 		case config.CreationJob:
 			job.Cleanup()
-			measurements.NewMeasurementFactory(burner.ClientSet, config.ConfigSpec.GlobalConfig, job.Config, uuid, indexer)
+			measurements.NewMeasurementFactory(burner.RestConfig, config.ConfigSpec.GlobalConfig, job.Config, uuid, indexer)
 			measurements.Register(config.ConfigSpec.GlobalConfig.Measurements)
 			measurements.Start()
 			job.RunCreateJob()
-			measurements.Stop()
 			if job.Config.VerifyObjects {
 				verification = job.Verify()
 				// If verification failed and ErrorOnVerify is enabled. Exit with error, otherwise continue
@@ -223,8 +229,8 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 					log.Fatal("Object verification failed. Exiting")
 				}
 			}
-			// We index measurements per job
-			measurements.Index()
+			// We stop and index measurements per job
+			measurements.Stop()
 			// Verification failed
 			if job.Config.VerifyObjects && !verification {
 				log.Error("Object verification failed")

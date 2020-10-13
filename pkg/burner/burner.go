@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -42,7 +41,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -83,45 +81,18 @@ var RestConfig *rest.Config
 
 // NewExecutorList Returns a list of executors
 func NewExecutorList(uuid string) []Executor {
+	var err error
 	var executorList []Executor
-	ReadConfig(0, 0)
+	RestConfig, err = config.GetRestConfig(0, 0)
+	if err != nil {
+		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
+	}
 	for _, job := range config.ConfigSpec.Jobs {
 		ex := getExecutor(job)
 		ex.uuid = uuid
 		executorList = append(executorList, ex)
 	}
 	return executorList
-}
-
-// ReadConfig Condfigures kube-burner with the given parameters
-func ReadConfig(QPS, burst int) {
-	var err error
-	var kubeconfig string
-	if os.Getenv("KUBECONFIG") != "" {
-		kubeconfig = os.Getenv("KUBECONFIG")
-	}
-	if config.ConfigSpec.GlobalConfig.Kubeconfig != "" {
-		kubeconfig = config.ConfigSpec.GlobalConfig.Kubeconfig
-	}
-	if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
-		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	}
-	if kubeconfig != "" {
-		log.Infof("Using kubeconfig: %s", kubeconfig)
-		RestConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	} else {
-		log.Info("Using in-cluster configuration")
-		RestConfig, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		log.Fatalf("Error configuring kube-burner: %s", err)
-	}
-	RestConfig.QPS = float32(QPS)
-	RestConfig.Burst = burst
-	ClientSet, err = kubernetes.NewForConfig(RestConfig)
-	if err != nil {
-		log.Fatalf("Error configuring kube-burner: %s", err)
-	}
 }
 
 func getExecutor(jobConfig config.Job) Executor {
@@ -230,10 +201,16 @@ func (ex *Executor) Cleanup() {
 
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob() {
+	log.Infof("Triggering job: %s", ex.Config.Name)
 	ex.Start = time.Now().UTC()
 	var wg sync.WaitGroup
-	var ns string
-	ReadConfig(ex.Config.QPS, ex.Config.Burst)
+	var  string
+	var err error
+	RestConfig, err = config.GetRestConfig(ex.Config.QPS, ex.Config.Burst)
+	if err != nil {
+		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
+	}
+	ClientSet := kubernetes.NewForConfigOrDie(RestConfig)
 	log.Infof("QPS: %v", RestConfig.QPS)
 	log.Infof("Burst: %v", RestConfig.Burst)
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
@@ -283,10 +260,14 @@ func (ex *Executor) RunDeleteJob() {
 	ex.Start = time.Now().UTC()
 	var wg sync.WaitGroup
 	var err error
-	ReadConfig(ex.Config.QPS, ex.Config.Burst)
+	RestConfig, err = config.GetRestConfig(ex.Config.QPS, ex.Config.Burst)
+	if err != nil {
+		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
+	}
+	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	dynamicClient, err = dynamic.NewForConfig(RestConfig)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error creating DynamicClient: %s", err)
 	}
 	for _, obj := range ex.objects {
 		labelSelector := labels.Set(obj.labelSelector).String()
