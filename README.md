@@ -16,6 +16,8 @@
     - [Metrics profile](#metrics-profile)
     - [Indexers](#indexers)
     - [Measurements](#measurements)
+      - [Pod latency](#pod-latency)
+      - [Pprof collection](#pprof-collection)
   - [Contributing to kube-burner](#contributing-to-kube-burner)
     - [Requirements](#requirements)
 
@@ -330,11 +332,12 @@ The `elastic` indexer is configured by the parameters below:
 
 Apart from prometheus metrics collection, `kube-burner` allows to get further metrics using other mechanisms or data sources such as the 
 own kubernetes API, these mechanisms are called measurements.
-Measurements are enabled by the measurements section of the configuration file. This section contains a list of measurements and their options.
-All measurements support the __esIndex__ option that configures the ES index where metrics will be indexed.
+Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
 'kube-burner' supports the following measurements so far:
 
-* pod-latency: It collects latencies from the different pod startup phases, these **latency metrics are in ms**. Can be enabled with:
+#### Pod latency
+
+Collects latencies from the different pod startup phases, these **latency metrics are in ms**. Can be enabled with:
 
 ```yaml
     measurements:
@@ -384,7 +387,40 @@ Pod latency quantile sample:
 }
 ```
 
+The __esIndex__ option can be used to configure the ES index where metrics will be indexed.
+
+#### Pprof collection
+
+This measurement takes care of collecting golang profiling information from pods. To do so, kube-burner connects to pods with the given labels running in certain namespaces. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. Pprof files are collected in a regular basis given by the parameter `pprofInterval` and these files are stored in the directory configured by the parameter `pprofDirectory` which by default is `pprof`.
+It's also possible to configure a token to get pprof data from authenticated endoints such as kube-apiserver with the variable `bearerToken`.
+
+An example of how to configure this measurement to collect pprof HEAP and CPU profiling data from kube-apiserver is shown below:
+
+```yaml
+   measurements:
+    - name: pprof
+      pprofInterval: 5m
+      pprofDirectory: pprof-data
+      pprofTargets:
+        - name: heap
+          namespace: "openshift-kube-apiserver"
+          labelSelector: {app: openshift-kube-apiserver}
+          bearerToken: thisIsNotAValidToken
+          url: https://localhost:6443/debug/pprof/heap
+
+        - name: cpu-profiling
+          namespace: "openshift-kube-apiserver"
+          labelSelector: {app: openshift-kube-apiserver}
+          bearerToken: thisIsNotAValidToken
+          url: https://localhost:6443/debug/pprof/profile?timeout=30
+```
+
+**Note**: As mentioned before, this measurement requires cURL to be installed in the target pods.
+
 ## Contributing to kube-burner
+
+If you want to contribute to kube-burner, submit a Pull Request or Issue.
+
 ### Requirements
 
 - `golang >= 1.13`
