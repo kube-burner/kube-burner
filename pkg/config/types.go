@@ -51,7 +51,7 @@ type IndexerConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
-// PProftargets pprof targets to collect
+// PProftarget pprof targets to collect
 type PProftarget struct {
 	// Name pprof target name
 	Name string `yaml:"name"`
@@ -61,7 +61,7 @@ type PProftarget struct {
 	LabelSelector map[string]string `yaml:"labelSelector"`
 	// BearerToken bearer token
 	BearerToken string `yaml:"bearerToken"`
-	// URL Target URL
+	// URL target URL
 	URL string `yaml:"url"`
 }
 
@@ -72,10 +72,12 @@ type Measurement struct {
 	// ESIndex contains the ElasticSearch index used to
 	// index the metrics
 	ESIndex string `yaml:"esIndex"`
-	// PPRof config
+	// PPRofTargets targets config
 	PProfTargets []PProftarget `yaml:"pprofTargets"`
-	// PPRof interval
+	// PPRofInterval pprof collect interval
 	PProfInterval time.Duration `yaml:"pprofInterval"`
+	// PProfDirectory output directory
+	PProfDirectory string `yaml:"pprofDirectory"`
 }
 
 // GlobalConfig holds the global configuration

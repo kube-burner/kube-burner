@@ -84,6 +84,7 @@ func NewExecutorList(uuid string) []Executor {
 	var err error
 	var executorList []Executor
 	RestConfig, err = config.GetRestConfig(0, 0)
+	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	if err != nil {
 		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
 	}
@@ -96,10 +97,7 @@ func NewExecutorList(uuid string) []Executor {
 }
 
 func getExecutor(jobConfig config.Job) Executor {
-	var limiter *rate.Limiter
 	var ex Executor
-	// Limits the number of workers to QPS and Burst
-	limiter = rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	if jobConfig.JobType == config.CreationJob {
 		ex = setupCreateJob(jobConfig)
 	} else if jobConfig.JobType == config.DeletionJob {
@@ -107,7 +105,8 @@ func getExecutor(jobConfig config.Job) Executor {
 	} else {
 		log.Fatalf("Unknown jobType: %s", jobConfig.JobType)
 	}
-	ex.limiter = limiter
+	// Limits the number of workers to QPS and Burst
+	ex.limiter = rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	ex.Config = jobConfig
 	return ex
 }
@@ -138,7 +137,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		uns := &unstructured.Unstructured{}
 		renderedObj := renderTemplate(t, empty)
 		_, gvk := yamlToUnstructured(renderedObj, uns)
-		restMapping, err := getGVR(*RestConfig, gvk)
+		restMapping, err := getGVR(gvk)
 		if err != nil {
 			log.Fatalf("Error getting GVR: %s", err)
 		}
@@ -160,7 +159,7 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 	var ex Executor
 	for _, o := range jobConfig.Objects {
 		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
-		restMapping, err := getGVR(*RestConfig, &gvk)
+		restMapping, err := getGVR(&gvk)
 		if err != nil {
 			log.Fatalf("Error getting gvr: %s", err)
 		}
@@ -178,11 +177,11 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 }
 
 // find the corresponding GVR (available in *meta.RESTMapping) for gvk
-func getGVR(restConfig rest.Config, gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
+func getGVR(gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
 	// see https://github.com/kubernetes/kubernetes/issues/86149
-	restConfig.Burst = 0
+	RestConfig.Burst = 0
 	// DiscoveryClient queries API server about the resources
-	dc, err := discovery.NewDiscoveryClientForConfig(&restConfig)
+	dc, err := discovery.NewDiscoveryClientForConfig(RestConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +209,7 @@ func (ex *Executor) RunCreateJob() {
 	if err != nil {
 		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
 	}
-	ClientSet := kubernetes.NewForConfigOrDie(RestConfig)
+	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	log.Infof("QPS: %v", RestConfig.QPS)
 	log.Infof("Burst: %v", RestConfig.Burst)
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)

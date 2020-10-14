@@ -19,6 +19,7 @@ import (
 )
 
 type pprof struct {
+	directory   string
 	config      config.Measurement
 	stopChannel chan struct{}
 }
@@ -28,14 +29,19 @@ func init() {
 }
 
 func (p *pprof) setConfig(cfg config.Measurement) {
+	p.directory = "pprof"
+	if cfg.PProfDirectory != "" {
+		p.directory = cfg.PProfDirectory
+	}
 	p.config = cfg
 }
 
 func (p *pprof) start() {
-	err := os.MkdirAll("pprof", 0744)
+	err := os.MkdirAll(p.directory, 0744)
 	if err != nil {
 		log.Fatalf("Error creating pprof directory: %s", err)
 	}
+	p.getPProf()
 	ticker := time.NewTicker(p.config.PProfInterval)
 	go func() {
 		for {
@@ -59,6 +65,7 @@ func getPods(target config.PProftarget) []corev1.Pod {
 
 func (p *pprof) getPProf() {
 	var wg sync.WaitGroup
+	var command []string
 	for _, target := range p.config.PProfTargets {
 		log.Infof("Collecting %s pprof", target.Name)
 		podList := getPods(target)
@@ -67,13 +74,17 @@ func (p *pprof) getPProf() {
 			go func(target config.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
 				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Name, time.Now().Unix())
-				f, err := os.Create(path.Join("pprof", pprofFile))
+				f, err := os.Create(path.Join(p.directory, pprofFile))
 				if err != nil {
 					log.Errorf("Error creating pprof file %s: %s", pprofFile, err)
 					return
 				}
 				defer f.Close()
-				containerName := pod.Spec.Containers[0].Name
+				if target.BearerToken != "" {
+					command = []string{"curl", "-sSLkH", fmt.Sprintf("Authorization:  Bearer %s", target.BearerToken), target.URL}
+				} else {
+					command = []string{"curl", "-sSLkH", target.URL}
+				}
 				req := factory.clientSet.CoreV1().
 					RESTClient().
 					Post().
@@ -82,8 +93,8 @@ func (p *pprof) getPProf() {
 					Namespace(pod.Namespace).
 					SubResource("exec")
 				req.VersionedParams(&corev1.PodExecOptions{
-					Command:   []string{"curl", "-sSLkH", fmt.Sprintf("Authorization:  Bearer %s", target.BearerToken), target.URL},
-					Container: containerName,
+					Command:   command,
+					Container: pod.Spec.Containers[0].Name,
 					Stdin:     false,
 					Stderr:    true,
 					Stdout:    true,
@@ -107,5 +118,6 @@ func (p *pprof) getPProf() {
 }
 
 func (p *pprof) stop() error {
+	close(p.stopChannel)
 	return nil
 }
