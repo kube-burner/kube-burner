@@ -62,7 +62,7 @@ func initCmd() *cobra.Command {
 			log.Infof("🔥 Starting kube-burner with UUID %s", uuid)
 			err := config.Parse(configFile, true)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Error parsing configuration: %s", err)
 			}
 			var p *prometheus.Prometheus
 			if url != "" {
@@ -98,13 +98,13 @@ func destroyCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			err := config.Parse(configFile, false)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Error parsing configuration: %s", err)
 			}
 			selector := util.NewSelector()
 			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
 			burner.ReadConfig(0, 0)
 			if err := burner.CleanupNamespaces(burner.ClientSet, selector); err != nil {
-				log.Fatal(err)
+				log.Fatalf("Error cleaning up namespaces: %s", err)
 			}
 		},
 	}
@@ -126,7 +126,7 @@ func indexCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			err := config.Parse(configFile, false)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Error parsing configuration: %s", err)
 			}
 			var indexer *indexers.Indexer
 			if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
