@@ -24,11 +24,11 @@ func renderTemplate(original []byte, data interface{}) []byte {
 	var rendered bytes.Buffer
 	t, err := template.New("").Parse(string(original))
 	if err != nil {
-		log.Fatalf("Error parsing template %s", err)
+		log.Fatalf("Error parsing template: %s", err)
 	}
 	err = t.Execute(&rendered, data)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error rendering template: %s", err)
 	}
 	return rendered.Bytes()
 }

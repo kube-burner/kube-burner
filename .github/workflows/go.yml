@@ -46,6 +46,9 @@ jobs:
     - name: Build
       run: make build
 
+    - name: Install
+      run: sudo make install
+
     - name: Setup kinD
       uses: engineerd/setup-kind@v0.4.0
       with:
@@ -55,7 +58,7 @@ jobs:
   
     - name: Execute kube-burner test
       working-directory: test
-      run: ../bin/kube-burner init -c kube-burner.yml --uuid my-uuid --log-level=debug
+      run: ./run.sh
 
   lint:
     name: Run golangci-lint
