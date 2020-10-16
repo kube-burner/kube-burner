@@ -169,7 +169,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		_, gvk := yamlToUnstructured(renderedObj, uns)
 		restMapping, err := getGVR(*RestConfig, gvk)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Error getting GVR: %s", err)
 		}
 		obj := object{
 			gvr:          restMapping.Resource,
@@ -223,7 +223,7 @@ func getGVR(restConfig rest.Config, gvk *schema.GroupVersionKind) (*meta.RESTMap
 func (ex *Executor) Cleanup() {
 	if ex.Config.Cleanup {
 		if err := CleanupNamespaces(ClientSet, ex.selector); err != nil {
-			log.Fatal(err)
+			log.Fatalf("Error cleaning up namespaces: %s", err)
 		}
 	}
 }
@@ -233,14 +233,10 @@ func (ex *Executor) RunCreateJob() {
 	ex.Start = time.Now().UTC()
 	var wg sync.WaitGroup
 	var ns string
-	var err error
 	ReadConfig(ex.Config.QPS, ex.Config.Burst)
 	log.Infof("QPS: %v", RestConfig.QPS)
 	log.Infof("Burst: %v", RestConfig.Burst)
-	dynamicClient, err = dynamic.NewForConfig(RestConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
+	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
 		createNamespace(ClientSet, ns, ex.Config, ex.uuid)
