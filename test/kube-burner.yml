@@ -13,7 +13,7 @@ global:
 jobs:
   - name: namespaced
     jobType: create
-    jobIterations: 2
+    jobIterations: 5
     qps: 5
     burst: 15
     namespacedIterations: true
@@ -32,7 +32,7 @@ jobs:
 
   - name: not-namespaced
     jobType: create
-    jobIterations: 2
+    jobIterations: 4
     qps: 5
     burst: 15
     namespacedIterations: false
@@ -42,7 +42,7 @@ jobs:
     waitWhenFinished: false
     verifyObjects: true
     errorOnVerify: true
-    jobIterationDelay: 1s
+    jobIterationDelay: 100ms
     objects:
     
     - objectTemplate: objectTemplates/deployment.yml

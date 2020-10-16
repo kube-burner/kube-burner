@@ -12,7 +12,7 @@ SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
 KUBE_BURNER_PACKAGE = github.com/cloud-bulldozer/kube-burner
 
-ifeq (, $(shell command -v docker))
+ifeq (, $(shell which docker))
   ENGINE := podman
 else
   ENGINE := docker

@@ -281,7 +281,7 @@ The metrics-profile flag points to a YAML file containing a list of the promethe
 As soon one of job finishes, `kube-burner` makes a range query for each query described in this file, and indexes it in the index configured by the parameter `defaultIndex`.
 We can use the parameter `indexName` in a metrics-profile file to make `kube-burner` to index the resulting metrics to a different index.
 An example of a valid metrics profile file is shown below:
-It's very recommended to use the **metricName** parameter in complex queries, since it will allow us to identify them easely.
+The parameter **metricName** is added to the indexed documents, it will allow us to identify documents from a certain query more easily.
 
 ```yaml
 metrics:
