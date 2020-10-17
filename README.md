@@ -2,25 +2,24 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cloud-bulldozer/kube-burner)](https://goreportcard.com/report/github.com/cloud-bulldozer/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# kube-burner
+<img src="./media/logo/kube-burner-logo.png" width="60%">
 
-- [kube-burner](#kube-burner)
-  - [What's this?](#whats-this)
-  - [Quick start](#quick-start)
-  - [Building](#building)
-  - [Getting started](#getting-started)
-  - [Configuration](#configuration)
-    - [Objects](#objects)
-    - [Job types](#job-types)
-    - [Injected variables](#injected-variables)
-    - [Metrics profile](#metrics-profile)
-    - [Indexers](#indexers)
-    - [Measurements](#measurements)
-      - [Pod latency](#pod-latency)
-      - [Pprof collection](#pprof-collection)
-  - [Contributing to kube-burner](#contributing-to-kube-burner)
-    - [Requirements](#requirements)
-
+---
+- [What's this?](#whats-this)
+- [Quick start](#quick-start)
+- [Building](#building)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+  - [Objects](#objects)
+  - [Job types](#job-types)
+  - [Injected variables](#injected-variables)
+  - [Metrics profile](#metrics-profile)
+  - [Indexers](#indexers)
+  - [Measurements](#measurements)
+    - [Pod latency](#pod-latency)
+    - [Pprof collection](#pprof-collection)
+- [Contributing to kube-burner](#contributing-to-kube-burner)
+  - [Requirements](#requirements)
 
 
 ## What's this?
