@@ -111,9 +111,7 @@ func destroyCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error creating ClientSet for kube-burner: %s", err)
 			}
-			if err := burner.CleanupNamespaces(clientSet, selector); err != nil {
-				log.Fatal(err)
-			}
+			burner.CleanupNamespaces(clientSet, selector)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")

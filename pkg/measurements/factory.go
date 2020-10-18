@@ -87,6 +87,7 @@ func Start() {
 // Stop stops registered measurements
 func Stop() {
 	for name, measurement := range factory.createFuncs {
+		log.Infof("Stopping measurement: %s", name)
 		if err := measurement.stop(); err != nil {
 			log.Errorf("Error stopping measurement %s: %s", name, err)
 		}
