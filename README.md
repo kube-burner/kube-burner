@@ -402,13 +402,13 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
       pprofInterval: 5m
       pprofDirectory: pprof-data
       pprofTargets:
-        - name: heap
+        - name: kube-apiserver-heap
           namespace: "openshift-kube-apiserver"
           labelSelector: {app: openshift-kube-apiserver}
           bearerToken: thisIsNotAValidToken
           url: https://localhost:6443/debug/pprof/heap
 
-        - name: cpu-profiling
+        - name: kube-apiserver-cpu
           namespace: "openshift-kube-apiserver"
           labelSelector: {app: openshift-kube-apiserver}
           bearerToken: thisIsNotAValidToken

@@ -179,8 +179,8 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexe
 				indexName = strings.ToLower(md.IndexName)
 			}
 			promMetrics := make([]interface{}, len(metrics))
-			for _, metric := range metrics {
-				promMetrics = append(promMetrics, metric)
+			for i, metric := range metrics {
+				promMetrics[i] = metric
 			}
 			(*indexer).Index(indexName, promMetrics)
 		}

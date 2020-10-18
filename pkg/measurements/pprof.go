@@ -21,7 +21,7 @@ import (
 type pprof struct {
 	directory   string
 	config      config.Measurement
-	stopChannel chan struct{}
+	stopChannel chan bool
 }
 
 func init() {
@@ -41,14 +41,18 @@ func (p *pprof) start() {
 	if err != nil {
 		log.Fatalf("Error creating pprof directory: %s", err)
 	}
+	p.stopChannel = make(chan bool)
 	p.getPProf()
-	ticker := time.NewTicker(p.config.PProfInterval)
 	go func() {
+		defer close(p.stopChannel)
+		ticker := time.NewTicker(p.config.PProfInterval)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
 				p.getPProf()
 			case <-p.stopChannel:
+				return
 			}
 		}
 	}()
@@ -118,6 +122,6 @@ func (p *pprof) getPProf() {
 }
 
 func (p *pprof) stop() error {
-	close(p.stopChannel)
+	p.stopChannel <- true
 	return nil
 }

@@ -206,13 +206,13 @@ func (p *podLatency) stop() error {
 // index sends metrics to the configured indexer
 func (p *podLatency) index() {
 	podMetricsinterface := make([]interface{}, len(normLatencies))
-	for _, podLatency := range normLatencies {
-		podMetricsinterface = append(podMetricsinterface, podLatency)
+	for i, podLatency := range normLatencies {
+		podMetricsinterface[i] = podLatency
 	}
 	(*factory.indexer).Index(p.config.ESIndex, podMetricsinterface)
 	podQuantilesinterface := make([]interface{}, len(podQuantiles))
-	for _, podQuantile := range podQuantiles {
-		podQuantilesinterface = append(podQuantilesinterface, podQuantile)
+	for i, podQuantile := range podQuantiles {
+		podQuantilesinterface[i] = podQuantile
 	}
 	(*factory.indexer).Index(p.config.ESIndex, podQuantilesinterface)
 }

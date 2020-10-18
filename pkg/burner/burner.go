@@ -84,10 +84,10 @@ func NewExecutorList(uuid string) []Executor {
 	var err error
 	var executorList []Executor
 	RestConfig, err = config.GetRestConfig(0, 0)
-	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	if err != nil {
 		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
 	}
+	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	for _, job := range config.ConfigSpec.Jobs {
 		ex := getExecutor(job)
 		ex.uuid = uuid
@@ -97,7 +97,10 @@ func NewExecutorList(uuid string) []Executor {
 }
 
 func getExecutor(jobConfig config.Job) Executor {
+	var limiter *rate.Limiter
 	var ex Executor
+	// Limits the number of workers to QPS and Burst
+	limiter = rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	if jobConfig.JobType == config.CreationJob {
 		ex = setupCreateJob(jobConfig)
 	} else if jobConfig.JobType == config.DeletionJob {
@@ -105,8 +108,7 @@ func getExecutor(jobConfig config.Job) Executor {
 	} else {
 		log.Fatalf("Unknown jobType: %s", jobConfig.JobType)
 	}
-	// Limits the number of workers to QPS and Burst
-	ex.limiter = rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
+	ex.limiter = limiter
 	ex.Config = jobConfig
 	return ex
 }
@@ -137,7 +139,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		uns := &unstructured.Unstructured{}
 		renderedObj := renderTemplate(t, empty)
 		_, gvk := yamlToUnstructured(renderedObj, uns)
-		restMapping, err := getGVR(gvk)
+		restMapping, err := getGVR(*RestConfig, gvk)
 		if err != nil {
 			log.Fatalf("Error getting GVR: %s", err)
 		}
@@ -159,7 +161,7 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 	var ex Executor
 	for _, o := range jobConfig.Objects {
 		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
-		restMapping, err := getGVR(&gvk)
+		restMapping, err := getGVR(*RestConfig, &gvk)
 		if err != nil {
 			log.Fatalf("Error getting gvr: %s", err)
 		}
@@ -177,11 +179,11 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 }
 
 // find the corresponding GVR (available in *meta.RESTMapping) for gvk
-func getGVR(gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
+func getGVR(restConfig rest.Config, gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
 	// see https://github.com/kubernetes/kubernetes/issues/86149
-	RestConfig.Burst = 0
+	restConfig.Burst = 0
 	// DiscoveryClient queries API server about the resources
-	dc, err := discovery.NewDiscoveryClientForConfig(RestConfig)
+	dc, err := discovery.NewDiscoveryClientForConfig(&restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -192,9 +194,7 @@ func getGVR(gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
 // Cleanup deletes old namespaces from a given job
 func (ex *Executor) Cleanup() {
 	if ex.Config.Cleanup {
-		if err := CleanupNamespaces(ClientSet, ex.selector); err != nil {
-			log.Fatalf("Error cleaning up namespaces: %s", err)
-		}
+		CleanupNamespaces(ClientSet, ex.selector)
 	}
 }
 
@@ -203,7 +203,7 @@ func (ex *Executor) RunCreateJob() {
 	log.Infof("Triggering job: %s", ex.Config.Name)
 	ex.Start = time.Now().UTC()
 	var wg sync.WaitGroup
-	var  string
+	var ns string
 	var err error
 	RestConfig, err = config.GetRestConfig(ex.Config.QPS, ex.Config.Burst)
 	if err != nil {
@@ -256,6 +256,7 @@ func (ex *Executor) RunCreateJob() {
 
 // RunDeleteJob executes a deletion job
 func (ex *Executor) RunDeleteJob() {
+	log.Infof("Triggering job: %s", ex.Config.Name)
 	ex.Start = time.Now().UTC()
 	var wg sync.WaitGroup
 	var err error
