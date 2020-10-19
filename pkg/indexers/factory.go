@@ -35,7 +35,7 @@ func NewIndexer(cfg config.IndexerConfig) *Indexer {
 		log.Infof("📁 Creating indexer: %s", cfg.Type)
 		indexer.new(cfg)
 	} else {
-		log.Warnf("Indexer not found: %s", cfg.Type)
+		log.Fatalf("Indexer not found: %s", cfg.Type)
 	}
 	return &indexer
 }
