@@ -57,8 +57,8 @@ type podLatencyQuantiles struct {
 	MetricName   string    `json:"metricName"`
 }
 
-var podQuantiles []podLatencyQuantiles
-var normLatencies []podMetric
+var podQuantiles []interface{}
+var normLatencies []interface{}
 var podMetrics map[string]podMetric
 
 const (
@@ -205,16 +205,8 @@ func (p *podLatency) stop() error {
 
 // index sends metrics to the configured indexer
 func (p *podLatency) index() {
-	podMetricsinterface := make([]interface{}, len(normLatencies))
-	for i, podLatency := range normLatencies {
-		podMetricsinterface[i] = podLatency
-	}
-	(*factory.indexer).Index(p.config.ESIndex, podMetricsinterface)
-	podQuantilesinterface := make([]interface{}, len(podQuantiles))
-	for i, podQuantile := range podQuantiles {
-		podQuantilesinterface[i] = podQuantile
-	}
-	(*factory.indexer).Index(p.config.ESIndex, podQuantilesinterface)
+	(*factory.indexer).Index(p.config.ESIndex, normLatencies)
+	(*factory.indexer).Index(p.config.ESIndex, podQuantiles)
 }
 
 func normalizeMetrics() {
@@ -236,10 +228,10 @@ func calcQuantiles() {
 		"podReady":        {},
 	}
 	for _, l := range normLatencies {
-		quantileMap["scheduling"] = append(quantileMap["scheduling"], int(l.SchedulingLatency))
-		quantileMap["containersReady"] = append(quantileMap["containersReady"], int(l.ContainersReadyLatency))
-		quantileMap["initialized"] = append(quantileMap["initialized"], int(l.InitializedLatency))
-		quantileMap["podReady"] = append(quantileMap["podReady"], int(l.PodReadyLatency))
+		quantileMap["scheduling"] = append(quantileMap["scheduling"], int(l.(podMetric).SchedulingLatency))
+		quantileMap["containersReady"] = append(quantileMap["containersReady"], int(l.(podMetric).ContainersReadyLatency))
+		quantileMap["initialized"] = append(quantileMap["initialized"], int(l.(podMetric).InitializedLatency))
+		quantileMap["podReady"] = append(quantileMap["podReady"], int(l.(podMetric).PodReadyLatency))
 	}
 	for quantileName, v := range quantileMap {
 		podQ := podLatencyQuantiles{

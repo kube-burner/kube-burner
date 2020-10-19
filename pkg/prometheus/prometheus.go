@@ -142,8 +142,8 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexe
 	r := apiv1.Range{Start: start, End: end, Step: p.step}
 	log.Infof("🔍 Scraping prometheus metrics from %s to %s", start, end)
 	for _, md := range p.metricsProfile.Metrics {
-		metrics := []metric{}
-		log.Infof("Quering %s", md.Query)
+		var metrics []interface{}
+		log.Infof("Querying %s", md.Query)
 		v, _, err := p.api.QueryRange(context.TODO(), md.Query, r)
 		if err != nil {
 			return prometheusError(err)
@@ -178,17 +178,13 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexe
 			if md.IndexName != "" {
 				indexName = strings.ToLower(md.IndexName)
 			}
-			promMetrics := make([]interface{}, len(metrics))
-			for i, metric := range metrics {
-				promMetrics[i] = metric
-			}
-			(*indexer).Index(indexName, promMetrics)
+			(*indexer).Index(indexName, metrics)
 		}
 	}
 	return nil
 }
 
-func (p *Prometheus) parseResponse(metricName, query string, value model.Value, metrics *[]metric) error {
+func (p *Prometheus) parseResponse(metricName, query string, value model.Value, metrics *[]interface{}) error {
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
