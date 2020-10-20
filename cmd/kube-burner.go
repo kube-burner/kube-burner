@@ -107,10 +107,7 @@ func destroyCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error creating restConfig for kube-burner: %s", err)
 			}
-			clientSet, err := kubernetes.NewForConfig(restConfig)
-			if err != nil {
-				log.Fatalf("Error creating ClientSet for kube-burner: %s", err)
-			}
+			clientSet := kubernetes.NewForConfigOrDie(restConfig)
 			burner.CleanupNamespaces(clientSet, selector)
 		},
 	}

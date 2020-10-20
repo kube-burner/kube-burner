@@ -34,13 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/discovery/cached/memory"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -97,10 +94,7 @@ func NewExecutorList(uuid string) []Executor {
 }
 
 func getExecutor(jobConfig config.Job) Executor {
-	var limiter *rate.Limiter
 	var ex Executor
-	// Limits the number of workers to QPS and Burst
-	limiter = rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	if jobConfig.JobType == config.CreationJob {
 		ex = setupCreateJob(jobConfig)
 	} else if jobConfig.JobType == config.DeletionJob {
@@ -108,7 +102,8 @@ func getExecutor(jobConfig config.Job) Executor {
 	} else {
 		log.Fatalf("Unknown jobType: %s", jobConfig.JobType)
 	}
-	ex.limiter = limiter
+	// Limits the number of workers to QPS and Burst
+	ex.limiter = rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
 	ex.Config = jobConfig
 	return ex
 }
@@ -139,18 +134,15 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		uns := &unstructured.Unstructured{}
 		renderedObj := renderTemplate(t, empty)
 		_, gvk := yamlToUnstructured(renderedObj, uns)
-		restMapping, err := getGVR(*RestConfig, gvk)
-		if err != nil {
-			log.Fatalf("Error getting GVR: %s", err)
-		}
+		gvr, _ := meta.UnsafeGuessKindToResource(*gvk)
 		obj := object{
-			gvr:          restMapping.Resource,
+			gvr:          gvr,
 			objectSpec:   t,
 			replicas:     o.Replicas,
 			unstructured: uns,
 			inputVars:    o.InputVars,
 		}
-		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, restMapping.GroupVersionKind.Kind)
+		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
 	return ex
@@ -160,35 +152,22 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 	log.Infof("Preparing delete job: %s", jobConfig.Name)
 	var ex Executor
 	for _, o := range jobConfig.Objects {
-		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
-		restMapping, err := getGVR(*RestConfig, &gvk)
-		if err != nil {
-			log.Fatalf("Error getting gvr: %s", err)
+		if o.APIVersion == "" {
+			o.APIVersion = "v1"
 		}
+		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
+		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
 		if o.LabelSelector == nil {
 			log.Fatalf("Empty labelSelectors not allowed with: %s", o.Kind)
 		}
 		obj := object{
-			gvr:           restMapping.Resource,
+			gvr:           gvr,
 			labelSelector: o.LabelSelector,
 		}
-		log.Infof("Job %s: Delete %s with selector %s", jobConfig.Name, restMapping.GroupVersionKind.Kind, labels.Set(obj.labelSelector))
+		log.Infof("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
 	}
 	return ex
-}
-
-// find the corresponding GVR (available in *meta.RESTMapping) for gvk
-func getGVR(restConfig rest.Config, gvk *schema.GroupVersionKind) (*meta.RESTMapping, error) {
-	// see https://github.com/kubernetes/kubernetes/issues/86149
-	restConfig.Burst = 0
-	// DiscoveryClient queries API server about the resources
-	dc, err := discovery.NewDiscoveryClientForConfig(&restConfig)
-	if err != nil {
-		return nil, err
-	}
-	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(dc))
-	return mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 }
 
 // Cleanup deletes old namespaces from a given job
@@ -202,6 +181,10 @@ func (ex *Executor) Cleanup() {
 func (ex *Executor) RunCreateJob() {
 	log.Infof("Triggering job: %s", ex.Config.Name)
 	ex.Start = time.Now().UTC()
+	nsLabels := map[string]string{
+		"kube-burner-job":  ex.Config.Name,
+		"kube-burner-uuid": ex.uuid,
+	}
 	var wg sync.WaitGroup
 	var ns string
 	var err error
@@ -215,23 +198,20 @@ func (ex *Executor) RunCreateJob() {
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
-		createNamespace(ClientSet, ns, ex.Config, ex.uuid)
+		createNamespace(ClientSet, ns, nsLabels)
 	}
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
-			createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), ex.Config, ex.uuid)
+			createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), nsLabels)
 		}
 		for objectIndex, obj := range ex.objects {
 			wg.Add(1)
 			go ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
-		// Wait for all replicaHandlers to finish before move forward to the next interation, only when using namespaced iterations
-		if ex.Config.NamespacedIterations {
-			wg.Wait()
-		}
+		// Wait for all replicaHandlers to finish before move forward to the next interation
+		wg.Wait()
 		if ex.Config.PodWait {
-			wg.Wait()
 			ex.waitForObjects(ns)
 		}
 		if ex.Config.JobIterationDelay > 0 {
