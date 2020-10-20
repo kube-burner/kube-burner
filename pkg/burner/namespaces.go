@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,18 +27,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func createNamespace(clientset *kubernetes.Clientset, namespaceName string, config config.Job, uuid string) {
-	labels := map[string]string{
-		"kube-burner-job":  config.Name,
-		"kube-burner-uuid": uuid,
-	}
+func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLabels map[string]string) {
 	ns := v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: labels},
+		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
 	}
 	log.Infof("Creating namespace %s", ns.Name)
 	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
 	if errors.IsAlreadyExists(err) {
 		log.Warnf("Namespace %s already exists", ns.Name)
+	} else if err != nil {
+		log.Errorf("Unexpected error creating namespace: %s", err)
 	}
 }
 
