@@ -322,10 +322,9 @@ The `elastic` indexer is configured by the parameters below:
 |----------------------|---------------------------------------------------|-------------|------------------------------------------|---------|
 | esServers            | List of ES instances                              | List        | [https://elastic.apps.rsevilla.org:9200] | ""      |
 | defaultIndex         | Default index to send the prometheus metrics into | String      | kube-burner                              | ""      | 
-| username             | Elasticsearch username                            | String      | user                                     | ""      |
-| password             | Elasticsearch password                            | String      | secret                                   | ""      |
 | insecureSkipVerify   | TLS certificate verification                      | Boolean     | true                                     | false   |
 
+**Note**: It's possible to index documents in an authenticated ES instance using the notation http(s)://[username]:[password][address]:[port] in the *esServers* parameter.
 
 ### Measurements
 

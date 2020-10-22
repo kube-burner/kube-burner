@@ -43,8 +43,6 @@ type IndexerConfig struct {
 	// DefaultIndex default index to send prometheus metrics
 	DefaultIndex string `yaml:"defaultIndex"`
 	Port         int    `yaml:"port"`
-	Username     string `yaml:"username"`
-	Password     string `yaml:"password"`
 	// InsecureSkipVerify disable TLS ceriticate verification
 	InsecureSkipVerify bool `yaml:"insecureSkipVerify"`
 	// Enabled enable indexer
