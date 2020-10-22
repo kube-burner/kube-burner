@@ -324,7 +324,7 @@ The `elastic` indexer is configured by the parameters below:
 | defaultIndex         | Default index to send the prometheus metrics into | String      | kube-burner                              | ""      | 
 | insecureSkipVerify   | TLS certificate verification                      | Boolean     | true                                     | false   |
 
-**Note**: It's possible to index documents in an authenticated ES instance using the notation http(s)://[username]:[password][address]:[port] in the *esServers* parameter.
+**Note**: It's possible to index documents in an authenticated ES instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the *esServers* parameter.
 
 ### Measurements
 
