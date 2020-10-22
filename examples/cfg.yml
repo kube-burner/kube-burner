@@ -9,7 +9,7 @@ global:
 
   indexerConfig:
     enabled: true
-    esServers: [https://es-instance.example.org:9200]
+    esServers: [https://user:password@es-instance.example.org:9200]
     insecureSkipVerify: true
     defaultIndex: kube-burner
     type: elastic

@@ -44,8 +44,6 @@ func init() {
 func (esIndexer *Elastic) new(esConfig config.IndexerConfig) {
 	cfg := elasticsearch.Config{
 		Addresses: esConfig.ESServers,
-		Username:  esConfig.Username,
-		Password:  esConfig.Password,
 		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: esConfig.InsecureSkipVerify}},
 	}
 	ESClient, err := elasticsearch.NewClient(cfg)
