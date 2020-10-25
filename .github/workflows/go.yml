@@ -43,6 +43,19 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
 
+    - name: Cache prometheus
+      uses: actions/cache@v2
+      with:
+        path: ~/prometheus-2.22.0.linux-amd64
+        key: prometheus
+
+    - name: Download prometheus binary
+      run: curl -L https://github.com/prometheus/prometheus/releases/download/v2.22.0/prometheus-2.22.0.linux-amd64.tar.gz | tar xz
+
+    - name: Start prometheus server
+      working-directory: ~/prometheus-2.22.0.linux-amd64
+      run: ./prometheus --storage.tsdb.path=/tmp/promdata 2>/dev/null &
+
     - name: Build
       run: make build
 
