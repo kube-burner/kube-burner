@@ -263,7 +263,7 @@ spec:
   type: ClusterIP
 ```
 
-It's worth to say that you can also more advanced [golang template semantics](https://golang.org/pkg/text/template/) on your objectTemplate files.
+It's worth to say that you can also use [golang template semantics](https://golang.org/pkg/text/template/) in your *objectTemplate* files.
 
 ```yaml
 kind: ImageStream
@@ -396,21 +396,21 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 
 ```yaml
    measurements:
-    - name: pprof
-      pprofInterval: 5m
-      pprofDirectory: pprof-data
-      pprofTargets:
-        - name: kube-apiserver-heap
-          namespace: "openshift-kube-apiserver"
-          labelSelector: {app: openshift-kube-apiserver}
-          bearerToken: thisIsNotAValidToken
-          url: https://localhost:6443/debug/pprof/heap
+   - name: pprof
+     pprofInterval: 5m
+     pprofDirectory: pprof-data
+     pprofTargets:
+     - name: kube-apiserver-heap
+       namespace: "openshift-kube-apiserver"
+       labelSelector: {app: openshift-kube-apiserver}
+       bearerToken: thisIsNotAValidToken
+       url: https://localhost:6443/debug/pprof/heap
 
-        - name: kube-apiserver-cpu
-          namespace: "openshift-kube-apiserver"
-          labelSelector: {app: openshift-kube-apiserver}
-          bearerToken: thisIsNotAValidToken
-          url: https://localhost:6443/debug/pprof/profile?timeout=30
+     - name: kube-apiserver-cpu
+       namespace: "openshift-kube-apiserver"
+       labelSelector: {app: openshift-kube-apiserver}
+       bearerToken: thisIsNotAValidToken
+       url: https://localhost:6443/debug/pprof/profile?timeout=30
 ```
 
 **Note**: As mentioned before, this measurement requires cURL to be installed in the target pods.
