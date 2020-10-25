@@ -4,8 +4,8 @@ global:
   writeToFile: true
   metricsDirectory: collected-metrics
   measurements:
-    - name: podLatency
-      esIndex: kube-burner
+  - name: podLatency
+    esIndex: kube-burner
 
   indexerConfig:
     enabled: false
@@ -23,6 +23,7 @@ jobs:
     waitWhenFinished: true
     verifyObjects: true
     errorOnVerify: true
+    jobIterationDelay: 10s
     objects:
     
     - objectTemplate: objectTemplates/deployment.yml
@@ -42,7 +43,6 @@ jobs:
     waitWhenFinished: false
     verifyObjects: true
     errorOnVerify: true
-    jobIterationDelay: 100ms
     objects:
     
     - objectTemplate: objectTemplates/deployment.yml
