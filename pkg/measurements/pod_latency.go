@@ -242,11 +242,13 @@ func calcQuantiles() {
 		}
 		sort.Ints(v)
 		length := len(v)
-		for _, quantile := range quantiles {
-			qValue := v[int(math.Ceil(float64(length)*quantile))-1]
-			podQ.setQuantile(quantile, qValue)
+		if length > 1 {
+			for _, quantile := range quantiles {
+				qValue := v[int(math.Ceil(float64(length)*quantile))-1]
+				podQ.setQuantile(quantile, qValue)
+			}
+			podQ.Max = v[length-1]
 		}
-		podQ.Max = v[length-1]
 		sum := 0
 		for _, n := range v {
 			sum += n

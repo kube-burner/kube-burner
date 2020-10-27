@@ -97,9 +97,11 @@ func destroyCmd() *cobra.Command {
 		Short: "Destroy old namespaces labeled with the given UUID.",
 		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			err := config.Parse(configFile, false)
-			if err != nil {
-				log.Fatalf("Error parsing configuration: %s", err)
+			if configFile != "" {
+				err := config.Parse(configFile, false)
+				if err != nil {
+					log.Fatalf("Error parsing configuration: %s", err)
+				}
 			}
 			selector := util.NewSelector()
 			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
@@ -112,7 +114,6 @@ func destroyCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path")
 	return cmd
 }
 
@@ -242,7 +243,7 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 	}
 	// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 	if p != nil {
-		log.Infof("Waiting an extra %v before scraping prometheus metrics", prometheusStep*4)
+		log.Infof("Waiting %v extra before scraping prometheus metrics", prometheusStep*4)
 		time.Sleep(prometheusStep * 4)
 		if err := p.ScrapeMetrics(start, time.Now().UTC(), config.ConfigSpec, indexer); err != nil {
 			log.Error(err)
