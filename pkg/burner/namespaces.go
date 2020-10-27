@@ -43,7 +43,7 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 // CleanupNamespaces deletes namespaces with the given selector
 func CleanupNamespaces(clientset *kubernetes.Clientset, s *util.Selector) {
 	log.Infof("Deleting namespaces with label %s", s.LabelSelector)
-	ns, _ := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: s.LabelSelector})
+	ns, _ := clientset.CoreV1().Namespaces().List(context.TODO(), s.ListOptions)
 	if len(ns.Items) > 0 {
 		for _, ns := range ns.Items {
 			err := clientset.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
@@ -56,7 +56,6 @@ func CleanupNamespaces(clientset *kubernetes.Clientset, s *util.Selector) {
 			}
 		}
 	}
-	ns, _ = clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: s.LabelSelector})
 	if len(ns.Items) > 0 {
 		waitForDeleteNamespaces(clientset, s)
 	}

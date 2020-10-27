@@ -152,9 +152,9 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexe
 			return err
 		}
 		if cfg.GlobalConfig.WriteToFile {
-			filename = fmt.Sprintf("%s-%s.json", md.MetricName, p.uuid)
+			filename = fmt.Sprintf("%s.json", md.MetricName)
 			if cfg.GlobalConfig.MetricsDirectory != "" {
-				err := os.MkdirAll(cfg.GlobalConfig.MetricsDirectory, 0744)
+				err = os.MkdirAll(cfg.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
 					return fmt.Errorf("Error creating metrics directory %s: ", err)
 				}

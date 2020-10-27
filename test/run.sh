@@ -33,7 +33,7 @@ check_running_pods() {
 }
 
 check_files () {
-  for f in collected-metrics/prometheusRSS-${uuid}.json collected-metrics/namespaced-podLatency.json collected-metrics/namespaced-podLatency-summary.json; do
+  for f in collected-metrics/prometheusRSS.json collected-metrics/namespaced-podLatency.json collected-metrics/namespaced-podLatency-summary.json; do
     if [[ ! -f $f ]]; then
       echo "File ${f} not present"
       rc=1
@@ -46,7 +46,7 @@ check_files
 check_ns kube-burner-job=not-namespaced,kube-burner-uuid=${uuid} 1
 check_ns kube-burner-job=namespaced,kube-burner-uuid=${uuid} 5
 check_running_pods kube-burner-job=namespaced,kube-burner-uuid=${uuid} 5 
-kube-burner destroy -c kube-burner.yml --uuid ${uuid}
+kube-burner destroy --uuid ${uuid}
 check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid=${uuid}
 check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid=${uuid}
 exit ${rc}
