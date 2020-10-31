@@ -38,11 +38,12 @@ var binName = filepath.Base(os.Args[0])
 var completionCmd = &cobra.Command{
 	Use:   "completion",
 	Short: "Generates completion scripts for bash shell",
-	Long: `To load completion run
-	. <(kube-burner completion)
-	To configure your bash shell to load completions for each session execute:
+	Long: `To load completion in the current shell run
+. <(kube-burner completion)
 
-	# kube-burner completion > /etc/bash_completion.d/kube-burner
+To configure your bash shell to load completions for each session execute:
+
+# kube-burner completion > /etc/bash_completion.d/kube-burner
 	`,
 	Args: cobra.MaximumNArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -170,11 +171,10 @@ func indexCmd() *cobra.Command {
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   binName,
-	Short: "Stress a kubernetes cluster",
-	Long: `kube-burner is a tool that aims to stress a kubernetes cluster.
-	
-It doesn’t only provide some similar features as other tools like cluster-loader, but also
-adds other features such as a simplified simplified usage, metrics collection and indexing capabilities`,
+	Short: "Burn a kubernetes cluster",
+	Long: `Kube-burner 🔥
+
+Tool aimed at stressing a kubernetes cluster by creating or deleting lot of objects.`,
 }
 
 // Execute executes rootCmd
@@ -208,8 +208,7 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
 	}
-	executorList := burner.NewExecutorList(uuid)
-	for _, job := range executorList {
+	for _, job := range burner.NewExecutorList(uuid) {
 		// Run execution
 		switch job.Config.JobType {
 		case config.CreationJob:

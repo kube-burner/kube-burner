@@ -24,9 +24,9 @@
 
 ## What's this?
 
-Kube-burner is a tool aimed to stress a kubernetes cluster. An overview of its behaviour can be summarized with these three steps:
+Kube-burner is a tool aimed at stressing kubernetes clusters. An overview of its behaviour can be summarized with these three steps:
 
-- Create the objects declared in the jobs.
+- Create/delete the objects declared in the jobs.
 - Collect desired on-cluster prometheus metrics.
 - Write and/or index them to the configured TSDB.
 
@@ -55,14 +55,13 @@ CGO_ENABLED=0 go build -v -mod vendor -ldflags "-X github.com/cloud-bulldozer/ku
 
 ## Getting started
 
-kube-burner is basically a binary client with currently the following options.
+kube-burner is basically a binary client with currently the following optionsn
 
 ```console
 ./bin/kube-burner help
-kube-burner is a tool that aims to stress a kubernetes cluster.
+Kube-burner 🔥
 
-It doesn’t only provide similar features as other tools like cluster-loader, but also
-adds other features such as simplified simplified usage, metrics collection and indexing capabilities
+Tool aimed at stressing a kubernetes cluster by creating or deleting lot of objects.
 
 Usage:
   kube-burner [command]
@@ -79,7 +78,6 @@ Flags:
   -h, --help   help for kube-burner
 
 Use "kube-burner [command] --help" for more information about a command.
-
 ```
 
 - The **init** option supports the following flags:
