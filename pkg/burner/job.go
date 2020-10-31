@@ -60,6 +60,7 @@ var RestConfig *rest.Config
 // NewExecutorList Returns a list of executors
 func NewExecutorList(uuid string) []Executor {
 	var err error
+	var ex Executor
 	var executorList []Executor
 	RestConfig, err = config.GetRestConfig(0, 0)
 	if err != nil {
@@ -67,24 +68,23 @@ func NewExecutorList(uuid string) []Executor {
 	}
 	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	for _, job := range config.ConfigSpec.Jobs {
-		ex := getExecutor(job)
+		if job.JobType == config.CreationJob {
+			ex = setupCreateJob(job)
+		} else if job.JobType == config.DeletionJob {
+			ex = setupDeleteJob(job)
+		} else {
+			log.Fatalf("Unknown jobType: %s", job.JobType)
+		}
+		for _, j := range executorList {
+			if job.Name == j.Config.Name {
+				log.Fatalf("Job names must be unique: %s", job.Name)
+			}
+		}
+		// Limits the number of workers to QPS and Burst
+		ex.limiter = rate.NewLimiter(rate.Limit(job.QPS), job.Burst)
+		ex.Config = job
 		ex.uuid = uuid
 		executorList = append(executorList, ex)
 	}
 	return executorList
-}
-
-func getExecutor(jobConfig config.Job) Executor {
-	var ex Executor
-	if jobConfig.JobType == config.CreationJob {
-		ex = setupCreateJob(jobConfig)
-	} else if jobConfig.JobType == config.DeletionJob {
-		ex = setupDeleteJob(jobConfig)
-	} else {
-		log.Fatalf("Unknown jobType: %s", jobConfig.JobType)
-	}
-	// Limits the number of workers to QPS and Burst
-	ex.limiter = rate.NewLimiter(rate.Limit(jobConfig.QPS), jobConfig.Burst)
-	ex.Config = jobConfig
-	return ex
 }
