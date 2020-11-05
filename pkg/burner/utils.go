@@ -19,13 +19,23 @@ import (
 	"context"
 	"fmt"
 	"text/template"
+	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubectl/pkg/scheme"
+)
+
+const (
+	// Parameters for retrying with exponential backoff.
+	retryBackoffInitialDuration = 1 * time.Second
+	retryBackoffFactor          = 3
+	retryBackoffJitter          = 0
+	retryBackoffSteps           = 3
 )
 
 func renderTemplate(original []byte, data interface{}) []byte {
@@ -58,15 +68,25 @@ func (ex *Executor) Cleanup() {
 
 // Verify verifies the number of created objects
 func (ex *Executor) Verify() bool {
+	var objList *unstructured.UnstructuredList
 	success := true
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
 		listOptions := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.Config.Name, objectIndex),
 		}
-		objList, err := dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
+		err := RetryWithExponentialBackOff(func() (done bool, err error) {
+			objList, err = dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
+			if err != nil {
+				log.Errorf("Error verifying object: %s", err)
+				return false, nil
+			}
+			return true, nil
+		})
+		// Mark success to false if we found an error
 		if err != nil {
-			log.Errorf("Error verifying object: %s", err)
+			success = false
+			continue
 		}
 		objectsExpected := ex.Config.JobIterations * obj.replicas
 		if len(objList.Items) != objectsExpected {
@@ -77,4 +97,15 @@ func (ex *Executor) Verify() bool {
 		}
 	}
 	return success
+}
+
+// RetryWithExponentialBackOff a utility for retrying the given function with exponential backoff.
+func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
+	backoff := wait.Backoff{
+		Duration: retryBackoffInitialDuration,
+		Factor:   retryBackoffFactor,
+		Jitter:   retryBackoffJitter,
+		Steps:    retryBackoffSteps,
+	}
+	return wait.ExponentialBackoff(backoff, fn)
 }
