@@ -55,10 +55,11 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 
 // RunDeleteJob executes a deletion job
 func (ex *Executor) RunDeleteJob() {
-	log.Infof("Triggering job: %s", ex.Config.Name)
-	ex.Start = time.Now().UTC()
 	var wg sync.WaitGroup
 	var err error
+	var resp *unstructured.UnstructuredList
+	log.Infof("Triggering job: %s", ex.Config.Name)
+	ex.Start = time.Now().UTC()
 	RestConfig, err = config.GetRestConfig(ex.Config.QPS, ex.Config.Burst)
 	if err != nil {
 		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
@@ -73,9 +74,16 @@ func (ex *Executor) RunDeleteJob() {
 		listOptions := metav1.ListOptions{
 			LabelSelector: labelSelector,
 		}
-		resp, err := dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+		err = RetryWithExponentialBackOff(func() (done bool, err error) {
+			resp, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+			if err != nil {
+				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
+				return false, nil
+			}
+			return true, nil
+		})
 		if err != nil {
-			log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
+			continue
 		}
 		for _, item := range resp.Items {
 			wg.Add(1)
