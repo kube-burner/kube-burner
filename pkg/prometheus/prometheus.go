@@ -70,6 +70,7 @@ type metric struct {
 	UUID       string            `json:"uuid"`
 	Query      string            `json:"query"`
 	MetricName string            `json:"metricName"`
+	JobName    string            `json:"jobName"`
 }
 
 func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -196,6 +197,7 @@ func (p *Prometheus) parseResponse(metricName, query string, value model.Value, 
 				UUID:       p.uuid,
 				Query:      query,
 				MetricName: metricName,
+				JobName:    config.ConfigSpec.Jobs[0].Name,
 			}
 			for k, v := range v.Metric {
 				if k == "__name__" {

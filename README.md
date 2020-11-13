@@ -397,7 +397,8 @@ Pod latency sample:
     "initializedLatency": 82,
     "containersReadyLatency": 82,
     "podReadyLatency": 82,
-    "metricName": "podLatencyMeasurement"
+    "metricName": "podLatencyMeasurement",
+    "jobName": "kube-burner-job"
 }
 ```
 
@@ -413,7 +414,8 @@ Pod latency quantile sample:
     "Max": 84523,
     "Avg": 53131,
     "timestamp": "2020-08-27T01:13:24.091110065+02:00",
-    "metricName": "podLatencyQuantilesMeasurement"
+    "metricName": "podLatencyQuantilesMeasurement",
+    "jobName": "kube-burner-job"
 },
 {
     "quantileName": "podReady",
@@ -424,7 +426,8 @@ Pod latency quantile sample:
     "Max": 82522,
     "Avg": 54153,
     "timestamp": "2020-08-27T01:13:24.091110483+02:00",
-    "metricName": "podLatencyQuantilesMeasurement"
+    "metricName": "podLatencyQuantilesMeasurement",
+    "jobName": "kube-burner-job"
 }
 ```
 

@@ -42,6 +42,7 @@ type podMetric struct {
 	podReady               time.Time
 	PodReadyLatency        int64  `json:"podReadyLatency"`
 	MetricName             string `json:"metricName"`
+	JobName                string `json:"jobName"`
 	UUID                   string `json:"uuid"`
 }
 
@@ -55,6 +56,7 @@ type podLatencyQuantiles struct {
 	Avg          float64   `json:"avg"`
 	Timestamp    time.Time `json:"timestamp"`
 	MetricName   string    `json:"metricName"`
+	JobName      string    `json:"jobName"`
 }
 
 var podQuantiles []interface{}
@@ -83,6 +85,7 @@ func (p *podLatency) createPod(obj interface{}) {
 				Timestamp:  time.Now(),
 				MetricName: "podLatencyMeasurement",
 				UUID:       factory.uuid,
+				JobName:    config.ConfigSpec.Jobs[0].Name,
 			}
 		}
 	}
@@ -221,12 +224,7 @@ func normalizeMetrics() {
 
 func calcQuantiles() {
 	quantiles := []float64{0.5, 0.95, 0.99}
-	quantileMap := map[string][]int{
-		"scheduling":      {},
-		"containersReady": {},
-		"initialized":     {},
-		"podReady":        {},
-	}
+	quantileMap := map[string][]int{}
 	for _, l := range normLatencies {
 		quantileMap["scheduling"] = append(quantileMap["scheduling"], int(l.(podMetric).SchedulingLatency))
 		quantileMap["containersReady"] = append(quantileMap["containersReady"], int(l.(podMetric).ContainersReadyLatency))
@@ -238,6 +236,7 @@ func calcQuantiles() {
 			QuantileName: quantileName,
 			UUID:         factory.uuid,
 			Timestamp:    time.Now(),
+			JobName:      config.ConfigSpec.Jobs[0].Name,
 			MetricName:   "podLatencyQuantilesMeasurement",
 		}
 		sort.Ints(v)
