@@ -96,58 +96,58 @@ type GlobalConfig struct {
 // Object defines an object that kube-burner will create
 type Object struct {
 	// ObjectTemplate path to a valid YAML definition of a k8s resource
-	ObjectTemplate string `yaml:"objectTemplate"`
+	ObjectTemplate string `yaml:"objectTemplate" json:"objectTemplate,omitempty"`
 	// Replicas number of replicas to create of the given object
-	Replicas int `yaml:"replicas"`
+	Replicas int `yaml:"replicas" json:"replicas,omitempty"`
 	// InputVars contains a map of arbitrary input variables
-	// that can be introduced by the users
-	InputVars map[string]string `yaml:"inputVars"`
+	// that can be introduced by users
+	InputVars map[string]string `yaml:"inputVars" json:"inputVars,omitempty"`
 	// Kind object kind to delete
-	Kind string `yaml:"kind"`
+	Kind string `yaml:"kind" json:"kind,omitempty"`
 	// APIVersion apiVersion of the object to remove
-	APIVersion string `yaml:"apiVersion"`
+	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with this labels will be removed
-	LabelSelector map[string]string `yaml:"labelSelector"`
+	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 }
 
 // Job defines a kube-burner job
 type Job struct {
 	// IterationCount how many times to execute the job
-	JobIterations int `yaml:"jobIterations"`
+	JobIterations int `yaml:"jobIterations" json:"jobIterations"`
 	// IterationDelay how much time to wait between each job iteration
-	JobIterationDelay time.Duration `yaml:"jobIterationDelay"`
+	JobIterationDelay time.Duration `yaml:"jobIterationDelay" json:"jobIterationDelay"`
 	// JobPause how much time to pause after finishing the job
-	JobPause time.Duration `yaml:"jobPause"`
+	JobPause time.Duration `yaml:"jobPause" json:"jobPause"`
 	// Name job name
-	Name string `yaml:"name"`
+	Name string `yaml:"name" json:"name"`
 	// Objects list of objects
-	Objects []Object `yaml:"objects"`
+	Objects []Object `yaml:"objects" json:"objects"`
 	// JobType type of job
-	JobType JobType `yaml:"jobType"`
+	JobType JobType `yaml:"jobType" json:"jobType"`
 	// Max number of queries per second
-	QPS int `yaml:"qps"`
+	QPS int `yaml:"qps" json:"qps"`
 	// Maximum burst for throttle
-	Burst int `yaml:"burst"`
+	Burst int `yaml:"burst" json:"burst"`
 	// Namespace namespace base name to use
-	Namespace string `yaml:"namespace"`
+	Namespace string `yaml:"namespace" json:"namespace"`
 	// WaitFor list of objects to wait for, if not specified wait for all
-	WaitFor []string `yaml:"waitFor"`
+	WaitFor []string `yaml:"waitFor" json:"waitFor"`
 	// MaxWaitTimeout maximum wait period
-	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout"`
+	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout" json:"maxWaitTimeout"`
 	// WaitForDeletion wait for objects to be definitively deleted
-	WaitForDeletion bool `yaml:"waitForDeletion"`
+	WaitForDeletion bool `yaml:"waitForDeletion" json:"waitForDeletion"`
 	// PodWait wait for all pods to be running before moving forward to the next iteration
-	PodWait bool `yaml:"podWait"`
+	PodWait bool `yaml:"podWait" json:"podWait"`
 	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
-	WaitWhenFinished bool `yaml:"waitWhenFinished"`
+	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished"`
 	// Cleanup clean up old namespaces
-	Cleanup bool `yaml:"cleanup"`
+	Cleanup bool `yaml:"cleanup" json:"cleanup"`
 	// whether to create namespaces or not with each job iteration
-	Namespaced bool `yaml:"namespaced"`
+	Namespaced bool `yaml:"namespaced" json:"namespaced"`
 	// NamespacedIterations create a namespace per job iteration
-	NamespacedIterations bool `yaml:"namespacedIterations"`
+	NamespacedIterations bool `yaml:"namespacedIterations" json:"namespacedIterations"`
 	// VerifyObjects verify object count after running the job
-	VerifyObjects bool `yaml:"verifyObjects"`
+	VerifyObjects bool `yaml:"verifyObjects" json:"verifyObjects"`
 	// ErrorOnVerify exit when verification fails
-	ErrorOnVerify bool `yaml:"errorOnVerify"`
+	ErrorOnVerify bool `yaml:"errorOnVerify" json:"errorOnVerify"`
 }

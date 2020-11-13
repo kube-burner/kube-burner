@@ -234,7 +234,11 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 		case config.DeletionJob:
 			job.RunDeleteJob()
 		}
-		log.Infof("Job %s took %.2f seconds", job.Config.Name, job.End.Sub(job.Start).Seconds())
+		elapsedTime := job.End.Sub(job.Start).Seconds()
+		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
+		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
+			burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config)
+		}
 		if job.Config.JobPause > 0 {
 			log.Infof("Pausing for %v before next job", job.Config.JobPause)
 			time.Sleep(job.Config.JobPause)

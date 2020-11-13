@@ -14,6 +14,7 @@
   - [Job types](#job-types)
   - [Injected variables](#injected-variables)
   - [Metrics profile](#metrics-profile)
+  - [Job Summary](#job-summary)
   - [Indexers](#indexers)
   - [Measurements](#measurements)
     - [Pod latency](#pod-latency)
@@ -292,6 +293,50 @@ metrics:
 
   - query: sum(irate(node_cpu_seconds_total[2m])) by (mode,instance)
     metricName: nodeCPU
+```
+
+### Job Summary
+
+In case indexing is enabled, at the end of each job, a document holding the job summary is indexed. This is useful to indentify the options the job was parameters with:
+
+This document looks like:
+
+```json
+{
+  "timestamp": "2020-11-13T13:55:31.654185032+01:00",
+  "uuid": "bdb7584a-d2cd-4185-8bfa-1387cc31f99e",
+  "metricName": "jobSummary",
+  "elapsedTime": 8.768932955,
+  "jobConfig": {
+    "jobIterations": 10,
+    "jobIterationDelay": 0,
+    "jobPause": 0,
+    "name": "kubelet-density",
+    "objects": [
+      {
+        "objectTemplate": "templates/pod.yml",
+        "replicas": 1,
+        "inputVars": {
+          "containerImage": "gcr.io/google_containers/pause-amd64:3.0"
+        }
+      }
+    ],
+    "jobType": "create",
+    "qps": 5,
+    "burst": 5,
+    "namespace": "kubelet-density",
+    "waitFor": null,
+    "maxWaitTimeout": 43200000000000,
+    "waitForDeletion": true,
+    "podWait": false,
+    "waitWhenFinished": true,
+    "cleanup": true,
+    "namespaced": false,
+    "namespacedIterations": false,
+    "verifyObjects": true,
+    "errorOnVerify": false
+  }
+}
 ```
 
 ### Indexers
