@@ -297,7 +297,7 @@ metrics:
 
 ### Job Summary
 
-In case indexing is enabled, at the end of each job, a document holding the job summary is indexed. This is useful to indentify the options the job was parameters with:
+In case indexing is enabled, at the end of each job, a document holding the job summary is indexed. This is useful to identify the parameters the job was executed with:
 
 This document looks like:
 

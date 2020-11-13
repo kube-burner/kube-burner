@@ -41,6 +41,6 @@ func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float
 			Timestamp:   time.Now(),
 		},
 	}
-	log.Infof("Indexing metadata information: %+v", metadataInfo)
+	log.Info("Indexing metadata information")
 	(*indexer).Index(config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex, metadataInfo)
 }
