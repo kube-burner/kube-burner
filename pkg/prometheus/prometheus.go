@@ -186,9 +186,13 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexe
 }
 
 func (p *Prometheus) parseResponse(metricName, query string, value model.Value, metrics *[]interface{}) error {
+	var jobName string
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
+	}
+	if len(config.ConfigSpec.Jobs) > 0 {
+		jobName = config.ConfigSpec.Jobs[0].Name
 	}
 	for _, v := range data {
 		for _, val := range v.Values {
@@ -197,7 +201,7 @@ func (p *Prometheus) parseResponse(metricName, query string, value model.Value, 
 				UUID:       p.uuid,
 				Query:      query,
 				MetricName: metricName,
-				JobName:    config.ConfigSpec.Jobs[0].Name,
+				JobName:    jobName,
 			}
 			for k, v := range v.Metric {
 				if k == "__name__" {

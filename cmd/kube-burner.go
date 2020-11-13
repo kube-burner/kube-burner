@@ -145,6 +145,7 @@ func indexCmd() *cobra.Command {
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
+			log.Infof("Indexing metrics with UUID %s", uuid)
 			if err := p.ScrapeMetrics(startTime, endTime, config.ConfigSpec, indexer); err != nil {
 				log.Error(err)
 			}
