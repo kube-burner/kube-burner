@@ -56,6 +56,7 @@ type metricDefinition struct {
 	Query      string `yaml:"query"`
 	MetricName string `yaml:"metricName"`
 	IndexName  string `yaml:"indexName"`
+	Instant    bool   `yaml:"instant"`
 }
 
 // MetricsProfile describes what metrics kube-burner collects
@@ -69,8 +70,8 @@ type metric struct {
 	Value      float64           `json:"value"`
 	UUID       string            `json:"uuid"`
 	Query      string            `json:"query"`
-	MetricName string            `json:"metricName"`
-	JobName    string            `json:"jobName"`
+	MetricName string            `json:"metricName,omitempty"`
+	JobName    string            `json:"jobName,omitempty"`
 }
 
 func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -138,28 +139,45 @@ func (p *Prometheus) readProfile(metricsFile string) error {
 }
 
 // ScrapeMetrics gets all prometheus metrics required and handles them
-func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexer *indexers.Indexer) error {
-	var filename string
+func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Indexer) error {
+	var filename, jobName string
+	var err error
+	var v model.Value
 	r := apiv1.Range{Start: start, End: end, Step: p.step}
 	log.Infof("🔍 Scraping prometheus metrics from %s to %s", start, end)
 	for _, md := range p.metricsProfile.Metrics {
 		var metrics []interface{}
-		log.Infof("Querying %s", md.Query)
-		v, _, err := p.api.QueryRange(context.TODO(), md.Query, r)
-		if err != nil {
-			return prometheusError(err)
+		// IndexCMD can work w/o specifying any job
+		if len(config.ConfigSpec.Jobs) > 0 {
+			jobName = config.ConfigSpec.Jobs[0].Name
 		}
-		if err := p.parseResponse(md.MetricName, md.Query, v, &metrics); err != nil {
-			return err
+		if md.Instant {
+			log.Infof("Instant query: %s", md.Query)
+			v, _, err = p.api.Query(context.TODO(), md.Query, time.Now().UTC())
+			if err != nil {
+				return prometheusError(err)
+			}
+			if err := p.parseVector(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
+				return err
+			}
+		} else {
+			log.Infof("Range query: %s", md.Query)
+			v, _, err = p.api.QueryRange(context.TODO(), md.Query, r)
+			if err != nil {
+				return prometheusError(err)
+			}
+			if err := p.parseMatrix(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
+				return err
+			}
 		}
-		if cfg.GlobalConfig.WriteToFile {
+		if config.ConfigSpec.GlobalConfig.WriteToFile {
 			filename = fmt.Sprintf("%s.json", md.MetricName)
-			if cfg.GlobalConfig.MetricsDirectory != "" {
-				err = os.MkdirAll(cfg.GlobalConfig.MetricsDirectory, 0744)
+			if config.ConfigSpec.GlobalConfig.MetricsDirectory != "" {
+				err = os.MkdirAll(config.ConfigSpec.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
 					return fmt.Errorf("Error creating metrics directory %s: ", err)
 				}
-				filename = path.Join(cfg.GlobalConfig.MetricsDirectory, filename)
+				filename = path.Join(config.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
 			}
 			log.Infof("Writing to: %s", filename)
 			f, err := os.Create(filename)
@@ -174,8 +192,8 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexe
 			}
 			f.Close()
 		}
-		if cfg.GlobalConfig.IndexerConfig.Enabled {
-			indexName := cfg.GlobalConfig.IndexerConfig.DefaultIndex
+		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
+			indexName := config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex
 			if md.IndexName != "" {
 				indexName = strings.ToLower(md.IndexName)
 			}
@@ -185,14 +203,40 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, cfg config.Spec, indexe
 	return nil
 }
 
-func (p *Prometheus) parseResponse(metricName, query string, value model.Value, metrics *[]interface{}) error {
-	var jobName string
-	data, ok := value.(model.Matrix)
+func (p *Prometheus) parseVector(metricName, query, jobName string, value model.Value, metrics *[]interface{}) error {
+	data, ok := value.(model.Vector)
 	if !ok {
 		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
 	}
-	if len(config.ConfigSpec.Jobs) > 0 {
-		jobName = config.ConfigSpec.Jobs[0].Name
+	for _, v := range data {
+		m := metric{
+			Labels:     make(map[string]string),
+			UUID:       p.uuid,
+			Query:      query,
+			MetricName: metricName,
+			JobName:    jobName,
+		}
+		for k, v := range v.Metric {
+			if k == "__name__" {
+				continue
+			}
+			m.Labels[string(k)] = string(v)
+		}
+		if math.IsNaN(float64(v.Value)) {
+			m.Value = 0
+		} else {
+			m.Value = float64(v.Value)
+		}
+		m.Timestamp = v.Timestamp.Time()
+		*metrics = append(*metrics, m)
+	}
+	return nil
+}
+
+func (p *Prometheus) parseMatrix(metricName, query, jobName string, value model.Value, metrics *[]interface{}) error {
+	data, ok := value.(model.Matrix)
+	if !ok {
+		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
 	}
 	for _, v := range data {
 		for _, val := range v.Values {

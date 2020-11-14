@@ -135,7 +135,7 @@ func indexCmd() *cobra.Command {
 			}
 			var indexer *indexers.Indexer
 			if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-				indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
+				indexer = indexers.NewIndexer()
 			} else {
 				log.Fatal("Indexing is disabled in the configuration")
 			}
@@ -146,7 +146,7 @@ func indexCmd() *cobra.Command {
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
 			log.Infof("Indexing metrics with UUID %s", uuid)
-			if err := p.ScrapeMetrics(startTime, endTime, config.ConfigSpec, indexer); err != nil {
+			if err := p.ScrapeMetrics(startTime, endTime, indexer); err != nil {
 				log.Error(err)
 			}
 		},
@@ -207,15 +207,15 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 	var rc int
 	var indexer *indexers.Indexer
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-		indexer = indexers.NewIndexer(config.ConfigSpec.GlobalConfig.IndexerConfig)
+		indexer = indexers.NewIndexer()
 	}
 	for _, job := range burner.NewExecutorList(uuid) {
 		// Run execution
 		switch job.Config.JobType {
 		case config.CreationJob:
 			job.Cleanup()
-			measurements.NewMeasurementFactory(burner.RestConfig, config.ConfigSpec.GlobalConfig, job.Config, uuid, indexer)
-			measurements.Register(config.ConfigSpec.GlobalConfig.Measurements)
+			measurements.NewMeasurementFactory(burner.RestConfig, job.Config, uuid, indexer)
+			measurements.Register()
 			measurements.Start()
 			job.RunCreateJob()
 			if job.Config.VerifyObjects {
@@ -249,7 +249,7 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 	if p != nil {
 		log.Infof("Waiting %v extra before scraping prometheus metrics", prometheusStep*4)
 		time.Sleep(prometheusStep * 4)
-		if err := p.ScrapeMetrics(start, time.Now().UTC(), config.ConfigSpec, indexer); err != nil {
+		if err := p.ScrapeMetrics(start, time.Now().UTC(), indexer); err != nil {
 			log.Error(err)
 		}
 	}
