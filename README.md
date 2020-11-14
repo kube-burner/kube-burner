@@ -295,6 +295,16 @@ metrics:
     metricName: nodeCPU
 ```
 
+
+It's also possible to execute instant queries from kube-burner by adding the flag instant to the desired metric. These kind of queries are useful to get only one sample for a static metric such as the number of nodes or the kube-apiserver version.
+
+```yaml
+metrics:
+  - query: kube_node_role
+    metricName: nodeRoles
+    instant: true
+```
+
 ### Job Summary
 
 In case indexing is enabled, at the end of each job, a document holding the job summary is indexed. This is useful to identify the parameters the job was executed with:
@@ -331,7 +341,6 @@ This document looks like:
     "podWait": false,
     "waitWhenFinished": true,
     "cleanup": true,
-    "namespaced": false,
     "namespacedIterations": false,
     "verifyObjects": true,
     "errorOnVerify": false

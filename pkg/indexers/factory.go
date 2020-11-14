@@ -28,9 +28,10 @@ type Indexer interface {
 var indexerMap = make(map[string]Indexer)
 
 // NewIndexer creates a new Indexer with the specified IndexerConfig
-func NewIndexer(cfg config.IndexerConfig) *Indexer {
+func NewIndexer() *Indexer {
 	var indexer Indexer
 	var exists bool
+	cfg := config.ConfigSpec.GlobalConfig.IndexerConfig
 	if indexer, exists = indexerMap[cfg.Type]; exists {
 		log.Infof("📁 Creating indexer: %s", cfg.Type)
 		indexer.new(cfg)

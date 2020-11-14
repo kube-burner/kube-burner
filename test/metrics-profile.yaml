@@ -1,3 +1,7 @@
 metrics:
 - query: process_resident_memory_bytes{job="prometheus"}
   metricName: prometheusRSS
+
+- query: prometheus_build_info
+  metricName: prometheusBuildInfo
+  instant: true

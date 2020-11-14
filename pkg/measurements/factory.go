@@ -42,12 +42,12 @@ var factory measurementFactory
 var measurementMap = make(map[string]measurement)
 
 // NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(restConfig *rest.Config, globalConfig config.GlobalConfig, config config.Job, uuid string, indexer *indexers.Indexer) {
+func NewMeasurementFactory(restConfig *rest.Config, jobConfig config.Job, uuid string, indexer *indexers.Indexer) {
 	log.Info("📈 Creating measurement factory")
 	clientSet := kubernetes.NewForConfigOrDie(restConfig)
 	factory = measurementFactory{
-		globalConfig: globalConfig,
-		config:       config,
+		globalConfig: config.ConfigSpec.GlobalConfig,
+		config:       jobConfig,
 		clientSet:    clientSet,
 		restConfig:   restConfig,
 		createFuncs:  make(map[string]measurement),
@@ -67,8 +67,8 @@ func (mf *measurementFactory) register(measure config.Measurement, measurementFu
 }
 
 // Register registers the given list of measurements
-func Register(measurementList []config.Measurement) {
-	for _, measurement := range measurementList {
+func Register() {
+	for _, measurement := range config.ConfigSpec.GlobalConfig.Measurements {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
 			factory.register(measurement, measurementFunc)
 		} else {
