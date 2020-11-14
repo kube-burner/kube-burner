@@ -29,7 +29,7 @@ const (
 // Spec configuration root
 type Spec struct {
 	// GlobalConfig defines global configuration parameters
-	GlobalConfig GlobalConfig `yaml:"global,omitempty"`
+	GlobalConfig GlobalConfig `yaml:"global"`
 	// Jobs list of kube-burner jobs
 	Jobs []Job `yaml:"jobs"`
 }
@@ -142,8 +142,6 @@ type Job struct {
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished"`
 	// Cleanup clean up old namespaces
 	Cleanup bool `yaml:"cleanup" json:"cleanup"`
-	// whether to create namespaces or not with each job iteration
-	Namespaced bool `yaml:"namespaced" json:"namespaced"`
 	// NamespacedIterations create a namespace per job iteration
 	NamespacedIterations bool `yaml:"namespacedIterations" json:"namespacedIterations"`
 	// VerifyObjects verify object count after running the job
