@@ -44,6 +44,8 @@ type podMetric struct {
 	MetricName             string `json:"metricName"`
 	JobName                string `json:"jobName"`
 	UUID                   string `json:"uuid"`
+	Namespace              string `json:"namespace"`
+	Name                   string `json:"podName"`
 }
 
 type podLatencyQuantiles struct {
@@ -64,7 +66,9 @@ var normLatencies []interface{}
 var podMetrics map[string]podMetric
 
 const (
-	informerTimeout = time.Minute
+	informerTimeout                = time.Minute
+	podLatencyMeasurement          = "podLatencyMeasurement"
+	podLatencyQuantilesMeasurement = "podLatencyQuantilesMeasurement"
 )
 
 type podLatency struct {
@@ -82,8 +86,10 @@ func (p *podLatency) createPod(obj interface{}) {
 	if _, exists := podMetrics[string(pod.UID)]; !exists {
 		if strings.Contains(pod.Namespace, factory.config.Namespace) {
 			podMetrics[string(pod.UID)] = podMetric{
-				Timestamp:  time.Now(),
-				MetricName: "podLatencyMeasurement",
+				Timestamp:  time.Now().UTC(),
+				Namespace:  pod.Namespace,
+				Name:       pod.Name,
+				MetricName: podLatencyMeasurement,
 				UUID:       factory.uuid,
 				JobName:    config.ConfigSpec.Jobs[0].Name,
 			}
@@ -98,19 +104,19 @@ func (p *podLatency) updatePod(obj interface{}) {
 			switch c.Type {
 			case v1.PodScheduled:
 				if pm.scheduled.IsZero() {
-					pm.scheduled = time.Now()
+					pm.scheduled = time.Now().UTC()
 				}
 			case v1.PodInitialized:
 				if pm.initialized.IsZero() {
-					pm.initialized = time.Now()
+					pm.initialized = time.Now().UTC()
 				}
 			case v1.ContainersReady:
 				if pm.containersReady.IsZero() {
-					pm.containersReady = time.Now()
+					pm.containersReady = time.Now().UTC()
 				}
 			case v1.PodReady:
 				if pm.podReady.IsZero() {
-					pm.podReady = time.Now()
+					pm.podReady = time.Now().UTC()
 				}
 			}
 		}
@@ -237,7 +243,7 @@ func calcQuantiles() {
 			UUID:         factory.uuid,
 			Timestamp:    time.Now(),
 			JobName:      config.ConfigSpec.Jobs[0].Name,
-			MetricName:   "podLatencyQuantilesMeasurement",
+			MetricName:   podLatencyQuantilesMeasurement,
 		}
 		sort.Ints(v)
 		length := len(v)
