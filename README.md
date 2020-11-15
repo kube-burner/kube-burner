@@ -390,9 +390,9 @@ Measurements are enabled in the measurements section of the configuration file. 
 Collects latencies from the different pod startup phases, these **latency metrics are in ms**. Can be enabled with:
 
 ```yaml
-    measurements:
-    - name: podLatency
-      esIndex: kube-burner-podlatency
+  measurements:
+  - name: podLatency
+    esIndex: kube-burner-podlatency
 ```
 
 This measurement sends its metrics to the index configured by *esIndex*. The metrics collected are pod latency histograms and pod latency quantiles P99, P95 and P50.
@@ -400,14 +400,17 @@ This measurement sends its metrics to the index configured by *esIndex*. The met
 Pod latency sample:
 ```json
 {
-    "uuid": "363073c1-5752-4a36-8e0a-1311fa7663f8",
-    "timestamp": "2020-08-24T19:05:49.316913942+02:00",
-    "schedulingLatency": 8,
-    "initializedLatency": 82,
-    "containersReadyLatency": 82,
-    "podReadyLatency": 82,
-    "metricName": "podLatencyMeasurement",
-    "jobName": "kube-burner-job"
+  "timestamp": "2020-11-15T20:28:59.598727718Z",
+  "schedulingLatency": 4,
+  "initializedLatency": 20,
+  "containersReadyLatency": 2997,
+  "podReadyLatency": 2997,
+  "metricName": "podLatencyMeasurement",
+  "jobName": "kubelet-density",
+  "uuid": "c40b4346-7af7-4c63-9ab4-aae7ccdd0616",
+  "namespace": "kubelet-density",
+  "podName": "kubelet-density-13",
+  "jobName": "kube-burner-job"
 }
 ```
 
@@ -415,32 +418,34 @@ Pod latency quantile sample:
 
 ```json
 {
-    "quantileName": "initialized",
-    "uuid": "363073c1-5752-4a36-8e0a-1311fa7663f8",
-    "P99": 76543,
-    "P95": 72702,
-    "P50": 336,
-    "Max": 84523,
-    "Avg": 53131,
-    "timestamp": "2020-08-27T01:13:24.091110065+02:00",
-    "metricName": "podLatencyQuantilesMeasurement",
-    "jobName": "kube-burner-job"
+  "quantileName": "podReady",
+  "uuid": "23c0b5fd-c17e-4326-a389-b3aebc774c82",
+  "P99": 3774,
+  "P95": 3510,
+  "P50": 2897,
+  "max": 3774,
+  "avg": 2876.3,
+  "timestamp": "2020-11-15T22:26:51.553221077+01:00",
+  "metricName": "podLatencyQuantilesMeasurement",
+  "jobName": "kubelet-density"
 },
 {
-    "quantileName": "podReady",
-    "uuid": "363073c1-5752-4a36-8e0a-1311fa7663f8",
-    "P99": 76543,
-    "P95": 72702,
-    "P50": 336,
-    "Max": 82522,
-    "Avg": 54153,
-    "timestamp": "2020-08-27T01:13:24.091110483+02:00",
-    "metricName": "podLatencyQuantilesMeasurement",
-    "jobName": "kube-burner-job"
+  "quantileName": "scheduling",
+  "uuid": "23c0b5fd-c17e-4326-a389-b3aebc774c82",
+  "P99": 64,
+  "P95": 8,
+  "P50": 5,
+  "max": 64,
+  "avg": 5.38,
+  "timestamp": "2020-11-15T22:26:51.553225151+01:00",
+  "metricName": "podLatencyQuantilesMeasurement",
+  "jobName": "kubelet-density"
 }
 ```
 
-The __esIndex__ option can be used to configure the ES index where metrics will be indexed.
+More information about the pod lifecycle can be found in the [kubernetes docs](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/).
+
+**Note**: The __esIndex__ option can be used to configure the ES index where metrics will be indexed.
 
 #### Pprof collection
 

@@ -34,13 +34,13 @@ import (
 type podMetric struct {
 	Timestamp              time.Time `json:"timestamp"`
 	scheduled              time.Time
-	SchedulingLatency      int64 `json:"schedulingLatency"`
+	SchedulingLatency      int `json:"schedulingLatency"`
 	initialized            time.Time
-	InitializedLatency     int64 `json:"initializedLatency"`
+	InitializedLatency     int `json:"initializedLatency"`
 	containersReady        time.Time
-	ContainersReadyLatency int64 `json:"containersReadyLatency"`
+	ContainersReadyLatency int `json:"containersReadyLatency"`
 	podReady               time.Time
-	PodReadyLatency        int64  `json:"podReadyLatency"`
+	PodReadyLatency        int    `json:"podReadyLatency"`
 	MetricName             string `json:"metricName"`
 	JobName                string `json:"jobName"`
 	UUID                   string `json:"uuid"`
@@ -99,23 +99,24 @@ func (p *podLatency) createPod(obj interface{}) {
 
 func (p *podLatency) updatePod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	if pm, exists := podMetrics[string(pod.UID)]; exists {
+	if pm, exists := podMetrics[string(pod.UID)]; exists && pm.podReady.IsZero() {
 		for _, c := range pod.Status.Conditions {
-			switch c.Type {
-			case v1.PodScheduled:
-				if pm.scheduled.IsZero() {
-					pm.scheduled = time.Now().UTC()
-				}
-			case v1.PodInitialized:
-				if pm.initialized.IsZero() {
-					pm.initialized = time.Now().UTC()
-				}
-			case v1.ContainersReady:
-				if pm.containersReady.IsZero() {
-					pm.containersReady = time.Now().UTC()
-				}
-			case v1.PodReady:
-				if pm.podReady.IsZero() {
+			if c.Status == v1.ConditionTrue {
+				switch c.Type {
+				case v1.PodScheduled:
+					if pm.scheduled.IsZero() {
+						pm.scheduled = time.Now().UTC()
+					}
+				case v1.PodInitialized:
+					if pm.initialized.IsZero() {
+						pm.initialized = time.Now().UTC()
+					}
+				case v1.ContainersReady:
+					if pm.containersReady.IsZero() {
+						pm.containersReady = time.Now().UTC()
+					}
+				case v1.PodReady:
+					log.Debugf("Pod %s is ready", pod.Name)
 					pm.podReady = time.Now().UTC()
 				}
 			}
@@ -155,7 +156,7 @@ func (p *podLatency) writeToFile() error {
 		if factory.globalConfig.MetricsDirectory != "" {
 			err := os.MkdirAll(factory.globalConfig.MetricsDirectory, 0744)
 			if err != nil {
-				return fmt.Errorf("Error creating metrics directory %s: ", err)
+				return fmt.Errorf("Error creating metrics directory: %s", err)
 			}
 			filename = path.Join(factory.globalConfig.MetricsDirectory, filename)
 		}
@@ -165,7 +166,7 @@ func (p *podLatency) writeToFile() error {
 		}
 		defer f.Close()
 		jsonEnc := json.NewEncoder(f)
-		jsonEnc.SetIndent("", "    ")
+		jsonEnc.SetIndent("", "  ")
 		log.Infof("Writing pod latency metrics in %s", filename)
 		if err := jsonEnc.Encode(data); err != nil {
 			return fmt.Errorf("JSON encoding error: %s", err)
@@ -220,10 +221,10 @@ func (p *podLatency) index() {
 
 func normalizeMetrics() {
 	for _, m := range podMetrics {
-		m.SchedulingLatency = m.scheduled.Sub(m.Timestamp).Milliseconds()
-		m.ContainersReadyLatency = m.containersReady.Sub(m.Timestamp).Milliseconds()
-		m.InitializedLatency = m.initialized.Sub(m.Timestamp).Milliseconds()
-		m.PodReadyLatency = m.podReady.Sub(m.Timestamp).Milliseconds()
+		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
+		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
+		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
+		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
 		normLatencies = append(normLatencies, m)
 	}
 }
@@ -232,10 +233,10 @@ func calcQuantiles() {
 	quantiles := []float64{0.5, 0.95, 0.99}
 	quantileMap := map[string][]int{}
 	for _, l := range normLatencies {
-		quantileMap["scheduling"] = append(quantileMap["scheduling"], int(l.(podMetric).SchedulingLatency))
-		quantileMap["containersReady"] = append(quantileMap["containersReady"], int(l.(podMetric).ContainersReadyLatency))
-		quantileMap["initialized"] = append(quantileMap["initialized"], int(l.(podMetric).InitializedLatency))
-		quantileMap["podReady"] = append(quantileMap["podReady"], int(l.(podMetric).PodReadyLatency))
+		quantileMap["scheduling"] = append(quantileMap["scheduling"], l.(podMetric).SchedulingLatency)
+		quantileMap["containersReady"] = append(quantileMap["containersReady"], l.(podMetric).ContainersReadyLatency)
+		quantileMap["initialized"] = append(quantileMap["initialized"], l.(podMetric).InitializedLatency)
+		quantileMap["podReady"] = append(quantileMap["podReady"], l.(podMetric).PodReadyLatency)
 	}
 	for quantileName, v := range quantileMap {
 		podQ := podLatencyQuantiles{
