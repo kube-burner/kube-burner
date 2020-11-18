@@ -247,8 +247,8 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 	}
 	// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 	if p != nil {
-		log.Infof("Waiting %v extra before scraping prometheus metrics", prometheusStep*4)
-		time.Sleep(prometheusStep * 4)
+		log.Infof("Waiting %v extra before scraping prometheus metrics", prometheusStep)
+		time.Sleep(prometheusStep)
 		if err := p.ScrapeMetrics(start, time.Now().UTC(), indexer); err != nil {
 			log.Error(err)
 		}
