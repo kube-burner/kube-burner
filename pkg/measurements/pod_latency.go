@@ -221,6 +221,10 @@ func (p *podLatency) index() {
 
 func normalizeMetrics() {
 	for _, m := range podMetrics {
+		// If a does not reach the Running state (this timestamp wasn't set), we skip that pod
+		if m.podReady.IsZero() {
+			continue
+		}
 		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
 		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
 		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
@@ -232,11 +236,11 @@ func normalizeMetrics() {
 func calcQuantiles() {
 	quantiles := []float64{0.5, 0.95, 0.99}
 	quantileMap := map[string][]int{}
-	for _, l := range normLatencies {
-		quantileMap["scheduling"] = append(quantileMap["scheduling"], l.(podMetric).SchedulingLatency)
-		quantileMap["containersReady"] = append(quantileMap["containersReady"], l.(podMetric).ContainersReadyLatency)
-		quantileMap["initialized"] = append(quantileMap["initialized"], l.(podMetric).InitializedLatency)
-		quantileMap["podReady"] = append(quantileMap["podReady"], l.(podMetric).PodReadyLatency)
+	for _, normLatency := range normLatencies {
+		quantileMap["scheduling"] = append(quantileMap["scheduling"], normLatency.(podMetric).SchedulingLatency)
+		quantileMap["containersReady"] = append(quantileMap["containersReady"], normLatency.(podMetric).ContainersReadyLatency)
+		quantileMap["initialized"] = append(quantileMap["initialized"], normLatency.(podMetric).InitializedLatency)
+		quantileMap["podReady"] = append(quantileMap["podReady"], normLatency.(podMetric).PodReadyLatency)
 	}
 	for quantileName, v := range quantileMap {
 		podQ := podLatencyQuantiles{
