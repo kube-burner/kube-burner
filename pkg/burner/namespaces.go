@@ -33,6 +33,9 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 	}
 	log.Infof("Creating namespace %s", ns.Name)
 	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
+	if errors.IsForbidden(err) {
+		log.Fatalf("Authorization error creating namespace %s: %s", ns.Name, err)
+	}
 	if errors.IsAlreadyExists(err) {
 		log.Warnf("Namespace %s already exists", ns.Name)
 	} else if err != nil {

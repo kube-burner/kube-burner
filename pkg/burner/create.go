@@ -17,6 +17,7 @@ package burner
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -42,6 +43,8 @@ const (
 )
 
 func setupCreateJob(jobConfig config.Job) Executor {
+	var f io.Reader
+	var err error
 	log.Infof("Preparing create job: %s", jobConfig.Name)
 	var empty interface{}
 	selector := util.NewSelector()
@@ -55,9 +58,13 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			continue
 		}
 		log.Debugf("Processing template: %s", o.ObjectTemplate)
-		f, err := os.Open(o.ObjectTemplate)
+		f, err = os.Open(o.ObjectTemplate)
+		// If the template file does not exist we try to read it from an URL
+		if os.IsNotExist(err) {
+			f, err = util.ReadURL(o.ObjectTemplate)
+		}
 		if err != nil {
-			log.Fatalf("Error getting gvr: %s", err)
+			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
 		t, err := ioutil.ReadAll(f)
 		if err != nil {
@@ -169,6 +176,9 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			defer wg.Done()
 			ex.limiter.Wait(context.TODO())
 			_, err := dynamicClient.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
+			if errors.IsForbidden(err) {
+				log.Fatalf("Authorization error creating object %s: %s", newObject.GetName(), err)
+			}
 			if errors.IsAlreadyExists(err) {
 				log.Errorf("Object %s in namespace %s already exists", newObject.GetName(), ns)
 			} else if err != nil {
