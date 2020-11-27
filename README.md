@@ -82,7 +82,7 @@ Use "kube-burner [command] --help" for more information about a command.
 ```
 
 - The **init** option supports the following flags:
-  - config: Path to a valid configuration file.
+  - config: Path or URL to a valid configuration file.
   - log-level: Logging level. Default `info`
   - prometheus-url: Prometheus full URL. i.e. `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
   - metrics-profile: Path to a valid metrics profile file. Default `metrics.yaml`
@@ -100,6 +100,12 @@ With the above, triggering kube-burner would be as simple as:
 ```console
 $ kube-burner init -c cfg.yml -u https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
+
+or
+```console
+$ kube-burner init -c http://web.domain.com:8080/cfg.yml -u https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+```
+
 
 If you have no interest in collecting prometheus metrics, kube-burner can also be launched w/o any prometheus endpoint.
 
@@ -161,11 +167,11 @@ A valid example of a configuration file can be found at [./examples/cfg.yml](./e
 The objects created by `kube-burner` are rendered using the default golang's [template library](https://golang.org/pkg/text/template/).
 Each object element supports the following parameters:
 
-| Option               | Description                                                       | Type    | Example        | Default |
-|----------------------|-------------------------------------------------------------------|---------|----------------|---------|
-| objectTemplate       | Object template file                                              | String  | deployment.yml | ""      |
-| replicas             | How replicas of this object to create per job iteration           | Integer | 10             | -       |
-| inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -              | -       |
+| Option               | Description                                                       | Type    | Example                                             | Default |
+|----------------------|-------------------------------------------------------------------|---------|-----------------------------------------------------|---------|
+| objectTemplate       | Object template file or URL                                       | String  | deployment.yml or https://domain.com/deployment.yml | ""      |
+| replicas             | How replicas of this object to create per job iteration           | Integer | 10                                                  | -       |
+| inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -                                                   | -       |
 
 It's important to note that all objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`
 
@@ -231,7 +237,7 @@ All object templates are injected a series of variables by default:
 - JobName: Job name.
 - UUID: Benchmark UUID.
 
-In addition, you can also inject arbitrary variables with the option inputVars from the objectTemplate object:
+In addition, you can also inject arbitrary variables with the option **inputVars** from the objectTemplate object:
 
 ```yaml
     - objectTemplate: service.yml
@@ -277,7 +283,7 @@ spec:
 
 ### Metrics profile
 
-The metrics-profile flag points to a YAML file containing a list of the prometheus queries kube-burner will collect for each job.
+The metrics-profile flag points to a YAML or URL of a file containing a list of the prometheus queries kube-burner will collect for each job.
 As soon one of job finishes, `kube-burner` makes a range query for each query described in this file, and indexes it in the index configured by the parameter `defaultIndex`.
 We can use the parameter `indexName` in a metrics-profile file to make `kube-burner` to index the resulting metrics to a different index.
 An example of a valid metrics profile file is shown below:

@@ -64,13 +64,13 @@ func initCmd() *cobra.Command {
 			log.Infof("🔥 Starting kube-burner with UUID %s", uuid)
 			err := config.Parse(configFile, true)
 			if err != nil {
-				log.Fatalf("Error parsing configuration: %s", err)
+				log.Fatal(err)
 			}
 			var p *prometheus.Prometheus
 			if url != "" {
 				p, err = prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
 				if err != nil {
-					log.Fatalf("Error setting up Prometheus client: %s", err)
+					log.Fatal(err)
 				}
 			}
 			steps(uuid, p, prometheusStep)
@@ -85,9 +85,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path")
-	cmd.MarkFlagFilename("config")
 	cmd.MarkFlagRequired("config")
-	cmd.MarkFlagFilename("metrics-profile")
 	return cmd
 }
 
@@ -101,7 +99,7 @@ func destroyCmd() *cobra.Command {
 			if configFile != "" {
 				err := config.Parse(configFile, false)
 				if err != nil {
-					log.Fatalf("Error parsing configuration: %s", err)
+					log.Fatal(err)
 				}
 			}
 			selector := util.NewSelector()
@@ -131,7 +129,7 @@ func indexCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			err := config.Parse(configFile, false)
 			if err != nil {
-				log.Fatalf("Error parsing configuration: %s", err)
+				log.Fatal(err)
 			}
 			var indexer *indexers.Indexer
 			if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
@@ -141,7 +139,7 @@ func indexCmd() *cobra.Command {
 			}
 			p, err := prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
-				log.Fatalf("Error setting up Prometheus client: %s", err)
+				log.Fatal(err)
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
@@ -162,9 +160,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path")
-	cmd.MarkFlagFilename("metrics-profile")
 	cmd.MarkFlagRequired("prometheus-url")
-	cmd.MarkFlagFilename("config")
 	cmd.MarkFlagRequired("config")
 	return cmd
 }

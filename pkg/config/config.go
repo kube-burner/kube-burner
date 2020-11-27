@@ -16,11 +16,13 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
@@ -64,9 +66,14 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // Parse parses configuration file
 func Parse(c string, jobsRequired bool) error {
+	var f io.Reader
 	f, err := os.Open(c)
+	// If the config file does not exist we try to read it from an URL
+	if os.IsNotExist(err) {
+		f, err = util.ReadURL(c)
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)

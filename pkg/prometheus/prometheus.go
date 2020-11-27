@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	api "github.com/prometheus/client_golang/api"
 	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -125,15 +127,20 @@ func (p *Prometheus) verifyConnection() error {
 	return nil
 }
 
-func (p *Prometheus) readProfile(metricsFile string) error {
-	f, err := os.Open(metricsFile)
+func (p *Prometheus) readProfile(metricsProfile string) error {
+	var f io.Reader
+	f, err := os.Open(metricsProfile)
+	// If the metricsProfile file does not exist we try to read it from an URL
+	if os.IsNotExist(err) {
+		f, err = util.ReadURL(metricsProfile)
+	}
 	if err != nil {
-		log.Fatalf("Error reading metrics profile %s: %s", metricsFile, err)
+		log.Fatalf("Error reading metrics profile %s: %s", metricsProfile, err)
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&p.metricsProfile); err != nil {
-		return fmt.Errorf("Error decoding metrics profile %s: %s", metricsFile, err)
+		return fmt.Errorf("Error decoding metrics profile %s: %s", metricsProfile, err)
 	}
 	return nil
 }
