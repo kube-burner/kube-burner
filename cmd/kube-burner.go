@@ -134,8 +134,6 @@ func indexCmd() *cobra.Command {
 			var indexer *indexers.Indexer
 			if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 				indexer = indexers.NewIndexer()
-			} else {
-				log.Fatal("Indexing is disabled in the configuration")
 			}
 			p, err := prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
