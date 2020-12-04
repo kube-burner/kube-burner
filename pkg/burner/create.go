@@ -72,7 +72,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		}
 		// Deserialize YAML
 		uns := &unstructured.Unstructured{}
-		renderedObj := renderTemplate(t, empty)
+		renderedObj := renderTemplate(t, empty, missingKeyDefault)
 		_, gvk := yamlToUnstructured(renderedObj, uns)
 		gvr, _ := meta.UnsafeGuessKindToResource(*gvk)
 		obj := object{
@@ -152,18 +152,18 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 		"kube-burner-job":   ex.Config.Name,
 		"kube-burner-index": strconv.Itoa(objectIndex),
 	}
-	tData := map[string]interface{}{
+	templateData := map[string]interface{}{
 		jobName:      ex.Config.Name,
 		jobIteration: iteration,
 		jobUUID:      ex.uuid,
 	}
 	for k, v := range obj.inputVars {
-		tData[k] = v
+		templateData[k] = v
 	}
 	for r := 1; r <= obj.replicas; r++ {
 		newObject := &unstructured.Unstructured{}
-		tData[replica] = r
-		renderedObj := renderTemplate(obj.objectSpec, tData)
+		templateData[replica] = r
+		renderedObj := renderTemplate(obj.objectSpec, templateData, missingKeyError)
 		// Re-decode rendered object
 		yamlToUnstructured(renderedObj, newObject)
 		for k, v := range newObject.GetLabels() {
