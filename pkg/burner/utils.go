@@ -30,17 +30,21 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 )
 
+type templateOption string
+
 const (
 	// Parameters for retrying with exponential backoff.
-	retryBackoffInitialDuration = 1 * time.Second
-	retryBackoffFactor          = 3
-	retryBackoffJitter          = 0
-	retryBackoffSteps           = 3
+	retryBackoffInitialDuration                = 1 * time.Second
+	retryBackoffFactor                         = 3
+	retryBackoffJitter                         = 0
+	retryBackoffSteps                          = 3
+	missingKeyDefault           templateOption = "missingkey=default"
+	missingKeyError             templateOption = "missingkey=error"
 )
 
-func renderTemplate(original []byte, data interface{}) []byte {
+func renderTemplate(original []byte, data interface{}, options templateOption) []byte {
 	var rendered bytes.Buffer
-	t, err := template.New("").Parse(string(original))
+	t, err := template.New("").Option(string(options)).Parse(string(original))
 	if err != nil {
 		log.Fatalf("Error parsing template: %s", err)
 	}
