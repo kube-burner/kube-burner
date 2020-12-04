@@ -95,11 +95,10 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yaml", "Metrics profile file or URL")
-	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "alerts.yaml", "Alert profile file or URL")
+	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
-	cmd.MarkFlagRequired("alert-profile")
 	cmd.MarkFlagRequired("config")
 	cmd.Flags().SortFlags = false
 	return cmd
