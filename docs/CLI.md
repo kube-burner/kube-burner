@@ -1,0 +1,77 @@
+kube-burner is basically a binary client with currently the following options:
+
+```console
+$ kube-burner help
+Kube-burner 🔥
+
+Tool aimed at stressing a kubernetes cluster by creating or deleting lot of objects.
+
+Usage:
+  kube-burner [command]
+
+Available Commands:
+  completion  Generates completion scripts for bash shell
+  destroy     Destroy old namespaces labeled with the given UUID.
+  help        Help about any command
+  index       Index metrics from the given time range
+  init        Launch benchmark
+  version     Print the version number of kube-burner
+
+Flags:
+  -h, --help   help for kube-burner
+
+Use "kube-burner [command] --help" for more information about a command.
+```
+
+# Init
+
+This option is meant to run Kube-burner benchmark, and it supports the these flags:
+
+  - config: Path or URL to a valid configuration file.
+  - log-level: Logging level. Default `info`
+  - prometheus-url: Prometheus full URL. i.e. `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
+  - metrics-profile: Path to a valid metrics profile file. Default `metrics.yaml`
+  - token: Prometheus Bearer token.
+  - username: Prometheus username for basic authentication.
+  - password: Prometheus password for basic authentication.
+  - skip-tls-verify: Skip TLS verification for prometheus. Default `true`
+  - step: Prometheus step size. Default `30s`
+  - UUID: Benchmark UUID.
+
+**Note**: Both basic authentication and Bearer authentication need credentials able to query the given Prometheus API.
+
+With the above, triggering kube-burner would be as simple as:
+
+```console
+$ kube-burner init -c cfg.yml -u https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+```
+
+Kube-burner also supports remote configuration files served by a web server, to use it, rather than a path pass a URL like below:
+
+```console
+$ kube-burner init -c http://web.domain.com:8080/cfg.yml -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+```
+
+If you have no interest in collecting prometheus metrics, kube-burner can also be launched w/o any prometheus endpoint, this will disable metrics collection.
+
+```console
+$ kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+```
+
+# Index
+
+This option can be used to collect and index the metrics from a given time range. The time range is given by:
+
+  - start: Epoch start time. Defaults to one hour before the current time.
+  - End: Epoch end time. Defaults to the current time.
+
+# Destroy
+
+This option requires the above `config` and `UUID` flags to destroy all namespaces labeled with `kube-burner-uuid=<UUID>`.
+
+# Completion
+Generates bash a completion script that can be imported with:
+`. <(kube-burner completion)`
+
+Or permanently imported with:
+`kube-burner completion > /etc/bash_completion.d/kube-burner`

@@ -1,0 +1,160 @@
+
+All the magic `kube-burner` does is described in the configuration file. As previoysly mentioned the location of this configuration file is provided by the flag `-c`. This file is written in YAML format and has several sections.
+
+# Global 
+
+In this section is described global job configuration, it holds the following parameters:
+
+| Option           | Description                                                                                              | Type           | Example        | Default     |
+|------------------|----------------------------------------------------------------------------------------------------------|----------------|----------------|-------------|
+| kubeconfig       | Points to a valid kubeconfig file. Can be omitted if using the KUBECONFIG environment variable, or running from a pod | String  | ~/mykubeconfig | in-cluster |             |
+| writeToFile      | Whether to dump collected metrics to files                                                               | Boolean        | true           | true        |
+| metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics | 
+| measurements     | List of measurements. Detailed in the [measurements section](#Measurements)                              | List           | -              | []          |
+| indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section](#Indexers)                           | Object         | -              | -           |
+
+# Jobs
+
+This section contains the list of jobs `kube-burner` will execute. Each job can hold the following parameters.
+
+| Option               | Description                                                                      | Type    | Example  | Default |
+|----------------------|----------------------------------------------------------------------------------|---------|----------|---------|
+| name                 | Job name                                                                         | String  | myjob    | ""      |
+| jobType              | Type of job to execute. More details at [job types](#job-types)                  | string  | create   | create  |
+| jobIterations        | How many times to execute the job                                                | Integer | 10       | 0       |
+| namespace            | Namespace base name to use                                                       | String  | firstjob | ""      |
+| namespacedIterations | Whether to create a namespace per job iteration                                  | Boolean | true     | true    |
+| cleanup              | Cleanup clean up old namespaces                                                  | Boolean | true     | true    |
+| podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | true     | true    |
+| waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | false   |
+| maxWaitTimeout       | Maximum wait timeout in seconds. (If podWait is enabled this timeout will be reseted with each iteration) | Integer | 1h     | 12h |
+| waitFor              | List containing the objects Kind wait for. Wait for all if empty                 | List    | ["Deployment", "Build", "DaemonSet"]| []      |
+| jobIterationDelay    | How long to wait between each job iteration                                      | Duration| 2s       | 0s      |
+| jobPause             | How long to pause after finishing the job                                        | Duration| 10s      | 0s      |
+| qps                  | Limit object creation queries per second                                         | Integer | 25       | 0       |
+| burst                | Maximum burst for throttle                                                       | Integer | 50       | 0       |
+| objects              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | -        | []      |
+| verifyObjects        | Verify object count after running each job. Return code will be 1 if failed      | Boolean | true     | true    |
+| errorOnVerify        | Exit with rc 1 before indexing when objects verification fails                   | Boolean | true     | false   |
+
+
+A valid example of a configuration file can be found at [./examples/cfg.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/examples/cfg.yml)
+
+# Objects
+
+The objects created by `kube-burner` are rendered using the default golang's [template library](https://golang.org/pkg/text/template/).
+Each object element supports the following parameters:
+
+| Option               | Description                                                       | Type    | Example                                             | Default |
+|----------------------|-------------------------------------------------------------------|---------|-----------------------------------------------------|---------|
+| objectTemplate       | Object template file or URL                                       | String  | deployment.yml or https://domain.com/deployment.yml | ""      |
+| replicas             | How replicas of this object to create per job iteration           | Integer | 10                                                  | -       |
+| inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -                                                   | -       |
+
+It's important to note that all objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`
+
+
+# Job types
+
+kube-burner support two types of jobs with different parameters each. The default job type is __create__. Which basically creates objects as described in the section [objects](#objects).
+
+The other type is __delete__, this type of job deletes objects described in the objects list. Using delete as job type the objects list would have the following structure.
+
+```yaml
+objects:
+- kind: Deployment
+  labelSelector: {kube-burner-job: cluster-density}
+  apiVersion: apps/v1
+
+- kind: Secret
+  labelSelector: {kube-burner-job: cluster-density}
+```
+Where:
+- kind: Object kind of the k8s object to delete.
+- labelSelector: Map with the labelSelector.
+- apiVersion: API version from the k8s object.
+
+As mentioned previously, all objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. Thanks to this we could design a workload with one job to create objects and another one able to remove the objects created by the previous
+
+```yaml
+jobs:
+- name: create-objects
+  namespace: job-namespace
+  jobIterations: 100
+  objects:
+  - objectTemplate: deployment.yml
+    replicas: 10
+
+  - objectTemplate: service.yml
+    replicas: 10
+
+- name: remove-objects
+  jobType: delete
+  objects:
+  - kind: Deployment
+    labelSelector: {kube-burner-job: create-objects}
+    apiVersion: apps/v1
+
+  - kind: Secret
+    labelSelector: {kube-burner-job: create-objects}
+```
+
+This job type supports the some of the same parameters as the create job type:
+- **waitForDeletion**: Wait for objects to be deleted before finishing the job. Defaults to true
+- name
+- qps
+- burst
+- jobPause
+
+# Injected variables
+
+All object templates are injected a series of variables by default:
+
+- Iteration: Job iteration number.
+- Replica: Object replica number. Keep in mind that this number is reset to 1 with each job iteration.
+- JobName: Job name.
+- UUID: Benchmark UUID.
+
+In addition, you can also inject arbitrary variables with the option **inputVars** from the objectTemplate object:
+
+```yaml
+    - objectTemplate: service.yml
+      replicas: 2
+      inputVars:
+        port: 80
+        targetPort: 8080
+```
+
+The following code snippet shows an example of a k8s service using these variables:
+
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: sleep-app-{{ .Iteration }}-{{ .Replica }}
+  labels:
+    name: my-app-{{ .Iteration }}-{{ .Replica }}
+spec:
+  selector:
+    app: sleep-app-{{ .Iteration }}-{{ .Replica }}
+  ports:
+  - name: serviceport
+    protocol: TCP
+    port: "{{ .port }}"
+    targetPort: "{{ .targetPort }}"
+  type: ClusterIP
+```
+
+It's worth to say that you can also use [golang template semantics](https://golang.org/pkg/text/template/) in your *objectTemplate* files.
+
+```yaml
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  name: {{.prefix}}-{{.Replica}}
+spec:
+{{ if .image }}
+  dockerImageRepository: {{.image}}
+{{ end }}
+```

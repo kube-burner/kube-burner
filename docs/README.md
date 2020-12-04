@@ -1,10 +1,9 @@
-<img src="./media/logo/kube-burner-logo.png" width="60%">
+<img src="./kube-burner-logo.png" width="60%">
 
 [![Build Status](https://github.com/cloud-bulldozer/kube-burner/workflows/Go/badge.svg?branch=master)](https://github.com/cloud-bulldozer/kube-burner/actions?query=workflow%3AGo)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cloud-bulldozer/kube-burner)](https://goreportcard.com/report/github.com/cloud-bulldozer/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# What is Kube-burner?
 
 Kube-burner is a tool aimed at stressing kubernetes clusters. The main functionallity it provides can be summareized these three steps:
 
@@ -14,9 +13,6 @@ Kube-burner is a tool aimed at stressing kubernetes clusters. The main functiona
 
 [![asciicast](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp.svg)](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp)
 
-## Documentation
-
-Documentation is available at https://kube-burner.readthedocs.io/
 
 ## Downloading Kube-burner
 
