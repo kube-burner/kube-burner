@@ -38,7 +38,6 @@ const (
 	Passed = 0
 	// Failed alert
 	Failed                    = 1
-	sevInfo     severityLevel = "info"
 	sevWarn     severityLevel = "warning"
 	sevError    severityLevel = "error"
 	sevCritical severityLevel = "critical"
