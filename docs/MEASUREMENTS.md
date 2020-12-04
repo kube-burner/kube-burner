@@ -1,8 +1,10 @@
+# Measurements
+
 Apart from prometheus metrics collection, Kube-burner allows to get further metrics using other mechanisms or data sources such as the own kubernetes API, these mechanisms are called measurements.
 Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
 'kube-burner' supports the following measurements so far:
 
-# Pod latency
+## Pod latency
 
 Collects latencies from the different pod startup phases, these **latency metrics are in ms**. Can be enabled with:
 
@@ -64,7 +66,7 @@ More information about the pod lifecycle can be found in the [kubernetes docs](h
 
 **Note**: The __esIndex__ option can be used to configure the ES index where metrics will be indexed.
 
-# Pprof collection
+## Pprof collection
 
 This measurement takes care of collecting golang profiling information from pods. To do so, kube-burner connects to pods with the given labels running in certain namespaces. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. Pprof files are collected in a regular basis given by the parameter `pprofInterval` and these files are stored in the directory configured by the parameter `pprofDirectory` which by default is `pprof`.
 It's also possible to configure a token to get pprof data from authenticated endoints such as kube-apiserver with the variable `bearerToken`.

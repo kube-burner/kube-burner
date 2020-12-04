@@ -1,3 +1,4 @@
+# CLI
 kube-burner is basically a binary client with currently the following options:
 
 ```console
@@ -10,6 +11,7 @@ Usage:
   kube-burner [command]
 
 Available Commands:
+  check-alerts Evaluate alerts for the given time range
   completion  Generates completion scripts for bash shell
   destroy     Destroy old namespaces labeled with the given UUID.
   help        Help about any command
@@ -23,7 +25,7 @@ Flags:
 Use "kube-burner [command] --help" for more information about a command.
 ```
 
-# Init
+## Init
 
 This option is meant to run Kube-burner benchmark, and it supports the these flags:
 
@@ -58,18 +60,22 @@ If you have no interest in collecting prometheus metrics, kube-burner can also b
 $ kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
-# Index
+## Index
 
 This option can be used to collect and index the metrics from a given time range. The time range is given by:
 
   - start: Epoch start time. Defaults to one hour before the current time.
-  - End: Epoch end time. Defaults to the current time.
+  - end: Epoch end time. Defaults to the current time.
 
-# Destroy
+## Check alerts
+
+This option can be used to evaluate alerts configured in in the given alert profile. Similar to `index` the time range is given by the start and end flags.
+
+## Destroy
 
 This option requires the above `config` and `UUID` flags to destroy all namespaces labeled with `kube-burner-uuid=<UUID>`.
 
-# Completion
+## Completion
 Generates bash a completion script that can be imported with:
 `. <(kube-burner completion)`
 

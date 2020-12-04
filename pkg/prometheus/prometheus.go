@@ -40,8 +40,8 @@ import (
 // Prometheus describes the prometheus connection
 type Prometheus struct {
 	api            apiv1.API
-	metricsProfile MetricsProfile
-	step           time.Duration
+	MetricsProfile MetricsProfile
+	Step           time.Duration
 	uuid           string
 }
 
@@ -89,9 +89,9 @@ func prometheusError(err error) error {
 }
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(url, token, username, password, metricsProfile, uuid string, tlsVerify bool, prometheusStep time.Duration) (*Prometheus, error) {
+func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify bool, prometheusStep time.Duration) (*Prometheus, error) {
 	var p Prometheus = Prometheus{
-		step: prometheusStep,
+		Step: prometheusStep,
 		uuid: uuid,
 	}
 	log.Info("👽 Initializing prometheus client")
@@ -112,9 +112,6 @@ func NewPrometheusClient(url, token, username, password, metricsProfile, uuid st
 	if err := p.verifyConnection(); err != nil {
 		return &p, prometheusError(err)
 	}
-	if err := p.readProfile(metricsProfile); err != nil {
-		return &p, prometheusError(err)
-	}
 	return &p, nil
 }
 
@@ -127,7 +124,8 @@ func (p *Prometheus) verifyConnection() error {
 	return nil
 }
 
-func (p *Prometheus) readProfile(metricsProfile string) error {
+// ReadProfile reads and parses metric profile configuration
+func (p *Prometheus) ReadProfile(metricsProfile string) error {
 	var f io.Reader
 	f, err := os.Open(metricsProfile)
 	// If the metricsProfile file does not exist we try to read it from an URL
@@ -139,7 +137,7 @@ func (p *Prometheus) readProfile(metricsProfile string) error {
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
-	if err = yamlDec.Decode(&p.metricsProfile); err != nil {
+	if err = yamlDec.Decode(&p.MetricsProfile); err != nil {
 		return fmt.Errorf("Error decoding metrics profile %s: %s", metricsProfile, err)
 	}
 	return nil
@@ -150,9 +148,8 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Index
 	var filename, jobName string
 	var err error
 	var v model.Value
-	r := apiv1.Range{Start: start, End: end, Step: p.step}
 	log.Infof("🔍 Scraping prometheus metrics from %s to %s", start, end)
-	for _, md := range p.metricsProfile.Metrics {
+	for _, md := range p.MetricsProfile.Metrics {
 		var metrics []interface{}
 		// IndexCMD can work w/o specifying any job
 		if len(config.ConfigSpec.Jobs) > 0 {
@@ -160,18 +157,18 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Index
 		}
 		if md.Instant {
 			log.Infof("Instant query: %s", md.Query)
-			v, _, err = p.api.Query(context.TODO(), md.Query, time.Now().UTC())
-			if err != nil {
-				return prometheusError(err)
+			if v, err = p.Query(md.Query, time.Now().UTC()); err != nil {
+				return err
 			}
 			if err := p.parseVector(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
 				return err
 			}
 		} else {
 			log.Infof("Range query: %s", md.Query)
-			v, _, err = p.api.QueryRange(context.TODO(), md.Query, r)
+			p.QueryRange(md.Query, start, end)
+			v, err = p.QueryRange(md.Query, start, end)
 			if err != nil {
-				return prometheusError(err)
+				return err
 			}
 			if err := p.parseMatrix(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
 				return err
@@ -270,4 +267,25 @@ func (p *Prometheus) parseMatrix(metricName, query, jobName string, value model.
 		}
 	}
 	return nil
+}
+
+// Query prometheues query wrapper
+func (p *Prometheus) Query(query string, time time.Time) (model.Value, error) {
+	var v model.Value
+	v, _, err := p.api.Query(context.TODO(), query, time)
+	if err != nil {
+		return v, prometheusError(err)
+	}
+	return v, nil
+}
+
+// QueryRange prometheues QueryRange wrapper
+func (p *Prometheus) QueryRange(query string, start, end time.Time) (model.Value, error) {
+	var v model.Value
+	r := apiv1.Range{Start: start, End: end, Step: p.Step}
+	v, _, err := p.api.QueryRange(context.TODO(), query, r)
+	if err != nil {
+		return v, prometheusError(err)
+	}
+	return v, nil
 }

@@ -5,6 +5,8 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 
+# What's this?
+
 Kube-burner is a tool aimed at stressing kubernetes clusters. The main functionallity it provides can be summareized these three steps:
 
 - Create/delete the objects declared in the jobs.
@@ -14,7 +16,7 @@ Kube-burner is a tool aimed at stressing kubernetes clusters. The main functiona
 [![asciicast](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp.svg)](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp)
 
 
-## Downloading Kube-burner
+# Downloading Kube-burner
 
 In case you want to start tinkering with `kube-burner` now:
 

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"k8s.io/client-go/kubernetes"
@@ -52,10 +53,12 @@ To configure your bash shell to load completions for each session execute:
 }
 
 func initCmd() *cobra.Command {
-	var url, metricsProfile, configFile string
+	var url, metricsProfile, alertProfile, configFile string
 	var username, password, uuid, token string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
+	var prometheusClient *prometheus.Prometheus
+	var alertM *alerting.AlertManager
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -66,14 +69,24 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			var p *prometheus.Prometheus
 			if url != "" {
-				p, err = prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
+				prometheusClient, err = prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 				if err != nil {
 					log.Fatal(err)
 				}
+				// If indexer is enabled or writeTofile is enabled we read the profile
+				if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled || config.ConfigSpec.GlobalConfig.WriteToFile {
+					if err := prometheusClient.ReadProfile(metricsProfile); err != nil {
+						log.Fatal(err)
+					}
+				}
+				if alertProfile != "" {
+					if alertM, err = alerting.NewAlertManager(alertProfile, prometheusClient); err != nil {
+						log.Fatalf("Error creating alert manager: %s", err)
+					}
+				}
 			}
-			steps(uuid, p, prometheusStep)
+			steps(uuid, prometheusClient, alertM)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID")
@@ -81,11 +94,14 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
-	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yaml", "Metrics profile file")
+	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yaml", "Metrics profile file or URL")
+	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagRequired("uuid")
+	cmd.Flags().SortFlags = false
 	return cmd
 }
 
@@ -113,6 +129,7 @@ func destroyCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
+	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
 
@@ -135,8 +152,11 @@ func indexCmd() *cobra.Command {
 			if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 				indexer = indexers.NewIndexer()
 			}
-			p, err := prometheus.NewPrometheusClient(url, token, username, password, metricsProfile, uuid, skipTLSVerify, prometheusStep)
+			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
+				log.Fatal(err)
+			}
+			if err := p.ReadProfile(metricsProfile); err != nil {
 				log.Fatal(err)
 			}
 			startTime := time.Unix(start, 0)
@@ -157,9 +177,52 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.MarkFlagRequired("prometheus-url")
+	cmd.MarkFlagRequired("uuid")
 	cmd.MarkFlagRequired("config")
+	cmd.Flags().SortFlags = false
+	return cmd
+}
+
+func alertCmd() *cobra.Command {
+	var url, alertProfile string
+	var start, end int64
+	var username, password, uuid, token string
+	var skipTLSVerify bool
+	var alertM *alerting.AlertManager
+	var prometheusStep time.Duration
+	cmd := &cobra.Command{
+		Use:   "check-alerts",
+		Short: "Evaluate alerts for the given time range",
+		Args:  cobra.MaximumNArgs(0),
+		Run: func(cmd *cobra.Command, args []string) {
+			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			if err != nil {
+				log.Fatal(err)
+			}
+			startTime := time.Unix(start, 0)
+			endTime := time.Unix(end, 0)
+			if alertM, err = alerting.NewAlertManager(alertProfile, p); err != nil {
+				log.Fatalf("Error creating alert manager: %s", err)
+			}
+			result := alertM.Evaluate(startTime, endTime)
+			log.Info("👋 Exiting kube-burner")
+			os.Exit(result)
+		},
+	}
+	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
+	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
+	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
+	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
+	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "alerts.yaml", "Alert profile file or URL")
+	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
+	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
+	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
+	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
+	cmd.MarkFlagRequired("prometheus-url")
+	cmd.MarkFlagRequired("alert-profile")
+	cmd.Flags().SortFlags = false
 	return cmd
 }
 
@@ -182,20 +245,20 @@ func init() {
 		initCmd(),
 		destroyCmd(),
 		indexCmd(),
+		alertCmd(),
 	)
-	for _, c := range rootCmd.Commands() {
-		logLevel := c.Flags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-		c.PreRun = func(cmd *cobra.Command, args []string) {
-			log.Infof("Setting log level to %s", *logLevel)
-			log.SetLogLevel(*logLevel)
-		}
-		c.MarkFlagRequired("uuid")
+	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		log.Infof("Setting log level to %s", *logLevel)
+		log.SetLogLevel(*logLevel)
 	}
 	rootCmd.AddCommand(completionCmd)
 	cobra.OnInitialize()
+	rootCmd.Execute()
+
 }
 
-func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) {
+func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) {
 	start := time.Now().UTC()
 	verification := true
 	var rc int
@@ -239,10 +302,14 @@ func steps(uuid string, p *prometheus.Prometheus, prometheusStep time.Duration) 
 			time.Sleep(job.Config.JobPause)
 		}
 	}
+	// If alertManager is configured and evaluation!=0 rc=1
+	if alertM != nil && alertM.Evaluate(start, time.Now().UTC()) == 1 {
+		rc = 1
+	}
 	// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-	if p != nil {
-		log.Infof("Waiting %v extra before scraping prometheus metrics", prometheusStep)
-		time.Sleep(prometheusStep)
+	if p != nil && len(p.MetricsProfile.Metrics) > 0 {
+		log.Infof("Waiting %v extra before scraping prometheus metrics", p.Step)
+		time.Sleep(p.Step)
 		if err := p.ScrapeMetrics(start, time.Now().UTC(), indexer); err != nil {
 			log.Error(err)
 		}

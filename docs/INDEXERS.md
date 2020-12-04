@@ -1,6 +1,7 @@
-# Configuration 
+# Indexers
+`kube-burner` is able to **index the collected prometheus metrics** into a given Indexer. These metrics are indexed after the execution of the last Kube-burner's job.
 
-`kube-burner` is able to **index the collected prometheus metrics** into a given Indexer. 
+## Indexer configuration
 The indexer configuration is described in the `indexerConfig` section and can be configured with the following parameters:
 
 
@@ -10,7 +11,7 @@ The indexer configuration is described in the `indexerConfig` section and can be
 | type                 | Type of indexer       | String   | elastic    | ""      | 
 
 
-# Elastic
+### Elastic
 
 Index documents in Elasticsearch 7 instances.
 

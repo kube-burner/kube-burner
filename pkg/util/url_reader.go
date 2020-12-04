@@ -21,6 +21,8 @@ import (
 	"net/url"
 )
 
+// TODO: this function should open a file and fallback to URL if not found
+
 // ReadURL reads an URL and returns a reader
 func ReadURL(stringURL string) (io.Reader, error) {
 	var body io.Reader

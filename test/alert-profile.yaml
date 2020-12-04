@@ -1,0 +1,3 @@
+- expr: count(prometheus_build_info) > 1
+  severity: critical
+  description: No prometheus instance found

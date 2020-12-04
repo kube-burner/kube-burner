@@ -1,4 +1,4 @@
-# Metrics profile
+# Metrics
 
 The metrics-profile flag points to a YAML or URL of a file containing a list of the prometheus queries kube-burner will collect for each job.
 As soon one of job finishes, `kube-burner` makes a range query for each query described in this file, and indexes it in the index configured by the parameter `defaultIndex`.
@@ -28,7 +28,7 @@ metrics:
     instant: true
 ```
 
-# Job Summary
+## Job Summary
 
 In case indexing is enabled, at the end of each job, a document holding the job summary is indexed. This is useful to identify the parameters the job was executed with:
 
