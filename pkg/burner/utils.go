@@ -18,6 +18,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"text/template"
 	"time"
 
@@ -38,21 +40,34 @@ const (
 	retryBackoffFactor                         = 3
 	retryBackoffJitter                         = 0
 	retryBackoffSteps                          = 3
-	missingKeyDefault           templateOption = "missingkey=default"
 	missingKeyError             templateOption = "missingkey=error"
 )
 
-func renderTemplate(original []byte, data interface{}, options templateOption) []byte {
+func prepareTemplate(original []byte) ([]byte, error) {
+	// Removing all placeholder from template.
+	// This needs to be done due to placeholders not being valid yaml.
+	if isEmpty(original) {
+		return nil, fmt.Errorf("template is empty")
+	}
+	r, err := regexp.Compile(`\{\{.*\}\}`)
+	if err != nil {
+		return nil, fmt.Errorf("regexp creation error: %v", err)
+	}
+	original = r.ReplaceAll(original, []byte{})
+	return original, nil
+}
+
+func renderTemplate(original []byte, data interface{}, options templateOption) ([]byte, error) {
 	var rendered bytes.Buffer
 	t, err := template.New("").Option(string(options)).Parse(string(original))
 	if err != nil {
-		log.Fatalf("Error parsing template: %s", err)
+		return nil, fmt.Errorf("Parsing error: %s", err)
 	}
 	err = t.Execute(&rendered, data)
 	if err != nil {
-		log.Fatalf("Error rendering template: %s", err)
+		return nil, fmt.Errorf("Rendering error: %s", err)
 	}
-	return rendered.Bytes()
+	return rendered.Bytes(), nil
 }
 
 func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
@@ -112,4 +127,8 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
 		Steps:    retryBackoffSteps,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func isEmpty(raw []byte) bool {
+	return strings.TrimSpace(string(raw)) == ""
 }

@@ -46,7 +46,6 @@ func setupCreateJob(jobConfig config.Job) Executor {
 	var f io.Reader
 	var err error
 	log.Infof("Preparing create job: %s", jobConfig.Name)
-	var empty interface{}
 	selector := util.NewSelector()
 	selector.Configure("", fmt.Sprintf("kube-burner-job=%s", jobConfig.Name), "")
 	ex := Executor{
@@ -72,15 +71,19 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		}
 		// Deserialize YAML
 		uns := &unstructured.Unstructured{}
-		renderedObj := renderTemplate(t, empty, missingKeyDefault)
-		_, gvk := yamlToUnstructured(renderedObj, uns)
+		cleanTemplate, err := prepareTemplate(t)
+		if err != nil {
+			log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
+		}
+		_, gvk := yamlToUnstructured(cleanTemplate, uns)
 		gvr, _ := meta.UnsafeGuessKindToResource(*gvk)
 		obj := object{
-			gvr:          gvr,
-			objectSpec:   t,
-			replicas:     o.Replicas,
-			unstructured: uns,
-			inputVars:    o.InputVars,
+			gvr:            gvr,
+			objectSpec:     t,
+			objectTemplate: o.ObjectTemplate,
+			replicas:       o.Replicas,
+			unstructured:   uns,
+			inputVars:      o.InputVars,
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
@@ -163,7 +166,10 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 	for r := 1; r <= obj.replicas; r++ {
 		newObject := &unstructured.Unstructured{}
 		templateData[replica] = r
-		renderedObj := renderTemplate(obj.objectSpec, templateData, missingKeyError)
+		renderedObj, err := renderTemplate(obj.objectSpec, templateData, missingKeyError)
+		if err != nil {
+			log.Fatalf("Template error in %s: %s", obj.objectTemplate, err)
+		}
 		// Re-decode rendered object
 		yamlToUnstructured(renderedObj, newObject)
 		for k, v := range newObject.GetLabels() {

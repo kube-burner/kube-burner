@@ -30,12 +30,13 @@ import (
 )
 
 type object struct {
-	gvr           schema.GroupVersionResource
-	objectSpec    []byte
-	replicas      int
-	unstructured  *unstructured.Unstructured
-	inputVars     map[string]string
-	labelSelector map[string]string
+	gvr            schema.GroupVersionResource
+	objectTemplate string
+	objectSpec     []byte
+	replicas       int
+	unstructured   *unstructured.Unstructured
+	inputVars      map[string]string
+	labelSelector  map[string]string
 }
 
 // Executor contains the information required to execute a job
