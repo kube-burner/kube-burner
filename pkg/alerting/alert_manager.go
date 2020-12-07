@@ -107,6 +107,7 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 		v, err := a.prometheus.QueryRange(alert.Expr, start, end)
 		if err != nil {
 			log.Warnf("Error performing query %s: %s", alert.Expr, err)
+			continue
 		}
 		result, err = parseMatrix(v, alert.Description, alert.Severity)
 		if err != nil {
