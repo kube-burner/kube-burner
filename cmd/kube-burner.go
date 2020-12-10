@@ -100,6 +100,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagRequired("uuid")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
@@ -128,6 +129,7 @@ func destroyCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
+	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
 
@@ -177,6 +179,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.MarkFlagRequired("prometheus-url")
+	cmd.MarkFlagRequired("uuid")
 	cmd.MarkFlagRequired("config")
 	cmd.Flags().SortFlags = false
 	return cmd
@@ -204,6 +207,7 @@ func alertCmd() *cobra.Command {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			result := alertM.Evaluate(startTime, endTime)
+			log.Info("👋 Exiting kube-burner")
 			os.Exit(result)
 		},
 	}
@@ -243,16 +247,15 @@ func init() {
 		indexCmd(),
 		alertCmd(),
 	)
-	for _, c := range rootCmd.Commands() {
-		logLevel := c.Flags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-		c.PreRun = func(cmd *cobra.Command, args []string) {
-			log.Infof("Setting log level to %s", *logLevel)
-			log.SetLogLevel(*logLevel)
-		}
-		c.MarkFlagRequired("uuid")
+	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		log.Infof("Setting log level to %s", *logLevel)
+		log.SetLogLevel(*logLevel)
 	}
 	rootCmd.AddCommand(completionCmd)
 	cobra.OnInitialize()
+	rootCmd.Execute()
+
 }
 
 func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) {

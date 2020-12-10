@@ -109,9 +109,12 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 			log.Warnf("Error performing query %s: %s", alert.Expr, err)
 			continue
 		}
-		result, err = parseMatrix(v, alert.Description, alert.Severity)
+		alarmResult, err := parseMatrix(v, alert.Description, alert.Severity)
 		if err != nil {
 			log.Error(err)
+		}
+		if alarmResult == Failed {
+			result = Failed
 		}
 	}
 	return result

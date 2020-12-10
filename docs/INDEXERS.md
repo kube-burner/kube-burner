@@ -1,6 +1,6 @@
 # Configuration 
 
-`kube-burner` is able to **index the collected prometheus metrics** into a given Indexer. 
+`kube-burner` is able to **index the collected prometheus metrics** into a given Indexer. These metrics are indexed after the execution of the last Kube-burner's job.
 The indexer configuration is described in the `indexerConfig` section and can be configured with the following parameters:
 
 

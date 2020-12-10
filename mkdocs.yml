@@ -1,14 +1,14 @@
 docs_dir: docs/
 repo_url: https://github.com/cloud-bulldozer/kube-burner
 nav:
-- Home:
-  - Quick start: README.md
-  - CLI: CLI.md
+- Home: INDEX.md
 - Configuration: 
+  - CLI: CLI.md
   - General: CONFIGURATION.md
   - Measurements: MEASUREMENTS.md
   - Metrics: METRICS.md
   - Indexers: INDEXERS.md
+  - Alerting: ALERTING.md
 - Development:
   - Contributing: CONTRIBUTING.md
   - Authors: AUTHORS.md
