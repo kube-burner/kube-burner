@@ -1,6 +1,6 @@
 # Configuration
 
-Kube-burner includes an alert mechanism that is able to evaluate Prometheus expressions after the end of the latest Kube-burner's job. Alerting is configured through a configuration file pointed by the flag `--alert-profile` or `-a`. This file looks like:
+Kube-burner includes an alert mechanism able to evaluate Prometheus expressions after the end of the latest Kube-burner's job. Alerting is configured through a configuration file pointed by the flag `--alert-profile` or `-a`. This file looks like:
 
 ```yaml
 - expr: avg_over_time(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))[5m:]) > 0.01
@@ -17,12 +17,12 @@ Kube-burner includes an alert mechanism that is able to evaluate Prometheus expr
 ```
 
 Where expr holds the Prometheus expression to evaluate and description holds a description of the alert. In the description we can make use of prometheus labels to improve verbosity, using the syntax `{{$labels.<label_name>}}` and print the expression value that triggered the alarm using `{{$value}}`.
-Each alarm can be configured with a different severity. Each one with different effects. At the moment they do the following:
+Alarm can be configured with a severity. Each one with different effects. At the moment they do the following:
 
-- info: Print an info message with the alarm description to stdout. By default all expressions have this severity.
-- warning: Print a warning message with the alarm description to stdout.
-- error: Print a error message with the alarm description to stdout and makes kube-burner rc = 1
-- critical: Print a fatal message with the alarm description to stdout and exits execution inmediatly with rc != 0
+- info: Prints an info message with the alarm description to stdout. By default all expressions have this severity.
+- warning: Prints a warning message with the alarm description to stdout.
+- error: Prints a error message with the alarm description to stdout and makes kube-burner rc = 1
+- critical: Prints a fatal message with the alarm description to stdout and exits execution inmediatly with rc != 0
 
 # Checking alerts
 
