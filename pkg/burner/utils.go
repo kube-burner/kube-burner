@@ -40,6 +40,7 @@ const (
 	retryBackoffFactor                         = 3
 	retryBackoffJitter                         = 0
 	retryBackoffSteps                          = 3
+	objectLimit                                = 500
 	missingKeyError             templateOption = "missingkey=error"
 )
 
@@ -88,17 +89,28 @@ func (ex *Executor) Cleanup() {
 // Verify verifies the number of created objects
 func (ex *Executor) Verify() bool {
 	var objList *unstructured.UnstructuredList
+	var replicas int
 	success := true
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
 		listOptions := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.Config.Name, objectIndex),
+			Limit:         objectLimit,
 		}
 		err := RetryWithExponentialBackOff(func() (done bool, err error) {
-			objList, err = dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
-			if err != nil {
-				log.Errorf("Error verifying object: %s", err)
-				return false, nil
+			replicas = 0
+			for {
+				objList, err = dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
+				if err != nil {
+					log.Errorf("Error verifying object: %s", err)
+					return false, nil
+				}
+				replicas += len(objList.Items)
+				listOptions.Continue = objList.GetContinue()
+				// If continue is not set
+				if listOptions.Continue == "" {
+					break
+				}
 			}
 			return true, nil
 		})
@@ -108,7 +120,7 @@ func (ex *Executor) Verify() bool {
 			continue
 		}
 		objectsExpected := ex.Config.JobIterations * obj.replicas
-		if len(objList.Items) != objectsExpected {
+		if replicas != objectsExpected {
 			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, len(objList.Items), objectsExpected)
 			success = false
 		} else {
