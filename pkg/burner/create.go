@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -107,8 +108,16 @@ func (ex *Executor) RunCreateJob() {
 		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
 	}
 	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
-	log.Infof("QPS: %v", RestConfig.QPS)
-	log.Infof("Burst: %v", RestConfig.Burst)
+	if RestConfig.QPS == 0 {
+		log.Infof("QPS not set, using default client-go value: %v", rest.DefaultQPS)
+	} else {
+		log.Infof("QPS: %v", RestConfig.QPS)
+	}
+	if RestConfig.Burst == 0 {
+		log.Infof("Burst rate not set, using default client-go value: %d", rest.DefaultBurst)
+	} else {
+		log.Infof("Burst: %v", RestConfig.Burst)
+	}
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
