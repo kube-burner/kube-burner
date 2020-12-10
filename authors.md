@@ -1,0 +1,1 @@
+docs/authors.md

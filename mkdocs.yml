@@ -3,15 +3,15 @@ repo_url: https://github.com/cloud-bulldozer/kube-burner
 nav:
 - Home: index.md
 - Configuration: 
-  - CLI: CLI.md
-  - General: CONFIGURATION.md
-  - Measurements: MEASUREMENTS.md
-  - Metrics: METRICS.md
-  - Indexers: INDEXERS.md
-  - Alerting: ALERTING.md
+  - CLI: cli.md
+  - General: configuration.md
+  - Measurements: measurements.md
+  - Metrics: metrics.md
+  - Indexers: indexers.md
+  - Alerting: alerting.md
 - Development:
-  - Contributing: CONTRIBUTING.md
-  - Authors: AUTHORS.md
+  - Contributing: contributing.md
+  - Authors: authors.md
 site_name: Kube-burner
 markdown_extensions:
 - toc:
