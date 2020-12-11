@@ -157,7 +157,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Index
 		}
 		if md.Instant {
 			log.Infof("Instant query: %s", md.Query)
-			if v, err = p.Query(md.Query, time.Now().UTC()); err != nil {
+			if v, err = p.Query(md.Query, end); err != nil {
 				return err
 			}
 			if err := p.parseVector(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
