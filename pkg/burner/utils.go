@@ -121,10 +121,10 @@ func (ex *Executor) Verify() bool {
 		}
 		objectsExpected := ex.Config.JobIterations * obj.replicas
 		if replicas != objectsExpected {
-			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, len(objList.Items), objectsExpected)
+			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 			success = false
 		} else {
-			log.Infof("%s found: %d Expected: %d", obj.gvr.Resource, len(objList.Items), objectsExpected)
+			log.Infof("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 		}
 	}
 	return success
