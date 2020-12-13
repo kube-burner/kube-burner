@@ -302,16 +302,19 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			time.Sleep(job.Config.JobPause)
 		}
 	}
-	// If alertManager is configured and evaluation!=0 rc=1
-	if alertM != nil && alertM.Evaluate(start, time.Now().UTC()) == 1 {
-		rc = 1
-	}
-	// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-	if p != nil && len(p.MetricsProfile.Metrics) > 0 {
-		log.Infof("Waiting %v extra before scraping prometheus metrics", p.Step)
+	if p != nil {
+		log.Infof("Waiting %v extra before scraping prometheus", p.Step)
 		time.Sleep(p.Step)
-		if err := p.ScrapeMetrics(start, time.Now().UTC(), indexer); err != nil {
-			log.Error(err)
+		end := time.Now().UTC()
+		// If alertManager is configured
+		if alertM != nil {
+			rc = alertM.Evaluate(start, end)
+		}
+		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
+		if len(p.MetricsProfile.Metrics) > 0 {
+			if err := p.ScrapeMetrics(start, end, indexer); err != nil {
+				log.Error(err)
+			}
 		}
 	}
 	log.Info("👋 Exiting kube-burner")
