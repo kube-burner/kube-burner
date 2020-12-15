@@ -154,7 +154,6 @@ func (ex *Executor) RunCreateJob() {
 			}
 		}
 	}
-	ex.End = time.Now().UTC()
 }
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {

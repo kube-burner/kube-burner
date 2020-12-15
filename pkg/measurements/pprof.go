@@ -135,7 +135,7 @@ func (p *pprof) getPProf() {
 	wg.Wait()
 }
 
-func (p *pprof) stop() error {
+func (p *pprof) stop() (int, error) {
 	p.stopChannel <- true
-	return nil
+	return 0, nil
 }

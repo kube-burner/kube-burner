@@ -7,7 +7,7 @@
 
 # What's this?
 
-Kube-burner is a tool aimed at stressing kubernetes clusters. The main functionallity it provides can be summareized these three steps:
+Kube-burner is a tool aimed at stressing kubernetes clusters. The main functionallity it provides can be summarized in these three steps:
 
 - Create/delete the objects declared in the jobs.
 - Collect desired on-cluster prometheus metrics.
@@ -18,7 +18,7 @@ Kube-burner is a tool aimed at stressing kubernetes clusters. The main functiona
 
 # Downloading Kube-burner
 
-In case you want to start tinkering with `kube-burner` now:
+In case you want to start tinkering with Kube-burner now:
 
 - You can find the binaries in the [releases section of the repository](https://github.com/cloud-bulldozer/kube-burner/releases).
 - There's also a container image available at [quay](https://quay.io/repository/cloud-bulldozer/kube-burner?tab=tags).
