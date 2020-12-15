@@ -34,7 +34,7 @@ type measurementFactory struct {
 
 type measurement interface {
 	start()
-	stop() error
+	stop() (int, error)
 	setConfig(config.Measurement)
 }
 
@@ -85,11 +85,17 @@ func Start() {
 }
 
 // Stop stops registered measurements
-func Stop() {
+func Stop() int {
+	var err error
+	var r, rc int
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Stopping measurement: %s", name)
-		if err := measurement.stop(); err != nil {
+		if r, err = measurement.stop(); err != nil {
 			log.Errorf("Error stopping measurement %s: %s", name, err)
 		}
+		if r != 0 {
+			rc = r
+		}
 	}
+	return rc
 }

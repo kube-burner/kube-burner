@@ -56,11 +56,9 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 // RunDeleteJob executes a deletion job
 func (ex *Executor) RunDeleteJob() {
 	var wg sync.WaitGroup
-	var err error
 	var resp *unstructured.UnstructuredList
 	log.Infof("Triggering job: %s", ex.Config.Name)
-	ex.Start = time.Now().UTC()
-	RestConfig, err = config.GetRestConfig(ex.Config.QPS, ex.Config.Burst)
+	RestConfig, err := config.GetRestConfig(ex.Config.QPS, ex.Config.Burst)
 	if err != nil {
 		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
 	}
@@ -92,16 +90,16 @@ func (ex *Executor) RunDeleteJob() {
 				ex.limiter.Wait(context.TODO())
 				err := dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 				if err != nil {
-					log.Errorf("Error found removing %s %s from ns %s: %s", item.GetKind(), item.GetName(), item.GetNamespace(), err)
+					log.Errorf("Error found removing %s %s: %s", item.GetKind(), item.GetName(), err)
 				} else {
-					log.Infof("Removing %s %s from ns %s", item.GetKind(), item.GetName(), item.GetNamespace())
+					log.Infof("Removing %s %s", item.GetKind(), item.GetName())
 				}
 			}(item)
 		}
 		if ex.Config.WaitForDeletion {
 			wg.Wait()
-			wait.PollImmediateInfinite(1*time.Second, func() (bool, error) {
-				resp, err := dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+			wait.PollImmediateInfinite(2*time.Second, func() (bool, error) {
+				resp, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 				if err != nil {
 					return false, err
 				}
@@ -113,5 +111,4 @@ func (ex *Executor) RunDeleteJob() {
 			})
 		}
 	}
-	ex.End = time.Now().UTC()
 }

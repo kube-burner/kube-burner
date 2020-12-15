@@ -14,16 +14,25 @@
 
 package config
 
-import "time"
+import (
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+)
 
 // JobType type of job
 type JobType string
+
+// Measurement type
+type MeasurementType string
 
 const (
 	// CreationJob used to create objects
 	CreationJob JobType = "create"
 	// DeletionJob used to delete objects
-	DeletionJob JobType = "delete"
+	DeletionJob JobType         = "delete"
+	podLatency  MeasurementType = "podLatency"
+	pprof       MeasurementType = "pprof"
 )
 
 // Spec configuration root
@@ -49,6 +58,12 @@ type IndexerConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+type LatencyThrehold struct {
+	ConditionType v1.PodConditionType `yaml:"conditionType"`
+	Metric        string              `yaml:"metric"`
+	Threshold     time.Duration       `yaml:"threshold"`
+}
+
 // PProftarget pprof targets to collect
 type PProftarget struct {
 	// Name pprof target name
@@ -70,6 +85,8 @@ type Measurement struct {
 	// ESIndex contains the ElasticSearch index used to
 	// index the metrics
 	ESIndex string `yaml:"esIndex"`
+	// LatencyThreholds config
+	LatencyThresholds []LatencyThrehold `yaml:"thresholds"`
 	// PPRofTargets targets config
 	PProfTargets []PProftarget `yaml:"pprofTargets"`
 	// PPRofInterval pprof collect interval

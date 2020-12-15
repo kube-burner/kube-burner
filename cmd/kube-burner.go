@@ -274,6 +274,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			measurements.NewMeasurementFactory(burner.RestConfig, job.Config, uuid, indexer)
 			measurements.Register()
 			measurements.Start()
+			job.Start = time.Now().UTC()
 			job.RunCreateJob()
 			if job.Config.VerifyObjects {
 				verification = job.Verify()
@@ -283,15 +284,17 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 				}
 			}
 			// We stop and index measurements per job
-			measurements.Stop()
+			rc = measurements.Stop()
 			// Verification failed
 			if job.Config.VerifyObjects && !verification {
 				log.Error("Object verification failed")
 				rc = 1
 			}
 		case config.DeletionJob:
+			job.Start = time.Now().UTC()
 			job.RunDeleteJob()
 		}
+		job.End = time.Now().UTC()
 		elapsedTime := job.End.Sub(job.Start).Seconds()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {

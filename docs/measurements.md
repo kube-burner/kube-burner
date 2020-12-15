@@ -33,11 +33,13 @@ Pod latency sample:
 }
 ```
 
+---
+
 Pod latency quantile sample:
 
 ```json
 {
-  "quantileName": "podReady",
+  "quantileName": "Ready",
   "uuid": "23c0b5fd-c17e-4326-a389-b3aebc774c82",
   "P99": 3774,
   "P95": 3510,
@@ -49,7 +51,7 @@ Pod latency quantile sample:
   "jobName": "kubelet-density"
 },
 {
-  "quantileName": "scheduling",
+  "quantileName": "PodScheduled",
   "uuid": "23c0b5fd-c17e-4326-a389-b3aebc774c82",
   "P99": 64,
   "P95": 8,
@@ -62,9 +64,47 @@ Pod latency quantile sample:
 }
 ```
 
+Where quantileName matches with pod conditions and can be:
+- PodScheduled: Pod has been scheduled in to a node.
+- ContainersReady: Indicates whether all containers in the pod are ready.
+- Initialized: All init containers in the pod have started successfully
+- Ready: The pod is able to service reqeusts and should be added to the load balancing pools of all matching services.
+
+And the metrics are:
+- P99: 99th percentile of the pod condition.
+- P95: 95th percentile of the pod condition.
+- P50: 50th percentile of the pod condition.
+- Max: Maximum value of the condition.
+- Avg: Average value of the condition.
+
 More information about the pod lifecycle can be found in the [kubernetes docs](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/).
 
 **Note**: The __esIndex__ option can be used to configure the ES index where metrics will be indexed.
+
+### Pod latency thresholds
+
+It's possible to stablish pod latency thresholds in the different pod conditions and metrics through the option `thresholds` from the podLatency measurement:
+
+For example, the example below establish a threshold of 2000ms in the P99 metric of the `Ready` condition.
+
+```yaml
+  measurements:
+  - name: podLatency
+    esIndex: kube-burner-podlatency
+    thresholds:
+    - conditionType: Ready
+      metric: P99
+      thrshold: 2000ms
+```
+
+Latency thresholds are evaluated at the end of each job, showing an informative message like the following:
+
+```
+INFO[2020-12-15 12:37:08] Evaluating latency thresholds
+WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured threshold: 2000ms
+```
+
+**In case of not meeting any of the configured thresholds, like the example above, Kube-burner return code will be 1**
 
 ## Pprof collection
 

@@ -20,6 +20,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -49,16 +50,16 @@ type podMetric struct {
 }
 
 type podLatencyQuantiles struct {
-	QuantileName string    `json:"quantileName"`
-	UUID         string    `json:"uuid"`
-	P99          int       `json:"P99"`
-	P95          int       `json:"P95"`
-	P50          int       `json:"P50"`
-	Max          int       `json:"max"`
-	Avg          float64   `json:"avg"`
-	Timestamp    time.Time `json:"timestamp"`
-	MetricName   string    `json:"metricName"`
-	JobName      string    `json:"jobName"`
+	QuantileName v1.PodConditionType `json:"quantileName"`
+	UUID         string              `json:"uuid"`
+	P99          int                 `json:"P99"`
+	P95          int                 `json:"P95"`
+	P50          int                 `json:"P50"`
+	Max          int                 `json:"max"`
+	Avg          int                 `json:"avg"`
+	Timestamp    time.Time           `json:"timestamp"`
+	MetricName   string              `json:"metricName"`
+	JobName      string              `json:"jobName"`
 }
 
 var podQuantiles []interface{}
@@ -190,9 +191,10 @@ func (p *podLatency) startAndSync() error {
 }
 
 // Stop stops podLatency measurement
-func (p *podLatency) stop() error {
+func (p *podLatency) stop() (int, error) {
 	normalizeMetrics()
 	calcQuantiles()
+	rc := p.checkThreshold()
 	defer close(p.stopChannel)
 	timeoutCh := make(chan struct{})
 	timeoutTimer := time.AfterFunc(informerTimeout, func() {
@@ -200,7 +202,7 @@ func (p *podLatency) stop() error {
 	})
 	defer timeoutTimer.Stop()
 	if !cache.WaitForCacheSync(timeoutCh, p.informer.HasSynced) {
-		return fmt.Errorf("Pod-latency: Timed out waiting for caches to sync")
+		return rc, fmt.Errorf("Pod-latency: Timed out waiting for caches to sync")
 	}
 	if factory.globalConfig.WriteToFile {
 		if err := p.writeToFile(); err != nil {
@@ -210,7 +212,7 @@ func (p *podLatency) stop() error {
 	if factory.globalConfig.IndexerConfig.Enabled {
 		p.index()
 	}
-	return nil
+	return rc, nil
 }
 
 // index sends metrics to the configured indexer
@@ -235,12 +237,12 @@ func normalizeMetrics() {
 
 func calcQuantiles() {
 	quantiles := []float64{0.5, 0.95, 0.99}
-	quantileMap := map[string][]int{}
+	quantileMap := map[v1.PodConditionType][]int{}
 	for _, normLatency := range normLatencies {
-		quantileMap["scheduling"] = append(quantileMap["scheduling"], normLatency.(podMetric).SchedulingLatency)
-		quantileMap["containersReady"] = append(quantileMap["containersReady"], normLatency.(podMetric).ContainersReadyLatency)
-		quantileMap["initialized"] = append(quantileMap["initialized"], normLatency.(podMetric).InitializedLatency)
-		quantileMap["podReady"] = append(quantileMap["podReady"], normLatency.(podMetric).PodReadyLatency)
+		quantileMap[v1.PodScheduled] = append(quantileMap[v1.PodScheduled], normLatency.(podMetric).SchedulingLatency)
+		quantileMap[v1.ContainersReady] = append(quantileMap[v1.ContainersReady], normLatency.(podMetric).ContainersReadyLatency)
+		quantileMap[v1.PodInitialized] = append(quantileMap[v1.PodInitialized], normLatency.(podMetric).InitializedLatency)
+		quantileMap[v1.PodReady] = append(quantileMap[v1.PodReady], normLatency.(podMetric).PodReadyLatency)
 	}
 	for quantileName, v := range quantileMap {
 		podQ := podLatencyQuantiles{
@@ -263,7 +265,7 @@ func calcQuantiles() {
 		for _, n := range v {
 			sum += n
 		}
-		podQ.Avg = math.Round(100*float64(sum)/float64(length)) / 100
+		podQ.Avg = int(math.Round(float64(sum) / float64(length)))
 		podQuantiles = append(podQuantiles, podQ)
 	}
 }
@@ -277,4 +279,26 @@ func (plq *podLatencyQuantiles) setQuantile(quantile float64, qValue int) {
 	case 0.99:
 		plq.P99 = qValue
 	}
+}
+
+func (p *podLatency) checkThreshold() int {
+	var rc int
+	log.Info("Evaluating latency thresholds")
+	for _, phase := range p.config.LatencyThresholds {
+		for _, pq := range podQuantiles {
+			if phase.ConditionType == pq.(podLatencyQuantiles).QuantileName {
+				// Required to acccess the attribute by name
+				r := reflect.ValueOf(pq.(podLatencyQuantiles))
+				v := r.FieldByName(phase.Metric).Int()
+				if v > phase.Threshold.Milliseconds() {
+					log.Warnf("%s %s latency (%dms) higher than configured threshold: %v", phase.Metric, phase.ConditionType, v, phase.Threshold)
+					rc = 1
+				} else {
+					log.Infof("%s %s latency (%dms) meets the configured threshold: %v", phase.Metric, phase.ConditionType, v, phase.Threshold)
+				}
+				continue
+			}
+		}
+	}
+	return rc
 }

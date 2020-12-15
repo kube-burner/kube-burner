@@ -87,6 +87,17 @@ func Parse(c string, jobsRequired bool) error {
 		if err := validateDNS1123(); err != nil {
 			return err
 		}
+		for _, m := range ConfigSpec.GlobalConfig.Measurements {
+			switch m.Name {
+			case string(podLatency):
+				err = validatePodLatencyCfg(m)
+			case string(pprof):
+				err = validatePprofCfg(m)
+			}
+			if err != nil {
+				log.Fatalf("Config validataion error: %s", err)
+			}
+		}
 	}
 	return nil
 }
