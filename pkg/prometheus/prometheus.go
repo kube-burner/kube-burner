@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
@@ -143,35 +144,59 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 	return nil
 }
 
-// ScrapeMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Indexer) error {
-	var filename, jobName string
+	var fakeJobList []burner.Executor
+	err := p.scrapeMetrics(fakeJobList, start, end, indexer)
+	return err
+}
+
+// ScrapeMetrics gets all prometheus metrics required and handles them
+func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *indexers.Indexer) error {
+	start := jobList[0].Start
+	end := jobList[len(jobList)-1].End
+	err := p.scrapeMetrics(jobList, start, end, indexer)
+	return err
+}
+
+func (p *Prometheus) scrapeMetrics(jobList []burner.Executor, start, end time.Time, indexer *indexers.Indexer) error {
+	var filename string
 	var err error
 	var v model.Value
 	log.Infof("🔍 Scraping prometheus metrics from %s to %s", start, end)
 	for _, md := range p.MetricsProfile.Metrics {
 		var metrics []interface{}
-		// IndexCMD can work w/o specifying any job
-		if len(config.ConfigSpec.Jobs) > 0 {
-			jobName = config.ConfigSpec.Jobs[0].Name
-		}
 		if md.Instant {
 			log.Infof("Instant query: %s", md.Query)
-			if v, err = p.Query(md.Query, end); err != nil {
-				return err
-			}
-			if err := p.parseVector(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
-				return err
+			if len(jobList) > 0 {
+				for _, job := range jobList {
+					if v, err = p.Query(md.Query, job.End); err != nil {
+						log.Warnf("Error found with query %s: %s", md.Query, err)
+						continue
+					}
+					if err := p.parseVector(md.MetricName, md.Query, job.Config.Name, v, &metrics); err != nil {
+						log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
+					}
+				}
+			} else {
+				if v, err = p.Query(md.Query, end); err != nil {
+					log.Warnf("Error found with query %s: %s", md.Query, err)
+					continue
+				}
+				if err := p.parseVector(md.MetricName, md.Query, "", v, &metrics); err != nil {
+					log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
+				}
 			}
 		} else {
 			log.Infof("Range query: %s", md.Query)
 			p.QueryRange(md.Query, start, end)
 			v, err = p.QueryRange(md.Query, start, end)
 			if err != nil {
-				return err
+				log.Warnf("Error found with query %s: %s", md.Query, err)
+				continue
 			}
-			if err := p.parseMatrix(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
-				return err
+			if err := p.parseMatrix(md.MetricName, md.Query, jobList, v, &metrics); err != nil {
+				log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
+				continue
 			}
 		}
 		if config.ConfigSpec.GlobalConfig.WriteToFile {
@@ -237,19 +262,24 @@ func (p *Prometheus) parseVector(metricName, query, jobName string, value model.
 	return nil
 }
 
-func (p *Prometheus) parseMatrix(metricName, query, jobName string, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseMatrix(metricName, query string, jobList []burner.Executor, value model.Value, metrics *[]interface{}) error {
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
 	}
 	for _, v := range data {
 		for _, val := range v.Values {
+			jobName, err := getJobName(val.Timestamp.Time(), jobList)
+			if err != nil {
+				log.Warnf("Couldn't determine job from timestmap: %s", val.Timestamp.Time())
+			}
 			m := metric{
 				Labels:     make(map[string]string),
 				UUID:       p.uuid,
 				Query:      query,
 				MetricName: metricName,
 				JobName:    jobName,
+				Timestamp:  val.Timestamp.Time(),
 			}
 			for k, v := range v.Metric {
 				if k == "__name__" {
@@ -262,11 +292,19 @@ func (p *Prometheus) parseMatrix(metricName, query, jobName string, value model.
 			} else {
 				m.Value = float64(val.Value)
 			}
-			m.Timestamp = val.Timestamp.Time()
 			*metrics = append(*metrics, m)
 		}
 	}
 	return nil
+}
+
+func getJobName(timestamp time.Time, jobList []burner.Executor) (string, error) {
+	for _, j := range jobList {
+		if timestamp.Before(j.End) {
+			return j.Config.Name, nil
+		}
+	}
+	return "kube-burner-indexing", nil
 }
 
 // Query prometheues query wrapper

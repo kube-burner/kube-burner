@@ -95,7 +95,6 @@ func setupCreateJob(jobConfig config.Job) Executor {
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob() {
 	log.Infof("Triggering job: %s", ex.Config.Name)
-	ex.Start = time.Now().UTC()
 	nsLabels := map[string]string{
 		"kube-burner-job":  ex.Config.Name,
 		"kube-burner-uuid": ex.uuid,

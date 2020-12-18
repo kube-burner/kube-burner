@@ -24,7 +24,7 @@ import (
 
 type measurementFactory struct {
 	globalConfig config.GlobalConfig
-	config       config.Job
+	config       *config.Job
 	clientSet    *kubernetes.Clientset
 	restConfig   *rest.Config
 	createFuncs  map[string]measurement
@@ -42,17 +42,23 @@ var factory measurementFactory
 var measurementMap = make(map[string]measurement)
 
 // NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(restConfig *rest.Config, jobConfig config.Job, uuid string, indexer *indexers.Indexer) {
+func NewMeasurementFactory(restConfig *rest.Config, uuid string, indexer *indexers.Indexer) {
 	log.Info("📈 Creating measurement factory")
 	clientSet := kubernetes.NewForConfigOrDie(restConfig)
 	factory = measurementFactory{
 		globalConfig: config.ConfigSpec.GlobalConfig,
-		config:       jobConfig,
 		clientSet:    clientSet,
 		restConfig:   restConfig,
 		createFuncs:  make(map[string]measurement),
 		indexer:      indexer,
 		uuid:         uuid,
+	}
+	for _, measurement := range config.ConfigSpec.GlobalConfig.Measurements {
+		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
+			factory.register(measurement, measurementFunc)
+		} else {
+			log.Warnf("Measurement not found: %s", measurement.Name)
+		}
 	}
 }
 
@@ -66,15 +72,8 @@ func (mf *measurementFactory) register(measure config.Measurement, measurementFu
 	}
 }
 
-// Register registers the given list of measurements
-func Register() {
-	for _, measurement := range config.ConfigSpec.GlobalConfig.Measurements {
-		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
-			factory.register(measurement, measurementFunc)
-		} else {
-			log.Warnf("Measurement not found: %s", measurement.Name)
-		}
-	}
+func SetJobConfig(jobConfig *config.Job) {
+	factory.config = jobConfig
 }
 
 // Start starts registered measurements

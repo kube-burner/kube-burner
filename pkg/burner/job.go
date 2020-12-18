@@ -65,7 +65,7 @@ func NewExecutorList(uuid string) []Executor {
 	var executorList []Executor
 	RestConfig, err = config.GetRestConfig(0, 0)
 	if err != nil {
-		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
+		log.Fatalf("Error creating restConfig: %s", err)
 	}
 	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	for _, job := range config.ConfigSpec.Jobs {
