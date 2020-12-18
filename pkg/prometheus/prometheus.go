@@ -269,10 +269,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, jobList []burner.Exec
 	}
 	for _, v := range data {
 		for _, val := range v.Values {
-			jobName, err := getJobName(val.Timestamp.Time(), jobList)
-			if err != nil {
-				log.Warnf("Couldn't determine job from timestmap: %s", val.Timestamp.Time())
-			}
+			jobName := getJobName(val.Timestamp.Time(), jobList)
 			m := metric{
 				Labels:     make(map[string]string),
 				UUID:       p.uuid,
@@ -298,13 +295,13 @@ func (p *Prometheus) parseMatrix(metricName, query string, jobList []burner.Exec
 	return nil
 }
 
-func getJobName(timestamp time.Time, jobList []burner.Executor) (string, error) {
+func getJobName(timestamp time.Time, jobList []burner.Executor) string {
 	for _, j := range jobList {
 		if timestamp.Before(j.End) {
-			return j.Config.Name, nil
+			return j.Config.Name
 		}
 	}
-	return "kube-burner-indexing", nil
+	return "kube-burner-indexing"
 }
 
 // Query prometheues query wrapper
