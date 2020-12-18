@@ -107,8 +107,10 @@ func validateDNS1123() error {
 		if errs := validation.IsDNS1123Subdomain(job.Name); len(errs) > 0 {
 			return fmt.Errorf("Job %s name validation error: %s", job.Name, fmt.Sprint(errs))
 		}
-		if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
-			return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, fmt.Sprint(errs))
+		if job.JobType == CreationJob {
+			if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
+				return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, fmt.Sprint(errs))
+			}
 		}
 	}
 	return nil

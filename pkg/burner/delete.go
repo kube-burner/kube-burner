@@ -83,6 +83,7 @@ func (ex *Executor) RunDeleteJob() {
 		if err != nil {
 			continue
 		}
+		log.Infof("Found %d %s with selector %s", len(resp.Items), obj.gvr.Resource, labelSelector)
 		for _, item := range resp.Items {
 			wg.Add(1)
 			go func(item unstructured.Unstructured) {
