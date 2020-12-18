@@ -92,7 +92,12 @@ func (ex *Executor) RunDeleteJob() {
 				if err != nil {
 					log.Errorf("Error found removing %s %s: %s", item.GetKind(), item.GetName(), err)
 				} else {
-					log.Infof("Removing %s %s", item.GetKind(), item.GetName())
+					ns := item.GetNamespace()
+					if ns != "" {
+						log.Infof("Removing %s %s from namespace %s", item.GetKind(), item.GetName(), ns)
+					} else {
+						log.Infof("Removing %s %s", item.GetKind(), item.GetName())
+					}
 				}
 			}(item)
 		}

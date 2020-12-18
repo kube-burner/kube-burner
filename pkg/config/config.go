@@ -129,10 +129,10 @@ func GetRestConfig(QPS, burst int) (*rest.Config, error) {
 		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	}
 	if kubeconfig != "" {
-		log.Infof("Using kubeconfig: %s", kubeconfig)
+		log.Debugf("Using kubeconfig: %s", kubeconfig)
 		restConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	} else {
-		log.Info("Using in-cluster configuration")
+		log.Debugf("Using in-cluster configuration")
 		restConfig, err = rest.InClusterConfig()
 	}
 	if err != nil {

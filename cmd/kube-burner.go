@@ -259,22 +259,26 @@ func init() {
 }
 
 func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) {
-	start := time.Now().UTC()
 	verification := true
 	var rc int
 	var indexer *indexers.Indexer
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer = indexers.NewIndexer()
 	}
-	for _, job := range burner.NewExecutorList(uuid) {
-		// Run execution
+	restConfig, err := config.GetRestConfig(0, 0)
+	if err != nil {
+		log.Fatalf("Error creating restConfig: %s", err)
+	}
+	measurements.NewMeasurementFactory(restConfig, uuid, indexer)
+	jobList := burner.NewExecutorList(uuid)
+	// Iterate through job list
+	for jobPosition, job := range jobList {
+		jobList[jobPosition].Start = time.Now().UTC()
+		measurements.SetJobConfig(&job.Config)
 		switch job.Config.JobType {
 		case config.CreationJob:
 			job.Cleanup()
-			measurements.NewMeasurementFactory(burner.RestConfig, job.Config, uuid, indexer)
-			measurements.Register()
 			measurements.Start()
-			job.Start = time.Now().UTC()
 			job.RunCreateJob()
 			if job.Config.VerifyObjects {
 				verification = job.Verify()
@@ -291,31 +295,33 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 				rc = 1
 			}
 		case config.DeletionJob:
-			job.Start = time.Now().UTC()
 			job.RunDeleteJob()
 		}
-		job.End = time.Now().UTC()
-		elapsedTime := job.End.Sub(job.Start).Seconds()
+
+		elapsedTime := time.Now().UTC().Sub(jobList[jobPosition].Start).Seconds()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-			burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config)
+			burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config, jobList[jobPosition].Start)
 		}
 		if job.Config.JobPause > 0 {
 			log.Infof("Pausing for %v before next job", job.Config.JobPause)
 			time.Sleep(job.Config.JobPause)
 		}
+		jobList[jobPosition].End = time.Now().UTC()
 	}
 	if p != nil {
 		log.Infof("Waiting %v extra before scraping prometheus", p.Step)
 		time.Sleep(p.Step)
-		end := time.Now().UTC()
+		// Update end time of last job
+		jobList[len(jobList)-1].End = time.Now().UTC()
 		// If alertManager is configured
 		if alertM != nil {
-			rc = alertM.Evaluate(start, end)
+			log.Infof("Evaluating alerts")
+			rc = alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End)
 		}
 		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 		if len(p.MetricsProfile.Metrics) > 0 {
-			if err := p.ScrapeMetrics(start, end, indexer); err != nil {
+			if err := p.ScrapeJobsMetrics(jobList, indexer); err != nil {
 				log.Error(err)
 			}
 		}

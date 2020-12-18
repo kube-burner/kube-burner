@@ -30,17 +30,19 @@ type metadata struct {
 	JobConfig   config.Job `json:"jobConfig"`
 }
 
+const jobSummary = "jobSummary"
+
 // IndexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job) {
+func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time) {
 	metadataInfo := []interface{}{
 		metadata{
 			UUID:        uuid,
 			ElapsedTime: elapsedTime,
 			JobConfig:   jobConfig,
-			MetricName:  "jobSummary",
-			Timestamp:   time.Now(),
+			MetricName:  jobSummary,
+			Timestamp:   timestamp,
 		},
 	}
-	log.Info("Indexing metadata information")
+	log.Info("Indexing metadata information for job: %s", jobConfig.Name)
 	(*indexer).Index(config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex, metadataInfo)
 }

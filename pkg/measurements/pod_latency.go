@@ -92,7 +92,7 @@ func (p *podLatency) createPod(obj interface{}) {
 				Name:       pod.Name,
 				MetricName: podLatencyMeasurement,
 				UUID:       factory.uuid,
-				JobName:    config.ConfigSpec.Jobs[0].Name,
+				JobName:    factory.config.Name,
 			}
 		}
 	}
@@ -248,8 +248,8 @@ func calcQuantiles() {
 		podQ := podLatencyQuantiles{
 			QuantileName: quantileName,
 			UUID:         factory.uuid,
-			Timestamp:    time.Now(),
-			JobName:      config.ConfigSpec.Jobs[0].Name,
+			Timestamp:    time.Now().UTC(),
+			JobName:      factory.config.Name,
 			MetricName:   podLatencyQuantilesMeasurement,
 		}
 		sort.Ints(v)
