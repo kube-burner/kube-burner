@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cmd
+package main
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -35,6 +36,28 @@ import (
 )
 
 var binName = filepath.Base(os.Args[0])
+
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   binName,
+	Short: "Burn a kubernetes cluster",
+	Long: `Kube-burner 🔥
+
+Tool aimed at stressing a kubernetes cluster by creating or deleting lot of objects.`,
+}
+
+// versionCmd represents the version command
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version number of kube-burner",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Version:", version.Version)
+		fmt.Println("Git Commit:", version.GitCommit)
+		fmt.Println("Build Date:", version.BuildDate)
+		fmt.Println("Go Version:", version.GoVersion)
+		fmt.Println("OS/Arch:", version.OsArch)
+	},
+}
 
 var completionCmd = &cobra.Command{
 	Use:   "completion",
@@ -206,9 +229,9 @@ func alertCmd() *cobra.Command {
 			if alertM, err = alerting.NewAlertManager(alertProfile, p); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
-			result := alertM.Evaluate(startTime, endTime)
+			rc := alertM.Evaluate(startTime, endTime)
 			log.Info("👋 Exiting kube-burner")
-			os.Exit(result)
+			os.Exit(rc)
 		},
 	}
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
@@ -224,38 +247,6 @@ func alertCmd() *cobra.Command {
 	cmd.MarkFlagRequired("alert-profile")
 	cmd.Flags().SortFlags = false
 	return cmd
-}
-
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   binName,
-	Short: "Burn a kubernetes cluster",
-	Long: `Kube-burner 🔥
-
-Tool aimed at stressing a kubernetes cluster by creating or deleting lot of objects.`,
-}
-
-// Execute executes rootCmd
-func Execute() {
-	rootCmd.Execute()
-}
-
-func init() {
-	rootCmd.AddCommand(
-		initCmd(),
-		destroyCmd(),
-		indexCmd(),
-		alertCmd(),
-	)
-	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		log.Infof("Setting log level to %s", *logLevel)
-		log.SetLogLevel(*logLevel)
-	}
-	rootCmd.AddCommand(completionCmd)
-	cobra.OnInitialize()
-	rootCmd.Execute()
-
 }
 
 func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) {
@@ -328,4 +319,23 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 	}
 	log.Info("👋 Exiting kube-burner")
 	os.Exit(rc)
+}
+
+// executes rootCmd
+func main() {
+	rootCmd.AddCommand(
+		versionCmd,
+		initCmd(),
+		destroyCmd(),
+		indexCmd(),
+		alertCmd(),
+	)
+	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		log.Infof("Setting log level to %s", *logLevel)
+		log.SetLogLevel(*logLevel)
+	}
+	rootCmd.AddCommand(completionCmd)
+	cobra.OnInitialize()
+	rootCmd.Execute()
 }
