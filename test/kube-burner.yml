@@ -62,3 +62,6 @@ jobs:
     - kind: Deployment
       labelSelector: {kube-burner-job: not-namespaced}
       apiVersion: apps/v1
+
+    - kind: Namespace
+      labelSelector: {kube-burner-job: not-namespaced}
