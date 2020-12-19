@@ -23,13 +23,12 @@ import (
 )
 
 type measurementFactory struct {
-	globalConfig config.GlobalConfig
-	config       *config.Job
-	clientSet    *kubernetes.Clientset
-	restConfig   *rest.Config
-	createFuncs  map[string]measurement
-	indexer      *indexers.Indexer
-	uuid         string
+	jobConfig   *config.Job
+	clientSet   *kubernetes.Clientset
+	restConfig  *rest.Config
+	createFuncs map[string]measurement
+	indexer     *indexers.Indexer
+	uuid        string
 }
 
 type measurement interface {
@@ -40,20 +39,20 @@ type measurement interface {
 
 var factory measurementFactory
 var measurementMap = make(map[string]measurement)
+var kubeburnerCfg config.GlobalConfig = config.ConfigSpec.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(restConfig *rest.Config, uuid string, indexer *indexers.Indexer) {
 	log.Info("📈 Creating measurement factory")
 	clientSet := kubernetes.NewForConfigOrDie(restConfig)
 	factory = measurementFactory{
-		globalConfig: config.ConfigSpec.GlobalConfig,
-		clientSet:    clientSet,
-		restConfig:   restConfig,
-		createFuncs:  make(map[string]measurement),
-		indexer:      indexer,
-		uuid:         uuid,
+		clientSet:   clientSet,
+		restConfig:  restConfig,
+		createFuncs: make(map[string]measurement),
+		indexer:     indexer,
+		uuid:        uuid,
 	}
-	for _, measurement := range config.ConfigSpec.GlobalConfig.Measurements {
+	for _, measurement := range kubeburnerCfg.Measurements {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
 			factory.register(measurement, measurementFunc)
 		} else {
@@ -73,7 +72,7 @@ func (mf *measurementFactory) register(measure config.Measurement, measurementFu
 }
 
 func SetJobConfig(jobConfig *config.Job) {
-	factory.config = jobConfig
+	factory.jobConfig = jobConfig
 }
 
 // Start starts registered measurements

@@ -85,14 +85,14 @@ func init() {
 func (p *podLatency) createPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	if _, exists := podMetrics[string(pod.UID)]; !exists {
-		if strings.Contains(pod.Namespace, factory.config.Namespace) {
+		if strings.Contains(pod.Namespace, factory.jobConfig.Namespace) {
 			podMetrics[string(pod.UID)] = podMetric{
 				Timestamp:  time.Now().UTC(),
 				Namespace:  pod.Namespace,
 				Name:       pod.Name,
 				MetricName: podLatencyMeasurement,
 				UUID:       factory.uuid,
-				JobName:    factory.config.Name,
+				JobName:    factory.jobConfig.Name,
 			}
 		}
 	}
@@ -133,7 +133,7 @@ func (p *podLatency) setConfig(cfg config.Measurement) {
 // Start starts podLatency measurement
 func (p *podLatency) start() {
 	podMetrics = make(map[string]podMetric)
-	log.Infof("Creating Pod latency informer for %s", factory.config.Name)
+	log.Infof("Creating Pod latency informer for %s", factory.jobConfig.Name)
 	podListWatcher := cache.NewFilteredListWatchFromClient(factory.clientSet.CoreV1().RESTClient(), "pods", v1.NamespaceAll, func(options *metav1.ListOptions) {})
 	p.informer = cache.NewSharedInformer(podListWatcher, nil, 0)
 	p.stopChannel = make(chan struct{})
@@ -150,16 +150,16 @@ func (p *podLatency) start() {
 
 func (p *podLatency) writeToFile() error {
 	filesMetrics := map[string]interface{}{
-		fmt.Sprintf("%s-podLatency.json", factory.config.Name):         normLatencies,
-		fmt.Sprintf("%s-podLatency-summary.json", factory.config.Name): podQuantiles,
+		fmt.Sprintf("%s-podLatency.json", factory.jobConfig.Name):         normLatencies,
+		fmt.Sprintf("%s-podLatency-summary.json", factory.jobConfig.Name): podQuantiles,
 	}
 	for filename, data := range filesMetrics {
-		if factory.globalConfig.MetricsDirectory != "" {
-			err := os.MkdirAll(factory.globalConfig.MetricsDirectory, 0744)
+		if kubeburnerCfg.MetricsDirectory != "" {
+			err := os.MkdirAll(kubeburnerCfg.MetricsDirectory, 0744)
 			if err != nil {
 				return fmt.Errorf("Error creating metrics directory: %s", err)
 			}
-			filename = path.Join(factory.globalConfig.MetricsDirectory, filename)
+			filename = path.Join(kubeburnerCfg.MetricsDirectory, filename)
 		}
 		f, err := os.Create(filename)
 		if err != nil {
@@ -204,12 +204,12 @@ func (p *podLatency) stop() (int, error) {
 	if !cache.WaitForCacheSync(timeoutCh, p.informer.HasSynced) {
 		return rc, fmt.Errorf("Pod-latency: Timed out waiting for caches to sync")
 	}
-	if factory.globalConfig.WriteToFile {
+	if kubeburnerCfg.WriteToFile {
 		if err := p.writeToFile(); err != nil {
 			log.Errorf("Error writing measurement podLatency: %s", err)
 		}
 	}
-	if factory.globalConfig.IndexerConfig.Enabled {
+	if kubeburnerCfg.IndexerConfig.Enabled {
 		p.index()
 	}
 	return rc, nil
@@ -249,7 +249,7 @@ func calcQuantiles() {
 			QuantileName: quantileName,
 			UUID:         factory.uuid,
 			Timestamp:    time.Now().UTC(),
-			JobName:      factory.config.Name,
+			JobName:      factory.jobConfig.Name,
 			MetricName:   podLatencyQuantilesMeasurement,
 		}
 		sort.Ints(v)

@@ -10,7 +10,7 @@ GIT_COMMIT = $(shell git rev-parse HEAD)
 GIT_BRANCH = $(shell git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
-KUBE_BURNER_PACKAGE = github.com/cloud-bulldozer/kube-burner
+KUBE_BURNER_VERSION= github.com/cloud-bulldozer/kube-burner/pkg/version
 
 ifeq (, $(shell command -v docker))
   ENGINE := podman
@@ -33,7 +33,7 @@ build: $(BIN_DIR)/$(BIN_NAME)
 $(BIN_DIR)/$(BIN_NAME): $(SOURCES)
 	@echo "Building $(BIN_NAME)"
 	@echo "GOPATH=$(GOPATH)"
-	CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X $(KUBE_BURNER_PACKAGE)/version.GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_PACKAGE)/version.BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_PACKAGE)/version.Version=$(GIT_BRANCH)" -o $(BIN_DIR)/$(BIN_NAME)
+	CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(GIT_BRANCH)" -o $(BIN_DIR)/$(BIN_NAME) ./cmd/kube-burner
 
 lint:
 	golangci-lint run
