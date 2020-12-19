@@ -39,7 +39,7 @@ type measurement interface {
 
 var factory measurementFactory
 var measurementMap = make(map[string]measurement)
-var kubeburnerCfg config.GlobalConfig = config.ConfigSpec.GlobalConfig
+var kubeburnerCfg *config.GlobalConfig = &config.ConfigSpec.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(restConfig *rest.Config, uuid string, indexer *indexers.Indexer) {
