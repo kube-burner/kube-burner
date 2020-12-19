@@ -47,7 +47,6 @@ type Prometheus struct {
 }
 
 // This object implements RoundTripper
-
 type authTransport struct {
 	Transport http.RoundTripper
 	token     string
@@ -144,6 +143,7 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 	return nil
 }
 
+// ScrapeMetrics defined in the metrics profile from start to end
 func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Indexer) error {
 	var fakeJobList []burner.Executor
 	err := p.scrapeMetrics(fakeJobList, start, end, indexer)
