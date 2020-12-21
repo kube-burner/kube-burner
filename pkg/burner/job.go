@@ -35,7 +35,7 @@ type object struct {
 	objectSpec     []byte
 	replicas       int
 	unstructured   *unstructured.Unstructured
-	inputVars      map[string]string
+	inputVars      map[string]interface{}
 	labelSelector  map[string]string
 }
 

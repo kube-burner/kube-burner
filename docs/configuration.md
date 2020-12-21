@@ -132,17 +132,17 @@ The following code snippet shows an example of a k8s service using these variabl
 apiVersion: v1
 kind: Service
 metadata:
-  name: sleep-app-{{ .Iteration }}-{{ .Replica }}
+  name: sleep-app-{{.Iteration}}-{{.Replica}}
   labels:
-    name: my-app-{{ .Iteration }}-{{ .Replica }}
+    name: my-app-{{.Iteration}}-{{.Replica}}
 spec:
   selector:
-    app: sleep-app-{{ .Iteration }}-{{ .Replica }}
+    app: sleep-app-{{.Iteration}}-{{.Replica}}
   ports:
   - name: serviceport
     protocol: TCP
-    port: "{{ .port }}"
-    targetPort: "{{ .targetPort }}"
+    port: "{{.port}}"
+    targetPort: "{{.targetPort}}"
   type: ClusterIP
 ```
 
@@ -159,6 +159,20 @@ spec:
 {{ end }}
 ```
 
+# Template functions
 
-[measurements section]: ../measurements/
-[indexers section]: ../indexers/
+Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner ships several functions to provide higher dynamism to the template language:
+- rand: This function can be used to generate a random string with the given length. i.e
+
+```yaml
+apiVersion: v1
+data:
+  myfile: {{rand 512}}
+  myOtherFile: {{rand .inputIntVariable}}
+kind: ConfigMap
+metadata:
+  name: configmap-{{.Replica}}
+```
+
+- [measurements section]: ../measurements/ 
+- [indexers section]: ../indexers/

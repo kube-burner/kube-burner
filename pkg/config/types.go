@@ -118,7 +118,7 @@ type Object struct {
 	Replicas int `yaml:"replicas" json:"replicas,omitempty"`
 	// InputVars contains a map of arbitrary input variables
 	// that can be introduced by users
-	InputVars map[string]string `yaml:"inputVars" json:"inputVars,omitempty"`
+	InputVars map[string]interface{} `yaml:"inputVars" json:"inputVars,omitempty"`
 	// Kind object kind to delete
 	Kind string `yaml:"kind" json:"kind,omitempty"`
 	// APIVersion apiVersion of the object to remove
