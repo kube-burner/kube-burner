@@ -174,5 +174,5 @@ metadata:
   name: configmap-{{.Replica}}
 ```
 
-- [measurements section]: ../measurements/ 
-- [indexers section]: ../indexers/
+[measurements section]: ../measurements/ 
+[indexers section]: ../indexers/
