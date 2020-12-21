@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
 	"text/template"
@@ -44,6 +45,10 @@ const (
 	missingKeyError             templateOption = "missingkey=error"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 func prepareTemplate(original []byte) ([]byte, error) {
 	// Removing all placeholder from template.
 	// This needs to be done due to placeholders not being valid yaml.
@@ -59,8 +64,16 @@ func prepareTemplate(original []byte) ([]byte, error) {
 }
 
 func renderTemplate(original []byte, data interface{}, options templateOption) ([]byte, error) {
+	funcMap := template.FuncMap{"rand": func(length int) string {
+		var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+		b := make([]rune, length)
+		for i := range b {
+			b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		}
+		return string(b)
+	}}
 	var rendered bytes.Buffer
-	t, err := template.New("").Option(string(options)).Parse(string(original))
+	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
 		return nil, fmt.Errorf("Parsing error: %s", err)
 	}
