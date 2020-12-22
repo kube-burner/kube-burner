@@ -118,7 +118,6 @@ func (ex *Executor) RunCreateJob() {
 	} else {
 		log.Infof("Burst: %v", RestConfig.Burst)
 	}
-	fmt.Println(RestConfig.Timeout)
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
