@@ -142,5 +142,6 @@ func GetRestConfig(QPS, burst int) (*rest.Config, error) {
 	}
 	restConfig.QPS = float32(QPS)
 	restConfig.Burst = burst
+	restConfig.Timeout = 5 * time.Second
 	return restConfig, nil
 }

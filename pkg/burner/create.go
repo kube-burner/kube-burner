@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -117,6 +118,7 @@ func (ex *Executor) RunCreateJob() {
 	} else {
 		log.Infof("Burst: %v", RestConfig.Burst)
 	}
+	fmt.Println(RestConfig.Timeout)
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
@@ -193,17 +195,30 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				labels[k] = v
 			}
 			newObject.SetLabels(labels)
-			_, err = dynamicClient.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
-			if errors.IsForbidden(err) {
-				log.Fatalf("Authorization error creating object %s: %s", newObject.GetName(), err)
-			}
-			if errors.IsAlreadyExists(err) {
-				log.Errorf("Object %s in namespace %s already exists", newObject.GetName(), ns)
-			} else if err != nil {
-				log.Errorf("Error creating object: %s", err)
-			} else {
-				log.Infof("Created %s %s in namespace %s", newObject.GetKind(), newObject.GetName(), ns)
-			}
+			createRequest(obj.gvr, ns, newObject)
 		}(r)
 	}
+}
+
+func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured) {
+	RetryWithExponentialBackOff(func() (bool, error) {
+		uns, err := dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err != nil {
+			if errors.IsForbidden(err) {
+				log.Fatalf("Authorization error creating  %s/%s: %s", obj.GetKind(), obj.GetName(), err)
+				return true, err
+			} else if errors.IsAlreadyExists(err) {
+				log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
+				return true, err
+			} else if errors.IsTimeout(err) {
+				log.Errorf("Timeout creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
+			} else if err != nil {
+				log.Errorf("Error creating object: %s", err)
+			}
+			log.Error("Retrying object creation")
+			return false, err
+		}
+		log.Infof("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
+		return true, err
+	})
 }
