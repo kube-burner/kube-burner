@@ -149,7 +149,7 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 			renderedDesc.Reset()
 			templateData.Value = float64(val.Value)
 			if err := t.Execute(&renderedDesc, templateData); err != nil {
-				fmt.Println(err)
+				log.Errorf("Rendering error: %s", err)
 			}
 			msg := fmt.Sprintf("Alert triggered at %v: '%s'", val.Timestamp.Time(), renderedDesc.String())
 			switch severity {

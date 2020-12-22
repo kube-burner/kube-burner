@@ -317,6 +317,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			}
 		}
 	}
+	log.Infof("Finished execution with UUID: %s", uuid)
 	log.Info("👋 Exiting kube-burner")
 	os.Exit(rc)
 }
