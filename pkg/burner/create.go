@@ -157,6 +157,7 @@ func (ex *Executor) RunCreateJob() {
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
 	defer wg.Done()
+	var mutex sync.Mutex
 	labels := map[string]string{
 		"kube-burner-uuid":  ex.uuid,
 		"kube-burner-job":   ex.Config.Name,
@@ -171,24 +172,28 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 		templateData[k] = v
 	}
 	for r := 1; r <= obj.replicas; r++ {
-		newObject := &unstructured.Unstructured{}
-		templateData[replica] = r
-		renderedObj, err := renderTemplate(obj.objectSpec, templateData, missingKeyError)
-		if err != nil {
-			log.Fatalf("Template error in %s: %s", obj.objectTemplate, err)
-		}
-		// Re-decode rendered object
-		yamlToUnstructured(renderedObj, newObject)
-		for k, v := range newObject.GetLabels() {
-			labels[k] = v
-		}
-		newObject.SetLabels(labels)
 		wg.Add(1)
-		go func() {
+		go func(r int) {
 			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
 			defer wg.Done()
 			ex.limiter.Wait(context.TODO())
-			_, err := dynamicClient.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
+			newObject := &unstructured.Unstructured{}
+			// Have to lock to prevent semaphore issues
+			mutex.Lock()
+			templateData[replica] = r
+			renderedObj, err := renderTemplate(obj.objectSpec, templateData, missingKeyError)
+			// Unlock when the template is rendered
+			mutex.Unlock()
+			if err != nil {
+				log.Fatalf("Template error in %s: %s", obj.objectTemplate, err)
+			}
+			// Re-decode rendered object
+			yamlToUnstructured(renderedObj, newObject)
+			for k, v := range newObject.GetLabels() {
+				labels[k] = v
+			}
+			newObject.SetLabels(labels)
+			_, err = dynamicClient.Resource(obj.gvr).Namespace(ns).Create(context.TODO(), newObject, metav1.CreateOptions{})
 			if errors.IsForbidden(err) {
 				log.Fatalf("Authorization error creating object %s: %s", newObject.GetName(), err)
 			}
@@ -199,6 +204,6 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			} else {
 				log.Infof("Created %s %s in namespace %s", newObject.GetKind(), newObject.GetName(), ns)
 			}
-		}()
+		}(r)
 	}
 }
