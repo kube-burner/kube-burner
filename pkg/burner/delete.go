@@ -95,9 +95,9 @@ func (ex *Executor) RunDeleteJob() {
 				} else {
 					ns := item.GetNamespace()
 					if ns != "" {
-						log.Infof("Removing %s %s from namespace %s", item.GetKind(), item.GetName(), ns)
+						log.Infof("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), ns)
 					} else {
-						log.Infof("Removing %s %s", item.GetKind(), item.GetName())
+						log.Infof("Removing %s/%s", item.GetKind(), item.GetName())
 					}
 				}
 			}(item)
