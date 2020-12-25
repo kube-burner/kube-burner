@@ -12,7 +12,7 @@ In this section is described global job configuration, it holds the following pa
 | metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics | 
 | measurements     | List of measurements. Detailed in the [measurements section]                                             | List           | -              | []          |
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section]                                      | Object         | -              | -           |
-
+| requestTimeout    | Client-go request timeout                                                                               | Duration       | 5s             | 15s           |
 # Jobs
 
 This section contains the list of jobs `kube-burner` will execute. Each job can hold the following parameters.

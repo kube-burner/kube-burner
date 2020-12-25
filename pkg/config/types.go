@@ -23,7 +23,7 @@ import (
 // JobType type of job
 type JobType string
 
-// Measurement type
+// MeasurementType type of measurement
 type MeasurementType string
 
 const (
@@ -51,17 +51,22 @@ type IndexerConfig struct {
 	ESServers []string `yaml:"esServers"`
 	// DefaultIndex default index to send prometheus metrics
 	DefaultIndex string `yaml:"defaultIndex"`
-	Port         int    `yaml:"port"`
+	// Port indexer port
+	Port int `yaml:"port"`
 	// InsecureSkipVerify disable TLS ceriticate verification
 	InsecureSkipVerify bool `yaml:"insecureSkipVerify"`
 	// Enabled enable indexer
 	Enabled bool `yaml:"enabled"`
 }
 
+// LatencyThrehold holds the thresholds configuration
 type LatencyThrehold struct {
+	// ConditionType
 	ConditionType v1.PodConditionType `yaml:"conditionType"`
-	Metric        string              `yaml:"metric"`
-	Threshold     time.Duration       `yaml:"threshold"`
+	// Metric type
+	Metric string `yaml:"metric"`
+	// Threshold accepted
+	Threshold time.Duration `yaml:"threshold"`
 }
 
 // PProftarget pprof targets to collect
@@ -108,6 +113,8 @@ type GlobalConfig struct {
 	// Measurements describes a list of measurements kube-burner
 	// will take along with job
 	Measurements []Measurement `yaml:"measurements"`
+	// RequestTimeout of restclient
+	RequestTimeout time.Duration `yaml:"requestTimeout"`
 }
 
 // Object defines an object that kube-burner will create

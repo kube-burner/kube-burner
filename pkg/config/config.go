@@ -33,6 +33,7 @@ import (
 var ConfigSpec Spec = Spec{
 	GlobalConfig: GlobalConfig{
 		MetricsDirectory: "collected-metrics",
+		RequestTimeout:   15 * time.Second,
 		WriteToFile:      true,
 		Measurements:     []Measurement{},
 		IndexerConfig: IndexerConfig{
@@ -142,6 +143,6 @@ func GetRestConfig(QPS, burst int) (*rest.Config, error) {
 	}
 	restConfig.QPS = float32(QPS)
 	restConfig.Burst = burst
-	restConfig.Timeout = 5 * time.Second
+	restConfig.Timeout = ConfigSpec.GlobalConfig.RequestTimeout
 	return restConfig, nil
 }
