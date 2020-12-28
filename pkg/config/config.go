@@ -16,7 +16,6 @@ package config
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -67,12 +66,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // Parse parses configuration file
 func Parse(c string, jobsRequired bool) error {
-	var f io.Reader
-	f, err := os.Open(c)
-	// If the config file does not exist we try to read it from an URL
-	if os.IsNotExist(err) {
-		f, err = util.ReadURL(c)
-	}
+	f, err := util.ReadConfig(c)
 	if err != nil {
 		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}

@@ -19,12 +19,25 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+
+	"github.com/cloud-bulldozer/kube-burner/log"
 )
 
-// TODO: this function should open a file and fallback to URL if not found
+// ReadConfig reads configuration from the given path or URL
+func ReadConfig(configFile string) (io.Reader, error) {
+	var f io.Reader
+	f, err := os.Open(configFile)
+	// If the template file does not exist we try to read it from an URL
+	if os.IsNotExist(err) {
+		log.Warnf("Configuration file %s not found, trying to read from URL", configFile)
+		f, err = readURL(configFile)
+	}
+	return f, err
+}
 
-// ReadURL reads an URL and returns a reader
-func ReadURL(stringURL string) (io.Reader, error) {
+// readURL reads an URL and returns a reader
+func readURL(stringURL string) (io.Reader, error) {
 	var body io.Reader
 	u, err := url.Parse(stringURL)
 	if err != nil {
@@ -40,6 +53,5 @@ func ReadURL(stringURL string) (io.Reader, error) {
 	if r.StatusCode != http.StatusOK {
 		return body, fmt.Errorf("Error requesting %s: %d", u, r.StatusCode)
 	}
-	body = r.Body
-	return body, nil
+	return r.Body, nil
 }
