@@ -17,8 +17,6 @@ package alerting
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"strings"
 	"text/template"
 	"time"
@@ -82,12 +80,7 @@ func NewAlertManager(alertProfile string, prometheusClient *prometheus.Prometheu
 }
 
 func (a *AlertManager) readProfile(alertProfile string) error {
-	var f io.Reader
-	f, err := os.Open(alertProfile)
-	// If the alertProfile file does not exist we try to read it from an URL
-	if os.IsNotExist(err) {
-		f, err = util.ReadURL(alertProfile)
-	}
+	f, err := util.ReadConfig(alertProfile)
 	if err != nil {
 		log.Fatalf("Error reading alert profile %s: %s", alertProfile, err)
 	}

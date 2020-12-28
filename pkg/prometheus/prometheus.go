@@ -19,7 +19,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"os"
@@ -126,12 +125,7 @@ func (p *Prometheus) verifyConnection() error {
 
 // ReadProfile reads and parses metric profile configuration
 func (p *Prometheus) ReadProfile(metricsProfile string) error {
-	var f io.Reader
-	f, err := os.Open(metricsProfile)
-	// If the metricsProfile file does not exist we try to read it from an URL
-	if os.IsNotExist(err) {
-		f, err = util.ReadURL(metricsProfile)
-	}
+	f, err := util.ReadConfig(metricsProfile)
 	if err != nil {
 		log.Fatalf("Error reading metrics profile %s: %s", metricsProfile, err)
 	}
@@ -150,7 +144,7 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Index
 	return err
 }
 
-// ScrapeMetrics gets all prometheus metrics required and handles them
+// ScrapeJobsMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *indexers.Indexer) error {
 	start := jobList[0].Start
 	end := jobList[len(jobList)-1].End
