@@ -12,7 +12,8 @@ In this section is described global job configuration, it holds the following pa
 | metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics | 
 | measurements     | List of measurements. Detailed in the [measurements section]                                             | List           | -              | []          |
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section]                                      | Object         | -              | -           |
-| requestTimeout    | Client-go request timeout                                                                               | Duration       | 5s             | 15s           |
+| requestTimeout    | Client-go request timeout                                                                               | Duration       | 5s             | 15s         |
+
 # Jobs
 
 This section contains the list of jobs `kube-burner` will execute. Each job can hold the following parameters.
@@ -69,7 +70,9 @@ objects:
 - kind: Secret
   labelSelector: {kube-burner-job: cluster-density}
 ```
+
 Where:
+
 - kind: Object kind of the k8s object to delete.
 - labelSelector: Map with the labelSelector.
 - apiVersion: API version from the k8s object.
@@ -100,6 +103,7 @@ jobs:
 ```
 
 This job type supports the some of the same parameters as the create job type:
+
 - **waitForDeletion**: Wait for objects to be deleted before finishing the job. Defaults to true
 - name
 - qps
