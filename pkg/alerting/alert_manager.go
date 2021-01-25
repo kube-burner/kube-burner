@@ -82,7 +82,7 @@ func NewAlertManager(alertProfile string, prometheusClient *prometheus.Prometheu
 func (a *AlertManager) readProfile(alertProfile string) error {
 	f, err := util.ReadConfig(alertProfile)
 	if err != nil {
-		log.Fatalf("Error reading alert profile %s: %s", alertProfile, err)
+		return fmt.Errorf("Error reading alert profile %s: %s", alertProfile, err)
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
@@ -90,6 +90,15 @@ func (a *AlertManager) readProfile(alertProfile string) error {
 		return fmt.Errorf("Error decoding alert profile %s: %s", alertProfile, err)
 	}
 	return a.validateTemplates()
+}
+
+func (a *AlertManager) validateTemplates() error {
+	for _, a := range a.alertProfile {
+		if _, err := template.New("").Parse(strings.Join(append(baseTemplate, a.Description), "")); err != nil {
+			return fmt.Errorf("template validation error '%s': %s", a.Description, err)
+		}
+	}
+	return nil
 }
 
 // Evaluate evaluates expressions
@@ -111,15 +120,6 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 		}
 	}
 	return result
-}
-
-func (a *AlertManager) validateTemplates() error {
-	for _, a := range a.alertProfile {
-		if _, err := template.New("").Parse(strings.Join(append(baseTemplate, a.Description), "")); err != nil {
-			return fmt.Errorf("template validation error '%s': %s", a.Description, err)
-		}
-	}
-	return nil
 }
 
 func parseMatrix(value model.Value, description string, severity severityLevel) (int, error) {

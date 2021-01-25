@@ -122,7 +122,7 @@ func (p *Prometheus) scrapeMetrics(jobName string, start, end time.Time, indexer
 		var metrics []interface{}
 		if md.Instant {
 			log.Infof("Instant query: %s", md.Query)
-			if v, err = p.Query(md.Query, end); err != nil {
+			if v, _, err = p.api.Query(context.TODO(), md.Query, end); err != nil {
 				log.Warnf("Error found with query %s: %s", md.Query, err)
 				continue
 			}
@@ -131,9 +131,7 @@ func (p *Prometheus) scrapeMetrics(jobName string, start, end time.Time, indexer
 			}
 		} else {
 			log.Infof("Range query: %s", md.Query)
-			p.QueryRange(md.Query, start, end)
-			v, err = p.QueryRange(md.Query, start, end)
-			if err != nil {
+			if v, err = p.QueryRange(md.Query, start, end); err != nil {
 				log.Warnf("Error found with query %s: %s", md.Query, err)
 				continue
 			}
@@ -236,16 +234,6 @@ func (p *Prometheus) parseMatrix(metricName, query string, jobName string, value
 		}
 	}
 	return nil
-}
-
-// Query prometheus query wrapper
-func (p *Prometheus) Query(query string, time time.Time) (model.Value, error) {
-	var v model.Value
-	v, _, err := p.api.Query(context.TODO(), query, time)
-	if err != nil {
-		return v, err
-	}
-	return v, nil
 }
 
 // QueryRange prometheus queryRange wrapper

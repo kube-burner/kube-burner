@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 )
@@ -38,6 +39,9 @@ func ReadConfig(configFile string) (io.Reader, error) {
 
 // readURL reads an URL and returns a reader
 func readURL(stringURL string, body io.Reader) (io.Reader, error) {
+	httpClient := http.Client{
+		Timeout: 5 * time.Second,
+	}
 	u, err := url.Parse(stringURL)
 	if err != nil {
 		return body, err
@@ -45,7 +49,7 @@ func readURL(stringURL string, body io.Reader) (io.Reader, error) {
 	if !u.IsAbs() {
 		return body, fmt.Errorf("%s is not a valid URL", u)
 	}
-	r, err := http.Get(stringURL)
+	r, err := httpClient.Get(stringURL)
 	if err != nil {
 		return body, err
 	}

@@ -87,11 +87,11 @@ func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 		}
 	}
 	start := time.Now().UTC()
-	log.Infof("Indexing [%d] documents in %s", len(documents), index)
 	for _, document := range documents {
 		j, err := json.Marshal(document)
 		if err != nil {
 			log.Errorf("Cannot encode document %s: %s", document, err)
+			continue
 		}
 		hasher.Write(j)
 		err = bi.Add(
