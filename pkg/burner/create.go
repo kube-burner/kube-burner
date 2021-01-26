@@ -116,12 +116,17 @@ func (ex *Executor) RunCreateJob() {
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
-		createNamespace(ClientSet, ns, nsLabels)
+		if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
+			log.Fatal(err.Error())
+		}
 	}
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
-			createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), nsLabels)
+			if err = createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), nsLabels); err != nil {
+				log.Error(err.Error())
+				continue
+			}
 		}
 		for objectIndex, obj := range ex.objects {
 			wg.Add(1)
@@ -169,7 +174,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 	}
 	for r := 1; r <= obj.replicas; r++ {
 		wg.Add(1)
-		go func(r int) {
+		go func(r int, labels map[string]string) {
 			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
 			defer wg.Done()
 			ex.limiter.Wait(context.TODO())
@@ -190,7 +195,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			}
 			newObject.SetLabels(labels)
 			createRequest(obj.gvr, ns, newObject)
-		}(r)
+		}(r, labels)
 	}
 }
 
