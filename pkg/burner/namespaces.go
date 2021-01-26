@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -27,7 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLabels map[string]string) {
+func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLabels map[string]string) error {
 	ns := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
 	}
@@ -39,8 +40,9 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 	if errors.IsAlreadyExists(err) {
 		log.Warnf("Namespace %s already exists", ns.Name)
 	} else if err != nil {
-		log.Errorf("Unexpected error creating namespace: %s", err)
+		return fmt.Errorf("Unexpected error creating namespace: %s", err)
 	}
+	return nil
 }
 
 // CleanupNamespaces deletes namespaces with the given selector
