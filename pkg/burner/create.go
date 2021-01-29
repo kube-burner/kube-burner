@@ -158,33 +158,28 @@ func (ex *Executor) RunCreateJob() {
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
 	defer wg.Done()
-	var mutex sync.Mutex
-	labels := map[string]string{
-		"kube-burner-uuid":  ex.uuid,
-		"kube-burner-job":   ex.Config.Name,
-		"kube-burner-index": strconv.Itoa(objectIndex),
-	}
-	templateData := map[string]interface{}{
-		jobName:      ex.Config.Name,
-		jobIteration: iteration,
-		jobUUID:      ex.uuid,
-	}
-	for k, v := range obj.inputVars {
-		templateData[k] = v
-	}
 	for r := 1; r <= obj.replicas; r++ {
 		wg.Add(1)
-		go func(r int, labels map[string]string) {
+		go func(r int) {
+			labels := map[string]string{
+				"kube-burner-uuid":  ex.uuid,
+				"kube-burner-job":   ex.Config.Name,
+				"kube-burner-index": strconv.Itoa(objectIndex),
+			}
+			templateData := map[string]interface{}{
+				jobName:      ex.Config.Name,
+				jobIteration: iteration,
+				jobUUID:      ex.uuid,
+			}
+			for k, v := range obj.inputVars {
+				templateData[k] = v
+			}
 			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
 			defer wg.Done()
 			ex.limiter.Wait(context.TODO())
 			newObject := &unstructured.Unstructured{}
-			// Have to lock to prevent semaphore issues
-			mutex.Lock()
 			templateData[replica] = r
 			renderedObj, err := renderTemplate(obj.objectSpec, templateData, missingKeyError)
-			// Unlock when the template is rendered
-			mutex.Unlock()
 			if err != nil {
 				log.Fatalf("Template error in %s: %s", obj.objectTemplate, err)
 			}
@@ -195,7 +190,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			}
 			newObject.SetLabels(labels)
 			createRequest(obj.gvr, ns, newObject)
-		}(r, labels)
+		}(r)
 	}
 }
 
@@ -204,7 +199,7 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 		uns, err := dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err != nil {
 			if errors.IsForbidden(err) {
-				log.Fatalf("Authorization error creating  %s/%s: %s", obj.GetKind(), obj.GetName(), err)
+				log.Fatalf("Authorization error creating %s/%s: %s", obj.GetKind(), obj.GetName(), err)
 				return true, err
 			} else if errors.IsAlreadyExists(err) {
 				log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
