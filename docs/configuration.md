@@ -1,5 +1,15 @@
 
-All the magic `kube-burner` does is described in the configuration file. As previoysly mentioned the location of this configuration file is provided by the flag `-c`. This file is written in YAML format and has several sections.
+All the magic `kube-burner` does is described in the configuration file. As previously mentioned the location of this configuration file is provided by the flag `-c`. This file is written in YAML format and consists of several sections.
+It's possible to use `go-template` syntax within this configuration file, also it's important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{ .MY_ENV_VAR}}`. For example, we could define the indexerConfig section of our configuration file like:
+
+```yaml
+  enabled: true
+  type: elastic
+  esServers: [{{ .ES_SERVER }}]
+  defaultIndex: elasticsearch-index
+```
+
+This feature can be very useful at the time of defining secrets such as the user and password of our indexer, or a token to use in pprof collection.
 
 # Global 
 
@@ -12,7 +22,7 @@ In this section is described global job configuration, it holds the following pa
 | metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics | 
 | measurements     | List of measurements. Detailed in the [measurements section]                                             | List           | -              | []          |
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section]                                      | Object         | -              | -           |
-| requestTimeout    | Client-go request timeout                                                                               | Duration       | 5s             | 15s         |
+| requestTimeout   | Client-go request timeout                                                                                | Duration       | 5s             | 15s         |
 
 # Jobs
 

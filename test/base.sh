@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export QPS=5
+export BURST=10
 export TERM=screen-256color
 
 bold=$(tput bold)

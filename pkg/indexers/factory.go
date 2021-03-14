@@ -22,7 +22,7 @@ import (
 // Indexer indexer interface
 type Indexer interface {
 	Index(string, []interface{})
-	new(config.IndexerConfig)
+	new()
 }
 
 var indexerMap = make(map[string]Indexer)
@@ -34,7 +34,7 @@ func NewIndexer() *Indexer {
 	cfg := config.ConfigSpec.GlobalConfig.IndexerConfig
 	if indexer, exists = indexerMap[cfg.Type]; exists {
 		log.Infof("📁 Creating indexer: %s", cfg.Type)
-		indexer.new(cfg)
+		indexer.new()
 	} else {
 		log.Fatalf("Indexer not found: %s", cfg.Type)
 	}

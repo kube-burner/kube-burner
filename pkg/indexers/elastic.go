@@ -41,7 +41,8 @@ func init() {
 	indexerMap[elastic] = &Elastic{}
 }
 
-func (esIndexer *Elastic) new(esConfig config.IndexerConfig) {
+func (esIndexer *Elastic) new() {
+	esConfig := config.ConfigSpec.GlobalConfig.IndexerConfig
 	cfg := elasticsearch.Config{
 		Addresses: esConfig.ESServers,
 		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: esConfig.InsecureSkipVerify}},

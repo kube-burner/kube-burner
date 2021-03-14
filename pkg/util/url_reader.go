@@ -31,14 +31,13 @@ func ReadConfig(configFile string) (io.Reader, error) {
 	// If the template file does not exist we try to read it from an URL
 	if os.IsNotExist(err) {
 		log.Warnf("Configuration file %s not found, trying to read from URL", configFile)
-		f, err = readURL(configFile)
+		f, err = readURL(configFile, f)
 	}
 	return f, err
 }
 
 // readURL reads an URL and returns a reader
-func readURL(stringURL string) (io.Reader, error) {
-	var body io.Reader
+func readURL(stringURL string, body io.Reader) (io.Reader, error) {
 	u, err := url.Parse(stringURL)
 	if err != nil {
 		return body, err
