@@ -15,9 +15,14 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
+	"text/template"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -42,6 +47,27 @@ var ConfigSpec Spec = Spec{
 	},
 }
 
+func envToMap() map[string]string {
+	envMap := make(map[string]string)
+	for _, v := range os.Environ() {
+		envVar := strings.SplitN(v, "=", 2)
+		envMap[envVar[0]] = envVar[1]
+	}
+	return envMap
+}
+
+func renderConfig(cfg string) (io.Reader, error) {
+	var rendered bytes.Buffer
+	t, err := template.New("cfg").Option("missingkey=error").Parse(cfg)
+	if err != nil {
+		return &rendered, fmt.Errorf("Error rendering configuration template: %s", err)
+	}
+	if err = t.Execute(&rendered, envToMap()); err != nil {
+		return &rendered, fmt.Errorf("Error rendering configuration template: %s", err)
+	}
+	return &rendered, nil
+}
+
 // UnmarshalYAML implements Unmarshaller to customize defaults
 func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type rawJob Job
@@ -54,7 +80,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ErrorOnVerify:        false,
 		JobType:              CreationJob,
 		WaitForDeletion:      true,
-		MaxWaitTimeout:       12 * time.Hour,
+		MaxWaitTimeout:       3 * time.Hour,
 	}
 	if err := unmarshal(&raw); err != nil {
 		return err
@@ -64,13 +90,21 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Parse parses configuration file
+// Parse parses a configuration file
 func Parse(c string, jobsRequired bool) error {
 	f, err := util.ReadConfig(c)
 	if err != nil {
 		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}
-	yamlDec := yaml.NewDecoder(f)
+	cfg, err := ioutil.ReadAll(f)
+	if err != nil {
+		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
+	}
+	renderedCfg, err := renderConfig(string(cfg))
+	if err != nil {
+		return err
+	}
+	yamlDec := yaml.NewDecoder(renderedCfg)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&ConfigSpec); err != nil {
 		return fmt.Errorf("Error decoding configuration file %s: %s", c, err)

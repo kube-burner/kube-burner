@@ -14,8 +14,8 @@ jobs:
   - name: namespaced
     jobType: create
     jobIterations: 5
-    qps: 5
-    burst: 15
+    qps: {{ .QPS }}
+    burst: {{ .BURST }}
     namespacedIterations: true
     cleanup: true
     namespace: namespaced
