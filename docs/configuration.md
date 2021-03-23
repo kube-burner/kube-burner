@@ -11,7 +11,7 @@ It's possible to use `go-template` syntax within this configuration file, also i
 
 This feature can be very useful at the time of defining secrets such as the user and password of our indexer, or a token to use in pprof collection.
 
-# Global 
+# Global
 
 In this section is described global job configuration, it holds the following parameters:
 
@@ -19,7 +19,7 @@ In this section is described global job configuration, it holds the following pa
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|----------------|-------------|
 | kubeconfig       | Points to a valid kubeconfig file. Can be omitted if using the KUBECONFIG environment variable, or running from a pod | String  | ~/mykubeconfig | in-cluster |             |
 | writeToFile      | Whether to dump collected metrics to files                                                               | Boolean        | true           | true        |
-| metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics | 
+| metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics |
 | measurements     | List of measurements. Detailed in the [measurements section]                                             | List           | -              | []          |
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section]                                      | Object         | -              | -           |
 | requestTimeout   | Client-go request timeout                                                                                | Duration       | 5s             | 15s         |
@@ -176,6 +176,30 @@ spec:
 # Template functions
 
 Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner ships several functions to provide higher dynamism to the template language:
+- add: Add two integers
+
+```yaml
+apiVersion: v1
+data:
+  two: {{add 1 1}}
+  anotherInt: {{add .inputIntVariable 1}}
+kind: ConfigMap
+metadata:
+  name: configmap-{{.Replica}}
+```
+
+- multiply: Multiply two integers
+
+```yaml
+apiVersion: v1
+data:
+  eight: {{multiply 2 4}}
+  anotherInt: {{multiply .inputIntVariable 5}}
+kind: ConfigMap
+metadata:
+  name: configmap-{{.Replica}}
+```
+
 - rand: This function can be used to generate a random string with the given length. i.e
 
 ```yaml
@@ -188,5 +212,20 @@ metadata:
   name: configmap-{{.Replica}}
 ```
 
-[measurements section]: ../measurements/ 
+- sequence: This function can be used to generate an array with elements to loop over
+
+```yaml
+apiVersion: v1
+data:
+  blah: "This has many labels"
+kind: ConfigMap
+metadata:
+  name: configmap-{{.Replica}}
+  labels:
+    {{ range $index, $element := sequence 1 10 }}
+    label-{{ $element }}: "true"
+    {{ end }}
+```
+
+[measurements section]: ../measurements/
 [indexers section]: ../indexers/
