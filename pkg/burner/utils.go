@@ -65,14 +65,29 @@ func prepareTemplate(original []byte) ([]byte, error) {
 
 func renderTemplate(original []byte, data interface{}, options templateOption) ([]byte, error) {
 	var rendered bytes.Buffer
-	funcMap := template.FuncMap{"rand": func(length int) string {
-		var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-		b := make([]rune, length)
-		for i := range b {
-			b[i] = letterRunes[rand.Intn(len(letterRunes))]
-		}
-		return string(b)
-	}}
+	funcMap := template.FuncMap{
+		"add": func(a int, b int) int {
+			return a + b
+		},
+		"multiply": func(a int, b int) int {
+			return a * b
+		},
+		"rand": func(length int) string {
+			var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+			b := make([]rune, length)
+			for i := range b {
+				b[i] = letterRunes[rand.Intn(len(letterRunes))]
+			}
+			return string(b)
+		},
+		"sequence": func(start int, end int) []int {
+			var sequence = []int{}
+			for i := start; i <= end; i++ {
+				sequence = append(sequence, i)
+			}
+			return sequence
+		},
+	}
 	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
 		return nil, fmt.Errorf("Parsing error: %s", err)
