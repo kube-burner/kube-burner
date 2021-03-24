@@ -288,17 +288,15 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 		case config.DeletionJob:
 			job.RunDeleteJob()
 		}
-
+		if job.Config.JobPause > 0 {
+			log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
+			time.Sleep(job.Config.JobPause)
+		}
 		elapsedTime := time.Now().UTC().Sub(jobList[jobPosition].Start).Seconds()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 			burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config, jobList[jobPosition].Start)
 		}
-		if job.Config.JobPause > 0 {
-			log.Infof("Pausing for %v before next job", job.Config.JobPause)
-			time.Sleep(job.Config.JobPause)
-		}
-		jobList[jobPosition].End = time.Now().UTC()
 	}
 	if p != nil {
 		log.Infof("Waiting %v extra before scraping prometheus", p.Step*2)
