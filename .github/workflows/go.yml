@@ -18,8 +18,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    environment:
-      name: kube-burner
     strategy:
       matrix:
         golang-version: [1.14, 1.15]
@@ -79,8 +77,6 @@ jobs:
 
   lint:
     name: Run golangci-lint
-    environment:
-      name: kube-burner
     runs-on: ubuntu-latest
     steps:
 
@@ -105,8 +101,6 @@ jobs:
 
   build-container:
     name: Build container image
-    environment:
-      name: kube-burner
     runs-on: ubuntu-latest
     steps:
 

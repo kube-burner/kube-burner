@@ -17,12 +17,10 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -56,16 +54,12 @@ func envToMap() map[string]string {
 	return envMap
 }
 
-func renderConfig(cfg string) (io.Reader, error) {
-	var rendered bytes.Buffer
-	t, err := template.New("cfg").Option("missingkey=error").Parse(cfg)
+func renderConfig(cfg []byte) ([]byte, error) {
+	rendered, err := util.RenderTemplate(cfg, envToMap(), util.MissingKeyError)
 	if err != nil {
-		return &rendered, fmt.Errorf("Error rendering configuration template: %s", err)
+		return rendered, fmt.Errorf("Error rendering configuration template: %s", err)
 	}
-	if err = t.Execute(&rendered, envToMap()); err != nil {
-		return &rendered, fmt.Errorf("Error rendering configuration template: %s", err)
-	}
-	return &rendered, nil
+	return rendered, nil
 }
 
 // UnmarshalYAML implements Unmarshaller to customize defaults
@@ -100,11 +94,12 @@ func Parse(c string, jobsRequired bool) error {
 	if err != nil {
 		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}
-	renderedCfg, err := renderConfig(string(cfg))
+	renderedCfg, err := renderConfig(cfg)
 	if err != nil {
 		return err
 	}
-	yamlDec := yaml.NewDecoder(renderedCfg)
+	cfgReader := bytes.NewReader(renderedCfg)
+	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&ConfigSpec); err != nil {
 		return fmt.Errorf("Error decoding configuration file %s: %s", c, err)
