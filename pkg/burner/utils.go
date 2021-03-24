@@ -15,13 +15,10 @@
 package burner
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"math/rand"
 	"regexp"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -33,25 +30,18 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 )
 
-type templateOption string
-
 const (
 	// Parameters for retrying with exponential backoff.
-	retryBackoffInitialDuration                = 1 * time.Second
-	retryBackoffFactor                         = 3
-	retryBackoffJitter                         = 0
-	retryBackoffSteps                          = 3
-	objectLimit                                = 500
-	missingKeyError             templateOption = "missingkey=error"
+	retryBackoffInitialDuration = 1 * time.Second
+	retryBackoffFactor          = 3
+	retryBackoffJitter          = 0
+	retryBackoffSteps           = 3
+	objectLimit                 = 500
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func prepareTemplate(original []byte) ([]byte, error) {
-	// Removing all placeholder from template.
-	// This needs to be done due to placeholders not being valid yaml.
+	// Removing all placeholders from template.
+	// This needs to be done due to placeholders not being valid yaml
 	if isEmpty(original) {
 		return nil, fmt.Errorf("template is empty")
 	}
@@ -61,42 +51,6 @@ func prepareTemplate(original []byte) ([]byte, error) {
 	}
 	original = r.ReplaceAll(original, []byte{})
 	return original, nil
-}
-
-func renderTemplate(original []byte, data interface{}, options templateOption) ([]byte, error) {
-	var rendered bytes.Buffer
-	funcMap := template.FuncMap{
-		"add": func(a int, b int) int {
-			return a + b
-		},
-		"multiply": func(a int, b int) int {
-			return a * b
-		},
-		"rand": func(length int) string {
-			var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-			b := make([]rune, length)
-			for i := range b {
-				b[i] = letterRunes[rand.Intn(len(letterRunes))]
-			}
-			return string(b)
-		},
-		"sequence": func(start int, end int) []int {
-			var sequence = []int{}
-			for i := start; i <= end; i++ {
-				sequence = append(sequence, i)
-			}
-			return sequence
-		},
-	}
-	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
-	if err != nil {
-		return nil, fmt.Errorf("Parsing error: %s", err)
-	}
-	err = t.Execute(&rendered, data)
-	if err != nil {
-		return nil, fmt.Errorf("Rendering error: %s", err)
-	}
-	return rendered.Bytes(), nil
 }
 
 func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {

@@ -194,7 +194,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			ex.limiter.Wait(context.TODO())
 			newObject := &unstructured.Unstructured{}
 			templateData[replica] = r
-			renderedObj, err := renderTemplate(obj.objectSpec, templateData, missingKeyError)
+			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
 			if err != nil {
 				log.Fatalf("Template error in %s: %s", obj.objectTemplate, err)
 			}
