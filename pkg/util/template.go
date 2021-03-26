@@ -20,6 +20,8 @@ import (
 	"math/rand"
 	"text/template"
 	"time"
+
+	"github.com/spf13/cast"
 )
 
 type templateOption string
@@ -36,23 +38,31 @@ func init() {
 func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
 	var rendered bytes.Buffer
 	funcMap := template.FuncMap{
-		"add": func(a int, b int) int {
-			return a + b
+		"add": func(a ...interface{}) int {
+			res := 0
+			for _, v := range a {
+				res += cast.ToInt(v)
+			}
+			return res
 		},
-		"multiply": func(a int, b int) int {
-			return a * b
+		"multiply": func(a interface{}, b ...interface{}) int {
+			res := cast.ToInt(a)
+			for _, v := range b {
+				res = res * cast.ToInt(v)
+			}
+			return res
 		},
-		"rand": func(length int) string {
+		"rand": func(length interface{}) string {
 			var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-			b := make([]rune, length)
+			b := make([]rune, cast.ToInt(length))
 			for i := range b {
 				b[i] = letterRunes[rand.Intn(len(letterRunes))]
 			}
 			return string(b)
 		},
-		"sequence": func(start int, end int) []int {
+		"sequence": func(start, end interface{}) []int {
 			var sequence = []int{}
-			for i := start; i <= end; i++ {
+			for i := cast.ToInt(start); i <= cast.ToInt(end); i++ {
 				sequence = append(sequence, i)
 			}
 			return sequence

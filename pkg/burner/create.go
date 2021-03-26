@@ -116,6 +116,7 @@ func (ex *Executor) RunCreateJob() {
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
+		nsLabels["name"] = ns
 		if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
 			log.Fatal(err.Error())
 		}
@@ -123,6 +124,7 @@ func (ex *Executor) RunCreateJob() {
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+			nsLabels["name"] = ns
 			if err = createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), nsLabels); err != nil {
 				log.Error(err.Error())
 				continue
