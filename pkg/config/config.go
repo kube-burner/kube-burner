@@ -45,8 +45,8 @@ var ConfigSpec Spec = Spec{
 	},
 }
 
-func envToMap() map[string]string {
-	envMap := make(map[string]string)
+func envToMap() map[string]interface{} {
+	envMap := make(map[string]interface{})
 	for _, v := range os.Environ() {
 		envVar := strings.SplitN(v, "=", 2)
 		envMap[envVar[0]] = envVar[1]
