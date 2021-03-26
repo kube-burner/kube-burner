@@ -3,6 +3,7 @@
 export QPS=5
 export BURST=10
 export TERM=screen-256color
+export JOB_ITERATIONS=4
 
 bold=$(tput bold)
 normal=$(tput sgr0)

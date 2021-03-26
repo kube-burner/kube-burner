@@ -13,7 +13,7 @@ global:
 jobs:
   - name: namespaced
     jobType: create
-    jobIterations: 5
+    jobIterations: {{ add .JOB_ITERATIONS 1 }}
     qps: {{ .QPS }}
     burst: {{ .BURST }}
     namespacedIterations: true
