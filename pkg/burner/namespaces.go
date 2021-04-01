@@ -31,7 +31,7 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 	ns := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
 	}
-	RetryWithExponentialBackOff(func() (done bool, err error) {
+	return RetryWithExponentialBackOff(func() (done bool, err error) {
 		_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
 		if errors.IsForbidden(err) {
 			log.Fatalf("Authorization error creating namespace %s: %s", ns.Name, err)
@@ -47,7 +47,6 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 		log.Infof("Created namespace: %s", ns.Name)
 		return true, err
 	})
-	return nil
 }
 
 // CleanupNamespaces deletes namespaces with the given selector
