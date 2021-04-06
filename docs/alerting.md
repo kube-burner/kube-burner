@@ -36,7 +36,7 @@ It's possible to look for alerts w/o triggering a kube-burner workload. To do so
 $ kube-burner check-alerts -u https://prometheus.url.com -t ${token} -a alert-profile.yml                       
 INFO[2020-12-10 11:47:23] Setting log level to info                                                                                                                                                                                           
 INFO[2020-12-10 11:47:23] 👽 Initializing prometheus client                                                                                                                                                                                   
-INFO[2020-12-10 11:47:24] 🔔 Initializaing alert manager                                                                                                                                                                                      
+INFO[2020-12-10 11:47:24] 🔔 Initializing alert manager
 INFO[2020-12-10 11:47:24] Evaluating expression: 'avg_over_time(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))[5m:]) > 0.01'                                                                                 
 ERRO[2020-12-10 11:47:24] Alert triggered at 2020-12-10 11:01:53 +0100 CET: '5 minutes avg. etcd fsync latency on etcd-ip-10-0-213-209.us-west-2.compute.internal higher than 10ms 0.010281314285714311' 
 INFO[2020-12-10 11:47:24] Evaluating expression: 'avg_over_time(histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket[5m]))[5m:]) > 0.1'                                                                             

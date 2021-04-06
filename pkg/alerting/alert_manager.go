@@ -69,7 +69,7 @@ type descriptionTemplate struct {
 
 // NewAlertManager creates a new alert manager
 func NewAlertManager(alertProfile string, prometheusClient *prometheus.Prometheus) (*AlertManager, error) {
-	log.Info("🔔 Initializaing alert manager")
+	log.Info("🔔 Initializing alert manager")
 	a := AlertManager{
 		prometheus: prometheusClient,
 	}

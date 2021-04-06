@@ -12,6 +12,13 @@ Kube-burner is a tool aimed at stressing kubernetes clusters. The main functiona
 - Collect desired on-cluster prometheus metrics.
 - Write and/or index them to the configured TSDB.
 
+But it also provides other features like
+
+- Standalone metrics collection
+- Alerting
+- PProf collection
+- Pod startup latency measurements
+
 [![asciicast](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp.svg)](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp)
 
 ## Documentation

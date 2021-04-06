@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 	Short: "Burn a kubernetes cluster",
 	Long: `Kube-burner 🔥
 
-Tool aimed at stressing a kubernetes cluster by creating or deleting lot of objects.`,
+Tool aimed at stressing a kubernetes cluster by creating or deleting lots of objects.`,
 }
 
 // versionCmd represents the version command
