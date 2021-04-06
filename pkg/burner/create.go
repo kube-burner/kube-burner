@@ -220,14 +220,14 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 				return true, err
 			} else if errors.IsAlreadyExists(err) {
 				log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
-				return true, err
+				return true, nil
 			} else if errors.IsTimeout(err) {
 				log.Errorf("Timeout creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
 			} else if err != nil {
 				log.Errorf("Error creating object: %s", err)
 			}
 			log.Error("Retrying object creation")
-			return false, err
+			return false, nil
 		}
 		log.Infof("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		return true, err
