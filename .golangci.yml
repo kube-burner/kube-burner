@@ -7,12 +7,10 @@ linters:
   disable-all: true
   enable:
     - nakedret
-    - interfacer
     - varcheck
     - deadcode
     - structcheck
     - misspell
-    - maligned
     - ineffassign
     - goconst
     - goimports
@@ -24,3 +22,4 @@ linters:
     - gosimple
     - unconvert
     - gocyclo
+    - structcheck
