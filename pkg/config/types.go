@@ -81,6 +81,10 @@ type PProftarget struct {
 	BearerToken string `yaml:"bearerToken"`
 	// URL target URL
 	URL string `yaml:"url"`
+	// Cert Client certificate file
+	Cert string `yaml:"cert"`
+	// Key Private key file
+	Key string `yaml:"key"`
 }
 
 // Measurement holds the measurement configuration
