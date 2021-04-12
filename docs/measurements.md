@@ -17,6 +17,7 @@ Collects latencies from the different pod startup phases, these **latency metric
 This measurement sends its metrics to the index configured by *esIndex*. The metrics collected are pod latency histograms and pod latency quantiles P99, P95 and P50.
 
 Pod latency sample:
+
 ```json
 {
   "timestamp": "2020-11-15T20:28:59.598727718Z",
@@ -108,10 +109,13 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 
 ## Pprof collection
 
-This measurement takes care of collecting golang profiling information from pods. To do so, kube-burner connects to pods with the given labels running in certain namespaces. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. Pprof files are collected in a regular basis given by the parameter `pprofInterval` and these files are stored in the directory configured by the parameter `pprofDirectory` which by default is `pprof`.
-It's also possible to configure a token to get pprof data from authenticated endoints such as kube-apiserver with the variable `bearerToken`.
+This measurement takes care of collecting golang profiling information from pods. To do so, kube-burner connects to pods with the given labels running in certain namespaces. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. Pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are stored in the directory configured by the parameter `pprofDirectory` which by default is `pprof`.
+As some components require authentication to get profiling information, `kube-burner` provides two different methods to address it:
 
-An example of how to configure this measurement to collect pprof HEAP and CPU profiling data from kube-apiserver is shown below:
+- bearerToken: This variable holds a valid Bearer token which used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components
+- cert + key: These variables point to a local certificate and private key files respectively. These files are copied to the remote pods and used by cURL to get pprof data. This method is usually valid with etcd.
+
+An example of how to configure this measurement to collect pprof HEAP and CPU profiling data from kube-apiserver and etcd is shown below:
 
 ```yaml
    measurements:
@@ -130,6 +134,13 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
        labelSelector: {app: openshift-kube-apiserver}
        bearerToken: thisIsNotAValidToken
        url: https://localhost:6443/debug/pprof/profile?timeout=30
+
+     - name: etcd-heap
+       namespace: "openshift-etcd"
+       labelSelector: {app: etcd}
+       cert: etcd-peer-pert.crt
+       key: etcd-peer-pert.key
+       url: https://localhost:2379/debug/pprof/heap
 ```
 
-**Note**: As mentioned before, this measurement requires cURL to be installed in the target pods.
+**Note**: As mentioned before, this measurement requires the `curl` command to be available in the target pods.
