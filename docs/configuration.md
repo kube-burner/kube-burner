@@ -1,3 +1,4 @@
+# Configuration
 
 All the magic `kube-burner` does is described in the configuration file. As previously mentioned the location of this configuration file is provided by the flag `-c`. This file is written in YAML format and consists of several sections.
 It's possible to use `go-template` syntax within this configuration file, also it's important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{ .MY_ENV_VAR}}`. For example, we could define the indexerConfig section of our configuration file like:
@@ -49,7 +50,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | errorOnVerify        | Exit with rc 1 before indexing when objects verification fails                   | Boolean | true     | false   |
 
 
-A valid example of a configuration file can be found at the [examples](examples) folder.
+A valid example of a configuration file can be found at the [examples](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples) folder.
 
 ## Objects
 
@@ -64,7 +65,7 @@ Each object element supports the following parameters:
 
 
 
-## Default labels
+### Default labels
 
 All objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`, these labels are appended to the actual object labels described at the template. They are used for internal purposes but they can also be used by the users.
 

@@ -2,9 +2,9 @@ docs_dir: docs/
 repo_url: https://github.com/cloud-bulldozer/kube-burner
 nav:
 - Home: index.md
-- Configuration: 
+- From scratch:
   - CLI: cli.md
-  - General: configuration.md
+  - Configuration: configuration.md
   - Measurements: measurements.md
   - Metrics: metrics.md
   - Indexers: indexers.md
