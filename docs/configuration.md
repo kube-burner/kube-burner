@@ -49,7 +49,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | errorOnVerify        | Exit with rc 1 before indexing when objects verification fails                   | Boolean | true     | false   |
 
 
-A valid example of a configuration file can be found at [./examples/cfg.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/examples/cfg.yml)
+A valid example of a configuration file can be found at the [examples](examples) folder.
 
 ## Objects
 
