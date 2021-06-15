@@ -11,7 +11,7 @@ It's possible to use `go-template` syntax within this configuration file, also i
 
 This feature can be very useful at the time of defining secrets such as the user and password of our indexer, or a token to use in pprof collection.
 
-# Global
+## Global
 
 In this section is described global job configuration, it holds the following parameters:
 
@@ -24,7 +24,7 @@ In this section is described global job configuration, it holds the following pa
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section]                                      | Object         | -              | -           |
 | requestTimeout   | Client-go request timeout                                                                                | Duration       | 5s             | 15s         |
 
-# Jobs
+## Jobs
 
 This section contains the list of jobs `kube-burner` will execute. Each job can hold the following parameters.
 
@@ -51,7 +51,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 
 A valid example of a configuration file can be found at [./examples/cfg.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/examples/cfg.yml)
 
-# Objects
+## Objects
 
 The objects created by `kube-burner` are rendered using the default golang's [template library](https://golang.org/pkg/text/template/).
 Each object element supports the following parameters:
@@ -62,10 +62,14 @@ Each object element supports the following parameters:
 | replicas             | How replicas of this object to create per job iteration           | Integer | 10                                                  | -       |
 | inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -                                                   | -       |
 
-It's important to note that all objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`
 
 
-# Job types
+## Default labels
+
+All objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`, these labels are appended to the actual object labels described at the template. They are used for internal purposes but they can also be used by the users.
+
+
+## Job types
 
 kube-burner support two types of jobs with different parameters each. The default job type is __create__. Which basically creates objects as described in the section [objects](#objects).
 
@@ -120,7 +124,7 @@ This job type supports the some of the same parameters as the create job type:
 - burst
 - jobPause
 
-# Injected variables
+## Injected variables
 
 All object templates are injected a series of variables by default:
 
@@ -173,7 +177,7 @@ spec:
 {{ end }}
 ```
 
-# Template functions
+## Template functions
 
 Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner ships several functions to provide higher dynamism to the template language:
 - add: Add two integers

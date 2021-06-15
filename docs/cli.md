@@ -29,6 +29,7 @@ Use "kube-burner [command] --help" for more information about a command.
 
 This option is meant to run Kube-burner benchmark, and it supports the these flags:
 
+  - uuid: Benchmark ID. This is esentially an arbitrary string that is used for different purposes along the benchmark. For example, label the objects created by kube-burner as mentioned in the [configuration chapter](/configuration/#Default-labels). You can generate a new uuid in linux with the commands `uuidgen` or `cat /proc/sys/kernel/random/uuid`.
   - config: Path or URL to a valid configuration file.
   - log-level: Logging level. Default `info`
   - prometheus-url: Prometheus full URL. i.e. `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
@@ -38,7 +39,6 @@ This option is meant to run Kube-burner benchmark, and it supports the these fla
   - password: Prometheus password for basic authentication.
   - skip-tls-verify: Skip TLS verification for prometheus. Default `true`
   - step: Prometheus step size. Default `30s`
-  - UUID: Benchmark UUID.
 
 **Note**: Both basic authentication and Bearer authentication need credentials able to query the given Prometheus API.
 
@@ -54,7 +54,7 @@ Kube-burner also supports remote configuration files served by a web server, to 
 $ kube-burner init -c http://web.domain.com:8080/cfg.yml -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
-If you have no interest in collecting prometheus metrics, kube-burner can also be launched w/o any prometheus endpoint, this will disable metrics collection.
+If you have no interest in collecting prometheus metrics, kube-burner can also be launched w/o any prometheus reference to disable metrics collection.
 
 ```console
 $ kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
