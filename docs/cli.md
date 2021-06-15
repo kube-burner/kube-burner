@@ -29,7 +29,7 @@ Use "kube-burner [command] --help" for more information about a command.
 
 This option is meant to run Kube-burner benchmark, and it supports the these flags:
 
-  - uuid: Benchmark ID. This is esentially an arbitrary string that is used for different purposes along the benchmark. For example, label the objects created by kube-burner as mentioned in the [configuration chapter](/configuration/#Default-labels). You can generate a new uuid in linux with the commands `uuidgen` or `cat /proc/sys/kernel/random/uuid`.
+  - uuid: Benchmark ID. This is esentially an arbitrary string that is used for different purposes along the benchmark. For example, label the objects created by kube-burner as mentioned in the [configuration chapter](configuration/#Default-labels). You can generate a new uuid in linux with the commands `uuidgen` or `cat /proc/sys/kernel/random/uuid`.
   - config: Path or URL to a valid configuration file.
   - log-level: Logging level. Default `info`
   - prometheus-url: Prometheus full URL. i.e. `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
