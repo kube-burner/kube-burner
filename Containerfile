@@ -1,6 +1,6 @@
 FROM registry.fedoraproject.org/fedora-minimal:latest as builder
 
-RUN microdnf install golang make git
+RUN microdnf install -y --nodocs golang make git && microdnf clean all
 COPY . /root/kube-burner
 RUN make clean -C /root/kube-burner && make build -C /root/kube-burner
 
