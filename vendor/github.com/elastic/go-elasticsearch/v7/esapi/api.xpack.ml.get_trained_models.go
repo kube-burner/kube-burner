@@ -1,8 +1,21 @@
-// Licensed to Elasticsearch B.V under one or more agreements.
-// Elasticsearch B.V. licenses this file to you under the Apache 2.0 License.
-// See the LICENSE file in the project root for more information.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Code generated from specification version 7.8.0: DO NOT EDIT
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Code generated from specification version 7.13.1: DO NOT EDIT
 
 package esapi
 
@@ -27,9 +40,7 @@ func newMLGetTrainedModelsFunc(t Transport) MLGetTrainedModels {
 
 // MLGetTrainedModels - Retrieves configuration information for a trained inference model.
 //
-// This API is experimental.
-//
-// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/current/get-inference.html.
+// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/current/get-trained-models.html.
 //
 type MLGetTrainedModels func(o ...func(*MLGetTrainedModelsRequest)) (*Response, error)
 
@@ -40,7 +51,9 @@ type MLGetTrainedModelsRequest struct {
 
 	AllowNoMatch           *bool
 	DecompressDefinition   *bool
+	ExcludeGenerated       *bool
 	From                   *int
+	Include                string
 	IncludeModelDefinition *bool
 	Size                   *int
 	Tags                   []string
@@ -66,11 +79,11 @@ func (r MLGetTrainedModelsRequest) Do(ctx context.Context, transport Transport) 
 
 	method = "GET"
 
-	path.Grow(1 + len("_ml") + 1 + len("inference") + 1 + len(r.ModelID))
+	path.Grow(1 + len("_ml") + 1 + len("trained_models") + 1 + len(r.ModelID))
 	path.WriteString("/")
 	path.WriteString("_ml")
 	path.WriteString("/")
-	path.WriteString("inference")
+	path.WriteString("trained_models")
 	if r.ModelID != "" {
 		path.WriteString("/")
 		path.WriteString(r.ModelID)
@@ -86,8 +99,16 @@ func (r MLGetTrainedModelsRequest) Do(ctx context.Context, transport Transport) 
 		params["decompress_definition"] = strconv.FormatBool(*r.DecompressDefinition)
 	}
 
+	if r.ExcludeGenerated != nil {
+		params["exclude_generated"] = strconv.FormatBool(*r.ExcludeGenerated)
+	}
+
 	if r.From != nil {
 		params["from"] = strconv.FormatInt(int64(*r.From), 10)
+	}
+
+	if r.Include != "" {
+		params["include"] = r.Include
 	}
 
 	if r.IncludeModelDefinition != nil {
@@ -193,11 +214,27 @@ func (f MLGetTrainedModels) WithDecompressDefinition(v bool) func(*MLGetTrainedM
 	}
 }
 
+// WithExcludeGenerated - omits fields that are illegal to set on model put.
+//
+func (f MLGetTrainedModels) WithExcludeGenerated(v bool) func(*MLGetTrainedModelsRequest) {
+	return func(r *MLGetTrainedModelsRequest) {
+		r.ExcludeGenerated = &v
+	}
+}
+
 // WithFrom - skips a number of trained models.
 //
 func (f MLGetTrainedModels) WithFrom(v int) func(*MLGetTrainedModelsRequest) {
 	return func(r *MLGetTrainedModelsRequest) {
 		r.From = &v
+	}
+}
+
+// WithInclude - a comma-separate list of fields to optionally include. valid options are 'definition' and 'total_feature_importance'. default is none..
+//
+func (f MLGetTrainedModels) WithInclude(v string) func(*MLGetTrainedModelsRequest) {
+	return func(r *MLGetTrainedModelsRequest) {
+		r.Include = v
 	}
 }
 

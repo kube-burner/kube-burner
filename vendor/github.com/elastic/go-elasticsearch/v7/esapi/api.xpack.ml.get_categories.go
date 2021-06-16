@@ -1,8 +1,21 @@
-// Licensed to Elasticsearch B.V under one or more agreements.
-// Elasticsearch B.V. licenses this file to you under the Apache 2.0 License.
-// See the LICENSE file in the project root for more information.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Code generated from specification version 7.8.0: DO NOT EDIT
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Code generated from specification version 7.13.1: DO NOT EDIT
 
 package esapi
 
@@ -40,8 +53,9 @@ type MLGetCategoriesRequest struct {
 	CategoryID *int
 	JobID      string
 
-	From *int
-	Size *int
+	From                *int
+	PartitionFieldValue string
+	Size                *int
 
 	Pretty     bool
 	Human      bool
@@ -62,7 +76,7 @@ func (r MLGetCategoriesRequest) Do(ctx context.Context, transport Transport) (*R
 		params map[string]string
 	)
 
-	method = "GET"
+	method = "POST"
 
 	path.Grow(1 + len("_ml") + 1 + len("anomaly_detectors") + 1 + len(r.JobID) + 1 + len("results") + 1 + len("categories"))
 	path.WriteString("/")
@@ -86,6 +100,10 @@ func (r MLGetCategoriesRequest) Do(ctx context.Context, transport Transport) (*R
 
 	if r.From != nil {
 		params["from"] = strconv.FormatInt(int64(*r.From), 10)
+	}
+
+	if r.PartitionFieldValue != "" {
+		params["partition_field_value"] = r.PartitionFieldValue
 	}
 
 	if r.Size != nil {
@@ -184,6 +202,14 @@ func (f MLGetCategories) WithCategoryID(v int) func(*MLGetCategoriesRequest) {
 func (f MLGetCategories) WithFrom(v int) func(*MLGetCategoriesRequest) {
 	return func(r *MLGetCategoriesRequest) {
 		r.From = &v
+	}
+}
+
+// WithPartitionFieldValue - specifies the partition to retrieve categories for. this is optional, and should never be used for jobs where per-partition categorization is disabled..
+//
+func (f MLGetCategories) WithPartitionFieldValue(v string) func(*MLGetCategoriesRequest) {
+	return func(r *MLGetCategoriesRequest) {
+		r.PartitionFieldValue = v
 	}
 }
 

@@ -1,8 +1,21 @@
-// Licensed to Elasticsearch B.V under one or more agreements.
-// Elasticsearch B.V. licenses this file to you under the Apache 2.0 License.
-// See the LICENSE file in the project root for more information.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Code generated from specification version 7.8.0: DO NOT EDIT
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Code generated from specification version 7.13.1: DO NOT EDIT
 
 package esapi
 
@@ -10,7 +23,9 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func newEqlSearchFunc(t Transport) EqlSearch {
@@ -27,8 +42,6 @@ func newEqlSearchFunc(t Transport) EqlSearch {
 
 // EqlSearch - Returns results matching a query expressed in Event Query Language (EQL)
 //
-// This API is beta.
-//
 // See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-search-api.html.
 //
 type EqlSearch func(index string, body io.Reader, o ...func(*EqlSearchRequest)) (*Response, error)
@@ -39,6 +52,10 @@ type EqlSearchRequest struct {
 	Index string
 
 	Body io.Reader
+
+	KeepAlive                time.Duration
+	KeepOnCompletion         *bool
+	WaitForCompletionTimeout time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -59,7 +76,7 @@ func (r EqlSearchRequest) Do(ctx context.Context, transport Transport) (*Respons
 		params map[string]string
 	)
 
-	method = "GET"
+	method = "POST"
 
 	path.Grow(1 + len(r.Index) + 1 + len("_eql") + 1 + len("search"))
 	path.WriteString("/")
@@ -70,6 +87,18 @@ func (r EqlSearchRequest) Do(ctx context.Context, transport Transport) (*Respons
 	path.WriteString("search")
 
 	params = make(map[string]string)
+
+	if r.KeepAlive != 0 {
+		params["keep_alive"] = formatDuration(r.KeepAlive)
+	}
+
+	if r.KeepOnCompletion != nil {
+		params["keep_on_completion"] = strconv.FormatBool(*r.KeepOnCompletion)
+	}
+
+	if r.WaitForCompletionTimeout != 0 {
+		params["wait_for_completion_timeout"] = formatDuration(r.WaitForCompletionTimeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -139,6 +168,30 @@ func (r EqlSearchRequest) Do(ctx context.Context, transport Transport) (*Respons
 func (f EqlSearch) WithContext(v context.Context) func(*EqlSearchRequest) {
 	return func(r *EqlSearchRequest) {
 		r.ctx = v
+	}
+}
+
+// WithKeepAlive - update the time interval in which the results (partial or final) for this search will be available.
+//
+func (f EqlSearch) WithKeepAlive(v time.Duration) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.KeepAlive = v
+	}
+}
+
+// WithKeepOnCompletion - control whether the response should be stored in the cluster if it completed within the provided [wait_for_completion] time (default: false).
+//
+func (f EqlSearch) WithKeepOnCompletion(v bool) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.KeepOnCompletion = &v
+	}
+}
+
+// WithWaitForCompletionTimeout - specify the time that the request should block waiting for the final response.
+//
+func (f EqlSearch) WithWaitForCompletionTimeout(v time.Duration) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.WaitForCompletionTimeout = v
 	}
 }
 

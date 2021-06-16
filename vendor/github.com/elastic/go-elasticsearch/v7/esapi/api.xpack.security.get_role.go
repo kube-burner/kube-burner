@@ -1,8 +1,21 @@
-// Licensed to Elasticsearch B.V under one or more agreements.
-// Elasticsearch B.V. licenses this file to you under the Apache 2.0 License.
-// See the LICENSE file in the project root for more information.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Code generated from specification version 7.8.0: DO NOT EDIT
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Code generated from specification version 7.13.1: DO NOT EDIT
 
 package esapi
 
@@ -33,7 +46,7 @@ type SecurityGetRole func(o ...func(*SecurityGetRoleRequest)) (*Response, error)
 // SecurityGetRoleRequest configures the Security Get Role API request.
 //
 type SecurityGetRoleRequest struct {
-	Name string
+	Name []string
 
 	Pretty     bool
 	Human      bool
@@ -56,14 +69,14 @@ func (r SecurityGetRoleRequest) Do(ctx context.Context, transport Transport) (*R
 
 	method = "GET"
 
-	path.Grow(1 + len("_security") + 1 + len("role") + 1 + len(r.Name))
+	path.Grow(1 + len("_security") + 1 + len("role") + 1 + len(strings.Join(r.Name, ",")))
 	path.WriteString("/")
 	path.WriteString("_security")
 	path.WriteString("/")
 	path.WriteString("role")
-	if r.Name != "" {
+	if len(r.Name) > 0 {
 		path.WriteString("/")
-		path.WriteString(r.Name)
+		path.WriteString(strings.Join(r.Name, ","))
 	}
 
 	params = make(map[string]string)
@@ -135,9 +148,9 @@ func (f SecurityGetRole) WithContext(v context.Context) func(*SecurityGetRoleReq
 	}
 }
 
-// WithName - role name.
+// WithName - a list of role names.
 //
-func (f SecurityGetRole) WithName(v string) func(*SecurityGetRoleRequest) {
+func (f SecurityGetRole) WithName(v ...string) func(*SecurityGetRoleRequest) {
 	return func(r *SecurityGetRoleRequest) {
 		r.Name = v
 	}

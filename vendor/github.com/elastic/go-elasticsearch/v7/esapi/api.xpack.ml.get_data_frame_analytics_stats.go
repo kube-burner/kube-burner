@@ -1,8 +1,21 @@
-// Licensed to Elasticsearch B.V under one or more agreements.
-// Elasticsearch B.V. licenses this file to you under the Apache 2.0 License.
-// See the LICENSE file in the project root for more information.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Code generated from specification version 7.8.0: DO NOT EDIT
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Code generated from specification version 7.13.1: DO NOT EDIT
 
 package esapi
 
@@ -27,8 +40,6 @@ func newMLGetDataFrameAnalyticsStatsFunc(t Transport) MLGetDataFrameAnalyticsSta
 
 // MLGetDataFrameAnalyticsStats - Retrieves usage information for data frame analytics jobs.
 //
-// This API is experimental.
-//
 // See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/current/get-dfanalytics-stats.html.
 //
 type MLGetDataFrameAnalyticsStats func(o ...func(*MLGetDataFrameAnalyticsStatsRequest)) (*Response, error)
@@ -41,6 +52,7 @@ type MLGetDataFrameAnalyticsStatsRequest struct {
 	AllowNoMatch *bool
 	From         *int
 	Size         *int
+	Verbose      *bool
 
 	Pretty     bool
 	Human      bool
@@ -89,6 +101,10 @@ func (r MLGetDataFrameAnalyticsStatsRequest) Do(ctx context.Context, transport T
 
 	if r.Size != nil {
 		params["size"] = strconv.FormatInt(int64(*r.Size), 10)
+	}
+
+	if r.Verbose != nil {
+		params["verbose"] = strconv.FormatBool(*r.Verbose)
 	}
 
 	if r.Pretty {
@@ -187,6 +203,14 @@ func (f MLGetDataFrameAnalyticsStats) WithFrom(v int) func(*MLGetDataFrameAnalyt
 func (f MLGetDataFrameAnalyticsStats) WithSize(v int) func(*MLGetDataFrameAnalyticsStatsRequest) {
 	return func(r *MLGetDataFrameAnalyticsStatsRequest) {
 		r.Size = &v
+	}
+}
+
+// WithVerbose - whether the stats response should be verbose.
+//
+func (f MLGetDataFrameAnalyticsStats) WithVerbose(v bool) func(*MLGetDataFrameAnalyticsStatsRequest) {
+	return func(r *MLGetDataFrameAnalyticsStatsRequest) {
+		r.Verbose = &v
 	}
 }
 
