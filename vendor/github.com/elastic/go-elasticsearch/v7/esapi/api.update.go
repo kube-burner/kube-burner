@@ -1,8 +1,21 @@
-// Licensed to Elasticsearch B.V under one or more agreements.
-// Elasticsearch B.V. licenses this file to you under the Apache 2.0 License.
-// See the LICENSE file in the project root for more information.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Code generated from specification version 7.8.0: DO NOT EDIT
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Code generated from specification version 7.13.1: DO NOT EDIT
 
 package esapi
 
@@ -46,6 +59,7 @@ type UpdateRequest struct {
 	IfSeqNo             *int
 	Lang                string
 	Refresh             string
+	RequireAlias        *bool
 	RetryOnConflict     *int
 	Routing             string
 	Source              []string
@@ -107,6 +121,10 @@ func (r UpdateRequest) Do(ctx context.Context, transport Transport) (*Response, 
 
 	if r.Refresh != "" {
 		params["refresh"] = r.Refresh
+	}
+
+	if r.RequireAlias != nil {
+		params["require_alias"] = strconv.FormatBool(*r.RequireAlias)
 	}
 
 	if r.RetryOnConflict != nil {
@@ -245,6 +263,14 @@ func (f Update) WithLang(v string) func(*UpdateRequest) {
 func (f Update) WithRefresh(v string) func(*UpdateRequest) {
 	return func(r *UpdateRequest) {
 		r.Refresh = v
+	}
+}
+
+// WithRequireAlias - when true, requires destination is an alias. default is false.
+//
+func (f Update) WithRequireAlias(v bool) func(*UpdateRequest) {
+	return func(r *UpdateRequest) {
+		r.RequireAlias = &v
 	}
 }
 

@@ -1,8 +1,21 @@
-// Licensed to Elasticsearch B.V under one or more agreements.
-// Elasticsearch B.V. licenses this file to you under the Apache 2.0 License.
-// See the LICENSE file in the project root for more information.
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// Code generated from specification version 7.8.0: DO NOT EDIT
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Code generated from specification version 7.13.1: DO NOT EDIT
 
 package esapi
 
@@ -10,7 +23,9 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func newMLDeleteExpiredDataFunc(t Transport) MLDeleteExpiredData {
@@ -36,6 +51,11 @@ type MLDeleteExpiredData func(o ...func(*MLDeleteExpiredDataRequest)) (*Response
 type MLDeleteExpiredDataRequest struct {
 	Body io.Reader
 
+	JobID string
+
+	RequestsPerSecond *int
+	Timeout           time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -57,10 +77,25 @@ func (r MLDeleteExpiredDataRequest) Do(ctx context.Context, transport Transport)
 
 	method = "DELETE"
 
-	path.Grow(len("/_ml/_delete_expired_data"))
-	path.WriteString("/_ml/_delete_expired_data")
+	path.Grow(1 + len("_ml") + 1 + len("_delete_expired_data") + 1 + len(r.JobID))
+	path.WriteString("/")
+	path.WriteString("_ml")
+	path.WriteString("/")
+	path.WriteString("_delete_expired_data")
+	if r.JobID != "" {
+		path.WriteString("/")
+		path.WriteString(r.JobID)
+	}
 
 	params = make(map[string]string)
+
+	if r.RequestsPerSecond != nil {
+		params["requests_per_second"] = strconv.FormatInt(int64(*r.RequestsPerSecond), 10)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -138,6 +173,30 @@ func (f MLDeleteExpiredData) WithContext(v context.Context) func(*MLDeleteExpire
 func (f MLDeleteExpiredData) WithBody(v io.Reader) func(*MLDeleteExpiredDataRequest) {
 	return func(r *MLDeleteExpiredDataRequest) {
 		r.Body = v
+	}
+}
+
+// WithJobID - the ID of the job(s) to perform expired data hygiene for.
+//
+func (f MLDeleteExpiredData) WithJobID(v string) func(*MLDeleteExpiredDataRequest) {
+	return func(r *MLDeleteExpiredDataRequest) {
+		r.JobID = v
+	}
+}
+
+// WithRequestsPerSecond - the desired requests per second for the deletion processes..
+//
+func (f MLDeleteExpiredData) WithRequestsPerSecond(v int) func(*MLDeleteExpiredDataRequest) {
+	return func(r *MLDeleteExpiredDataRequest) {
+		r.RequestsPerSecond = &v
+	}
+}
+
+// WithTimeout - how long can the underlying delete processes run until they are canceled.
+//
+func (f MLDeleteExpiredData) WithTimeout(v time.Duration) func(*MLDeleteExpiredDataRequest) {
+	return func(r *MLDeleteExpiredDataRequest) {
+		r.Timeout = v
 	}
 }
 

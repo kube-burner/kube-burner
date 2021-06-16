@@ -20,11 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        golang-version: [1.14, 1.15]
+        golang-version: [1.15, 1.16]
         image-versions:
+        - kindest/node:v1.21.0
+        - kindest/node:v1.20.0
         - kindest/node:v1.19.0
-        - kindest/node:v1.18.0
-        - kindest/node:v1.17.0
     steps:
 
     - name: Set up Go 1.x
