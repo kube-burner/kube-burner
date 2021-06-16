@@ -9,8 +9,6 @@ jobs:
   build:
     name: GoReleaser build
     runs-on: ubuntu-latest
-    environment:
-      name: kube-burner
 
     steps:
       - name: Check out code into the Go module directory
