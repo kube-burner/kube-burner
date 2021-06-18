@@ -67,6 +67,9 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 			}
 			return sequence
 		},
+		"randInteger": func(a, b interface{}) int {
+			return rand.Intn(cast.ToInt(b)) + cast.ToInt(a)
+		},
 	}
 	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {

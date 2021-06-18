@@ -146,7 +146,6 @@ In addition, you can also inject arbitrary variables with the option **inputVars
 
 The following code snippet shows an example of a k8s service using these variables:
 
-
 ```yaml
 apiVersion: v1
 kind: Service
@@ -200,6 +199,17 @@ apiVersion: v1
 data:
   eight: {{multiply 2 4}}
   anotherInt: {{multiply .inputIntVariable 5}}
+kind: ConfigMap
+metadata:
+  name: configmap-{{.Replica}}
+```
+
+- randInteger: Generates a positive random integer between two numbers.
+
+```yaml
+apiVersion: v1
+data:
+  number: {{randInteger 0 100}}
 kind: ConfigMap
 metadata:
   name: configmap-{{.Replica}}
