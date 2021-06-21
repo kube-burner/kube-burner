@@ -39,10 +39,10 @@ import (
 
 // Prometheus describes the prometheus connection
 type Prometheus struct {
-	api            apiv1.API
-	MetricsProfile MetricsProfile
-	Step           time.Duration
-	uuid           string
+	api           apiv1.API
+	MetricProfile metricProfile
+	Step          time.Duration
+	uuid          string
 }
 
 // This object implements RoundTripper
@@ -53,19 +53,15 @@ type authTransport struct {
 	password  string
 }
 
-type metricDefinition struct {
+// metricProfile describes what metrics kube-burner collects
+type metricProfile []struct {
 	Query      string `yaml:"query"`
 	MetricName string `yaml:"metricName"`
 	IndexName  string `yaml:"indexName"`
 	Instant    bool   `yaml:"instant"`
 }
 
-// MetricsProfile describes what metrics kube-burner collects
-type MetricsProfile struct {
-	Metrics []metricDefinition `yaml:"metrics"`
-}
-
-type Metric struct {
+type metric struct {
 	Timestamp  time.Time         `json:"timestamp"`
 	Labels     map[string]string `json:"labels"`
 	Value      float64           `json:"value"`
@@ -83,14 +79,10 @@ func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return bat.Transport.RoundTrip(req)
 }
 
-func prometheusError(err error) error {
-	return fmt.Errorf("Prometheus error: %s", err.Error())
-}
-
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify bool, prometheusStep time.Duration) (*Prometheus, error) {
+func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify bool, step time.Duration) (*Prometheus, error) {
 	var p Prometheus = Prometheus{
-		Step: prometheusStep,
+		Step: step,
 		uuid: uuid,
 	}
 	log.Info("👽 Initializing prometheus client")
@@ -105,11 +97,12 @@ func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify 
 	}
 	c, err := api.NewClient(cfg)
 	if err != nil {
-		return &p, prometheusError(err)
+		return &p, err
 	}
 	p.api = apiv1.NewAPI(c)
+	// Verify Prometheus connection prior returning
 	if err := p.verifyConnection(); err != nil {
-		return &p, prometheusError(err)
+		return &p, err
 	}
 	return &p, nil
 }
@@ -117,7 +110,7 @@ func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify 
 func (p *Prometheus) verifyConnection() error {
 	_, err := p.api.Config(context.TODO())
 	if err != nil {
-		return prometheusError(err)
+		return err
 	}
 	log.Debug("Prometheus endpoint verified")
 	return nil
@@ -131,7 +124,7 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
-	if err = yamlDec.Decode(&p.MetricsProfile); err != nil {
+	if err = yamlDec.Decode(&p.MetricProfile); err != nil {
 		return fmt.Errorf("Error decoding metrics profile %s: %s", metricsProfile, err)
 	}
 	return nil
@@ -139,8 +132,7 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 
 // ScrapeMetrics defined in the metrics profile from start to end
 func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Indexer) error {
-	var fakeJobList []burner.Executor
-	err := p.scrapeMetrics(fakeJobList, start, end, indexer)
+	err := p.scrapeMetrics("kube-burner-indexing", start, end, indexer)
 	return err
 }
 
@@ -148,37 +140,30 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Index
 func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *indexers.Indexer) error {
 	start := jobList[0].Start
 	end := jobList[len(jobList)-1].End
-	err := p.scrapeMetrics(jobList, start, end, indexer)
-	return err
+	for _, job := range jobList {
+		err := p.scrapeMetrics(job.Config.Name, start, end, indexer)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (p *Prometheus) scrapeMetrics(jobList []burner.Executor, start, end time.Time, indexer *indexers.Indexer) error {
+func (p *Prometheus) scrapeMetrics(jobName string, start, end time.Time, indexer *indexers.Indexer) error {
 	var filename string
 	var err error
 	var v model.Value
 	log.Infof("🔍 Scraping prometheus metrics from %s to %s", start, end)
-	for _, md := range p.MetricsProfile.Metrics {
+	for _, md := range p.MetricProfile {
 		var metrics []interface{}
 		if md.Instant {
 			log.Infof("Instant query: %s", md.Query)
-			if len(jobList) > 0 {
-				for _, job := range jobList {
-					if v, err = p.Query(md.Query, job.End); err != nil {
-						log.Warnf("Error found with query %s: %s", md.Query, err)
-						continue
-					}
-					if err := p.parseVector(md.MetricName, md.Query, job.Config.Name, v, &metrics); err != nil {
-						log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
-					}
-				}
-			} else {
-				if v, err = p.Query(md.Query, end); err != nil {
-					log.Warnf("Error found with query %s: %s", md.Query, err)
-					continue
-				}
-				if err := p.parseVector(md.MetricName, md.Query, "", v, &metrics); err != nil {
-					log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
-				}
+			if v, err = p.Query(md.Query, end); err != nil {
+				log.Warnf("Error found with query %s: %s", md.Query, err)
+				continue
+			}
+			if err := p.parseVector(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
+				log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
 			}
 		} else {
 			log.Infof("Range query: %s", md.Query)
@@ -188,7 +173,7 @@ func (p *Prometheus) scrapeMetrics(jobList []burner.Executor, start, end time.Ti
 				log.Warnf("Error found with query %s: %s", md.Query, err)
 				continue
 			}
-			if err := p.parseMatrix(md.MetricName, md.Query, jobList, v, &metrics); err != nil {
+			if err := p.parseMatrix(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
 				continue
 			}
@@ -230,10 +215,10 @@ func (p *Prometheus) scrapeMetrics(jobList []burner.Executor, start, end time.Ti
 func (p *Prometheus) parseVector(metricName, query, jobName string, value model.Value, metrics *[]interface{}) error {
 	data, ok := value.(model.Vector)
 	if !ok {
-		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
+		return fmt.Errorf("Unsupported result format: %s", value.Type().String())
 	}
 	for _, v := range data {
-		m := Metric{
+		m := metric{
 			Labels:     make(map[string]string),
 			UUID:       p.uuid,
 			Query:      query,
@@ -257,15 +242,14 @@ func (p *Prometheus) parseVector(metricName, query, jobName string, value model.
 	return nil
 }
 
-func (p *Prometheus) parseMatrix(metricName, query string, jobList []burner.Executor, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseMatrix(metricName, query string, jobName string, value model.Value, metrics *[]interface{}) error {
 	data, ok := value.(model.Matrix)
 	if !ok {
-		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
+		return fmt.Errorf("Unsupported result format: %s", value.Type().String())
 	}
 	for _, v := range data {
 		for _, val := range v.Values {
-			jobName := getJobName(val.Timestamp.Time(), jobList)
-			m := Metric{
+			m := metric{
 				Labels:     make(map[string]string),
 				UUID:       p.uuid,
 				Query:      query,
@@ -290,32 +274,23 @@ func (p *Prometheus) parseMatrix(metricName, query string, jobList []burner.Exec
 	return nil
 }
 
-func getJobName(timestamp time.Time, jobList []burner.Executor) string {
-	for _, j := range jobList {
-		if timestamp.Before(j.End) {
-			return j.Config.Name
-		}
-	}
-	return "kube-burner-indexing"
-}
-
-// Query prometheues query wrapper
+// Query prometheus query wrapper
 func (p *Prometheus) Query(query string, time time.Time) (model.Value, error) {
 	var v model.Value
 	v, _, err := p.api.Query(context.TODO(), query, time)
 	if err != nil {
-		return v, prometheusError(err)
+		return v, err
 	}
 	return v, nil
 }
 
-// QueryRange prometheues QueryRange wrapper
+// QueryRange prometheus queryRange wrapper
 func (p *Prometheus) QueryRange(query string, start, end time.Time) (model.Value, error) {
 	var v model.Value
 	r := apiv1.Range{Start: start, End: end, Step: p.Step}
 	v, _, err := p.api.QueryRange(context.TODO(), query, r)
 	if err != nil {
-		return v, prometheusError(err)
+		return v, err
 	}
 	return v, nil
 }

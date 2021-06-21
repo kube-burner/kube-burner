@@ -1,0 +1,71 @@
+- query: irate(process_cpu_seconds_total{job=~".*(crio|etcd|controller-manager|apiserver|scheduler).*"}[2m])
+  metricName: controlPlaneCPU
+
+- query: process_resident_memory_bytes{job=~".*(crio|etcd|controller-manager|apiserver|scheduler).*"}
+  metricName: controlPlaneMemory
+
+- query: sum(irate(node_cpu_seconds_total[2m])) by (mode,instance)
+  metricName: nodeCPU
+
+- query: avg(node_memory_MemAvailable_bytes) by (instance) - (avg(node_memory_Cached_bytes) by (instance) + avg(node_memory_Buffers_bytes) by (instance))
+  metricName: nodeMemoryAvailable
+
+- query: avg(node_memory_Active_bytes) by (instance)
+  metricName: nodeMemoryActive
+
+- query: avg(node_memory_Cached_bytes) by (instance) + avg(node_memory_Buffers_bytes) by (instance)
+  metricName: nodeMemoryCached+nodeMemoryBuffers
+
+- query: irate(node_network_receive_bytes_total{device=~"^(ens|eth|bond|team).*"}[2m])
+  metricName: rxNetworkBytes
+
+- query: irate(node_network_transmit_bytes_total{device=~"^(ens|eth|bond|team).*"}[2m])
+  metricName: txNetworkBytes
+
+- query: irate(node_network_receive_drop_total{device=~"^(ens|eth|bond|team).*"}[2m])
+  metricName: rxDroppedPackets
+
+- query: irate(node_network_transmit_drop_total{device=~"^(ens|eth|bond|team).*"}[2m])
+  metricName: txDroppedPackets
+
+- query: rate(node_disk_written_bytes_total{device!~"^(dm|rb).*"}[2m])
+  metricName: nodeDiskWrittenBytes
+
+- query: rate(node_disk_read_bytes_total{device!~"^(dm|rb).*"}[2m])
+  metricName: nodeDiskReadBytes
+
+- query: node_nf_conntrack_entries
+  metricName: nodeConntrackEntries
+
+- query: etcd_server_has_leader
+  metricName: etcdServerHasLeader
+
+- query: rate(etcd_server_leader_changes_seen_total[2m])
+  metricName: etcdLeaderChangesRate
+
+- query: histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket[2m]))
+  metricName: 99thEtcdDiskBackendCommitDurationSeconds
+
+- query: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))
+  metricName: 99thEtcdDiskWalFsyncDurationSeconds
+
+- query: count(kube_namespace_created)
+  metricName: namespaceCount
+
+- query: sum(kube_pod_status_phase{}) by (phase)
+  metricName: podStatusCount
+
+- query: count(kube_secret_info{})
+  metricName: secretCount
+
+- query: count(kube_deployment_labels{})
+  metricName: deploymentCount
+
+- query: count(kube_configmap_info{})
+  metricName: configmapCount
+
+- query: kube_node_role
+  metricName: nodeRoles
+
+- query: sum(kube_node_status_condition{status="true"}) by (condition)
+  metricName: nodeStatus

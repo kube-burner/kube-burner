@@ -351,7 +351,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			rc = alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End)
 		}
 		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-		if len(p.MetricsProfile.Metrics) > 0 {
+		if len(p.MetricProfile) > 0 {
 			if err := p.ScrapeJobsMetrics(jobList, indexer); err != nil {
 				log.Fatal(err.Error())
 			}

@@ -38,27 +38,25 @@ The extra fields are useful at the time of identifing and representing the metri
 The field **metricName** in the example above, allow us to identify documents from a certain query more easily, and it's configured in each query of the metric-profile by adding the parameter `metricName` to the query as shown in the metrics profile below:
 
 ```yaml
-metrics:
-  - query: irate(process_cpu_seconds_total{job=~".*(crio|etcd|controller-manager|apiserver|scheduler).*"}[2m])
-    metricName: controlPlaneCPU
+- query: irate(process_cpu_seconds_total{job=~".*(crio|etcd|controller-manager|apiserver|scheduler).*"}[2m])
+  metricName: controlPlaneCPU
 
-  - query: process_resident_memory_bytes{job=~".*(crio|etcd|controller-manager|apiserver|scheduler).*"}
-    metricName: controlPlaneMemory
+- query: process_resident_memory_bytes{job=~".*(crio|etcd|controller-manager|apiserver|scheduler).*"}
+  metricName: controlPlaneMemory
 
-  - query: sum(irate(node_cpu_seconds_total[2m])) by (mode,instance)
-    metricName: nodeCPU
-    indexName: customIndex
+- query: sum(irate(node_cpu_seconds_total[2m])) by (mode,instance)
+  metricName: nodeCPU
+  indexName: customIndex
 ```
 
-The parameter `indexName` in the metrics-profile forces `kube-burner` to send the resulting metrics to a different index.
+> The parameter `indexName` in the metrics-profile forces `kube-burner` to send the resulting metrics of this query to a different index.
 
 Apart from range queries, kube-burner has the ability perform instant queries by adding the field instant to the desired metric. These kind of queries are useful to get only one sample of a "permanent" metric such as the number of nodes or the kube-apiserver version.
 
 ```yaml
-metrics:
-  - query: kube_node_role
-    metricName: nodeRoles
-    instant: true
+- query: kube_node_role
+  metricName: nodeRoles
+  instant: true
 ```
 
 Examples of metrics profiles can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples/). There're are also ElasticSearch based grafana dashboards available in the same examples directory.
@@ -111,6 +109,7 @@ This document looks like:
 kube-burner provides the ability of generating a tarball containing the collected metrics. This feature is useful to store and import them later in a different environment. Metrics exporting is enabled setting to true the parameters `writeToFile` and `createTarball` from the configuration file. The tarball is generated after running running benchmark, but it can be also used in the `index` subcommand.
 
 e.g.
+
 ```shell
 $ kube-burner index --prometheus-url=https://prometheus-instance.domain.com --token=${token} --uuid=$(uuidgen) -c cfg.yml -m metrics.yaml
 INFO[2021-06-23 12:07:07] Setting log level to info
