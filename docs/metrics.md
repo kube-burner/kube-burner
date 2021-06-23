@@ -70,3 +70,48 @@ This document looks like:
   }
 }
 ```
+
+## Metric exporting & importing
+
+kube-burner provides the ability of generating a tarball containing the collected metrics. This feature is useful to store and import them later in a different environment. Metrics exporting is enabled setting to true the parameters `writeToFile` and `createTarball` from the configuration file. The tarball is generated after running running benchmark, but it can be also used in the `index` subcommand.
+
+e.g.
+```shell
+$ kube-burner index --prometheus-url=https://prometheus-instance.domain.com --token=${token} --uuid=$(uuidgen) -c cfg.yml -m metrics.yaml
+INFO[2021-06-23 12:07:07] Setting log level to info
+INFO[2021-06-23 12:07:07] 👽 Initializing prometheus client
+INFO[2021-06-23 12:07:07] Indexing metrics with UUID 0f618e71-c6bc-4b4e-9668-d59530c06e2f
+INFO[2021-06-23 12:07:07] 🔍 Scraping prometheus metrics from 2021-06-23 11:07:07 +0200 CEST to 2021-06-23 12:07:07 +0200 CEST
+INFO[2021-06-23 12:07:07] Range query: count(kube_namespace_created)
+INFO[2021-06-23 12:07:07] Writing to: collected-metrics/namespaceCount.json
+INFO[2021-06-23 12:07:07] Range query: sum(kube_pod_status_phase{}) by (phase)
+INFO[2021-06-23 12:07:07] Writing to: collected-metrics/podStatusCount.json
+INFO[2021-06-23 12:07:07] Range query: count(kube_secret_info{})
+INFO[2021-06-23 12:07:07] Writing to: collected-metrics/secretCount.json
+INFO[2021-06-23 12:07:07] Range query: count(kube_deployment_labels{})
+INFO[2021-06-23 12:07:07] Writing to: collected-metrics/deploymentCount.json
+INFO[2021-06-23 12:07:07] Range query: count(kube_configmap_info{})
+INFO[2021-06-23 12:07:08] Writing to: collected-metrics/configmapCount.json
+INFO[2021-06-23 12:07:08] Range query: count(kube_service_info{})
+INFO[2021-06-23 12:07:08] Writing to: collected-metrics/serviceCount.json
+INFO[2021-06-23 12:07:08] Instant query: kube_node_role
+INFO[2021-06-23 12:07:08] Writing to: collected-metrics/nodeRoles.json
+INFO[2021-06-23 12:07:08] Range query: sum(kube_node_status_condition{status="true"}) by (condition)
+INFO[2021-06-23 12:07:08] Writing to: collected-metrics/nodeStatus.json
+INFO[2021-06-23 12:07:08] Instant query: cluster_version{type="completed"}
+INFO[2021-06-23 12:07:08] Writing to: collected-metrics/clusterVersion.json
+INFO[2021-06-23 12:07:08] Metrics tarball generated at kube-burner-metrics-1624442828.tgz
+```
+
+Once we've enabled it, a tarball (`kube-burner-metrics-<timestamp>.tgz`) containing all metrics will be generated in the current working directory.
+This tarball can be imported and indexed by kube-burner with the import subcommand. e.g.
+
+```shell
+$ kube-burner/bin/kube-burner import --config kubelet-config.yml --tarball kube-burner-metrics-1624441857.tgz
+INFO[2021-06-23 11:39:40] Setting log level to info
+INFO[2021-06-23 11:39:40] 📁 Creating indexer: elastic
+INFO[2021-06-23 11:39:42] Importing tarball kube-burner-metrics-1624441857.tgz
+INFO[2021-06-23 11:39:42] Importing metrics from doc.json
+INFO[2021-06-23 11:39:43] Indexing [1] documents in kube-burner
+INFO[2021-06-23 11:39:43] Successfully indexed [1] documents in 208ms in kube-burner
+```
