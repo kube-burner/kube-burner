@@ -1,0 +1,16 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{.name}}-{{.Replica}}
+spec:
+  selector:
+    app: {{.name}}-{{.Replica}}
+  ports:
+  - name: {{.name}}
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
+
+ 

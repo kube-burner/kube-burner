@@ -1,0 +1,32 @@
+metrics:
+
+# Cluster metrics
+  - query: count(kube_namespace_created)
+    metricName: namespaceCount
+
+  - query: sum(kube_pod_status_phase{}) by (phase)
+    metricName: podStatusCount
+
+  - query: count(kube_secret_info{})
+    metricName: secretCount
+
+  - query: count(kube_deployment_labels{})
+    metricName: deploymentCount
+
+  - query: count(kube_configmap_info{})
+    metricName: configmapCount
+
+  - query: count(kube_service_info{})
+    metricName: serviceCount
+
+  - query: kube_node_role
+    metricName: nodeRoles
+    instant: true
+
+  - query: sum(kube_node_status_condition{status="true"}) by (condition)
+    metricName: nodeStatus
+
+  - query: cluster_version{type="completed"}
+    metricName: clusterVersion
+    instant: true
+

@@ -51,7 +51,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | errorOnVerify        | Exit with rc 1 before indexing when objects verification fails                   | Boolean | true     | false   |
 
 
-A valid example of a configuration file can be found at the [examples](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples) folder.
+Examples of valid configuration files can be found at the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
 
 ## Objects
 

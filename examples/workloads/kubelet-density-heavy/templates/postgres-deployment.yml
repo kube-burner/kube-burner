@@ -1,0 +1,37 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: postgres-{{.Replica}}-{{.Iteration}}
+spec:
+  template:
+    metadata:
+      labels:
+        name: postgres-{{.Replica}}-{{.Iteration}}
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      containers:
+      - name: postgresql
+        image: registry.redhat.io/rhscl/postgresql-10-rhel7:latest
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        env:
+        - name: POSTGRESQL_USER
+          value: admin
+        - name: POSTGRESQL_PASSWORD
+          value: secret
+        - name: POSTGRESQL_DATABASE
+          value: kubelet-density
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          privileged: false
+      restartPolicy: Always
+  replicas: 1
+  selector:
+    matchLabels:
+      name: postgres-{{.Replica}}-{{.Iteration}}
+  triggers:
+  - type: ConfigChange
+  strategy:
+    type: RollingUpdate

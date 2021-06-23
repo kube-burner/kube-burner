@@ -1,0 +1,53 @@
+metrics:
+  - query: (sum(irate(container_cpu_usage_seconds_total{name!="",namespace="openshift-monitoring"}[2m]) * 100) by (pod, namespace, node) and on (node) kube_node_role{role="infra"})
+    metricName: podCPU
+
+  - query: (sum(container_memory_rss{name!="",namespace="openshift-monitoring"}) by (pod, namespace, node) and on (node) kube_node_role{role="infra"})
+    metricName: podMemory
+
+  - query: (sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: nodeCPU
+
+  - query: (avg(node_memory_MemAvailable_bytes) by (instance) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: nodeMemoryAvailable
+
+  - query: (avg(node_memory_Active_bytes) by (instance) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: nodeMemoryActive
+
+  - query: avg(node_memory_Cached_bytes) by (instance) + avg(node_memory_Buffers_bytes) by (instance) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")
+    metricName: nodeMemoryCached+nodeMemoryBuffers
+
+  - query: (irate(node_network_receive_bytes_total{device=~"^(ens|eth|bond|team).*"}[2m]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: rxNetworkBytes
+
+  - query: (irate(node_network_transmit_bytes_total{device=~"^(ens|eth|bond|team).*"}[2m]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: txNetworkBytes
+
+  - query: (rate(node_disk_written_bytes_total{device!~"^(dm|rb).*"}[2m]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: nodeDiskWrittenBytes
+
+  - query: (rate(node_disk_read_bytes_total{device!~"^(dm|rb).*"}[2m]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: nodeDiskReadBytes
+
+  - query: (rate(node_disk_writes_completed_total{device!~"^(dm|rb).*"}[2m]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: nodeDiskWriteOps
+
+  - query: (rate(node_disk_reads_completed_total{device!~"^(dm|rb).*"}[2m]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: nodeDiskReadOps
+
+  - query: sum(kube_pod_status_phase{}) by (phase)
+    metricName: podStatusCount
+
+  - query: kube_node_role
+    metricName: nodeRoles
+    instant: true
+
+  - query: sum(kube_node_status_condition{status="true"}) by (condition)
+    metricName: nodeStatus
+
+  - query: (sum(rate(container_fs_writes_bytes_total{container!="",device!~".+dm.+"}[5m])) by (device, container, node) and on (node) kube_node_role{role="infra"}) > 0
+    metricName: containerDiskUsage
+
+  - query: cluster_version{type="completed"}
+    metricName: clusterVersion
+    instant: true

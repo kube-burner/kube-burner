@@ -18,6 +18,6 @@ Kube-burner is a tool aimed at stressing kubernetes clusters. The main functiona
 
 In case you want to start tinkering with Kube-burner now:
 
-- You can find the binaries in the [releases section of the repository](https://github.com/cloud-bulldozer/kube-burner/releases).
-- There's also a container image available at [quay](https://quay.io/repository/cloud-bulldozer/kube-burner?tab=tags).
-- Some valid examples of configuration files can be found in examples [examples](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples) folder of the repository and in a personal [repository](https://github.com/rsevilla87/kube-burner-workloads) which holds several useful workloads, metric profiles and grafana dashboards.
+- You can binaries for different CPU architectures and operating systems in the [releases section of the repository](https://github.com/cloud-bulldozer/kube-burner/releases).
+- There's also a container image repository available at [quay](https://quay.io/repository/cloud-bulldozer/kube-burner?tab=tags).
+- Some valid examples of configuration files, metrics profiles and grafana dashboards can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples) of the repository.

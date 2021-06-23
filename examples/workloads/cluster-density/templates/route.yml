@@ -2,12 +2,12 @@
 kind: Route
 apiVersion: route.openshift.io/v1
 metadata:
-  name: my-route-{{.Replica}}-{{ .Iteration }}
+  name: {{.name}}-{{.Replica}}
 spec:
-  host: www.myroute.example-{{.Replica}}-{{ .Iteration }}.com
+  host: www.{{.name}}.example-{{.Iteration}}-{{.Replica}}.com
   to:
     kind: Service
-    name: my-svc-{{ .Iteration }}-{{ .Replica }}
+    name: {{.name}}-{{.Replica}}
   tls:
     termination: edge
     certificate: |-

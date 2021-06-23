@@ -1,0 +1,31 @@
+---
+global:
+  writeToFile: true
+  metricsDirectory: collected-metrics
+  indexerConfig:
+    enabled: false
+    esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
+    insecureSkipVerify: false
+    defaultIndex: kube-burner
+    type: elastic
+  measurements:
+    - name: podLatency
+      esIndex: kube-burner
+
+jobs:
+  - name: cluster-density
+    jobIterations: {{ randInteger 1 10}}
+    qps: 20
+    burst: 20
+    namespacedIterations: true
+    namespace: cluster-density
+    podWait: false
+    waitFor: []
+    waitWhenFinished: true
+    objects:
+
+      - objectTemplate: templates/imagestream.yml
+        replicas: 3
+        inputVars:
+          prefix: cluster-density-src
+          image: quay.io/openshift-scale/mastervertical-build 
