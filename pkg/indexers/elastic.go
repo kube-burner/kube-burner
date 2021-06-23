@@ -17,8 +17,11 @@ package indexers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"runtime"
 	"time"
@@ -41,7 +44,7 @@ func init() {
 	indexerMap[elastic] = &Elastic{}
 }
 
-func (esIndexer *Elastic) new() {
+func (esIndexer *Elastic) new() error {
 	esConfig := config.ConfigSpec.GlobalConfig.IndexerConfig
 	cfg := elasticsearch.Config{
 		Addresses: esConfig.ESServers,
@@ -49,20 +52,23 @@ func (esIndexer *Elastic) new() {
 	}
 	ESClient, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		log.Errorf("Error creating the ES client: %s", err)
+		return fmt.Errorf("Error creating the ES client: %s", err)
 	}
 	r, err := ESClient.Cluster.Health()
 	if err != nil {
-		log.Fatalf("ES health check failed: %s", err)
+		return fmt.Errorf("ES health check failed: %s", err)
 	}
 	if r.StatusCode != 200 {
-		log.Fatalf("Unexpected ES status code: %d", r.StatusCode)
+		return fmt.Errorf("Unexpected ES status code: %d", r.StatusCode)
 	}
 	esIndexer.client = ESClient
+	return nil
 }
 
 // Index uses bulkIndexer to index the documents in the given index
 func (esIndexer *Elastic) Index(index string, documents []interface{}) {
+	var statusCount int
+	hasher := sha256.New()
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Client:     esIndexer.client,
 		Index:      index,
@@ -87,21 +93,28 @@ func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 		if err != nil {
 			log.Errorf("Cannot encode document %s: %s", document, err)
 		}
+		hasher.Write(j)
 		err = bi.Add(
 			context.Background(),
 			esutil.BulkIndexerItem{
-				Action: "index",
-				Body:   bytes.NewReader(j),
+				Action:     "index",
+				Body:       bytes.NewReader(j),
+				DocumentID: hex.EncodeToString(hasher.Sum(nil)),
+				OnSuccess: func(c context.Context, bii esutil.BulkIndexerItem, biri esutil.BulkIndexerResponseItem) {
+					if biri.Status == 201 {
+						statusCount++
+					}
+				},
 			},
 		)
 		if err != nil {
 			log.Errorf("Unexpected ES indexing error: %s", err)
 		}
+		hasher.Reset()
 	}
 	if err := bi.Close(context.Background()); err != nil {
 		log.Fatalf("Unexpected ES error: %s", err)
 	}
-	stats := bi.Stats()
 	dur := time.Since(start)
-	log.Infof("Successfully indexed [%d] documents in %s in %s", stats.NumFlushed, dur.Truncate(time.Millisecond), index)
+	log.Infof("Indexed [%d] documents in %s in %s", statusCount, dur.Truncate(time.Millisecond), index)
 }
