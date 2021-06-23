@@ -65,7 +65,7 @@ type MetricsProfile struct {
 	Metrics []metricDefinition `yaml:"metrics"`
 }
 
-type metric struct {
+type Metric struct {
 	Timestamp  time.Time         `json:"timestamp"`
 	Labels     map[string]string `json:"labels"`
 	Value      float64           `json:"value"`
@@ -198,22 +198,23 @@ func (p *Prometheus) scrapeMetrics(jobList []burner.Executor, start, end time.Ti
 			if config.ConfigSpec.GlobalConfig.MetricsDirectory != "" {
 				err = os.MkdirAll(config.ConfigSpec.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
-					return fmt.Errorf("Error creating metrics directory %s: ", err)
+					return fmt.Errorf("Error creating metrics directory: %v: ", err)
 				}
 				filename = path.Join(config.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
 			}
 			log.Infof("Writing to: %s", filename)
 			f, err := os.Create(filename)
+			defer f.Close()
 			if err != nil {
 				log.Errorf("Error creating metrics file %s: %s", filename, err)
+				continue
 			}
 			jsonEnc := json.NewEncoder(f)
-			jsonEnc.SetIndent("", "    ")
 			err = jsonEnc.Encode(metrics)
 			if err != nil {
 				log.Errorf("JSON encoding error: %s", err)
+
 			}
-			f.Close()
 		}
 		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 			indexName := config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex
@@ -232,7 +233,7 @@ func (p *Prometheus) parseVector(metricName, query, jobName string, value model.
 		return prometheusError(fmt.Errorf("Unsupported result format: %s", value.Type().String()))
 	}
 	for _, v := range data {
-		m := metric{
+		m := Metric{
 			Labels:     make(map[string]string),
 			UUID:       p.uuid,
 			Query:      query,
@@ -264,7 +265,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, jobList []burner.Exec
 	for _, v := range data {
 		for _, val := range v.Values {
 			jobName := getJobName(val.Timestamp.Time(), jobList)
-			m := metric{
+			m := Metric{
 				Labels:     make(map[string]string),
 				UUID:       p.uuid,
 				Query:      query,

@@ -22,21 +22,24 @@ import (
 // Indexer indexer interface
 type Indexer interface {
 	Index(string, []interface{})
-	new()
+	new() error
 }
 
 var indexerMap = make(map[string]Indexer)
 
 // NewIndexer creates a new Indexer with the specified IndexerConfig
-func NewIndexer() *Indexer {
+func NewIndexer() (*Indexer, error) {
 	var indexer Indexer
 	var exists bool
 	cfg := config.ConfigSpec.GlobalConfig.IndexerConfig
 	if indexer, exists = indexerMap[cfg.Type]; exists {
 		log.Infof("📁 Creating indexer: %s", cfg.Type)
-		indexer.new()
+		err := indexer.new()
+		if err != nil {
+			return &indexer, err
+		}
 	} else {
 		log.Fatalf("Indexer not found: %s", cfg.Type)
 	}
-	return &indexer
+	return &indexer, nil
 }
