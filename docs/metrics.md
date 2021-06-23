@@ -60,6 +60,8 @@ metrics:
     instant: true
 ```
 
+Examples of metrics profiles can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples/). There're are also ElasticSearch based grafana dashboards available in the same examples directory.
+
 ## Job Summary
 
 In case indexing is enabled, at the end of each job, a document holding the job summary is indexed. This is useful to identify the parameters the job was executed with:

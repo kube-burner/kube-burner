@@ -1,0 +1,117 @@
+metrics:
+# Common
+  - query: (sum(irate(container_cpu_usage_seconds_total{name!="",container!="POD",namespace=~"openshift-(etcd|.*apiserver)"}[2m]) * 100) by (container, pod, namespace, node) and on (node) kube_node_role{role="master"}) > 0
+    metricName: containerCPU-Masters
+
+  - query: (sum(container_memory_rss{name!="",container!="POD",namespace=~"openshift-(etcd|.*apiserver)"}) by (container, pod, namespace, node) and on (node) kube_node_role{role="master"}) > 0
+    metricName: containerMemory-Masters
+
+  - query: cluster_version{type="completed"}
+    metricName: clusterVersion
+    instant: true
+  
+  - query: kube_node_role
+    metricName: nodeRoles
+    instant: true
+
+  - query: sum(kube_node_status_condition{status="true"}) by (condition)
+    metricName: nodeStatus
+
+  - query: count(kube_configmap_info{})
+    metricName: configmapCount
+
+  - query: (sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: nodeCPU-Masters
+
+  - query: (irate(node_disk_reads_completed_total[2m]) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: readOpsSec
+
+  - query: (irate(node_disk_writes_completed_total[2m]) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: writeOpsSec
+
+  - query: (irate(node_disk_read_bytes_total[2m]) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: diskReadBytesRate
+
+  - query: (irate(node_disk_written_bytes_total[2m]) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")) > 0
+    metricName: diskWriteBytesRate
+
+  - query: avg(node_memory_MemAvailable_bytes) by (instance) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")
+    metricName: nodeMemoryAvailable-Masters
+
+  - query: avg(node_memory_Active_bytes) by (instance) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")
+    metricName: nodeMemoryActive-Masters
+
+  - query:  irate(node_network_receive_bytes_total{device=~"^(ens|eth|bond|team).*"}[2m]) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")
+    metricName: rxNetworkBytes-Masters
+
+  - query:  irate(node_network_transmit_bytes_total{device=~"^(ens|eth|bond|team).*"}[2m]) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")
+    metricName: txNetworkBytes-Masters
+
+# Etcd metrics
+  - query: rate(etcd_disk_wal_write_bytes_total[2m])
+    metricName: etcdWALWriteBytesRate
+
+  - query: rate(etcd_network_client_grpc_received_bytes_total[2m])
+    metricName: etcdClientGRPCReceivedBytesRate
+
+  - query: rate(etcd_network_client_grpc_sent_bytes_total[2m])
+    metricName: etcdClientGRPCSentBytesRate
+  
+  - query: sum(rate(etcd_server_leader_changes_seen_total[2m]))
+    metricName: etcdLeaderChangesRate
+
+  - query: etcd_server_is_leader > 0
+    metricName: etcdServerIsLeader
+
+  - query: histogram_quantile(0.99, irate(etcd_disk_backend_commit_duration_seconds_bucket[2m]))
+    metricName: 99thEtcdDiskBackendCommitDurationSeconds
+
+  - query: histogram_quantile(0.99, irate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))
+    metricName: 99thEtcdDiskWalFsyncDurationSeconds
+
+  - query: histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket[5m]))
+    metricName: 99thEtcdRoundTripTimeSeconds
+
+  - query: etcd_mvcc_db_total_size_in_bytes
+    metricName: etcdDBPhysicalSizeBytes
+
+  - query: etcd_mvcc_db_total_size_in_use_in_bytes
+    metricName: etcdDBLogicalSizeBytes
+
+  - query: sum by (cluster_version)(etcd_cluster_version)
+    metricName: etcdVersion
+    instant: true
+
+  - query: delta(etcd_server_slow_apply_total[2m])
+    metricName: etcdSlowApply
+
+  - query: delta(etcd_server_slow_read_indexes_total[2m])
+    metricName: etcdSlowRead
+
+# API server
+
+  - query: histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{apiserver="kube-apiserver", verb!~"WATCH", subresource!="log"}[2m])) by (verb,resource,subresource,instance,le)) > 0
+    metricName: P99APICallsLatency
+
+  - query: sum(irate(apiserver_request_total{apiserver="kube-apiserver",verb!="WATCH",subresource!="log"}[2m])) by (verb,instance,resource,code) > 0
+    metricName: APIRequestRate
+
+  - query: sum(apiserver_current_inflight_requests{}) by (request_kind) > 0
+    metricName: APIInflightRequests
+
+  - query: histogram_quantile(0.99,sum(rate(etcd_request_duration_seconds_bucket[2m])) by (le,operation,apiserver)) > 0
+    metricName: P99APIEtcdRequestLatency
+
+  - query: sum(rate(apiserver_flowcontrol_dispatched_requests_total[2m])) by (flow_schema,priority_level)
+    metricName: flowControlRate
+
+# Golang metrics
+
+  - query: go_memstats_heap_alloc_bytes{job=~"apiserver|api|etcd"}
+    metricName: goHeapAllocBytes
+
+  - query: go_memstats_heap_inuse_bytes{job=~"apiserver|api|etcd"}
+    metricName: goHeapInuseBytes
+  
+  - query: go_gc_duration_seconds{job=~"apiserver|api|etcd",quantile="1"}
+    metricName: goGCDurationSeconds

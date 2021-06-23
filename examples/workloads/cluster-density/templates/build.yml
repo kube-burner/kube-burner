@@ -1,0 +1,24 @@
+---
+kind: Build
+apiVersion: build.openshift.io/v1
+metadata:
+  name: {{.JobName}}-{{.Replica}}
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  serviceAccount: builder
+  source:
+    dockerfile: |-
+      FROM registry.fedoraproject.org/fedora-minimal:latest
+      RUN touch $(date +%s)
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: registry.fedoraproject.org/fedora-minimal:latest
+    type: Source
+  output:
+    to:
+      kind: ImageStreamTag
+      name: {{.prefix}}-{{.Replica}}:latest

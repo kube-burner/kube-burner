@@ -1,0 +1,27 @@
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: {{.JobName}}-{{.Replica}}
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  triggers:
+  - type: GitHub
+    github:
+      secret: {{.JobName}}-{{.Replica}}
+  - type: ImageChange
+  source:
+    type: Git
+    git:
+      uri: {{.gitUri}}
+  strategy:
+    type: Source
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: {{.from}}-{{.Replica}}:latest
+  output:
+    to:
+      kind: ImageStreamTag
+      name: {{.to}}-{{.Replica}}:latest
