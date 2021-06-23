@@ -54,16 +54,16 @@ func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float
 				return fmt.Errorf("Error creating metrics directory: %v: ", err)
 			}
 			filename = path.Join(config.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
-			log.Infof("Writing to: %s", filename)
-			f, err := os.Create(filename)
-			if err != nil {
-				return fmt.Errorf("Error creating %s: %v", filename, err)
-			}
-			defer f.Close()
-			jsonEnc := json.NewEncoder(f)
-			if err := jsonEnc.Encode(metadataInfo); err != nil {
-				return fmt.Errorf("JSON encoding error: %s", err)
-			}
+		}
+		log.Infof("Writing to: %s", filename)
+		f, err := os.Create(filename)
+		if err != nil {
+			return fmt.Errorf("Error creating %s: %v", filename, err)
+		}
+		defer f.Close()
+		jsonEnc := json.NewEncoder(f)
+		if err := jsonEnc.Encode(metadataInfo); err != nil {
+			return fmt.Errorf("JSON encoding error: %s", err)
 		}
 	}
 	log.Infof("Indexing metadata information for job: %s", jobConfig.Name)

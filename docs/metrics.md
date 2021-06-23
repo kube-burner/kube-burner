@@ -1,10 +1,40 @@
 # Metrics
 
-The metrics-profile flag points to a YAML or URL of a file containing a list of the prometheus queries kube-burner will collect for each job.
-As soon one of job finishes, `kube-burner` makes a range query for each query described in this file, and indexes it in the index configured by the parameter `defaultIndex`.
-We can use the parameter `indexName` in a metrics-profile file to make `kube-burner` to index the resulting metrics to a different index.
-An example of a valid metrics profile file is shown below:
-The parameter **metricName** is added to the indexed documents, it will allow us to identify documents from a certain query more easily.
+The metrics-profile flag points to a YAML or URL of a file containing a list of the prometheus queries that kube-burner will execute after finishing the benchmark.
+As soon as all jobs described in the configuration file finish, `kube-burner` iterates all queries defined in the metric-profile, and executes them using the jobs start and end date as time range, then kube-burner has the ability to index the metrics in one of the supported indexers.
+Kube-burner adds some extra fields to the metrics obtained from prometheus. These fields are the job UUID, the job name, the metric name and the prometheus query as shown in the example below:
+
+```json
+[
+  {
+    "timestamp": "2021-06-23T11:50:15+02:00",
+    "labels": {
+      "instance": "ip-10-0-219-170.eu-west-3.compute.internal",
+      "mode": "user"
+    },
+    "value": 0.3300880234732172,
+    "uuid": "bc82badf-0e43-48cc-aca8-fdaa6cee5a84",
+    "query": "sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) > 0",
+    "metricName": "nodeCPU",
+    "jobName": "kube-burner-indexing"
+  },
+  {
+    "timestamp": "2021-06-23T11:50:45+02:00",
+    "labels": {
+      "instance": "ip-10-0-219-170.eu-west-3.compute.internal",
+      "mode": "user"
+    },
+    "value": 0.31978102677038506,
+    "uuid": "bc82badf-0e43-48cc-aca8-fdaa6cee5a84",
+    "query": "sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) > 0",
+    "metricName": "nodeCPU",
+    "jobName": "kube-burner-indexing"
+  }
+]
+```
+These extra fields are useful at the time of identifing and representing the metrics.
+
+The field **metricName** in the example above, allow us to identify documents from a certain query more easily, and it's configured in each query of the metric-profile by adding the parameter `metricName` to the query as shown in the metrics profile below:
 
 ```yaml
 metrics:
@@ -16,10 +46,12 @@ metrics:
 
   - query: sum(irate(node_cpu_seconds_total[2m])) by (mode,instance)
     metricName: nodeCPU
+    indexName: customIndex
 ```
 
+The parameter `indexName` in the metrics-profile forces `kube-burner` to send the resulting metrics to a different index.
 
-It's also possible to execute instant queries from kube-burner by adding the flag instant to the desired metric. These kind of queries are useful to get only one sample for a static metric such as the number of nodes or the kube-apiserver version.
+Apart from range queries, kube-burner has the ability perform instant queries by adding the field instant to the desired metric. These kind of queries are useful to get only one sample of a "permanent" metric such as the number of nodes or the kube-apiserver version.
 
 ```yaml
 metrics:
