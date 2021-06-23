@@ -5,22 +5,24 @@ kube-burner is basically a binary client with currently the following options:
 $ kube-burner help
 Kube-burner 🔥
 
-Tool aimed at stressing a kubernetes cluster by creating or deleting lot of objects.
+Tool aimed at stressing a kubernetes cluster by creating or deleting lots of objects.
 
 Usage:
   kube-burner [command]
 
 Available Commands:
   check-alerts Evaluate alerts for the given time range
-  completion  Generates completion scripts for bash shell
-  destroy     Destroy old namespaces labeled with the given UUID.
-  help        Help about any command
-  index       Index metrics from the given time range
-  init        Launch benchmark
-  version     Print the version number of kube-burner
+  completion   Generates completion scripts for bash shell
+  destroy      Destroy old namespaces labeled with the given UUID.
+  help         Help about any command
+  import       Import metrics tarball
+  index        Index kube-burner metrics
+  init         Launch benchmark
+  version      Print the version number of kube-burner
 
 Flags:
   -h, --help   help for kube-burner
+  --log-level string   Allowed values: debug, info, warn, error, fatal (default "info")
 
 Use "kube-burner [command] --help" for more information about a command.
 ```

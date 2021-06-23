@@ -20,6 +20,7 @@ In this section is described global job configuration, it holds the following pa
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|----------------|-------------|
 | kubeconfig       | Points to a valid kubeconfig file. Can be omitted if using the KUBECONFIG environment variable, or running from a pod | String  | ~/mykubeconfig | in-cluster |             |
 | writeToFile      | Whether to dump collected metrics to files                                                               | Boolean        | true           | true        |
+| createTarball    | Create metrics tarball, it has no effect if `writeToFile` is not enabled                                 | Boolean        | true           | false       |
 | metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics |
 | measurements     | List of measurements. Detailed in the [measurements section]                                             | List           | -              | []          |
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section]                                      | Object         | -              | -           |

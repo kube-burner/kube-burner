@@ -43,7 +43,10 @@ func CreateTarball(metricsDirectory string) error {
 	defer tarball.Close()
 	defer gzipWriter.Close()
 	defer tarWriter.Close()
-	filepath.Walk(metricsDirectory, func(path string, info fs.FileInfo, err error) error {
+	err = filepath.Walk(metricsDirectory, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if info.IsDir() {
 			return nil
 		}
@@ -60,6 +63,9 @@ func CreateTarball(metricsDirectory string) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 	log.Infof("Metrics tarball generated at %s", tarball.Name())
 	return nil
 }

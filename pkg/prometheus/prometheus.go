@@ -204,11 +204,11 @@ func (p *Prometheus) scrapeMetrics(jobList []burner.Executor, start, end time.Ti
 			}
 			log.Infof("Writing to: %s", filename)
 			f, err := os.Create(filename)
-			defer f.Close()
 			if err != nil {
 				log.Errorf("Error creating metrics file %s: %s", filename, err)
 				continue
 			}
+			defer f.Close()
 			jsonEnc := json.NewEncoder(f)
 			err = jsonEnc.Encode(metrics)
 			if err != nil {

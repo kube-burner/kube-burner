@@ -2,6 +2,7 @@
  
 global:
   writeToFile: true
+  createTarball: true
   metricsDirectory: collected-metrics
   measurements:
     - name: podLatency
