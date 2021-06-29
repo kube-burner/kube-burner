@@ -32,7 +32,8 @@ Kube-burner adds some extra fields to the metrics obtained from prometheus. Thes
   }
 ]
 ```
-These extra fields are useful at the time of identifing and representing the metrics.
+
+The extra fields are useful at the time of identifing and representing the metrics.
 
 The field **metricName** in the example above, allow us to identify documents from a certain query more easily, and it's configured in each query of the metric-profile by adding the parameter `metricName` to the query as shown in the metrics profile below:
 

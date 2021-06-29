@@ -3,7 +3,7 @@ global:
   writeToFile: true
   metricsDirectory: collected-metrics
   indexerConfig:
-    enabled: false
+    enabled: true
     esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
     insecureSkipVerify: false
     defaultIndex: kube-burner
