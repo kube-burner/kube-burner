@@ -31,4 +31,4 @@ In case you want to start tinkering with Kube-burner now:
 
 - You can find the binaries in the [releases section of the repository](https://github.com/cloud-bulldozer/kube-burner/releases).
 - There's also a container image available at [quay](https://quay.io/repository/cloud-bulldozer/kube-burner?tab=tags).
-- A valid example of a configuration file can be found at [examples/cfg.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/examples/cfg.yml)
+- Example configuration files can be found at the [examples directory](./examples).
