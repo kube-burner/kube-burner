@@ -34,7 +34,7 @@ jobs:
 
   - name: not-namespaced
     jobType: create
-    jobIterations: {{randInteger 1 4}}
+    jobIterations: {{randInteger 1 2}}
     qps: 5
     burst: 15
     namespacedIterations: false
@@ -44,6 +44,7 @@ jobs:
     waitWhenFinished: false
     verifyObjects: true
     errorOnVerify: true
+    maxWaitTimeout: 2m
     objects:
     
     - objectTemplate: objectTemplates/deployment.yml

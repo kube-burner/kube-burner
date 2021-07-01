@@ -23,7 +23,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 
 	corev1 "k8s.io/api/core/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -79,14 +78,15 @@ func (ex *Executor) waitForObjects(ns string) {
 
 func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
+	// TODO handle errors such as timeouts
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
 		deps, err := ClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
 		for _, dep := range deps.Items {
-			if dep.Status.AvailableReplicas != *dep.Spec.Replicas {
-				log.Debugf("Waiting for Deployments in ns %s to be ready", ns)
+			if *dep.Spec.Replicas != dep.Status.ReadyReplicas {
+				log.Debugf("Waiting for replicas from deployments in ns %s to be ready", ns)
 				return false, nil
 			}
 		}
@@ -102,8 +102,8 @@ func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 			return false, err
 		}
 		for _, rs := range rss.Items {
-			if *rs.Spec.Replicas != rs.Status.AvailableReplicas {
-				log.Debugf("Waiting for ReplicaSets in ns %s to be ready", ns)
+			if *rs.Spec.Replicas != rs.Status.ReadyReplicas {
+				log.Debugf("Waiting for replicas from replicaSets in ns %s to be ready", ns)
 				return false, nil
 			}
 		}
@@ -120,7 +120,7 @@ func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		}
 		for _, rc := range rcs.Items {
 			if *rc.Spec.Replicas != rc.Status.ReadyReplicas {
-				log.Debugf("Waiting for ReplicationControllers in ns %s to be ready", ns)
+				log.Debugf("Waiting for replicas from replicationControllers in ns %s to be ready", ns)
 				return false, nil
 			}
 		}
@@ -136,8 +136,8 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 			return false, err
 		}
 		for _, ds := range dss.Items {
-			if ds.Status.DesiredNumberScheduled != ds.Status.NumberAvailable {
-				log.Debugf("Waiting for daemonsets in ns %s to be readt", ns)
+			if ds.Status.DesiredNumberScheduled != ds.Status.NumberReady {
+				log.Debugf("Waiting for replicas from daemonsets in ns %s to be ready", ns)
 				return false, nil
 			}
 		}
@@ -153,6 +153,7 @@ func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 			return false, err
 		}
 		for _, pod := range pods.Items {
+			// TODO Check for all containers from the pod to be in ready state
 			if pod.Status.Phase != corev1.PodRunning {
 				log.Debugf("Waiting for pods in ns %s to be running", ns)
 				return false, nil
