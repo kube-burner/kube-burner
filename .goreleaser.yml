@@ -16,7 +16,7 @@ builds:
       - ppc64le
     dir: ./cmd/kube-burner/
     ldflags:
-      - -X github.com/cloud-bulldozer/kube-burner/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/kube-burner/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/kube-burner/version.Version={{.Version}}
+      - -X github.com/cloud-bulldozer/kube-burner/pkg/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/kube-burner/pkg/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/kube-burner/pkg/version.Version={{.Version}}
 archives:
   - name_template: "kube-burner-{{.Version}}-{{.Os}}-{{.Arch}}"
     format: tar.gz
