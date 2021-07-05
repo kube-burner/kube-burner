@@ -22,9 +22,9 @@ jobs:
       matrix:
         golang-version: [1.16]
         image-versions:
-        - kindest/node:v1.20.0
-        - kindest/node:v1.19.0
         - kindest/node:v1.18.0
+        - kindest/node:v1.19.0
+        - kindest/node:v1.20.7
     steps:
 
     - name: Set up Go 1.x
@@ -69,7 +69,7 @@ jobs:
       with:
         config: test/kind.yml 
         image: ${{matrix.image-versions}}
-        version: "v0.7.0"
+        version: "v0.9.0"
   
     - name: Execute kube-burner test
       working-directory: test
