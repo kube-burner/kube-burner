@@ -140,7 +140,7 @@ metrics:
     metricName: P99APIEtcdRequestLatency
 
 # Cluster metrics
-  - query: count(kube_namespace_created)
+  - query:  sum(kube_namespace_status_phase) by (phase) > 0
     metricName: namespaceCount
 
   - query: sum(kube_pod_status_phase{}) by (phase)
