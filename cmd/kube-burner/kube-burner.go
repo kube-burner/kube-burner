@@ -25,7 +25,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
@@ -69,7 +68,7 @@ To configure your bash shell to load completions for each session execute:
 
 # kube-burner completion > /etc/bash_completion.d/kube-burner
 	`,
-	Args: cobra.MaximumNArgs(0),
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return rootCmd.GenBashCompletion(os.Stdout)
 	},
@@ -85,7 +84,7 @@ func initCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Infof("🔥 Starting kube-burner with UUID %s", uuid)
 			err := config.Parse(configFile, true)
@@ -133,7 +132,7 @@ func destroyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy old namespaces labeled with the given UUID.",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if configFile != "" {
 				err := config.Parse(configFile, false)
@@ -143,11 +142,10 @@ func destroyCmd() *cobra.Command {
 			}
 			selector := util.NewSelector()
 			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
-			restConfig, err := config.GetRestConfig(0, 0)
+			clientSet, _, err := config.GetClientSet(0, 0)
 			if err != nil {
-				log.Fatalf("Error creating restConfig for kube-burner: %s", err)
+				log.Fatalf("Error creating clientSet: %s", err)
 			}
-			clientSet := kubernetes.NewForConfigOrDie(restConfig)
 			burner.CleanupNamespaces(clientSet, selector)
 		},
 	}
@@ -166,7 +164,7 @@ func indexCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "index",
 		Short: "Index kube-burner metrics",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := config.Parse(configFile, false)
 			if err != nil {
@@ -253,7 +251,7 @@ func alertCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
@@ -295,7 +293,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			log.Fatal(err.Error())
 		}
 	}
-	restConfig, err := config.GetRestConfig(0, 0)
+	_, restConfig, err := config.GetClientSet(0, 0)
 	if err != nil {
 		log.Fatalf("Error creating restConfig: %s", err)
 	}
