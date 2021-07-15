@@ -64,12 +64,9 @@ Each object element supports the following parameters:
 | replicas             | How replicas of this object to create per job iteration           | Integer | 10                                                  | -       |
 | inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -                                                   | -       |
 
-
-
 ### Default labels
 
 All objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`, these labels are appended to the actual object labels described at the template. They are used for internal purposes but they can also be used by the users.
-
 
 ## Job types
 
