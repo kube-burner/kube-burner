@@ -63,11 +63,10 @@ func NewExecutorList(uuid string) []Executor {
 	var err error
 	var ex Executor
 	var executorList []Executor
-	RestConfig, err = config.GetRestConfig(0, 0)
+	ClientSet, RestConfig, err = config.GetClientSet(0, 0)
 	if err != nil {
-		log.Fatalf("Error creating restConfig: %s", err)
+		log.Fatalf("Error creating clientSet: %s", err)
 	}
-	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	for _, job := range config.ConfigSpec.Jobs {
 		if job.JobType == config.CreationJob {
 			ex = setupCreateJob(job)

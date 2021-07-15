@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 )
 
 func setupDeleteJob(jobConfig config.Job) Executor {
@@ -58,11 +57,10 @@ func (ex *Executor) RunDeleteJob() {
 	var wg sync.WaitGroup
 	var resp *unstructured.UnstructuredList
 	log.Infof("Triggering job: %s", ex.Config.Name)
-	RestConfig, err := config.GetRestConfig(ex.Config.QPS, ex.Config.Burst)
+	_, RestConfig, err := config.GetClientSet(ex.Config.QPS, ex.Config.Burst)
 	if err != nil {
 		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
 	}
-	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
 	dynamicClient, err = dynamic.NewForConfig(RestConfig)
 	if err != nil {
 		log.Fatalf("Error creating DynamicClient: %s", err)

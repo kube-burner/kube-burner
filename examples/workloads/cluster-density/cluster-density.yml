@@ -29,12 +29,13 @@ jobs:
         inputVars:
           prefix: cluster-density-src
           image: quay.io/openshift-scale/mastervertical-build
+          image: quay.io/rsevilla/ubi8-go-toolset:latest
 
       - objectTemplate: templates/imagestream.yml
         replicas: 3
         inputVars:
           prefix: cluster-density-dst
-          image: quay.io/openshift-scale/mastervertical-build
+          image: quay.io/rsevilla/ubi8-go-toolset:latest
 
       - objectTemplate: templates/buildconfig.yml
         replicas: 3

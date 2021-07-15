@@ -155,7 +155,7 @@ type Job struct {
 	// JobType type of job
 	JobType JobType `yaml:"jobType" json:"jobType"`
 	// Max number of queries per second
-	QPS int `yaml:"qps" json:"qps"`
+	QPS float32 `yaml:"qps" json:"qps"`
 	// Maximum burst for throttle
 	Burst int `yaml:"burst" json:"burst"`
 	// Namespace namespace base name to use

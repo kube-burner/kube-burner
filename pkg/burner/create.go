@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
@@ -98,17 +97,16 @@ func (ex *Executor) RunCreateJob() {
 	var wg sync.WaitGroup
 	var ns string
 	var err error
-	RestConfig, err = config.GetRestConfig(ex.Config.QPS, ex.Config.Burst)
+	ClientSet, RestConfig, err = config.GetClientSet(ex.Config.QPS, ex.Config.Burst)
 	if err != nil {
-		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
+		log.Fatalf("Error creating clientSet: %s", err)
 	}
-	ClientSet = kubernetes.NewForConfigOrDie(RestConfig)
-	if RestConfig.QPS == 0 {
+	if ex.Config.QPS == 0 {
 		log.Infof("QPS not set, using default client-go value: %v", rest.DefaultQPS)
 	} else {
 		log.Infof("QPS: %v", RestConfig.QPS)
 	}
-	if RestConfig.Burst == 0 {
+	if ex.Config.Burst == 0 {
 		log.Infof("Burst rate not set, using default client-go value: %d", rest.DefaultBurst)
 	} else {
 		log.Infof("Burst: %v", RestConfig.Burst)
@@ -149,7 +147,7 @@ func (ex *Executor) RunCreateJob() {
 		wg.Wait()
 		log.Infof("Waiting %s for actions to be completed", ex.Config.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, ex.Config.QPS/2)
+		sem := make(chan int, int(ex.Config.QPS)/2)
 		if RestConfig.QPS == 0 {
 			sem = make(chan int, int(rest.DefaultQPS)/2)
 		}

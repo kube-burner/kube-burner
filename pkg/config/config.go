@@ -27,6 +27,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -141,31 +142,23 @@ func validateDNS1123() error {
 }
 
 // GetRestConfig returns restConfig with the given QPS and burst
-func GetRestConfig(QPS, burst int) (*rest.Config, error) {
+func GetClientSet(QPS float32, burst int) (*kubernetes.Clientset, *rest.Config, error) {
 	var err error
 	var restConfig *rest.Config
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
-	}
-	if ConfigSpec.GlobalConfig.Kubeconfig != "" {
+	} else if ConfigSpec.GlobalConfig.Kubeconfig != "" {
 		kubeconfig = ConfigSpec.GlobalConfig.Kubeconfig
-	}
-	if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
+	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
 		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	}
-	if kubeconfig != "" {
-		log.Debugf("Using kubeconfig: %s", kubeconfig)
-		restConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-	} else {
-		log.Debugf("Using in-cluster configuration")
-		restConfig, err = rest.InClusterConfig()
-	}
+	restConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		return restConfig, err
+		return &kubernetes.Clientset{}, restConfig, err
 	}
-	restConfig.QPS = float32(QPS)
+	restConfig.QPS = QPS
 	restConfig.Burst = burst
 	restConfig.Timeout = ConfigSpec.GlobalConfig.RequestTimeout
-	return restConfig, nil
+	return kubernetes.NewForConfigOrDie(restConfig), restConfig, nil
 }
