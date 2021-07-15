@@ -331,7 +331,8 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
 			time.Sleep(job.Config.JobPause)
 		}
-		elapsedTime := time.Now().UTC().Sub(jobList[jobPosition].Start).Seconds()
+		jobList[jobPosition].End = time.Now().UTC()
+		elapsedTime := jobList[jobPosition].End.Sub(jobList[jobPosition].Start).Seconds()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 			err := burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config, jobList[jobPosition].Start)
