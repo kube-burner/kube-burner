@@ -3,8 +3,9 @@
 
 
 ARCH ?= amd64
+BIN_NAME = kube-burner
 BIN_DIR = bin
-BIN_PATH = $(BIN_DIR)/$(ARCH)/kube-burner
+BIN_PATH = $(BIN_DIR)/$(ARCH)/$(BIN_NAME)
 CGO = 0
 
 GIT_COMMIT = $(shell git rev-parse HEAD)
@@ -30,8 +31,9 @@ help:
 	@echo "Commands for $(BIN_PATH):"
 	@echo
 	@echo 'Usage:'
-	@echo '    make clean                    Clean the directory tree'
+	@echo '    make clean                    Clean the compiled binaries'
 	@echo '    [ARCH=arch] make build        Compile the project for arch, default amd64'
+	@echo '    [ARCH=arch] make install      Installs kube-burner binary in the system, default amd64'
 	@echo '    [ARCH=arch] make images       Build images for arch, default amd64'
 	@echo '    [ARCH=arch] make push         Push images for arch, default amd64'
 	@echo '    make help                     Show this message'
@@ -47,13 +49,13 @@ lint:
 	golangci-lint run
 
 clean:
-	test ! -e bin/$(BIN_PATH) || rm $(BIN_PATH)
+	test ! -e $(BIN_DIR) || rm -Rf $(BIN_PATH)
 
 vendor:
 	go mod vendor
 
 install:
-	cp $(BIN_PATH) /usr/bin/$(BIN_PATH)
+	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
 
 images:
 	@echo -e "\n\033[2mBuilding container $(CONTAINER_NAME)\033[0m"
