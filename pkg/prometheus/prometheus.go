@@ -37,40 +37,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Prometheus describes the prometheus connection
-type Prometheus struct {
-	api           apiv1.API
-	MetricProfile metricProfile
-	Step          time.Duration
-	uuid          string
-}
-
-// This object implements RoundTripper
-type authTransport struct {
-	Transport http.RoundTripper
-	token     string
-	username  string
-	password  string
-}
-
-// metricProfile describes what metrics kube-burner collects
-type metricProfile []struct {
-	Query      string `yaml:"query"`
-	MetricName string `yaml:"metricName"`
-	IndexName  string `yaml:"indexName"`
-	Instant    bool   `yaml:"instant"`
-}
-
-type metric struct {
-	Timestamp  time.Time         `json:"timestamp"`
-	Labels     map[string]string `json:"labels"`
-	Value      float64           `json:"value"`
-	UUID       string            `json:"uuid"`
-	Query      string            `json:"query"`
-	MetricName string            `json:"metricName,omitempty"`
-	JobName    string            `json:"jobName,omitempty"`
-}
-
 func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if bat.username != "" {
 		req.SetBasicAuth(bat.username, bat.password)
@@ -138,10 +104,8 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Index
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *indexers.Indexer) error {
-	start := jobList[0].Start
-	end := jobList[len(jobList)-1].End
 	for _, job := range jobList {
-		err := p.scrapeMetrics(job.Config.Name, start, end, indexer)
+		err := p.scrapeMetrics(job.Config.Name, job.Start, job.End, indexer)
 		if err != nil {
 			return err
 		}
@@ -153,7 +117,7 @@ func (p *Prometheus) scrapeMetrics(jobName string, start, end time.Time, indexer
 	var filename string
 	var err error
 	var v model.Value
-	log.Infof("🔍 Scraping prometheus metrics from %s to %s", start, end)
+	log.Infof("🔍 Scraping prometheus metrics for job %s from %s to %s", jobName, start, end)
 	for _, md := range p.MetricProfile {
 		var metrics []interface{}
 		if md.Instant {
