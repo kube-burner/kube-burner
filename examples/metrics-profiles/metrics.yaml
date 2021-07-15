@@ -8,7 +8,7 @@
 - query: sum(apiserver_current_inflight_requests{}) by (request_kind) > 0
   metricName: APIInflightRequests
 
-Containers & pod metrics
+# Containers & pod metrics
 - query: sum(irate(container_cpu_usage_seconds_total{name!="",namespace=~"openshift-(etcd|oauth-apiserver|.*apiserver|ovn-kubernetes|sdn|ingress|authentication|.*controller-manager|.*scheduler|monitoring|logging|image-registry)"}[2m]) * 100) by (pod, namespace, node)
   metricName: podCPU
 
@@ -18,7 +18,7 @@ Containers & pod metrics
 - query: (sum(rate(container_fs_writes_bytes_total{container!="",device!~".+dm.+"}[5m])) by (device, container, node) and on (node) kube_node_role{role="master"}) > 0
   metricName: containerDiskUsage
 
-Kubelet & CRI-O metrics
+# Kubelet & CRI-O metrics
 - query: sum(irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m]) * 100) by (node) and on (node) kube_node_role{role="worker"}
   metricName: kubeletCPU
 
@@ -31,7 +31,7 @@ Kubelet & CRI-O metrics
 - query: sum(process_resident_memory_bytes{service="kubelet",job="crio"}) by (node) and on (node) kube_node_role{role="worker"}
   metricName: crioMemory
 
-Node metrics
+# Node metrics
 - query: sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) > 0
   metricName: nodeCPU
 
@@ -59,7 +59,7 @@ Node metrics
 - query: sum(rate(etcd_server_leader_changes_seen_total[2m]))
   metricName: etcdLeaderChangesRate
 
-Etcd metrics
+# Etcd metrics
 - query: etcd_server_is_leader > 0
   metricName: etcdServerIsLeader
 
@@ -85,7 +85,7 @@ Etcd metrics
   metricName: etcdVersion
   instant: true
 
-Cluster metrics
+# Cluster metrics
 - query: sum(kube_namespace_status_phase) by (phase) > 0
   metricName: namespaceCount
 
