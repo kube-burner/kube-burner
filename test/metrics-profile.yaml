@@ -1,4 +1,3 @@
-metrics:
 - query: process_resident_memory_bytes{job="prometheus"}
   metricName: prometheusRSS
 
