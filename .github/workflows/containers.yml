@@ -1,0 +1,54 @@
+name: Containers 
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*" # triggers only if push new tag version
+
+jobs:
+  containers:
+    name: Build container images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+         - arm64
+         - amd64
+         - ppc64le
+
+    steps:
+
+      - name: Install dependencies required for multi-arch builds
+        run: sudo apt-get install qemu-user-static podman fuse-overlayfs
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
+
+      - name: Login in quay
+        run: podman login quay.io -u ${QUAY_USER} -p ${QUAY_TOKEN}
+        env:
+          QUAY_USER: ${{ secrets.QUAY_USER }}
+          QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Build kube-burner binary
+        run: make build
+        env:
+          ARCH: ${{ matrix.arch }}
+
+      - name: Build container image
+        run: make images
+        env:
+          ARCH: ${{ matrix.arch }}
+
+      - name: Push container image
+        run: make push
+        env:
+          ARCH: ${{ matrix.arch }}
