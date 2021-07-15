@@ -31,6 +31,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 
+	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -111,7 +112,7 @@ func initCmd() *cobra.Command {
 			steps(uuid, prometheusClient, alertM)
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
@@ -122,7 +123,6 @@ func initCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.MarkFlagRequired("config")
-	cmd.MarkFlagRequired("uuid")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
@@ -197,7 +197,7 @@ func indexCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
@@ -208,7 +208,6 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
-	cmd.MarkFlagRequired("uuid")
 	cmd.MarkFlagRequired("prometheus-url")
 	cmd.MarkFlagRequired("config")
 	cmd.Flags().SortFlags = false
