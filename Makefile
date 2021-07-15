@@ -41,7 +41,7 @@ help:
 build: $(BIN_PATH)
 
 $(BIN_PATH): $(SOURCES)
-	@echo "Building $(BIN_PATH)"
+	@echo -e "\033[2mBuilding $(BIN_PATH)\033[0m\n"
 	@echo "GOPATH=$(GOPATH)"
 	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner
 
@@ -58,9 +58,9 @@ install:
 	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
 
 images:
-	@echo -e "\n\033[2mBuilding container $(CONTAINER_NAME)\033[0m"
+	@echo "\n\033[2mBuilding container $(CONTAINER_NAME)\033[0m\n"
 	$(ENGINE) build --arch=$(ARCH) -f Containerfile $(BIN_DIR)/$(ARCH)/ -t $(CONTAINER_NAME)
 
 push:
-	@echo -e "\n\033[2mPushing container $(CONTAINER_NAME)\033[0m"
+	@echo "\033[2mPushing container $(CONTAINER_NAME)\033[0m\n"
 	$(ENGINE) push $(CONTAINER_NAME)
