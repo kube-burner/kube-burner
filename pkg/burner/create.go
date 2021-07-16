@@ -89,7 +89,6 @@ func setupCreateJob(jobConfig config.Job) Executor {
 
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob() {
-	log.Infof("Triggering job: %s", ex.Config.Name)
 	nsLabels := map[string]string{
 		"kube-burner-job":  ex.Config.Name,
 		"kube-burner-uuid": ex.uuid,
@@ -120,6 +119,7 @@ func (ex *Executor) RunCreateJob() {
 		}
 	}
 	for i := 1; i <= ex.Config.JobIterations; i++ {
+		log.Infof("Creating object replicas from iteration %d", i)
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			nsLabels["name"] = ns
@@ -227,7 +227,7 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 			log.Error("Retrying object creation")
 			return false, nil
 		}
-		log.Infof("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
+		log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		return true, err
 	})
 }
