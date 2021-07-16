@@ -301,6 +301,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 	// Iterate through job list
 	for jobPosition, job := range jobList {
 		jobList[jobPosition].Start = time.Now().UTC()
+		log.Infof("Triggering job: %s", job.Config.Name)
 		measurements.SetJobConfig(&job.Config)
 		switch job.Config.JobType {
 		case config.CreationJob:

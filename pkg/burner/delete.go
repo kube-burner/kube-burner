@@ -55,8 +55,7 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 // RunDeleteJob executes a deletion job
 func (ex *Executor) RunDeleteJob() {
 	var wg sync.WaitGroup
-	var resp *unstructured.UnstructuredList
-	log.Infof("Triggering job: %s", ex.Config.Name)
+	var itemList *unstructured.UnstructuredList
 	_, RestConfig, err := config.GetClientSet(ex.Config.QPS, ex.Config.Burst)
 	if err != nil {
 		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
@@ -71,7 +70,7 @@ func (ex *Executor) RunDeleteJob() {
 			LabelSelector: labelSelector,
 		}
 		err = RetryWithExponentialBackOff(func() (done bool, err error) {
-			resp, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+			itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 			if err != nil {
 				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
 				return false, nil
@@ -81,8 +80,8 @@ func (ex *Executor) RunDeleteJob() {
 		if err != nil {
 			continue
 		}
-		log.Infof("Found %d %s with selector %s", len(resp.Items), obj.gvr.Resource, labelSelector)
-		for _, item := range resp.Items {
+		log.Infof("Found %d %s with selector %s, removing them", len(itemList.Items), obj.gvr.Resource, labelSelector)
+		for _, item := range itemList.Items {
 			wg.Add(1)
 			go func(item unstructured.Unstructured) {
 				defer wg.Done()
@@ -93,9 +92,9 @@ func (ex *Executor) RunDeleteJob() {
 				} else {
 					ns := item.GetNamespace()
 					if ns != "" {
-						log.Infof("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), ns)
+						log.Debugf("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), ns)
 					} else {
-						log.Infof("Removing %s/%s", item.GetKind(), item.GetName())
+						log.Debugf("Removing %s/%s", item.GetKind(), item.GetName())
 					}
 				}
 			}(item)
@@ -103,12 +102,12 @@ func (ex *Executor) RunDeleteJob() {
 		if ex.Config.WaitForDeletion {
 			wg.Wait()
 			wait.PollImmediateInfinite(2*time.Second, func() (bool, error) {
-				resp, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+				itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 				if err != nil {
 					return false, err
 				}
-				if len(resp.Items) > 0 {
-					log.Infof("Waiting for %d %s labeled with %s to be deleted", len(resp.Items), obj.gvr.Resource, labelSelector)
+				if len(itemList.Items) > 0 {
+					log.Debugf("Waiting for %d %s labeled with %s to be deleted", len(itemList.Items), obj.gvr.Resource, labelSelector)
 					return false, nil
 				}
 				return true, nil
