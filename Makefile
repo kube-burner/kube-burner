@@ -1,5 +1,4 @@
-
-.PHONY: build clean test help images push manifest manifest-build
+.PHONY: build clean test help images push manifest manifest-build test unit-test lint
 
 
 ARCH ?= amd64
@@ -74,3 +73,8 @@ manifest-build:
 		$(ENGINE) manifest add $(CONTAINER_NAME) $(CONTAINER_NAME)-$${arch}; \
 	done
 
+
+unit-test:
+	go test -v ./... -race -coverprofile=coverage.out -covermode=atomic
+
+test: unit-test
