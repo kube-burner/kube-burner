@@ -35,12 +35,6 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
-    - name: Execute tests
-      run: make test
-
-    - name: Upload coverage to Codecov
-      run: bash <(curl -s https://codecov.io/bash)
-
     - name: Cache prometheus
       uses: actions/cache@v2
       with:

@@ -79,7 +79,65 @@ func TestParseVector(t *testing.T) {
 		var result []interface{}
 		err := prometheus.parseVector(testCase.metricName, testCase.query, testCase.jobName, testCase.value, &result)
 		returnErr := err != nil
-		t.Logf("Comparing %v with %v", returnErr, testCase.failed)
+		if returnErr {
+			if returnErr != testCase.failed {
+				t.Fatal(err)
+			}
+		} else {
+			data, ok := result[0].(metric)
+			if !ok {
+				t.Errorf("Return data is not of type metric")
+			}
+			if data.JobName != testCase.jobName {
+				t.Errorf("%s != %s", data.JobName, testCase.jobName)
+			}
+		}
+	}
+}
+
+func TestParseMatrix(t *testing.T) {
+	ts := time.Now()
+	type inputStruct struct {
+		metricName string
+		query      string
+		jobName    string
+		failed     bool
+		value      model.Value
+		result     []interface{}
+	}
+	baseTest := inputStruct{
+		metricName: "foo",
+		query:      "query_name",
+		jobName:    "myJob",
+		failed:     false,
+		value: model.Matrix{
+			&model.SampleStream{
+				Values: []model.SamplePair{
+					{
+						Timestamp: model.Now(),
+						Value:     model.SampleValue(2),
+					},
+				},
+				Metric: model.Metric(map[model.LabelName]model.LabelValue{"foo": "bar"}),
+			},
+		},
+		result: []interface{}{
+			metric{Timestamp: ts},
+		},
+	}
+
+	testCases := []inputStruct{
+		baseTest,
+		func() inputStruct {
+			baseTest.value = model.Vector{}
+			baseTest.failed = true
+			return baseTest
+		}(),
+	}
+	for _, testCase := range testCases {
+		var result []interface{}
+		err := prometheus.parseMatrix(testCase.metricName, testCase.query, testCase.jobName, testCase.value, &result)
+		returnErr := err != nil
 		if returnErr {
 			if returnErr != testCase.failed {
 				t.Fatal(err)
