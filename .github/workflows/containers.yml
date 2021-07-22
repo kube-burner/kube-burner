@@ -52,3 +52,21 @@ jobs:
         run: make push
         env:
           ARCH: ${{ matrix.arch }}
+
+  manifest:
+    name: Build container manifest
+    runs-on: ubuntu-latest
+    needs: containers
+    steps:
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Login in quay
+        run: podman login quay.io -u ${QUAY_USER} -p ${QUAY_TOKEN}
+        env:
+          QUAY_USER: ${{ secrets.QUAY_USER }}
+          QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Create and push manifest
+        run: make manifest
