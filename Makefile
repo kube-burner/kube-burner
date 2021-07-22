@@ -1,5 +1,5 @@
 
-.PHONY: build clean test help images push
+.PHONY: build clean test help images push manifest manifest-build
 
 
 ARCH ?= amd64
@@ -9,7 +9,7 @@ BIN_PATH = $(BIN_DIR)/$(ARCH)/$(BIN_NAME)
 CGO = 0
 
 GIT_COMMIT = $(shell git rev-parse HEAD)
-VERSION = $(shell git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+VERSION = $(shell git rev-parse --symbolic-full-name --abbrev-ref HEAD | sed 's/master/latest/' )
 SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
 KUBE_BURNER_VERSION= github.com/cloud-bulldozer/kube-burner/pkg/version
@@ -22,8 +22,10 @@ else
 endif
 
 REGISTRY = quay.io
-ORG = cloud-bulldozer
-CONTAINER_NAME = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)-$(ARCH)
+ORG ?= cloud-bulldozer
+CONTAINER_NAME = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)
+CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)-$(ARCH)
+MANIFEST_ARCHS ?= amd64 arm64 ppc64le
 
 all: lint build images push
 
@@ -36,6 +38,7 @@ help:
 	@echo '    [ARCH=arch] make install      Installs kube-burner binary in the system, default amd64'
 	@echo '    [ARCH=arch] make images       Build images for arch, default amd64'
 	@echo '    [ARCH=arch] make push         Push images for arch, default amd64'
+	@echo '    make manifest                 Create and push manifest for the different architectures supported'
 	@echo '    make help                     Show this message'
 
 build: $(BIN_PATH)
@@ -58,9 +61,21 @@ install:
 	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
 
 images:
-	@echo "\n\033[2mBuilding container $(CONTAINER_NAME)\033[0m\n"
-	$(ENGINE) build --arch=$(ARCH) -f Containerfile $(BIN_DIR)/$(ARCH)/ -t $(CONTAINER_NAME)
+	@echo -e "\n\033[2mBuilding container $(CONTAINER_NAME_ARCH)\033[0m"
+	$(ENGINE) build --arch=$(ARCH) -f Containerfile $(BIN_DIR)/$(ARCH)/ -t $(CONTAINER_NAME_ARCH)
 
 push:
-	@echo "\033[2mPushing container $(CONTAINER_NAME)\033[0m\n"
-	$(ENGINE) push $(CONTAINER_NAME)
+	@echo -e "\033[2mPushing container $(CONTAINER_NAME_ARCH)\033[0m"
+	$(ENGINE) push $(CONTAINER_NAME_ARCH)
+
+manifest: manifest-build
+	@echo -e "\033[2mPushing container manifest $(CONTAINER_NAME)\033[0m"
+	$(ENGINE) manifest push $(CONTAINER_NAME) $(CONTAINER_NAME)
+
+manifest-build:
+	@echo -e "\033[2mCreating container manifest $(CONTAINER_NAME)\033[0m"
+	$(ENGINE) manifest create $(CONTAINER_NAME)
+	for arch in $(MANIFEST_ARCHS); do \
+		$(ENGINE) manifest add $(CONTAINER_NAME) $(CONTAINER_NAME)-$${arch}; \
+	done
+
