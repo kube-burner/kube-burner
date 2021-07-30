@@ -1,6 +1,7 @@
 
 global:
   writeToFile: true
+  createTarball: true
   metricsDirectory: collected-metrics
   indexerConfig:
     enabled: false
@@ -28,21 +29,20 @@ jobs:
         replicas: 3
         inputVars:
           prefix: cluster-density-src
-          image: quay.io/openshift-scale/mastervertical-build
-          image: quay.io/rsevilla/ubi8-go-toolset:latest
+          image: quay.io/cloud-bulldozer/ubi8-go-toolset
 
       - objectTemplate: templates/imagestream.yml
         replicas: 3
         inputVars:
           prefix: cluster-density-dst
-          image: quay.io/rsevilla/ubi8-go-toolset:latest
+          image: quay.io/cloud-bulldozer/ubi8-go-toolset
 
       - objectTemplate: templates/buildconfig.yml
         replicas: 3
         inputVars:
           from: cluster-density-src
           to: cluster-density-dst
-          gitUri: https://github.com/openshift-scale/hello-openshift.git
+          gitUri: https://github.com/cloud-bulldozer/hello-openshift.git
 
       - objectTemplate: templates/imagestream.yml
         replicas: 6
