@@ -9,7 +9,7 @@ BIN_PATH = $(BIN_DIR)/$(ARCH)/$(BIN_NAME)
 CGO = 0
 
 GIT_COMMIT = $(shell git rev-parse HEAD)
-VERSION = $(shell git rev-parse --symbolic-full-name --abbrev-ref HEAD | sed 's/master/latest/' )
+VERSION ?= $(shell hack/tag_name.sh)
 SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
 KUBE_BURNER_VERSION= github.com/cloud-bulldozer/kube-burner/pkg/version
