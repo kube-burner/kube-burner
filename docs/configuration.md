@@ -178,6 +178,7 @@ spec:
 ## Template functions
 
 Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner ships several functions to provide higher dynamism to the template language:
+
 - add: Add two integers
 
 ```yaml

@@ -1,6 +1,7 @@
 # Measurements
 
 Apart from prometheus metrics collection, Kube-burner allows to get further metrics using other mechanisms or data sources such as the own kubernetes API, these mechanisms are called measurements.
+
 Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
 'kube-burner' supports the following measurements so far:
 
@@ -66,19 +67,21 @@ Pod latency quantile sample:
 ```
 
 Where quantileName matches with pod conditions and can be:
-- PodScheduled: Pod has been scheduled in to a node.
-- ContainersReady: Indicates whether all containers in the pod are ready.
-- Initialized: All init containers in the pod have started successfully
-- Ready: The pod is able to service reqeusts and should be added to the load balancing pools of all matching services.
+
+- __PodScheduled__: Pod has been scheduled in to a node.
+- __Initialized__: All init containers in the pod have started successfully
+- __ContainersReady__: Indicates whether all containers in the pod are ready.
+- __Ready__: The pod is able to service reqeusts and should be added to the load balancing pools of all matching services.
 
 And the metrics are:
+
 - P99: 99th percentile of the pod condition.
 - P95: 95th percentile of the pod condition.
 - P50: 50th percentile of the pod condition.
 - Max: Maximum value of the condition.
 - Avg: Average value of the condition.
 
-More information about the pod lifecycle can be found in the [kubernetes docs](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/).
+More information about the pod conditions can be found in the [kubernetes docs site](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions).
 
 **Note**: The __esIndex__ option can be used to configure the ES index where metrics will be indexed.
 
@@ -109,7 +112,8 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 
 ## Pprof collection
 
-This measurement takes care of collecting golang profiling information from pods. To do so, kube-burner connects to pods with the given labels running in certain namespaces. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. Pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are stored in the directory configured by the parameter `pprofDirectory` which by default is `pprof`.
+This measurement takes care of collecting golang profiling information from pods. To do so, kube-burner connects to pods with the given labels running in certain namespaces. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. Pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
+
 As some components require authentication to get profiling information, `kube-burner` provides two different methods to address it:
 
 - bearerToken: This variable holds a valid Bearer token which used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components
