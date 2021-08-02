@@ -30,7 +30,7 @@ func ReadConfig(configFile string) (io.Reader, error) {
 	f, err := os.Open(configFile)
 	// If the template file does not exist we try to read it from an URL
 	if os.IsNotExist(err) {
-		log.Warnf("Configuration file %s not found, trying to read from URL", configFile)
+		log.Infof("File %s not found, falling back to read from URL", configFile)
 		f, err = readURL(configFile, f)
 	}
 	return f, err
