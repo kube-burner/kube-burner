@@ -23,8 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
+	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
@@ -38,7 +39,7 @@ var ConfigSpec Spec = Spec{
 		MetricsDirectory: "collected-metrics",
 		RequestTimeout:   15 * time.Second,
 		WriteToFile:      true,
-		Measurements:     []Measurement{},
+		Measurements:     []mtypes.Measurement{},
 		IndexerConfig: IndexerConfig{
 			Enabled:            false,
 			InsecureSkipVerify: false,
@@ -111,17 +112,6 @@ func Parse(c string, jobsRequired bool) error {
 		}
 		if err := validateDNS1123(); err != nil {
 			return err
-		}
-		for _, m := range ConfigSpec.GlobalConfig.Measurements {
-			switch m.Name {
-			case string(podLatency):
-				err = validatePodLatencyCfg(m)
-			case string(pprof):
-				err = validatePprofCfg(m)
-			}
-			if err != nil {
-				log.Fatalf("Config validataion error: %s", err)
-			}
 		}
 	}
 	return nil

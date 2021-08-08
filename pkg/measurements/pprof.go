@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/remotecommand"
@@ -36,7 +36,7 @@ import (
 
 type pprof struct {
 	directory   string
-	config      config.Measurement
+	config      types.Measurement
 	stopChannel chan bool
 }
 
@@ -44,12 +44,16 @@ func init() {
 	measurementMap["pprof"] = &pprof{}
 }
 
-func (p *pprof) setConfig(cfg config.Measurement) {
+func (p *pprof) setConfig(cfg types.Measurement) error {
 	p.directory = "pprof"
 	if cfg.PProfDirectory != "" {
 		p.directory = cfg.PProfDirectory
 	}
 	p.config = cfg
+	if err := p.validateConfig(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (p *pprof) start() {
@@ -79,7 +83,7 @@ func (p *pprof) start() {
 	}()
 }
 
-func getPods(target config.PProftarget) []corev1.Pod {
+func getPods(target types.PProftarget) []corev1.Pod {
 	labelSelector := labels.Set(target.LabelSelector).String()
 	podList, err := factory.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), v1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
@@ -99,7 +103,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, copyCerts bool) {
 		podList := getPods(target)
 		for _, pod := range podList {
 			wg.Add(1)
-			go func(target config.PProftarget, pod corev1.Pod) {
+			go func(target types.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
 				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Name, time.Now().Unix())
 				f, err := os.Create(path.Join(p.directory, pprofFile))
@@ -221,5 +225,9 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 		}
 	}
 	log.Infof("Certificate and private key copied into %s %s", pod.Name, pod.Spec.Containers[0].Name)
+	return nil
+}
+
+func (p *pprof) validateConfig() error {
 	return nil
 }

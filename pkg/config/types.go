@@ -17,6 +17,7 @@ package config
 import (
 	"time"
 
+	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -118,7 +119,7 @@ type GlobalConfig struct {
 	MetricsDirectory string `yaml:"metricsDirectory"`
 	// Measurements describes a list of measurements kube-burner
 	// will take along with job
-	Measurements []Measurement `yaml:"measurements"`
+	Measurements []mtypes.Measurement `yaml:"measurements"`
 	// RequestTimeout of restclient
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
 }
