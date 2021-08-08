@@ -18,22 +18,16 @@ import (
 	"time"
 
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
-	v1 "k8s.io/api/core/v1"
 )
 
 // JobType type of job
 type JobType string
 
-// MeasurementType type of measurement
-type MeasurementType string
-
 const (
 	// CreationJob used to create objects
 	CreationJob JobType = "create"
 	// DeletionJob used to delete objects
-	DeletionJob JobType         = "delete"
-	podLatency  MeasurementType = "podLatency"
-	pprof       MeasurementType = "pprof"
+	DeletionJob JobType = "delete"
 )
 
 // Spec configuration root
@@ -58,51 +52,6 @@ type IndexerConfig struct {
 	InsecureSkipVerify bool `yaml:"insecureSkipVerify"`
 	// Enabled enable indexer
 	Enabled bool `yaml:"enabled"`
-}
-
-// LatencyThrehold holds the thresholds configuration
-type LatencyThrehold struct {
-	// ConditionType
-	ConditionType v1.PodConditionType `yaml:"conditionType"`
-	// Metric type
-	Metric string `yaml:"metric"`
-	// Threshold accepted
-	Threshold time.Duration `yaml:"threshold"`
-}
-
-// PProftarget pprof targets to collect
-type PProftarget struct {
-	// Name pprof target name
-	Name string `yaml:"name"`
-	// Namespace pod namespace
-	Namespace string `yaml:"namespace"`
-	// LabelSelector get pprof from pods with these labels
-	LabelSelector map[string]string `yaml:"labelSelector"`
-	// BearerToken bearer token
-	BearerToken string `yaml:"bearerToken"`
-	// URL target URL
-	URL string `yaml:"url"`
-	// Cert Client certificate file
-	Cert string `yaml:"cert"`
-	// Key Private key file
-	Key string `yaml:"key"`
-}
-
-// Measurement holds the measurement configuration
-type Measurement struct {
-	// Name is the name the measurement
-	Name string `yaml:"name"`
-	// ESIndex contains the ElasticSearch index used to
-	// index the metrics
-	ESIndex string `yaml:"esIndex"`
-	// LatencyThreholds config
-	LatencyThresholds []LatencyThrehold `yaml:"thresholds"`
-	// PPRofTargets targets config
-	PProfTargets []PProftarget `yaml:"pprofTargets"`
-	// PPRofInterval pprof collect interval
-	PProfInterval time.Duration `yaml:"pprofInterval"`
-	// PProfDirectory output directory
-	PProfDirectory string `yaml:"pprofDirectory"`
 }
 
 // GlobalConfig holds the global configuration
