@@ -15,9 +15,12 @@
 package measurements
 
 import (
+	"fmt"
+
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -34,7 +37,7 @@ type measurementFactory struct {
 type measurement interface {
 	start()
 	stop() (int, error)
-	setConfig(config.Measurement)
+	setConfig(types.Measurement) error
 }
 
 var factory measurementFactory
@@ -54,21 +57,26 @@ func NewMeasurementFactory(restConfig *rest.Config, uuid string, indexer *indexe
 	}
 	for _, measurement := range kubeburnerCfg.Measurements {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
-			factory.register(measurement, measurementFunc)
+			if err := factory.register(measurement, measurementFunc); err != nil {
+				log.Fatal(err.Error())
+			}
 		} else {
 			log.Warnf("Measurement not found: %s", measurement.Name)
 		}
 	}
 }
 
-func (mf *measurementFactory) register(measure config.Measurement, measurementFunc measurement) {
-	if _, exists := mf.createFuncs[measure.Name]; exists {
-		log.Warnf("Measurement already registered: %s", measure.Name)
+func (mf *measurementFactory) register(measurement types.Measurement, measurementFunc measurement) error {
+	if _, exists := mf.createFuncs[measurement.Name]; exists {
+		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
-		measurementFunc.setConfig(measure)
-		mf.createFuncs[measure.Name] = measurementFunc
-		log.Infof("Registered measurement: %s", measure.Name)
+		if err := measurementFunc.setConfig(measurement); err != nil {
+			return fmt.Errorf("Config validataion error: %s", err)
+		}
+		mf.createFuncs[measurement.Name] = measurementFunc
+		log.Infof("Registered measurement: %s", measurement.Name)
 	}
+	return nil
 }
 
 func SetJobConfig(jobConfig *config.Job) {

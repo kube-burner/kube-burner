@@ -36,6 +36,9 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
+    - name: branch
+      run: echo ${GITHUB_REF}
+
     - uses: actions/cache@v2
       with:
         path: ~/go/pkg/mod

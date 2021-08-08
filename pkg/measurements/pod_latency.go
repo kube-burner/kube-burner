@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -75,7 +75,7 @@ const (
 type podLatency struct {
 	informer    cache.SharedInformer
 	stopChannel chan struct{}
-	config      config.Measurement
+	config      types.Measurement
 }
 
 func init() {
@@ -126,8 +126,12 @@ func (p *podLatency) updatePod(obj interface{}) {
 	}
 }
 
-func (p *podLatency) setConfig(cfg config.Measurement) {
+func (p *podLatency) setConfig(cfg types.Measurement) error {
 	p.config = cfg
+	if err := p.validateConfig(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Start starts podLatency measurement
@@ -301,4 +305,25 @@ func (p *podLatency) checkThreshold() int {
 		}
 	}
 	return rc
+}
+
+func (p *podLatency) validateConfig() error {
+	var metricFound bool
+	var latencyMetrics []string = []string{"P99", "P95", "P50", "Avg", "Max"}
+	for _, th := range p.config.LatencyThresholds {
+		if th.ConditionType == v1.ContainersReady || th.ConditionType == v1.PodInitialized || th.ConditionType == v1.PodReady || th.ConditionType == v1.PodScheduled {
+			for _, lm := range latencyMetrics {
+				if th.Metric == lm {
+					metricFound = true
+					break
+				}
+			}
+			if !metricFound {
+				return fmt.Errorf("Unsupported metric %s in podLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
+			}
+		} else {
+			return fmt.Errorf("Unsupported pod condition type in podLatency measurement: %s", th.ConditionType)
+		}
+	}
+	return nil
 }
