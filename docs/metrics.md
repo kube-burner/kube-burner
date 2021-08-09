@@ -140,7 +140,7 @@ INFO[2021-06-23 12:07:08] Metrics tarball generated at kube-burner-metrics-16244
 Once we've enabled it, a tarball (`kube-burner-metrics-<timestamp>.tgz`) containing all metrics will be generated in the current working directory.
 This tarball can be imported and indexed by kube-burner with the import subcommand. e.g.
 
-```shell
+```log
 $ kube-burner/bin/kube-burner import --config kubelet-config.yml --tarball kube-burner-metrics-1624441857.tgz
 INFO[2021-06-23 11:39:40] Setting log level to info
 INFO[2021-06-23 11:39:40] 📁 Creating indexer: elastic
