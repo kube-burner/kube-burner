@@ -103,7 +103,7 @@ For example, the example below establish a threshold of 2000ms in the P99 metric
 
 Latency thresholds are evaluated at the end of each job, showing an informative message like the following:
 
-```
+```log
 INFO[2020-12-15 12:37:08] Evaluating latency thresholds
 WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured threshold: 2000ms
 ```
@@ -116,15 +116,19 @@ This measurement takes care of collecting golang profiling information from pods
 
 As some components require authentication to get profiling information, `kube-burner` provides two different methods to address it:
 
-- bearerToken: This variable holds a valid Bearer token which used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components
-- cert + key: These variables point to a local certificate and private key files respectively. These files are copied to the remote pods and used by cURL to get pprof data. This method is usually valid with etcd.
+- Bearer token authentication: This modality is configured by the variable `bearerToken`, which holds a valid Bearer token that will be used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components
+- Certificate Authentication, usually valid for etcd: This method can be configured using a combination of cert/privKey files or directly using the cert/privkey content, it can be tweaked with the following variables:
+  - cert: Certificate string. The content of this string is written to the file `/tmp/pprof.crt` in the remote pods.
+  - key: Privete key string. The content of this string is written to the file `/tmp/pprof.key` in the remote pods.
+  - certFile: Path to a certificate file. The content of this file is copied to the remote pods to the path `/tmp/pprof.crt`
+  - keyFile: Path to a private key file. The content of this file is copied to the remote pods to the path `/tmp/pprof.key`
 
 An example of how to configure this measurement to collect pprof HEAP and CPU profiling data from kube-apiserver and etcd is shown below:
 
 ```yaml
    measurements:
    - name: pprof
-     pprofInterval: 5m
+     pprofInterval: 30m
      pprofDirectory: pprof-data
      pprofTargets:
      - name: kube-apiserver-heap
@@ -142,9 +146,42 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
      - name: etcd-heap
        namespace: "openshift-etcd"
        labelSelector: {app: etcd}
-       cert: etcd-peer-pert.crt
-       key: etcd-peer-pert.key
+       certFile: etcd-peer-pert.crt
+       keyFile: etcd-peer-pert.key
        url: https://localhost:2379/debug/pprof/heap
+
+     - name: etcd-cpu
+       namespace: "openshift-etcd"
+       labelSelector: {app: etcd}
+       cert: |
+         -----BEGIN CERTIFICATE-----
+         rztlngowHwYDVR0jBB/asdfadsSDFDSKJEZz61mN8MKux9xciz0wgeMGA1UdEQSB
+         2zCB2IIUZXRjZCFwerdsvadsc3RlbS5zdmOCImV0Y2Qua3ViZS1zeXN0ZW0uc3Zj
+         LmNsdXN0ZXIubG9jYWyCF2V0Y2Qub3BlbnNoaWZ0LWV0Y2Quc3ZjgiVldGNkLm9w
+         ZW5zaGlmdC1ldGNkLnN2Yy5jbHVzdGVyLmxvY2Fsgglsb2NhbGhvc3SCAzo6MYIM
+         MTAuMC4xNDEuMjI4ggkxMjcuMC4wLjGCAzo6MYcQAAAAAAAAAAAAAAAAAAAAAYcE
+         CgCN5IcEfwAAAYcQAAAFFFF098asdfNkS23123ANBgkqhkiG9w0BAQsFAAOCAQEA
+         vlVzkjOIquj3uS0QxeixXWyCl8vApYanD/LqUN7ARSH5+vQ+Pw3qQJm1tdP3b7Yh
+         6NZC1DuA/n/kwWOMXtfsbaobZjV5XlPKjp4Oz7SIFE4P8ZmyYxTNSordmbkS4ezS
+         3QpJOF34IgyqxojTbQkWy4l3PZfpAt7ypWrbQiX8N9cSIKFicJN+uAzeDDM2qsh3
+         Xxk2PQtmmxpfOe9VaAj1dnGg9YNiF7ECuOD8nZsctmx79rPeBOzI5N093op/eFNb
+         yTE03WjyNP82xfiQnFfZQvqX6niasdf987ASfd4X1yh00ymxpK/cG1s7BPLSpaL1
+         xCMBdF9nD3tq9v/oyKJjvQ==
+         -----END CERTIFICATE-----
+       key: |
+         -----BEGIN RSA PRIVATE KEY-----
+         FOOvpAIBAAKCAQEAruV1jbKMqi5XfCaz7Ey6Bn5XGYOJvYc4VWKpT4OZ/TzBarDO
+         Okou0FU04klDK06Zajm13NKHDZjzhzcskO9xKQvFDanR17zqV0aX03MZR4pydbUv
+         WLKSE9KAKA823298gnkeQ9sorUwLrtjnFHdUDwfagIOffmPiZPIFM1hABZ50B1FV
+         xXCRdaAAIGKYvAg0ZcarE4LXSasdf/asdSk32kVMd2t7unA2nAIcxJmik4AcZxok
+         oIgOIIIIIIL1LOToA0XYPxkuOcWTpIg6XCVQuI104SKZ9K7yZSWmEBm3E2uSWz++
+         x/lYpw/vEjaWeaK9qdmCjXud+jceiCLjmiJF4QIDAQABAoIBADgvowo4eBQb+yL5
+         VAfvxjtbzyN1LITkseZMYdQXlRrTr9dUoYv8VPm8xdaEbr207HhBvfkI8TYfEu03
+         fmu5YIMtMsrm6XEDUc1j8laNvWtMQOUrpeA6zc7sJhvS5ys09gM6H+RwvaqeqYos
+         SGA8zZZekYWDw3NZJ1wCnEUYbsjeEE298fjLfvs7vk5AswD2yyX2fF4wEBLwMi0L
+         -----END RSA PRIVATE KEY-----
+       url: https://localhost:2379/debug/pprof/profile?timeout=30
+       
 ```
 
 **Note**: As mentioned before, this measurement requires the `curl` command to be available in the target pods.

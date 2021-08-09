@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -92,16 +93,26 @@ func getPods(target types.PProftarget) []corev1.Pod {
 	return podList.Items
 }
 
-func (p *pprof) getPProf(wg *sync.WaitGroup, copyCerts bool) {
+func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
+	var err error
 	var command []string
-	for _, target := range p.config.PProfTargets {
-		if target.BearerToken != "" && target.Cert != "" {
-			log.Errorf("bearerToken and cert auth methods cannot be specified together, skipping pprof target")
-			continue
-		}
+	for pos, target := range p.config.PProfTargets {
 		log.Infof("Collecting %s pprof", target.Name)
 		podList := getPods(target)
 		for _, pod := range podList {
+			var cert, privKey io.Reader
+			if target.CertFile != "" && target.KeyFile != "" && first {
+				// target is a copy of one of the slice elements, so we need to modify the target object directly from the slice
+				p.config.PProfTargets[pos].Cert, p.config.PProfTargets[pos].Key, err = readCerts(target.CertFile, target.KeyFile)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+			}
+			if target.Cert != "" && target.Key != "" && first {
+				cert = strings.NewReader(target.Cert)
+				privKey = strings.NewReader(target.Key)
+			}
 			wg.Add(1)
 			go func(target types.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
@@ -113,25 +124,14 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, copyCerts bool) {
 					return
 				}
 				defer f.Close()
-				if target.Cert != "" && target.Key != "" && copyCerts {
-					cert, privKey, err := readCerts(target.Cert, target.Key)
-					if err != nil {
-						log.Error(err)
-						return
-					}
-					defer cert.Close()
-					defer privKey.Close()
-					if err != nil {
-						log.Error(err)
-						return
-					}
+				if cert != nil && privKey != nil && first {
 					if err = copyCertsToPod(pod, cert, privKey); err != nil {
 						log.Error(err)
 						return
 					}
 				}
 				if target.BearerToken != "" {
-					command = []string{"curl", "-sSLkH", fmt.Sprintf("Authorization:  Bearer %s", target.BearerToken), target.URL}
+					command = []string{"curl", "-sSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
 				} else if target.Cert != "" && target.Key != "" {
 					command = []string{"curl", "-sSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
 				} else {
@@ -165,7 +165,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, copyCerts bool) {
 				if err != nil {
 					log.Errorf("Failed to get pprof from %s: %s", pod.Name, stderr.String())
 				}
-			}(target, pod)
+			}(p.config.PProfTargets[pos], pod)
 		}
 	}
 	wg.Wait()
@@ -176,17 +176,26 @@ func (p *pprof) stop() (int, error) {
 	return 0, nil
 }
 
-func readCerts(cert, privKey string) (*os.File, *os.File, error) {
+func readCerts(cert, privKey string) (string, string, error) {
 	var certFd, privKeyFd *os.File
+	var certData, privKeyData []byte
 	certFd, err := os.Open(cert)
 	if err != nil {
-		return certFd, privKeyFd, fmt.Errorf("Cannot read %s, skipping: %v", cert, err)
+		return "", "", fmt.Errorf("Cannot read %s, skipping: %v", cert, err)
 	}
 	privKeyFd, err = os.Open(privKey)
 	if err != nil {
-		return certFd, privKeyFd, fmt.Errorf("Cannot read %s, skipping: %v", cert, err)
+		return "", "", fmt.Errorf("Cannot read %s, skipping: %v", cert, err)
 	}
-	return certFd, privKeyFd, nil
+	certData, err = io.ReadAll(certFd)
+	if err != nil {
+		return "", "", err
+	}
+	privKeyData, err = io.ReadAll(privKeyFd)
+	if err != nil {
+		return "", "", err
+	}
+	return string(certData), string(privKeyData), nil
 }
 
 func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
@@ -229,5 +238,10 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 }
 
 func (p *pprof) validateConfig() error {
+	for _, target := range p.config.PProfTargets {
+		if target.BearerToken != "" && (target.CertFile != "" || target.Cert != "") {
+			return fmt.Errorf("bearerToken and cert auth methods cannot be specified together in the same target")
+		}
+	}
 	return nil
 }

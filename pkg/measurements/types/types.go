@@ -59,8 +59,12 @@ type PProftarget struct {
 	BearerToken string `yaml:"bearerToken"`
 	// URL target URL
 	URL string `yaml:"url"`
-	// Cert Client certificate file
+	// CertFile Client certificate file
+	CertFile string `yaml:"certFile"`
+	// KeyFile Private key file
+	KeyFile string `yaml:"keyFile"`
+	// Cert Client certificate content
 	Cert string `yaml:"cert"`
-	// Key Private key file
+	// Key Private key content
 	Key string `yaml:"key"`
 }
