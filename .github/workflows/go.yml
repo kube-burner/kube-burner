@@ -27,12 +27,6 @@ jobs:
         - v1.18.0
     steps:
 
-    - name: Who
-      run: whoami
-
-    - name: container
-      run: podman info
-
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
@@ -46,6 +40,12 @@ jobs:
       with:
         path: prometheus-2.22.0.linux-amd64
         key: prometheus
+
+    - name: Cache container layers
+      uses: actions/cache@v2
+      with:
+        path: ~/.local/share/containers/storage
+        key: containers-${{matrix.k8s-version}}
 
     - name: Download prometheus
       run: |

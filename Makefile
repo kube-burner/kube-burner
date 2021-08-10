@@ -62,7 +62,7 @@ install:
 
 images:
 	@echo -e "\n\033[2mBuilding container $(CONTAINER_NAME_ARCH)\033[0m"
-	$(ENGINE) build --arch=$(ARCH) -f Containerfile $(BIN_DIR)/$(ARCH)/ -t $(CONTAINER_NAME_ARCH)
+	$(ENGINE) build --pull-always --arch=$(ARCH) -f Containerfile $(BIN_DIR)/$(ARCH)/ -t $(CONTAINER_NAME_ARCH)
 
 push:
 	@echo -e "\033[2mPushing container $(CONTAINER_NAME_ARCH)\033[0m"
