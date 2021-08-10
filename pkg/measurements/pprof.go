@@ -17,6 +17,7 @@ package measurements
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -110,8 +111,18 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				}
 			}
 			if target.Cert != "" && target.Key != "" && first {
-				cert = strings.NewReader(target.Cert)
-				privKey = strings.NewReader(target.Key)
+				certData, err := base64.StdEncoding.DecodeString(target.Cert)
+				if err != nil {
+					log.Errorf("Error decoding pprof certificate data from %s", target.Name)
+					continue
+				}
+				privKeyData, err := base64.StdEncoding.DecodeString(target.Key)
+				if err != nil {
+					log.Errorf("Error decoding pprof private key data from %s", target.Name)
+					continue
+				}
+				cert = strings.NewReader(string(certData))
+				privKey = strings.NewReader(string(privKeyData))
 			}
 			wg.Add(1)
 			go func(target types.PProftarget, pod corev1.Pod) {
