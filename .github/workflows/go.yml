@@ -27,6 +27,12 @@ jobs:
         - v1.18.0
     steps:
 
+    - name: Who
+      run: whoami
+
+    - name: container
+      run: podman info
+
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
