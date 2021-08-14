@@ -175,6 +175,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				})
 				if err != nil {
 					log.Errorf("Failed to get pprof from %s: %s", pod.Name, stderr.String())
+					os.Remove(f.Name())
 				}
 			}(p.config.PProfTargets[pos], pod)
 		}
@@ -240,7 +241,7 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 			Stdout: nil,
 			Stderr: &stderr,
 		})
-		if err != nil {
+		if err != nil || stderr.String() != "" {
 			return fmt.Errorf("Failed to copy file to %s: %s", pod.Name, stderr.Bytes())
 		}
 	}
