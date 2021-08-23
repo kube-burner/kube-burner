@@ -15,17 +15,12 @@ BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
 KUBE_BURNER_VERSION= github.com/cloud-bulldozer/kube-burner/pkg/version
 
 # Containers
-ifeq (, $(shell command -v docker))
-  ENGINE := podman
-else
-  ENGINE := docker
-endif
-
+ENGINE ?= podman
 REGISTRY = quay.io
 ORG ?= cloud-bulldozer
 CONTAINER_NAME = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)
 CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)-$(ARCH)
-MANIFEST_ARCHS ?= amd64 arm64 ppc64le
+MANIFEST_ARCHS ?= amd64 arm64 ppc64 ppc64le s390x
 
 all: lint build images push
 

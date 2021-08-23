@@ -16,7 +16,9 @@ jobs:
         arch:
          - arm64
          - amd64
+         - ppc64
          - ppc64le
+         - s390x
 
     steps:
 

@@ -14,6 +14,7 @@ builds:
       - arm64
       - ppc64
       - ppc64le
+      - s390x
     dir: ./cmd/kube-burner/
     ldflags:
       - -X github.com/cloud-bulldozer/kube-burner/pkg/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/kube-burner/pkg/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/kube-burner/pkg/version.Version={{.Version}}
