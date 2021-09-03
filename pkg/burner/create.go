@@ -119,7 +119,7 @@ func (ex *Executor) RunCreateJob() {
 		}
 	}
 	for i := 1; i <= ex.Config.JobIterations; i++ {
-		log.Infof("Creating object replicas from iteration %d", i)
+		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			nsLabels["name"] = ns
@@ -135,7 +135,8 @@ func (ex *Executor) RunCreateJob() {
 		// Wait for all replicaHandlers to finish before move forward to the next interation
 		wg.Wait()
 		if ex.Config.PodWait {
-			log.Infof("Waiting %s for actions in namespace %v to be completed", ex.Config.MaxWaitTimeout, ns)
+			log.Infof("Waiting %s all job actions to be completed", ex.Config.MaxWaitTimeout)
+			log.Debugf("Waiting for actions in namespace %v to be completed", ns)
 			ex.waitForObjects(ns)
 		}
 		if ex.Config.JobIterationDelay > 0 {
