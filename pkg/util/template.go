@@ -73,11 +73,11 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 	}
 	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error: %s", err)
+		return nil, fmt.Errorf("parsing error: %s", err)
 	}
 	err = t.Execute(&rendered, inputData)
 	if err != nil {
-		return nil, fmt.Errorf("Rendering error: %s", err)
+		return nil, fmt.Errorf("rendering error: %s", err)
 	}
 	return rendered.Bytes(), nil
 }

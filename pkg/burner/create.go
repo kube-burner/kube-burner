@@ -111,6 +111,7 @@ func (ex *Executor) RunCreateJob() {
 		log.Infof("Burst: %v", RestConfig.Burst)
 	}
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
+	log.Infof("Running job %s", ex.Config.Name)
 	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
 		nsLabels["name"] = ns
@@ -220,10 +221,8 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 			} else if errors.IsAlreadyExists(err) {
 				log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
 				return true, nil
-			} else if errors.IsTimeout(err) {
-				log.Errorf("Timeout creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
 			} else if err != nil {
-				log.Errorf("Error creating object: %s", err)
+				log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
 			}
 			log.Error("Retrying object creation")
 			return false, nil
