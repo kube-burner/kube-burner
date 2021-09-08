@@ -30,7 +30,7 @@ func ReadConfig(configFile string) (io.Reader, error) {
 	f, err := os.Open(configFile)
 	// If the template file does not exist we try to read it from an URL
 	if os.IsNotExist(err) {
-		log.Infof("File %s not found, falling back to read from URL", configFile)
+		log.Debugf("File %s not found, falling back to read from URL", configFile)
 		f, err = readURL(configFile, f)
 	}
 	return f, err
@@ -50,7 +50,7 @@ func readURL(stringURL string, body io.Reader) (io.Reader, error) {
 		return body, err
 	}
 	if r.StatusCode != http.StatusOK {
-		return body, fmt.Errorf("Error requesting %s: %d", u, r.StatusCode)
+		return body, fmt.Errorf("error requesting %s: %d", u, r.StatusCode)
 	}
 	return r.Body, nil
 }
