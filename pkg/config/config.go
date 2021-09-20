@@ -16,6 +16,7 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -23,10 +24,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloud-bulldozer/kube-burner/log"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 
 	"gopkg.in/yaml.v3"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -113,6 +116,39 @@ func Parse(c string, jobsRequired bool) error {
 		if err := validateDNS1123(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func FetchConfigMap(configMap, namespace string) error {
+	log.Infof("Fetching configmap %s", configMap)
+	var kubeconfig string
+	var found bool
+	if os.Getenv("KUBECONFIG") != "" {
+		kubeconfig = os.Getenv("KUBECONFIG")
+	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
+	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		return err
+	}
+	clientSet := kubernetes.NewForConfigOrDie(restConfig)
+	configMapData, err := clientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	// We write the configMap data into the CWD
+	for name, data := range configMapData.Data {
+		if name == "config.yml" {
+			found = true
+		}
+		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
+			return fmt.Errorf("Error writing configmap into disk: %v", err)
+		}
+	}
+	if !found {
+		return fmt.Errorf("File config.yml not found in configMap %s", configMap)
 	}
 	return nil
 }
