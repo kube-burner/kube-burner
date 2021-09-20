@@ -31,7 +31,8 @@ Pod latency sample:
   "uuid": "c40b4346-7af7-4c63-9ab4-aae7ccdd0616",
   "namespace": "kubelet-density",
   "podName": "kubelet-density-13",
-  "jobName": "kube-burner-job"
+  "jobName": "kube-burner-job",
+  "nodeName": "worker-001"
 }
 ```
 

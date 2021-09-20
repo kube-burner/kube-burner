@@ -47,6 +47,7 @@ type podMetric struct {
 	UUID                   string `json:"uuid"`
 	Namespace              string `json:"namespace"`
 	Name                   string `json:"podName"`
+	NodeName               string `json:"NodeName"`
 }
 
 type podLatencyQuantiles struct {
@@ -107,6 +108,7 @@ func (p *podLatency) updatePod(obj interface{}) {
 				case v1.PodScheduled:
 					if pm.scheduled.IsZero() {
 						pm.scheduled = time.Now().UTC()
+						pm.NodeName = pod.Spec.NodeName
 					}
 				case v1.PodInitialized:
 					if pm.initialized.IsZero() {
