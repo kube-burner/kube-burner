@@ -76,8 +76,9 @@ To configure your bash shell to load completions for each session execute:
 }
 
 func initCmd() *cobra.Command {
+	var err error
 	var url, metricsProfile, alertProfile, configFile string
-	var username, password, uuid, token string
+	var username, password, uuid, token, configMap, namespace string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
 	var prometheusClient *prometheus.Prometheus
@@ -88,7 +89,23 @@ func initCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Infof("🔥 Starting kube-burner with UUID %s", uuid)
-			err := config.Parse(configFile, true)
+			if configMap != "" {
+				if configFile != "" {
+					log.Fatal("The flags --config and --configmap can't be passed together")
+				}
+			}
+			if configMap == "" && configFile == "" {
+				log.Fatal("Either --configmap or --config flags are required")
+			}
+			if configMap != "" {
+				err = config.FetchConfigMap(configMap, namespace)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+				// We assume configFile is config.yml
+				configFile = "config.yml"
+			}
+			err = config.Parse(configFile, true)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -122,7 +139,8 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
-	cmd.MarkFlagRequired("config")
+	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Config map holding the a configuration file config.yml")
+	cmd.Flags().StringVarP(&namespace, "namespace", "", "default", "Namespace where the configmap is")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
