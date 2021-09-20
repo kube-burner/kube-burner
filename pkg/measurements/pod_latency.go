@@ -47,7 +47,7 @@ type podMetric struct {
 	UUID                   string `json:"uuid"`
 	Namespace              string `json:"namespace"`
 	Name                   string `json:"podName"`
-	NodeName               string `json:"NodeName"`
+	NodeName               string `json:"nodeName"`
 }
 
 type podLatencyQuantiles struct {
