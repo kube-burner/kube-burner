@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -175,16 +177,26 @@ func GetClientSet(QPS float32, burst int) (*kubernetes.Clientset, *rest.Config, 
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
-	} else if ConfigSpec.GlobalConfig.Kubeconfig != "" {
-		kubeconfig = ConfigSpec.GlobalConfig.Kubeconfig
 	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
 		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	}
-	restConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	restConfig, err = buildConfig(kubeconfig)
 	if err != nil {
 		return &kubernetes.Clientset{}, restConfig, err
 	}
 	restConfig.QPS, restConfig.Burst = QPS, burst
 	restConfig.Timeout = ConfigSpec.GlobalConfig.RequestTimeout
 	return kubernetes.NewForConfigOrDie(restConfig), restConfig, nil
+}
+
+func buildConfig(kubeconfigPath string) (*rest.Config, error) {
+	if kubeconfigPath == "" {
+		kubeconfig, err := rest.InClusterConfig()
+		if err == nil {
+			return kubeconfig, nil
+		}
+	}
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}}).ClientConfig()
 }
