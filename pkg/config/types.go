@@ -56,8 +56,6 @@ type IndexerConfig struct {
 
 // GlobalConfig holds the global configuration
 type GlobalConfig struct {
-	// Kubeconfig path to a valid kubeconfig file
-	Kubeconfig string `yaml:"kubeconfig"`
 	// IndexerConfig contains a IndexerConfig definition
 	IndexerConfig IndexerConfig `yaml:"indexerConfig"`
 	// Write prometheus metrics to a file
