@@ -120,11 +120,10 @@ func Parse(c string, jobsRequired bool) error {
 	return nil
 }
 
+// FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
 func FetchConfigMap(configMap, namespace string) (string, string, error) {
 	log.Infof("Fetching configmap %s", configMap)
-	var kubeconfig string
-	var found bool
-	var metricProfile, alertProfile string
+	var kubeconfig, metricProfile, alertProfile string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
 	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
@@ -139,12 +138,9 @@ func FetchConfigMap(configMap, namespace string) (string, string, error) {
 	if err != nil {
 		return metricProfile, alertProfile, err
 	}
-	// We write the configMap data into the CWD
 
 	for name, data := range configMapData.Data {
-		if name == "config.yml" {
-			found = true
-		}
+		// We write the configMap data into the CWD
 		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
 			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
 		}
@@ -154,9 +150,6 @@ func FetchConfigMap(configMap, namespace string) (string, string, error) {
 		if name == "alerts.yml" {
 			alertProfile = "alerts.yml"
 		}
-	}
-	if !found {
-		return metricProfile, alertProfile, fmt.Errorf("File config.yml not found in configMap %s", configMap)
 	}
 	return metricProfile, alertProfile, nil
 }
@@ -168,7 +161,7 @@ func validateDNS1123() error {
 		}
 		if job.JobType == CreationJob {
 			if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
-				return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, fmt.Sprint(errs))
+				return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, errs)
 			}
 		}
 	}
@@ -191,8 +184,7 @@ func GetClientSet(QPS float32, burst int) (*kubernetes.Clientset, *rest.Config, 
 	if err != nil {
 		return &kubernetes.Clientset{}, restConfig, err
 	}
-	restConfig.QPS = QPS
-	restConfig.Burst = burst
+	restConfig.QPS, restConfig.Burst = QPS, burst
 	restConfig.Timeout = ConfigSpec.GlobalConfig.RequestTimeout
 	return kubernetes.NewForConfigOrDie(restConfig), restConfig, nil
 }

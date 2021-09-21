@@ -139,7 +139,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
-	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Config map holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
+	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "", "default", "Namespace where the configmap is")
 	cmd.Flags().SortFlags = false
 	return cmd
@@ -312,7 +312,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 	}
 	_, restConfig, err := config.GetClientSet(0, 0)
 	if err != nil {
-		log.Fatalf("Error creating restConfig: %s", err)
+		log.Fatalf("Error creating k8s clientSet: %s", err)
 	}
 	measurements.NewMeasurementFactory(restConfig, uuid, indexer)
 	jobList := burner.NewExecutorList(uuid)
