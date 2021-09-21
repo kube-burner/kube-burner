@@ -91,14 +91,14 @@ func initCmd() *cobra.Command {
 			log.Infof("🔥 Starting kube-burner with UUID %s", uuid)
 			if configMap != "" {
 				if configFile != "" {
-					log.Fatal("The flags --config and --configmap can't be passed together")
+					log.Fatal("The flags --config and --configmap can't be specified together")
 				}
 			}
 			if configMap == "" && configFile == "" {
 				log.Fatal("Either --configmap or --config flags are required")
 			}
 			if configMap != "" {
-				err = config.FetchConfigMap(configMap, namespace)
+				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -139,7 +139,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
-	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Config map holding the a configuration file config.yml")
+	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Config map holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "", "default", "Namespace where the configmap is")
 	cmd.Flags().SortFlags = false
 	return cmd

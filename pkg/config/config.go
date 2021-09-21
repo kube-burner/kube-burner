@@ -120,10 +120,11 @@ func Parse(c string, jobsRequired bool) error {
 	return nil
 }
 
-func FetchConfigMap(configMap, namespace string) error {
+func FetchConfigMap(configMap, namespace string) (string, string, error) {
 	log.Infof("Fetching configmap %s", configMap)
 	var kubeconfig string
 	var found bool
+	var metricProfile, alertProfile string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
 	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
@@ -131,26 +132,33 @@ func FetchConfigMap(configMap, namespace string) error {
 	}
 	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		return err
+		return metricProfile, alertProfile, err
 	}
 	clientSet := kubernetes.NewForConfigOrDie(restConfig)
 	configMapData, err := clientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap, v1.GetOptions{})
 	if err != nil {
-		return err
+		return metricProfile, alertProfile, err
 	}
 	// We write the configMap data into the CWD
+
 	for name, data := range configMapData.Data {
 		if name == "config.yml" {
 			found = true
 		}
 		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
-			return fmt.Errorf("Error writing configmap into disk: %v", err)
+			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
+		}
+		if name == "metrics.yml" {
+			metricProfile = "metrics.yml"
+		}
+		if name == "alerts.yml" {
+			alertProfile = "alerts.yml"
 		}
 	}
 	if !found {
-		return fmt.Errorf("File config.yml not found in configMap %s", configMap)
+		return metricProfile, alertProfile, fmt.Errorf("File config.yml not found in configMap %s", configMap)
 	}
-	return nil
+	return metricProfile, alertProfile, nil
 }
 
 func validateDNS1123() error {
