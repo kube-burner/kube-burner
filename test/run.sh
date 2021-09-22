@@ -42,7 +42,9 @@ check_files () {
     if [[ ! -f $f ]]; then
       log "File ${f} not present"
       rc=1
+      continue
     fi
+    cat $f | jq .
   done
 }
 

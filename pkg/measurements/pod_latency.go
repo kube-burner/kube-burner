@@ -198,18 +198,18 @@ func (p *podLatency) startAndSync() error {
 
 // Stop stops podLatency measurement
 func (p *podLatency) stop() (int, error) {
-	normalizeMetrics()
-	calcQuantiles()
-	rc := p.checkThreshold()
-	defer close(p.stopChannel)
 	timeoutCh := make(chan struct{})
 	timeoutTimer := time.AfterFunc(informerTimeout, func() {
 		close(timeoutCh)
 	})
-	defer timeoutTimer.Stop()
 	if !cache.WaitForCacheSync(timeoutCh, p.informer.HasSynced) {
-		return rc, fmt.Errorf("Pod-latency: Timed out waiting for caches to sync")
+		return 0, fmt.Errorf("Pod-latency: Timed out waiting for caches to sync")
 	}
+	timeoutTimer.Stop()
+	close(p.stopChannel)
+	normalizeMetrics()
+	calcQuantiles()
+	rc := p.checkThreshold()
 	if kubeburnerCfg.WriteToFile {
 		if err := p.writeToFile(); err != nil {
 			log.Errorf("Error writing measurement podLatency: %s", err)
