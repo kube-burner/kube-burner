@@ -39,7 +39,7 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 		}
 		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
 		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
-		if o.LabelSelector == nil {
+		if len(o.LabelSelector) == 0 {
 			log.Fatalf("Empty labelSelectors not allowed with: %s", o.Kind)
 		}
 		obj := object{
