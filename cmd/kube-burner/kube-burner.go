@@ -354,7 +354,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		for _, job := range jobList {
 			elapsedTime := job.End.Sub(job.Start).Seconds()
-			err := burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config, job.Start)
+			err := indexers.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config, job.Start)
 			if err != nil {
 				log.Errorf(err.Error())
 			}
@@ -400,10 +400,6 @@ func main() {
 	)
 	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-<<<<<<< HEAD
-=======
-		log.Debugf("Setting log level to %s", *logLevel)
->>>>>>> 431126e (Summary metadata and alternative summary index)
 		log.SetLogLevel(*logLevel)
 	}
 	rootCmd.AddCommand(completionCmd)

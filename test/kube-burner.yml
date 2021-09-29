@@ -9,6 +9,7 @@ global:
 
   indexerConfig:
     enabled: false
+    extraMetadata: extra-metadata.yml
 
 jobs:
   - name: namespaced
