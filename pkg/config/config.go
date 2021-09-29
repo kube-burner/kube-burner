@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// ExtraMetadata
+// ExtraMetadata instance
 var ExtraMetadata Extra
 
 // ConfigSpec configuration object
