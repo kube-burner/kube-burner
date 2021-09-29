@@ -57,7 +57,7 @@ func IndexMetadataInfo(indexer *Indexer, uuid string, elapsedTime float64, jobCo
 			}
 			filename = path.Join(config.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
 		}
-		log.Infof("Writing to: %s", filename)
+		log.Infof("Writing job summary to: %s", filename)
 		f, err := os.Create(filename)
 		if err != nil {
 			return fmt.Errorf("Error creating %s: %v", filename, err)
@@ -68,12 +68,14 @@ func IndexMetadataInfo(indexer *Indexer, uuid string, elapsedTime float64, jobCo
 			return fmt.Errorf("JSON encoding error: %s", err)
 		}
 	}
-	log.Infof("Indexing metadata information for job: %s", jobConfig.Name)
-	if config.ConfigSpec.GlobalConfig.IndexerConfig.SummaryIndex != "" {
-		index = config.ConfigSpec.GlobalConfig.IndexerConfig.SummaryIndex
-	} else {
-		index = config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex
+	if indexer != nil {
+		log.Infof("Indexing jobsummary")
+		if config.ConfigSpec.GlobalConfig.IndexerConfig.SummaryIndex != "" {
+			index = config.ConfigSpec.GlobalConfig.IndexerConfig.SummaryIndex
+		} else {
+			index = config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex
+		}
+		(*indexer).Index(index, metadataInfo)
 	}
-	(*indexer).Index(index, metadataInfo)
 	return nil
 }
