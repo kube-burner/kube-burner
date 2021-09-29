@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package burner
+package indexers
 
 import (
 	"encoding/json"
@@ -23,21 +23,22 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 )
 
 type metadata struct {
-	Timestamp   time.Time  `json:"timestamp"`
-	UUID        string     `json:"uuid"`
-	MetricName  string     `json:"metricName"`
-	ElapsedTime float64    `json:"elapsedTime"`
-	JobConfig   config.Job `json:"jobConfig"`
+	Timestamp   time.Time    `json:"timestamp"`
+	UUID        string       `json:"uuid"`
+	MetricName  string       `json:"metricName"`
+	ElapsedTime float64      `json:"elapsedTime"`
+	JobConfig   config.Job   `json:"jobConfig"`
+	Extra       config.Extra `json:"extra"`
 }
 
 const jobSummary = "jobSummary"
 
 // IndexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time) error {
+func IndexMetadataInfo(indexer *Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time) error {
+	var index string
 	metadataInfo := []interface{}{
 		metadata{
 			UUID:        uuid,
@@ -45,6 +46,7 @@ func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float
 			JobConfig:   jobConfig,
 			MetricName:  jobSummary,
 			Timestamp:   timestamp,
+			Extra:       config.ExtraMetadata,
 		},
 	}
 	if config.ConfigSpec.GlobalConfig.WriteToFile {
@@ -67,6 +69,11 @@ func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float
 		}
 	}
 	log.Infof("Indexing metadata information for job: %s", jobConfig.Name)
-	(*indexer).Index(config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex, metadataInfo)
+	if config.ConfigSpec.GlobalConfig.IndexerConfig.SummaryIndex != "" {
+		index = config.ConfigSpec.GlobalConfig.IndexerConfig.SummaryIndex
+	} else {
+		index = config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex
+	}
+	(*indexer).Index(index, metadataInfo)
 	return nil
 }

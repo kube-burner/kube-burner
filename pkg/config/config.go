@@ -38,6 +38,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// ExtraMetadata
+var ExtraMetadata Extra
+
 // ConfigSpec configuration object
 var ConfigSpec Spec = Spec{
 	GlobalConfig: GlobalConfig{
@@ -119,6 +122,11 @@ func Parse(c string, jobsRequired bool) error {
 			return err
 		}
 	}
+	if ConfigSpec.GlobalConfig.IndexerConfig.ExtraMetadata != "" {
+		if err := readExtraMetadata(ConfigSpec.GlobalConfig.IndexerConfig.ExtraMetadata); err != nil {
+			return fmt.Errorf("Error reading extra metadata: '%v'", err)
+		}
+	}
 	return nil
 }
 
@@ -144,7 +152,7 @@ func FetchConfigMap(configMap, namespace string) (string, string, error) {
 	for name, data := range configMapData.Data {
 		// We write the configMap data into the CWD
 		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
-			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
+			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: '%v'", err)
 		}
 		if name == "metrics.yml" {
 			metricProfile = "metrics.yml"
@@ -159,12 +167,10 @@ func FetchConfigMap(configMap, namespace string) (string, string, error) {
 func validateDNS1123() error {
 	for _, job := range ConfigSpec.Jobs {
 		if errs := validation.IsDNS1123Subdomain(job.Name); len(errs) > 0 {
-			return fmt.Errorf("Job %s name validation error: %s", job.Name, fmt.Sprint(errs))
+			return fmt.Errorf("Job %s name validation error: '%s'", job.Name, fmt.Sprint(errs))
 		}
-		if job.JobType == CreationJob {
-			if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
-				return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, errs)
-			}
+		if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
+			return fmt.Errorf("Namespace %s name validation error: '%s'", job.Namespace, errs)
 		}
 	}
 	return nil
@@ -199,4 +205,17 @@ func buildConfig(kubeconfigPath string) (*rest.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}}).ClientConfig()
+}
+
+func readExtraMetadata(extraMetadata string) error {
+	extraMeadataData, err := os.Open(extraMetadata)
+	if err != nil {
+		return err
+	}
+	yamlDec := yaml.NewDecoder(extraMeadataData)
+	err = yamlDec.Decode(&ExtraMetadata)
+	if err != nil {
+		return err
+	}
+	return nil
 }

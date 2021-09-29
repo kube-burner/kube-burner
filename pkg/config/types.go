@@ -52,6 +52,10 @@ type IndexerConfig struct {
 	InsecureSkipVerify bool `yaml:"insecureSkipVerify"`
 	// Enabled enable indexer
 	Enabled bool `yaml:"enabled"`
+	// ExtraMetadata extra metadata to append to benchmark summary
+	ExtraMetadata string `yaml:"extraMetadata"`
+	// SummaryIndex index to send benchmark summary
+	SummaryIndex string `yaml:"summaryIndex"`
 }
 
 // GlobalConfig holds the global configuration
@@ -127,3 +131,6 @@ type Job struct {
 	// ErrorOnVerify exit when verification fails
 	ErrorOnVerify bool `yaml:"errorOnVerify" json:"errorOnVerify"`
 }
+
+// Extra metadata to index along with the summary
+type Extra map[string]string

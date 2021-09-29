@@ -24,7 +24,9 @@ The `elastic` indexer is configured by the parameters below:
 | Option               | Description                                       | Type        | Example                                  | Default |
 |----------------------|---------------------------------------------------|-------------|------------------------------------------|---------|
 | esServers            | List of ES instances                              | List        | [https://elastic.apps.rsevilla.org:9200] | ""      |
-| defaultIndex         | Default index to send the prometheus metrics into | String      | kube-burner                              | ""      |
+| defaultIndex         | Default index to send the collected metrics into  | String      | kube-burner                              | ""      |
 | insecureSkipVerify   | TLS certificate verification                      | Boolean     | true                                     | false   |
+| summaryIndex         | Alternative index for benchmark summary           | String      | kube-burner-summary                      | ""      |
+| extraMetadata        | File path holding arbitrary metadata to be indexed along with the benchmark summary | String | Example | metadata.yaml | "" |
 
 **Note**: It's possible to index documents in an authenticated ES instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the *esServers* parameter.
