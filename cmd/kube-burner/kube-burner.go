@@ -88,7 +88,7 @@ func initCmd() *cobra.Command {
 		Short: "Launch benchmark",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			log.Infof("🔥 Starting kube-burner with UUID %s", uuid)
+			log.Infof("🔥 Starting kube-burner (%s) with UUID %s", version.GitCommit, uuid)
 			if configMap != "" {
 				if configFile != "" {
 					log.Fatal("The flags --config and --configmap can't be specified together")
@@ -397,7 +397,7 @@ func main() {
 	)
 	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		log.Infof("Setting log level to %s", *logLevel)
+		log.Debugf("Setting log level to %s", *logLevel)
 		log.SetLogLevel(*logLevel)
 	}
 	rootCmd.AddCommand(completionCmd)
