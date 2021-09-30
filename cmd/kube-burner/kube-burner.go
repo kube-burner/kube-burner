@@ -350,8 +350,11 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 		jobList[jobPosition].End = time.Now().UTC()
 		elapsedTime := jobList[jobPosition].End.Sub(jobList[jobPosition].Start).Seconds()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
-		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-			err := burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config, jobList[jobPosition].Start)
+	}
+	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
+		for _, job := range jobList {
+			elapsedTime := job.End.Sub(job.Start).Seconds()
+			err := burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config, job.Start)
 			if err != nil {
 				log.Errorf(err.Error())
 			}
