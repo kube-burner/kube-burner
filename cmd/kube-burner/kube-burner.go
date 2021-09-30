@@ -88,7 +88,7 @@ func initCmd() *cobra.Command {
 		Short: "Launch benchmark",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			log.Infof("🔥 Starting kube-burner (%s) with UUID %s", version.GitCommit, uuid)
+			log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 			if configMap != "" {
 				if configFile != "" {
 					log.Fatal("The flags --config and --configmap can't be specified together")
