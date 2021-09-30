@@ -37,7 +37,7 @@ check_running_pods() {
 }
 
 check_files () {
-  for f in collected-metrics/namespaced-prometheusRSS.json collected-metrics/not-namespaced-prometheusRSS.json collected-metrics/namespaced-podLatency.json collected-metrics/namespaced-podLatency-summary.json; do
+  for f in collected-metrics/prometheusRSS-${uuid}.json collected-metrics/prometheusRSS-${uuid}.json collected-metrics/namespaced-podLatency.json collected-metrics/namespaced-podLatency-summary.json; do
     log "Checking file ${f}"
     if [[ ! -f $f ]]; then
       log "File ${f} not present"

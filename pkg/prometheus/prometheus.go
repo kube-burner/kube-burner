@@ -98,26 +98,26 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 
 // ScrapeMetrics defined in the metrics profile from start to end
 func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Indexer) error {
-	err := p.scrapeMetrics("kube-burner-indexing", start, end, indexer)
+	foo := []burner.Executor{
+		{
+			Start: start,
+			End:   end,
+			Config: config.Job{
+				Name: "kube-burner-indexing"},
+		},
+	}
+	err := p.ScrapeJobsMetrics(foo, indexer)
 	return err
 }
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *indexers.Indexer) error {
-	for _, job := range jobList {
-		err := p.scrapeMetrics(job.Config.Name, job.Start, job.End, indexer)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *Prometheus) scrapeMetrics(jobName string, start, end time.Time, indexer *indexers.Indexer) error {
+	start := jobList[0].Start
+	end := jobList[len(jobList)-1].End
 	var filename string
 	var err error
 	var v model.Value
-	log.Infof("🔍 Scraping prometheus metrics for job %s from %s to %s", jobName, start, end)
+	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start, end)
 	for _, md := range p.MetricProfile {
 		var metrics []interface{}
 		if md.Instant {
@@ -126,7 +126,7 @@ func (p *Prometheus) scrapeMetrics(jobName string, start, end time.Time, indexer
 				log.Warnf("Error found with query %s: %s", md.Query, err)
 				continue
 			}
-			if err := p.parseVector(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
+			if err := p.parseVector(md.MetricName, md.Query, jobList, v, &metrics); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
 			}
 		} else {
@@ -137,13 +137,13 @@ func (p *Prometheus) scrapeMetrics(jobName string, start, end time.Time, indexer
 				log.Warnf("Error found with query %s: %s", md.Query, err)
 				continue
 			}
-			if err := p.parseMatrix(md.MetricName, md.Query, jobName, v, &metrics); err != nil {
+			if err := p.parseMatrix(md.MetricName, md.Query, jobList, v, &metrics); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
 				continue
 			}
 		}
 		if config.ConfigSpec.GlobalConfig.WriteToFile {
-			filename = fmt.Sprintf("%s-%s.json", jobName, md.MetricName)
+			filename = fmt.Sprintf("%s-%s.json", md.MetricName, p.uuid)
 			if config.ConfigSpec.GlobalConfig.MetricsDirectory != "" {
 				err = os.MkdirAll(config.ConfigSpec.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
@@ -174,14 +174,21 @@ func (p *Prometheus) scrapeMetrics(jobName string, start, end time.Time, indexer
 		}
 	}
 	return nil
+
 }
 
-func (p *Prometheus) parseVector(metricName, query, jobName string, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseVector(metricName, query string, jobList []burner.Executor, value model.Value, metrics *[]interface{}) error {
+	var jobName string
 	data, ok := value.(model.Vector)
 	if !ok {
 		return fmt.Errorf("Unsupported result format: %s", value.Type().String())
 	}
 	for _, v := range data {
+		for _, job := range jobList {
+			if v.Timestamp.Time().Before(job.End) {
+				jobName = job.Config.Name
+			}
+		}
 		m := metric{
 			Labels:     make(map[string]string),
 			UUID:       p.uuid,
@@ -206,13 +213,19 @@ func (p *Prometheus) parseVector(metricName, query, jobName string, value model.
 	return nil
 }
 
-func (p *Prometheus) parseMatrix(metricName, query string, jobName string, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseMatrix(metricName, query string, jobList []burner.Executor, value model.Value, metrics *[]interface{}) error {
+	var jobName string
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return fmt.Errorf("Unsupported result format: %s", value.Type().String())
 	}
 	for _, v := range data {
 		for _, val := range v.Values {
+			for _, job := range jobList {
+				if val.Timestamp.Time().Before(job.End) {
+					jobName = job.Config.Name
+				}
+			}
 			m := metric{
 				Labels:     make(map[string]string),
 				UUID:       p.uuid,
