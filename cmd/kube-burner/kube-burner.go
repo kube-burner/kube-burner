@@ -397,10 +397,11 @@ func main() {
 	)
 	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		log.Debugf("Setting log level to %s", *logLevel)
 		log.SetLogLevel(*logLevel)
 	}
 	rootCmd.AddCommand(completionCmd)
 	cobra.OnInitialize()
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
