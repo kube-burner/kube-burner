@@ -67,13 +67,15 @@ func (esIndexer *Elastic) new() error {
 
 // Index uses bulkIndexer to index the documents in the given index
 func (esIndexer *Elastic) Index(index string, documents []interface{}) {
-	var statusCount int
+	var statString string
+	indexerStats := make(map[string]int)
 	hasher := sha256.New()
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Client:     esIndexer.client,
 		Index:      index,
 		FlushBytes: 5e+6,
 		NumWorkers: runtime.NumCPU(),
+		Timeout:    10 * time.Minute, // TODO: hardcoded
 	})
 	if err != nil {
 		log.Errorf("Error creating the indexer: %s", err)
@@ -101,9 +103,7 @@ func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 				Body:       bytes.NewReader(j),
 				DocumentID: hex.EncodeToString(hasher.Sum(nil)),
 				OnSuccess: func(c context.Context, bii esutil.BulkIndexerItem, biri esutil.BulkIndexerResponseItem) {
-					if biri.Status == 201 {
-						statusCount++
-					}
+					indexerStats[biri.Result]++
 				},
 			},
 		)
@@ -115,6 +115,10 @@ func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 	if err := bi.Close(context.Background()); err != nil {
 		log.Fatalf("Unexpected ES error: %s", err)
 	}
+
 	dur := time.Since(start)
-	log.Infof("Indexed [%d] documents in %s in %s", statusCount, dur.Truncate(time.Millisecond), index)
+	for stat, val := range indexerStats {
+		statString += fmt.Sprintf(" %s=%d", stat, val)
+	}
+	log.Infof("Indexing finished in %v:%v", dur.Truncate(time.Millisecond), statString)
 }
