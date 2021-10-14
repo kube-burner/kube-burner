@@ -21,6 +21,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/spf13/cast"
 )
 
@@ -79,5 +80,6 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 	if err != nil {
 		return nil, fmt.Errorf("rendering error: %s", err)
 	}
+	log.Tracef("Rendered template: %s", rendered.String())
 	return rendered.Bytes(), nil
 }

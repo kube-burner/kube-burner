@@ -23,6 +23,9 @@ import (
 // Logger defines a set of methods for writing application logs. Derived from and
 // inspired by logrus.Entry.
 type Logger interface {
+	Trace(args ...interface{})
+	Tracef(format string, args ...interface{})
+	Traceln(args ...interface{})
 	Debug(args ...interface{})
 	Debugf(format string, args ...interface{})
 	Debugln(args ...interface{})
@@ -58,6 +61,8 @@ func init() {
 // SetLogLevel sets log level
 func SetLogLevel(logLevel string) {
 	switch logLevel {
+	case "trace":
+		defaultLogger.Level = logrus.TraceLevel
 	case "debug":
 		defaultLogger.Level = logrus.DebugLevel
 	case "warn":
@@ -103,6 +108,21 @@ func (f Fields) WithFields(f2 Fields) Fields {
 // WithFields allow us to define fields in out structured logs
 func WithFields(fields Fields) Logger {
 	return defaultLogger.WithFields(logrus.Fields(fields))
+}
+
+// Trace package-level convenience method.
+func Trace(args ...interface{}) {
+	defaultLogger.Trace(args...)
+}
+
+// Tracef package-level convenience method.
+func Tracef(format string, args ...interface{}) {
+	defaultLogger.Tracef(format, args...)
+}
+
+// Traceln package-level convenience method.
+func Traceln(args ...interface{}) {
+	defaultLogger.Traceln(args...)
 }
 
 // Debug package-level convenience method.
