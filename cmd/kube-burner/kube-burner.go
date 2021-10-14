@@ -398,7 +398,7 @@ func main() {
 		alertCmd(),
 		importCmd(),
 	)
-	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
+	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: trace, debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		log.SetLogLevel(*logLevel)
 	}
