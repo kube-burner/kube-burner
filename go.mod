@@ -3,10 +3,12 @@ module github.com/cloud-bulldozer/kube-burner
 go 1.16
 
 require (
+	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/elastic/go-elasticsearch/v7 v7.13.1
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/imdario/mergo v0.3.10 // indirect
+	github.com/huandu/xstrings v1.3.2 // indirect
+	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/common v0.11.1
 	github.com/satori/go.uuid v1.2.0

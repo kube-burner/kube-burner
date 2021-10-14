@@ -21,6 +21,7 @@ import (
 	"text/template"
 	"time"
 
+	sprig "github.com/Masterminds/sprig/v3"
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/spf13/cast"
 )
@@ -38,7 +39,8 @@ func init() {
 //RenderTemplate renders a go-template and adds several custom functions
 func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
 	var rendered bytes.Buffer
-	funcMap := template.FuncMap{
+	funcMap := sprig.GenericFuncMap()
+	extraFuncs := map[string]interface{}{
 		"add": func(a ...interface{}) int {
 			res := 0
 			for _, v := range a {
@@ -72,6 +74,10 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 			return rand.Intn(cast.ToInt(b)) + cast.ToInt(a)
 		},
 	}
+	for k, v := range extraFuncs {
+		funcMap[k] = v
+	}
+	sprig.GenericFuncMap()
 	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
 		return nil, fmt.Errorf("parsing error: %s", err)
