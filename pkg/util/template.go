@@ -46,6 +46,9 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 			}
 			return res
 		},
+		"subtract": func(a int, b int) int {
+			return a - b
+		},
 		"multiply": func(a interface{}, b ...interface{}) int {
 			res := cast.ToInt(a)
 			for _, v := range b {
