@@ -182,7 +182,8 @@ spec:
 
 ## Template functions
 
-Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner ships several functions to provide higher dynamism to the template language:
+Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner is compiled with the library [sprig](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.
+Apart from the sprig ones it ships some several extra functions:
 
 - add: Add two integers
 
