@@ -41,13 +41,6 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 	var rendered bytes.Buffer
 	funcMap := sprig.GenericFuncMap()
 	extraFuncs := map[string]interface{}{
-		"add": func(a ...interface{}) int {
-			res := 0
-			for _, v := range a {
-				res += cast.ToInt(v)
-			}
-			return res
-		},
 		"multiply": func(a interface{}, b ...interface{}) int {
 			res := cast.ToInt(a)
 			for _, v := range b {
