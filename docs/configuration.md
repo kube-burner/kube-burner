@@ -182,19 +182,8 @@ spec:
 
 ## Template functions
 
-Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner ships several functions to provide higher dynamism to the template language:
-
-- add: Add two integers
-
-```yaml
-apiVersion: v1
-data:
-  two: {{add 1 1}}
-  anotherInt: {{add .inputIntVariable 1}}
-kind: ConfigMap
-metadata:
-  name: configmap-{{.Replica}}
-```
+Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner is compiled with the library [sprig](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.
+In addition, kube-burner ships some several extra functions:
 
 - multiply: Multiply two integers
 
