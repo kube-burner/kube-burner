@@ -35,7 +35,7 @@ jobs:
   - name: not-namespaced
     jobType: create
     jobIterations: {{randInteger 1 2}}
-    qps: 5
+    qps: {{randInt 5 6 }}
     burst: 15
     namespacedIterations: false
     cleanup: true
