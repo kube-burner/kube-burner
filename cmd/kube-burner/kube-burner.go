@@ -173,7 +173,7 @@ func destroyCmd() *cobra.Command {
 }
 
 func indexCmd() *cobra.Command {
-	var url, metricsProfile, configFile string
+	var url, metricsProfile, configFile, jobName string
 	var start, end int64
 	var username, password, uuid, token string
 	var skipTLSVerify bool
@@ -204,7 +204,7 @@ func indexCmd() *cobra.Command {
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
 			log.Infof("Indexing metrics with UUID %s", uuid)
-			if err := p.ScrapeMetrics(startTime, endTime, indexer); err != nil {
+			if err := p.ScrapeMetrics(startTime, endTime, indexer, jobName); err != nil {
 				log.Error(err)
 			}
 			if config.ConfigSpec.GlobalConfig.WriteToFile && config.ConfigSpec.GlobalConfig.CreateTarball {
@@ -226,6 +226,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
 	cmd.MarkFlagRequired("prometheus-url")
 	cmd.MarkFlagRequired("config")
 	cmd.Flags().SortFlags = false
