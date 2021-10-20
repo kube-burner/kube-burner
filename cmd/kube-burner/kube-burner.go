@@ -134,7 +134,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
-	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yaml", "Metrics profile file or URL")
+	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file or URL")
 	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
@@ -173,7 +173,7 @@ func destroyCmd() *cobra.Command {
 }
 
 func indexCmd() *cobra.Command {
-	var url, metricsProfile, configFile string
+	var url, metricsProfile, configFile, jobName string
 	var start, end int64
 	var username, password, uuid, token string
 	var skipTLSVerify bool
@@ -204,7 +204,7 @@ func indexCmd() *cobra.Command {
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
 			log.Infof("Indexing metrics with UUID %s", uuid)
-			if err := p.ScrapeMetrics(startTime, endTime, indexer); err != nil {
+			if err := p.ScrapeMetrics(startTime, endTime, indexer, jobName); err != nil {
 				log.Error(err)
 			}
 			if config.ConfigSpec.GlobalConfig.WriteToFile && config.ConfigSpec.GlobalConfig.CreateTarball {
@@ -220,12 +220,13 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
-	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yaml", "Metrics profile file")
+	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
 	cmd.MarkFlagRequired("prometheus-url")
 	cmd.MarkFlagRequired("config")
 	cmd.Flags().SortFlags = false
