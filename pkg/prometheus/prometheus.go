@@ -97,17 +97,16 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 }
 
 // ScrapeMetrics defined in the metrics profile from start to end
-func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Indexer) error {
-	foo := []burner.Executor{
+func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Indexer, jobName string) error {
+	scraper := []burner.Executor{
 		{
 			Start: start,
 			End:   end,
 			Config: config.Job{
-				Name: "kube-burner-indexing"},
+				Name: jobName},
 		},
 	}
-	err := p.ScrapeJobsMetrics(foo, indexer)
-	return err
+	return p.ScrapeJobsMetrics(scraper, indexer)
 }
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
@@ -162,7 +161,6 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 			err = jsonEnc.Encode(metrics)
 			if err != nil {
 				log.Errorf("JSON encoding error: %s", err)
-
 			}
 		}
 		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
@@ -174,7 +172,6 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 		}
 	}
 	return nil
-
 }
 
 func (p *Prometheus) parseVector(metricName, query string, jobList []burner.Executor, value model.Value, metrics *[]interface{}) error {
