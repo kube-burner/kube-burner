@@ -5,6 +5,8 @@ Apart from prometheus metrics collection, Kube-burner allows to get further metr
 Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
 'kube-burner' supports the following measurements so far:
 
+Note: podLatency is only captured when a benchmark is triggered. It does not work with the "index" mode of kube-burner
+
 ## Pod latency
 
 Collects latencies from the different pod startup phases, these **latency metrics are in ms**. Can be enabled with:
