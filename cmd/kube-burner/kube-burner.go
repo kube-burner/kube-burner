@@ -33,6 +33,7 @@ import (
 
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 var binName = filepath.Base(os.Args[0])
