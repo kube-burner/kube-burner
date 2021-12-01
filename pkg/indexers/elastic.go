@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -68,6 +69,7 @@ func (esIndexer *Elastic) new() error {
 // Index uses bulkIndexer to index the documents in the given index
 func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 	var statString string
+	var indexerStatsLock sync.Mutex
 	indexerStats := make(map[string]int)
 	hasher := sha256.New()
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
@@ -103,6 +105,8 @@ func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 				Body:       bytes.NewReader(j),
 				DocumentID: hex.EncodeToString(hasher.Sum(nil)),
 				OnSuccess: func(c context.Context, bii esutil.BulkIndexerItem, biri esutil.BulkIndexerResponseItem) {
+					indexerStatsLock.Lock()
+					defer indexerStatsLock.Unlock()
 					indexerStats[biri.Result]++
 				},
 			},
