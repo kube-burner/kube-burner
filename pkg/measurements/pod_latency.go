@@ -198,6 +198,7 @@ func (p *podLatency) startAndSync() error {
 
 // Stop stops podLatency measurement
 func (p *podLatency) stop() (int, error) {
+	var rc int
 	timeoutCh := make(chan struct{})
 	timeoutTimer := time.AfterFunc(informerTimeout, func() {
 		close(timeoutCh)
@@ -209,7 +210,9 @@ func (p *podLatency) stop() (int, error) {
 	close(p.stopChannel)
 	normalizeMetrics()
 	calcQuantiles()
-	rc := p.checkThreshold()
+	if len(p.config.LatencyThresholds) > 0 {
+		rc = p.checkThreshold()
+	}
 	if kubeburnerCfg.WriteToFile {
 		if err := p.writeToFile(); err != nil {
 			log.Errorf("Error writing measurement podLatency: %s", err)
@@ -289,9 +292,7 @@ func (plq *podLatencyQuantiles) setQuantile(quantile float64, qValue int) {
 
 func (p *podLatency) checkThreshold() int {
 	var rc int
-	if len(p.config.LatencyThresholds) > 0 {
-		log.Info("Evaluating latency thresholds")
-	}
+	log.Info("Evaluating latency thresholds")
 	for _, phase := range p.config.LatencyThresholds {
 		for _, pq := range podQuantiles {
 			if phase.ConditionType == pq.(podLatencyQuantiles).QuantileName {
