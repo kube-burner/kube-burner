@@ -289,7 +289,9 @@ func (plq *podLatencyQuantiles) setQuantile(quantile float64, qValue int) {
 
 func (p *podLatency) checkThreshold() int {
 	var rc int
-	log.Info("Evaluating latency thresholds")
+	if len(p.config.LatencyThresholds) > 0 {
+		log.Info("Evaluating latency thresholds")
+	}
 	for _, phase := range p.config.LatencyThresholds {
 		for _, pq := range podQuantiles {
 			if phase.ConditionType == pq.(podLatencyQuantiles).QuantileName {
