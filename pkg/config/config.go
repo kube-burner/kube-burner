@@ -118,6 +118,12 @@ func Parse(c string, jobsRequired bool) error {
 		if err := validateDNS1123(); err != nil {
 			return err
 		}
+		for _, job := range ConfigSpec.Jobs {
+			if len(job.Namespace) > 62 {
+				log.Warnf("Namespace %s length has > 63 characters, truncating it", job.Namespace)
+				job.Namespace = job.Namespace[:62]
+			}
+		}
 	}
 	return nil
 }
