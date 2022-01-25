@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -100,14 +101,10 @@ func (ex *Executor) RunCreateJob() {
 	if err != nil {
 		log.Fatalf("Error creating clientSet: %s", err)
 	}
-	if ex.Config.QPS == 0 {
-		log.Infof("QPS not set, using default client-go value: %v", rest.DefaultQPS)
+	if ex.Config.QPS == 0 || ex.Config.Burst == 0 {
+		log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
 	} else {
 		log.Infof("QPS: %v", RestConfig.QPS)
-	}
-	if ex.Config.Burst == 0 {
-		log.Infof("Burst rate not set, using default client-go value: %d", rest.DefaultBurst)
-	} else {
 		log.Infof("Burst: %v", RestConfig.Burst)
 	}
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
@@ -134,7 +131,7 @@ func (ex *Executor) RunCreateJob() {
 			wg.Add(1)
 			go ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
-		// Wait for all replicaHandlers to finish before move forward to the next interation
+		// Wait for all replicaHandlers to finish before moving forward to next iteration
 		wg.Wait()
 		if ex.Config.PodWait {
 			log.Infof("Waiting %s all job actions to be completed", ex.Config.MaxWaitTimeout)
@@ -211,6 +208,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				labels[k] = v
 			}
 			newObject.SetLabels(labels)
+			json.Marshal(newObject.Object)
 			createRequest(obj.gvr, ns, newObject)
 		}(r)
 	}

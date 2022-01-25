@@ -90,6 +90,8 @@ type Object struct {
 	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with this labels will be removed
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
+	// Namespaced
+	Namespaced bool `yaml:"namespaced" json:"namespaced"`
 }
 
 // Job defines a kube-burner job
