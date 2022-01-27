@@ -344,6 +344,9 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			}
 		case config.DeletionJob:
 			job.RunDeleteJob()
+		case config.PatchJob:
+			log.Infoln("Running patch job")
+			job.RunPatchJob()
 		}
 		if job.Config.JobPause > 0 {
 			log.Infof("Pausing for %v before finishing job", job.Config.JobPause)

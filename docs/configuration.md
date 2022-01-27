@@ -75,9 +75,9 @@ All objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,ku
 
 ## Job types
 
-kube-burner support two types of jobs with different parameters each. The default job type is __create__. Which basically creates objects as described in the section [objects](#objects).
+kube-burner support three types of jobs with different parameters each. The default job type is __create__. Which basically creates objects as described in the section [objects](#objects).
 
-The other type is __delete__, this type of job deletes objects described in the objects list. Using delete as job type the objects list would have the following structure.
+The second type is __delete__, this type of job deletes objects described in the objects list. Using delete as job type the objects list would have the following structure:
 
 ```yaml
 objects:
@@ -95,7 +95,34 @@ Where:
 - labelSelector: Map with the labelSelector.
 - apiVersion: API version from the k8s object.
 
-As mentioned previously, all objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. Thanks to this we could design a workload with one job to create objects and another one able to remove the objects created by the previous
+
+The third type is __patch__, which can patch objects described in the objects list with the template described in the object list. The objects list would have the following structure:
+
+```yaml
+objects:
+- kind: Deployment
+  labelSelector: {kube-burner-job: cluster-density}
+  objectTemplate: templates/deployment_patch_add_label.json
+  patchType: "application/strategic-merge-patch+json"
+  apiVersion: apps/v1
+
+```
+
+Where:
+
+- kind: Object kind of the k8s object to patch.
+- labelSelector: Map with the labelSelector.
+- objectTemplate: The YAML template or JSON file to patch.
+- apiVersion: API version from the k8s object.
+- patchType: The kubernetes request patch type (see below).
+
+Valid patch types:
+- application/json-patch+json
+- application/merge-patch+json
+- application/strategic-merge-patch+json
+- application/apply-patch+yaml (requires YAML)
+
+As mentioned previously, all objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. Thanks to this we could design a workload with one job to create objects and another one able to patch or remove the objects created by the previous
 
 ```yaml
 jobs:

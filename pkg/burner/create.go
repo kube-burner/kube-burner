@@ -72,6 +72,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
 		}
 		_, gvk := yamlToUnstructured(cleanTemplate, uns)
+
 		gvr, _ := meta.UnsafeGuessKindToResource(*gvk)
 		obj := object{
 			gvr:            gvr,
