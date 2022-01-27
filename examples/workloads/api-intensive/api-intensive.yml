@@ -35,6 +35,7 @@ jobs:
 
   - name: api-intensive-patch
     jobType: patch
+    jobIterations: 10
     qps: 2
     burst: 2
     objects:

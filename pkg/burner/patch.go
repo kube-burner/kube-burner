@@ -112,9 +112,11 @@ func (ex *Executor) RunPatchJob() {
 			continue
 		}
 		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
-		for _, item := range itemList.Items {
-			wg.Add(1)
-			go ex.patchHandler(obj, item, 1, &wg)
+		for i := 1; i <= ex.Config.JobIterations; i++ {
+			for _, item := range itemList.Items {
+				wg.Add(1)
+				go ex.patchHandler(obj, item, i, &wg)
+			}
 		}
 	}
 	wg.Wait()
