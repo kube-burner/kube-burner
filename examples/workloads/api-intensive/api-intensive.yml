@@ -33,6 +33,27 @@ jobs:
       - objectTemplate: templates/service.yaml
         replicas: 1
 
+  - name: api-intensive-patch
+    jobType: patch
+    qps: 2
+    burst: 2
+    objects:
+      - kind: Deployment
+        objectTemplate: templates/deployment_patch_add_label.json
+        labelSelector: {kube-burner-job: api-intensive}
+        patchType: "application/json-patch+json"
+        apiVersion: apps/v1
+      - kind: Deployment
+        objectTemplate: templates/deployment_patch_add_pod_2.yaml
+        labelSelector: {kube-burner-job: api-intensive}
+        patchType: "application/apply-patch+yaml"
+        apiVersion: apps/v1
+      - kind: Deployment
+        objectTemplate: templates/deployment_patch_add_pod_3.yaml
+        labelSelector: {kube-burner-job: api-intensive}
+        patchType: "application/strategic-merge-patch+json"
+        apiVersion: apps/v1
+
   - name: api-intensive-remove
     qps: 2
     burst: 2
