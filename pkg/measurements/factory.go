@@ -16,6 +16,7 @@ package measurements
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
@@ -35,7 +36,7 @@ type measurementFactory struct {
 }
 
 type measurement interface {
-	start()
+	start(*sync.WaitGroup)
 	stop() (int, error)
 	setConfig(types.Measurement) error
 }
@@ -84,9 +85,10 @@ func SetJobConfig(jobConfig *config.Job) {
 }
 
 // Start starts registered measurements
-func Start() {
+func Start(wg *sync.WaitGroup) {
 	for _, measurement := range factory.createFuncs {
-		go measurement.start()
+		wg.Add(1)
+		go measurement.start(wg)
 	}
 }
 
