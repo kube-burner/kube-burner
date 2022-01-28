@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -137,7 +138,8 @@ func (p *podLatency) setConfig(cfg types.Measurement) error {
 }
 
 // Start starts podLatency measurement
-func (p *podLatency) start() {
+func (p *podLatency) start(measurementWg *sync.WaitGroup) {
+	defer measurementWg.Done()
 	podMetrics = make(map[string]podMetric)
 	log.Infof("Creating Pod latency informer for %s", factory.jobConfig.Name)
 	podListWatcher := cache.NewFilteredListWatchFromClient(factory.clientSet.CoreV1().RESTClient(), "pods", v1.NamespaceAll, func(options *metav1.ListOptions) {})
