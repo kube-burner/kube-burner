@@ -52,6 +52,10 @@ clean:
 vendor:
 	go mod vendor
 
+deps-update:
+	go mod tidy
+	go mod vendor
+
 install:
 	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
 
