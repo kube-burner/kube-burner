@@ -1,0 +1,101 @@
+global:
+  # collect metrics from Prometheus and dump to files
+  writeToFile: true
+  createTarball: true
+  metricsDirectory: collected-metrics
+  measurements:
+  - name: vmiLatency
+    esIndex: kube-burner
+
+  # save metrics to database (e.g., elasticsearch)
+  indexerConfig:
+    enabled: False
+    esServers: [http://localhost:9200]
+    insecureSkipVerify: true
+    defaultIndex: kube-burner
+    type: elastic
+
+jobs:
+  # wait 5 minutes before creating objs to collect prometheus metrics from idle times
+  - name: idle-job
+    jobType: delete
+    waitForDeletion: true
+    qps: 5
+    burst: 10
+    # how long to pause after finishing the job
+    jobPause: 5m
+    objects:
+
+    - kind: VirtualMachine
+      labelSelector: {kube-burner-job: kubevirt-density}
+      apiVersion: kubevirt.io/v1
+
+    - kind: VirtualMachineInstance
+      labelSelector: {kube-burner-job: kubevirt-density}
+      apiVersion: kubevirt.io/v1
+
+    - kind: Pod
+      labelSelector: {kubevirt.io: virt-launcher}
+      apiVersion: v1
+
+    - kind: Namespace
+      labelSelector: {kube-burner-job: kubevirt-density}
+
+  # create the VMs
+  - name: kubevirt-density
+    jobType: create
+    jobIterations: 1
+    qps: 20
+    burst: 20
+    namespacedIterations: false
+    namespace: kubevirt-density
+    # verify object count after running each job
+    verifyObjects: true
+    errorOnVerify: true
+    # interval between jobs execution
+    jobIterationDelay: 1s
+    # wait all VMI be in the Ready Condition
+    waitFor: ["VirtualMachine"]
+    waitWhenFinished: true
+    # does not need to wait all pods be running since we wait for all VMIs be running
+    podWait: false
+    # timeout time after waiting for all object creation
+    maxWaitTimeout: 1h   
+    jobPause: 20m
+    # cleanup cleans previous execution (not deleted or failed)
+    cleanup: true
+    objects:
+
+    - objectTemplate: templates/vm-ephemeral.yml
+      replicas: {{ .OBJ_REPLICAS }}
+      inputVars:
+        name: kubevirt-density
+        image: quay.io/kubevirt/fedora-with-test-tooling-container-disk:v0.48.1
+        OS: fedora27
+        cpuCores: 1
+        memory: 4G
+        createVMI: true
+
+  # cleanup the experiment
+  - name: delete-job
+    jobType: delete
+    waitForDeletion: true
+    qps: 5
+    burst: 10
+    jobPause: 5m
+    objects:
+
+    - kind: VirtualMachine
+      labelSelector: {kube-burner-job: kubevirt-density}
+      apiVersion: kubevirt.io/v1
+
+    - kind: VirtualMachineInstance
+      labelSelector: {kube-burner-job: kubevirt-density}
+      apiVersion: kubevirt.io/v1
+
+    - kind: Pod
+      labelSelector: {kubevirt.io: virt-launcher}
+      apiVersion: v1
+
+    - kind: Namespace
+      labelSelector: {kube-burner-job: kubevirt-density}
