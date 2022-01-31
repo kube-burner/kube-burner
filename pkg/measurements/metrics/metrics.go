@@ -26,7 +26,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 )
 
-// LatencyQuantiles holds the latency measurement quatiles
+// LatencyQuantiles holds the latency measurement quantiles
 type LatencyQuantiles struct {
 	QuantileName string    `json:"quantileName"`
 	UUID         string    `json:"uuid"`
@@ -81,11 +81,11 @@ func WriteToFile(lat []interface{}, quant []interface{}, metricName string, jobN
 	return nil
 }
 
-func CheckThreshold(thresholds []types.LatencyThreshold, quatiles []interface{}) int {
+func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}) int {
 	var rc int
 	log.Info("Evaluating latency thresholds")
 	for _, phase := range thresholds {
-		for _, pq := range quatiles {
+		for _, pq := range quantiles {
 			if phase.ConditionType == pq.(LatencyQuantiles).QuantileName {
 				// Required to acccess the attribute by name
 				r := reflect.ValueOf(pq.(LatencyQuantiles))
