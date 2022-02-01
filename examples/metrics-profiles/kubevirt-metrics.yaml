@@ -1,0 +1,300 @@
+
+# K8s control plane
+- query: histogram_quantile(0.99, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{}[5m])) by (le, pod))
+  metricName: 99thSchedulingDuration
+
+- query: histogram_quantile(0.99, sum(rate(scheduler_volume_scheduling_duration_seconds_bucket{}[5m])) by (le, pod))
+  metricName: 99thSchedulingVolumeDuration
+
+- query: sum(irate(workqueue_adds_total{}[2m])) by (service, name) > 0
+  metricName: workQueueAddRate
+
+- query: sum(workqueue_depth{}) by (service, name) > 0
+  metricName: workQueueDepth
+
+- query: histogram_quantile(0.99, sum(rate(workqueue_queue_duration_seconds_bucket{}[5m])) by (service, name, le)) > 0
+  metricName: workQueue99thQueueDuration
+
+- query: histogram_quantile(0.99, sum(rate(workqueue_work_duration_seconds_bucket{}[1m]))  by (service, name, le)) > 0
+  metricName: workQueue99thWorkDuration
+
+- query: sum(workqueue_unfinished_work_seconds) by (service, name) > 0
+  metricName: workQueueUnfinishedWork
+
+- query: sum(workqueue_longest_running_processor_seconds{}) by (service, name) > 0
+  metricName: workQueueLongestRunningProcessor
+
+- query: sum(irate(workqueue_retries_total{}[5m])) by (service, name) > 0
+  metricName: workQueueRetryRate
+
+# K8s API server
+- query: histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb=~"LIST|GET", subresource!="log"}[2m])) by (verb,resource,subresource,component,apiserver,le)) > 0
+  metricName: API99thReadRequestLatency
+
+- query: histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb=~"POST|PUT|PATCH|DELETE", subresource!="log"}[2m])) by (verb,resource,subresource,component,apiserver,le)) > 0
+  metricName: API99thWriteRequestLatency
+
+- query: sum(increase(apiserver_request_total{}[5m])) by (verb,resource,subresource,apiserver,component,code) > 0
+  metricName: APIRequestCount
+
+- query: sum(irate(apiserver_request_total{}[2m])) by (verb,resource,subresource,apiserver,component,code) > 0
+  metricName: APIRequestRate
+
+- query: sum(apiserver_current_inflight_requests{}) by (request_kind) > 0
+  metricName: APIInflightRequests
+
+- query: sum(rate(apiserver_flowcontrol_dispatched_requests_total[2m])) by (flow_schema,priority_level) > 0
+  metricName: flowControlRate
+
+- query: sum(rate(apiserver_flowcontrol_rejected_requests_total{}[5m])) by (flowSchema,reason) > 0
+  metricName: flowControlRejectedRequest
+
+- query: histogram_quantile(0.99, sum(rate(apiserver_flowcontrol_request_wait_duration_seconds_bucket{}[5m])) by (le, flow_schema, priority_level)) > 0
+  metricName: flowControl99thRequestWait
+
+- query: histogram_quantile(0.99, sum(rate(apiserver_flowcontrol_request_execution_seconds_bucket{}[5m])) by (le, flow_schema, priority_level)) > 0
+  metricName: flowControl99thRequestExecution
+
+# Containers & pod metrics
+- query: sum(irate(container_cpu_usage_seconds_total{name!=""}[2m]) * 100) by (pod, namespace, node) > 0
+  metricName: podCPU
+
+- query: sum(container_memory_rss{name!=""}) by (pod, namespace, node) > 0
+  metricName: podMemory
+
+- query: sum(rate(container_network_receive_packets_dropped_total{name!=""}[5m])) by (pod, namespace, node) > 0
+  metricName: rxDroppedPackets
+
+- query: sum(rate(container_network_transmit_packets_dropped_total{name!=""}[5m])) by (pod, namespace, node) > 0
+  metricName: txDroppedPackets
+
+- query: (sum(rate(container_fs_writes_bytes_total{container!="",device!~".+dm.+"}[5m])) by (device, container, node)) > 0
+  metricName: containerDiskUsage
+
+- query: sum(container_fs_usage_bytes{id="/",device=~"/dev/vd.*|/dev/sd.*"}) by (node) > 0
+  metricName: containerFsUsage
+
+# Prometheus
+- query: (sum(container_memory_rss{pod!="",name!="",container="prometheus"}) by (container, pod, namespace, node)) > 0
+  metricName: containerMemory-Prometheus
+
+- query: (sum(irate(container_cpu_usage_seconds_total{pod!="",container="prometheus"}[2m]) * 100) by (container, pod, namespace, node)) > 0
+  metricName: containerCPU-Prometheus
+
+- query: sum(prometheus_tsdb_storage_blocks_bytes{}) by (pod) > 0
+  metricName: prometheus-tsdb-storage
+
+# Kubelet & CRI-O metrics
+- query: sum(irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m]) * 100) by (node) and on (node) kube_node_role{role="worker"} > 0
+  metricName: kubeletCPU
+
+- query: sum(process_resident_memory_bytes{service="kubelet",job="kubelet"}) by (node) and on (node) kube_node_role{role="worker"} > 0
+  metricName: kubeletMemory
+
+- query: histogram_quantile(0.99, sum(rate(kubelet_pod_start_duration_seconds_bucket{}[5m])) by (instance, le)) > 0
+  metricName: kubelet99thPodStartDuration
+
+- query: sum(rate(kubelet_pod_start_duration_seconds_count{}[5m])) by (node) > 0
+  metricName: kubeletPodStartRate
+
+- query: histogram_quantile(0.99, sum(rate(kubelet_pod_worker_duration_seconds_bucket{}[5m])) by (node, le, operation_type)) > 0
+  metricName: kubelet99thPodWorkerDuration
+
+- query: histogram_quantile(0.99, sum(rate(storage_operation_duration_seconds_bucket{metrics_path="/metrics"}[5m])) by (le, node, operation_name, volume_plugin)) > 0.01
+  metricName: kubeletStorageOperation99thDurationSeconds
+
+- query: sum(rate(storage_operation_duration_seconds_count{metrics_path="/metrics"}[5m])) by (instance, node, operation_name, volume_plugin) > 0
+  metricName: kubeletStorageOperationRate
+
+- query: sum(rate(storage_operation_errors_total{metrics_path="/metrics"}[5m])) by (instance, node, operation_name, volume_plugin) > 0
+  metricName: kubeletStorageOperationErrorsRate
+
+- query: sum(irate(process_cpu_seconds_total{service="kubelet",job="crio"}[2m]) * 100) by (node) and on (node) kube_node_role{role="worker"} > 0
+  metricName: crioCPU
+
+- query: sum(process_resident_memory_bytes{service="kubelet",job="crio"}) by (node) and on (node) kube_node_role{role="worker"} > 0
+  metricName: crioMemory
+
+# Node metrics
+- query: sum(irate(node_cpu_seconds_total[5m])) by (mode,instance) > 1
+  metricName: nodeCPU
+
+- query: sum(node_memory_MemAvailable_bytes) by (instance) > 0
+  metricName: nodeMemoryAvailable
+
+- query: sum(node_memory_Active_bytes) by (instance) > 0
+  metricName: nodeMemoryActive
+
+- query: sum(node_memory_Cached_bytes) by (instance) + sum(node_memory_Buffers_bytes) by (instance) > 0
+  metricName: nodeMemoryCached+nodeMemoryBuffers
+
+- query: sum(irate(node_network_receive_bytes_total{device=~"^(ens|eth|bond|team).*"}[5m])) by (device, instance) > 0
+  metricName: rxNetworkBytes
+
+- query: sum(irate(node_network_transmit_bytes_total{device=~"^(ens|eth|bond|team).*"}[5m])) by (device, instance) > 0
+  metricName: txNetworkBytes
+
+- query: sum(rate(node_disk_written_bytes_total{}[5m])) by (device, instance) > 0
+  metricName: nodeDiskWrittenBytes
+
+- query: sum(rate(node_disk_read_bytes_total{}[5m])) by (device, instance) > 0
+  metricName: nodeDiskReadBytes
+
+- query: sum(rate(node_disk_reads_completed_total{}[5m])) by (device, instance) > 0
+  metricName: nodeDiskReadOpsSec
+
+- query: sum(rate(node_disk_writes_completed_total{}[5m])) by (device, instance) > 0
+  metricName: nodeDiskWriteOpsSec
+
+# Etcd metrics
+- query: etcd_server_is_leader > 0
+  metricName: etcdServerIsLeader
+
+- query: histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket[2m])) > 0
+  metricName: 99thEtcdDiskBackendCommitDurationSeconds
+
+- query: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m])) > 0
+  metricName: 99thEtcdDiskWalFsyncDurationSeconds
+
+- query: histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket[5m])) > 0
+  metricName: 99thEtcdRoundTripTimeSeconds
+
+- query: etcd_mvcc_db_total_size_in_bytes > 0
+  metricName: etcdDBPhysicalSizeBytes
+
+- query: etcd_mvcc_db_total_size_in_use_in_bytes > 0
+  metricName: etcdDBLogicalSizeBytes
+
+- query: sum(increase(etcd_object_counts{}[5m])) by (resource) > 0
+  metricName: etcdObjectCount
+
+- query: sum(rate(etcd_object_counts{}[5m])) by (resource) > 0
+  metricName: etcdObjectRate
+
+- query: sum(rate(etcd_server_leader_changes_seen_total[2m])) > 0
+  metricName: etcdLeaderChangesRate
+
+- query: sum by (cluster_version)(etcd_cluster_version) > 0
+  metricName: etcdVersion
+  instant: true
+
+- query: histogram_quantile(0.99,sum(rate(etcd_request_duration_seconds_bucket[2m])) by (le,operation,apiserver)) > 0
+  metricName: P99APIEtcdRequestLatency
+
+# Cluster metrics
+- query: sum(kube_namespace_status_phase) by (phase) > 0
+  metricName: namespaceCount
+
+- query: sum(kube_pod_status_phase{}) by (phase) > 0
+  metricName: podStatusCount
+
+- query: count(kube_secret_info{}) > 0
+  metricName: secretCount
+
+- query: count(kube_deployment_labels{}) > 0
+  metricName: deploymentCount
+
+- query: count(kube_configmap_info{}) > 0
+  metricName: configmapCount
+
+- query: count(kube_service_info{}) > 0
+  metricName: serviceCount
+
+- query: kube_node_role > 0
+  metricName: nodeRoles
+  instant: true
+
+- query: sum(kube_node_status_condition{status="true"}) by (condition) > 0
+  metricName: nodeStatus
+
+- query: cluster_version{type="completed"} > 0
+  metricName: clusterVersion
+  instant: true
+
+# Golang metrics
+- query: go_memstats_heap_alloc_bytes{job=~"apiserver|api|etcd|kubevirt.*"} > 0
+  metricName: goHeapAllocBytes
+
+- query: go_memstats_heap_inuse_bytes{job=~"apiserver|api|etcd|kubevirt.*"} > 0
+  metricName: goHeapInuseBytes
+
+- query: sum(rate(go_gc_duration_seconds_sum{job=~"apiserver|api|etcd|kubevirt.*"}[5m])) by (container, instance) / sum(rate(go_gc_duration_seconds_count{job=~"apiserver|api|etcd|kubevirt.*"}[5m])) by (container, instance) > 0
+  metricName: goGCDurationRate
+
+- query: go_goroutines{job=~"apiserver|api|etcd|kubevirt.*"} > 0
+  metricName: goRoutinesCount
+
+# Kubevirt metrics
+- query: kubevirt_info{} > 0
+  metricName: kubevirtVersion
+  instant: true
+
+- query: sum(increase(kubevirt_vmi_phase_transition_time_from_creation_seconds_count{}[30m])) by (phase) > 0
+  metricName: vmiStatusCount
+
+- query: count(rate(container_cpu_usage_seconds_total{pod=~".*virt-launcher.*", container="compute", node!~".*master.*", service="kubelet"}[5m])) by (node) > 0
+  metricName: vmiNodeCount
+
+- query: sum(irate(kubevirt_vmi_phase_transition_time_from_creation_seconds_count{}[2m])) by (phase) > 0
+  metricName: vmiStatusRate
+
+- query: histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{group="kubevirt", verb=~"LIST|GET"}[2m])) by (verb,resource,subresource,instance,le)) > 0
+  metricName: kubevirtAPI99thReadRequestLatency
+
+- query: histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{group="kubevirt", verb=~"POST|PUT|PATCH|DELETE"}[2m])) by (verb,resource,subresource,instance,le)) > 0
+  metricName: kubevirtAPI99thWriteRequestLatency
+
+- query: sum(increase(apiserver_request_total{group=~".*kubevirt.*"}[5m])) by (verb,group,resource,subresource,code) > 0
+  metricName: kubevirtAPIRequestCount
+
+- query: sum(irate(apiserver_request_total{group=~".*kubevirt.*"}[2m])) by (verb,group,resource,subresource,code) > 0
+  metricName: kubevirtAPIRequestRate
+
+- query: histogram_quantile(0.99, sum(rate(rest_client_request_duration_seconds_bucket{url=~".*kubevirt.*", verb=~"LIST|GET"}[2m])) by (verb,le,url)) > 0
+  metricName: kubevirtRestClient99thReadRequestLatency
+
+- query: histogram_quantile(0.99, sum(rate(rest_client_request_duration_seconds_bucket{url=~".*kubevirt.*", verb=~"POST|PUT|PATCH|DELETE"}[2m])) by (verb,le,url)) > 0
+  metricName: kubevirtRestClient99thWriteRequestLatency
+
+- query: sum(increase(rest_client_requests_total{pod=~"virt-controller.*|virt-handler.*|virt-operator.*|virt-api.*|vm.*|hco.*|kubevirt.*"}[5m])) by (code, container, job, verb, method) > 0
+  metricName: kubevirtRestClientRequestCount
+
+- query: sum(irate(rest_client_requests_total{pod=~"virt-controller.*|virt-handler.*|virt-operator.*|virt-api.*|vm.*|hco.*|kubevirt.*"}[2m])) by (code, container, job, verb, method) > 0
+  metricName: kubevirtRestClientRequestRate
+
+- query: histogram_quantile(0.95, sum(rate(rest_client_rate_limiter_duration_seconds_bucket{container!=""}[5m])) by (container, service, le)) > 0
+  metricName: kubevirtRateLimiter95thDuration
+
+- query: sum(irate(kubevirt_workqueue_adds_total{job=~".*kubevirt.*"}[2m])) by (instance, name) > 0
+  metricName: kubevirtWorkQueueAddRate
+
+- query: irate(kubevirt_workqueue_retries_total{}[5m]) > 0
+  metricName: kubevirtWorkQueueRetryRate
+
+- query: histogram_quantile(0.99, sum(rate(kubevirt_workqueue_queue_duration_seconds_bucket{job=~".*kubevirt.*"}[1m])) by (instance, name, le)) > 0
+  metricName: kubevirtWorkQueue99thQueueDuration
+
+- query: histogram_quantile(0.99, sum(rate(kubevirt_workqueue_work_duration_seconds_bucket{job=~".*kubevirt.*"}[1m])) by (instance, name, le)) > 0
+  metricName: kubevirtWorkQueue99thWorkDuration
+
+- query: kubevirt_workqueue_unfinished_work_seconds{} > 0
+  metricName: kubevirtWorkQueueUnfinishedWork
+
+- query: kubevirt_workqueue_longest_running_processor_seconds{} > 0
+  metricName: kubevirtWorkQueueLongestRunningProcessor
+
+- query: sum(kubevirt_workqueue_depth{}) by (instance, name) > 0
+  metricName: kubevirtWorkQueueDepth
+
+- query: sum(process_resident_memory_bytes{container!="", job=~".*kubevirt.*"}) by (container, instance) > 0
+  metricName: kubevirtMemory
+
+- query: sum(irate(process_cpu_seconds_total{container!="", job=~".*kubevirt.*"}[5m]) * 100) by (container, instance) > 0
+  metricName: kubevirtCPU
+
+# Processes metrics
+- query: sum(irate(process_cpu_seconds_total{container!=""}[2m]) * 100) by (job, container, instance) > 0
+  metricName: processCPU
+
+- query: sum(process_resident_memory_bytes{container!=""}) by (job, container, instance) > 0
+  metricName: processMemory

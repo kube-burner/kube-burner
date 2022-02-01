@@ -16,8 +16,6 @@ package types
 
 import (
 	"time"
-
-	v1 "k8s.io/api/core/v1"
 )
 
 // Measurement holds the measurement configuration
@@ -40,7 +38,7 @@ type Measurement struct {
 // LatencyThreshold holds the thresholds configuration
 type LatencyThreshold struct {
 	// ConditionType
-	ConditionType v1.PodConditionType `yaml:"conditionType"`
+	ConditionType string `yaml:"conditionType"`
 	// Metric type
 	Metric string `yaml:"metric"`
 	// Threshold accepted

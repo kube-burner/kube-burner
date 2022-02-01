@@ -58,7 +58,8 @@ func (p *pprof) setConfig(cfg types.Measurement) error {
 	return nil
 }
 
-func (p *pprof) start() {
+func (p *pprof) start(measurementWg *sync.WaitGroup) {
+	defer measurementWg.Done()
 	var wg sync.WaitGroup
 	err := os.MkdirAll(p.directory, 0744)
 	if err != nil {

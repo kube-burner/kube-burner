@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -305,6 +306,8 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 	verification := true
 	var rc int
 	var err error
+	var wg, measurementsWg sync.WaitGroup
+	wg.Wait()
 	var indexer *indexers.Indexer
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer, err = indexers.NewIndexer()
@@ -326,7 +329,8 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 		switch job.Config.JobType {
 		case config.CreationJob:
 			job.Cleanup()
-			measurements.Start()
+			measurements.Start(&measurementsWg)
+			measurementsWg.Wait()
 			job.RunCreateJob()
 			if job.Config.VerifyObjects {
 				verification = job.Verify()
