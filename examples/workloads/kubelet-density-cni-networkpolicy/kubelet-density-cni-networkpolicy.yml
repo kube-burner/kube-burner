@@ -1,0 +1,50 @@
+---
+global:
+  writeToFile: true
+  metricsDirectory: collected-metrics
+  indexerConfig:
+    enabled: true
+    esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
+    insecureSkipVerify: true
+    defaultIndex: kube-burner
+    type: elastic
+  measurements:
+    - name: podLatency
+      esIndex: kube-burner
+
+jobs:
+  - name: deny-all-policy
+    jobIterations: 1
+    qps: 1
+    burst: 1
+    namespacedIterations: false
+    namespace: kubelet-density-cni-networkpolicy
+    jobPause: 1m
+    objects:
+
+      - objectTemplate: templates/deny-all.yml
+        replicas: 1
+
+  - name: kubelet-density-cni-networkpolicy
+    jobIterations: 100
+    qps: 25
+    burst: 25
+    namespacedIterations: false
+    namespace: kubelet-density-cni-networkpolicy
+    waitWhenFinished: true
+    podWait: false
+    preloadImages: true
+    preLoadPeriod: 2m
+    objects:
+
+      - objectTemplate: templates/webserver-deployment.yml
+        replicas: 1
+
+      - objectTemplate: templates/webserver-service.yml
+        replicas: 1
+
+      - objectTemplate: templates/allow-http.yml
+        replicas: 1
+
+      - objectTemplate: templates/curl-deployment.yml
+        replicas: 1
