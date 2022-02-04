@@ -30,10 +30,10 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -160,13 +160,12 @@ func destroyCmd() *cobra.Command {
 					log.Fatal(err.Error())
 				}
 			}
-			selector := util.NewSelector()
-			selector.Configure("", fmt.Sprintf("kube-burner-uuid=%s", uuid), "")
+			listOptions := v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%s", uuid)}
 			clientSet, _, err := config.GetClientSet(0, 0)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
-			burner.CleanupNamespaces(clientSet, selector)
+			burner.CleanupNamespaces(clientSet, listOptions)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
@@ -323,6 +322,9 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 	jobList := burner.NewExecutorList(uuid)
 	// Iterate through job list
 	for jobPosition, job := range jobList {
+		if job.Config.PreLoadImages {
+			burner.PreLoadImages(job)
+		}
 		jobList[jobPosition].Start = time.Now().UTC()
 		log.Infof("Triggering job: %s", job.Config.Name)
 		measurements.SetJobConfig(&job.Config)

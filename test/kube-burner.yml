@@ -17,6 +17,8 @@ jobs:
     qps: {{ .QPS }}
     burst: {{ .BURST }}
     namespacedIterations: true
+    preLoadImages: true
+    preLoadPeriod: 30s
     cleanup: true
     namespace: namespaced
     podWait: false

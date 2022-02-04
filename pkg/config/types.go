@@ -126,4 +126,8 @@ type Job struct {
 	VerifyObjects bool `yaml:"verifyObjects" json:"verifyObjects"`
 	// ErrorOnVerify exit when verification fails
 	ErrorOnVerify bool `yaml:"errorOnVerify" json:"errorOnVerify"`
+	// PreLoadImages enables pulling all images before running the job
+	PreLoadImages bool `yaml:"preLoadImages" json:"preLoadImages"`
+	// PreLoadPeriod determines the duration of the preload stage
+	PreLoadPeriod time.Duration `yaml:"preLoadPeriod" json:"preLoadPeriod"`
 }

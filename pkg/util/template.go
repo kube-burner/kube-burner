@@ -30,6 +30,7 @@ type templateOption string
 
 const (
 	MissingKeyError templateOption = "missingkey=error"
+	MissingKeyZero  templateOption = "missingkey=zero"
 )
 
 func init() {
