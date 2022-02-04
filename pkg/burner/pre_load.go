@@ -27,18 +27,18 @@ type NestedPod struct {
 }
 
 func PreLoadImages(job Executor) {
-	log.Info("Pre-pulling: images from job ", job.Config.Name)
+	log.Info("Pre-load: images from job ", job.Config.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
 		log.Fatal(err)
 	}
 	err = createDS(imageList, job.Config.Name)
 	if err != nil {
-		log.Fatalf("Pre-pulling: %v", err)
+		log.Fatalf("Pre-load: %v", err)
 	}
-	log.Infof("Pre-pulling: Sleeping for %v", job.Config.PreLoadPeriod)
+	log.Infof("Pre-load: Sleeping for %v", job.Config.PreLoadPeriod)
 	time.Sleep(job.Config.PreLoadPeriod)
-	log.Info("Pre-pulling: Deleting namespace")
+	log.Infof("Pre-load: Deleting namespace %s", preLoadNs)
 	CleanupNamespaces(ClientSet, v1.ListOptions{LabelSelector: fmt.Sprintf("kubernetes.io/metadata.name=%s", preLoadNs)})
 }
 
@@ -114,7 +114,7 @@ func createDS(imageList []string, jobName string) error {
 			},
 		},
 	}
-	log.Infof("Pre-pulling: Creating DaemonSet %s in namespace %s", dsName, preLoadNs)
+	log.Infof("Pre-load: Creating DaemonSet %s in namespace %s", dsName, preLoadNs)
 	_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, v1.CreateOptions{})
 	if err != nil {
 		return err
