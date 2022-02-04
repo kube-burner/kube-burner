@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,10 +49,10 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 }
 
 // CleanupNamespaces deletes namespaces with the given selector
-func CleanupNamespaces(clientset *kubernetes.Clientset, s *util.Selector) {
-	ns, _ := clientset.CoreV1().Namespaces().List(context.TODO(), s.ListOptions)
+func CleanupNamespaces(clientset *kubernetes.Clientset, l metav1.ListOptions) {
+	ns, _ := clientset.CoreV1().Namespaces().List(context.TODO(), l)
 	if len(ns.Items) > 0 {
-		log.Infof("Deleting namespaces with label %s", s.LabelSelector)
+		log.Infof("Deleting namespaces with label %s", l.LabelSelector)
 		for _, ns := range ns.Items {
 			err := clientset.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 			if errors.IsNotFound(err) {
@@ -66,21 +65,21 @@ func CleanupNamespaces(clientset *kubernetes.Clientset, s *util.Selector) {
 		}
 	}
 	if len(ns.Items) > 0 {
-		waitForDeleteNamespaces(clientset, s)
+		waitForDeleteNamespaces(clientset, l)
 	}
 }
 
-func waitForDeleteNamespaces(clientset *kubernetes.Clientset, s *util.Selector) {
+func waitForDeleteNamespaces(clientset *kubernetes.Clientset, l metav1.ListOptions) {
 	log.Info("Waiting for namespaces to be definitely deleted")
 	wait.PollImmediateInfinite(time.Second, func() (bool, error) {
-		ns, err := clientset.CoreV1().Namespaces().List(context.TODO(), s.ListOptions)
+		ns, err := clientset.CoreV1().Namespaces().List(context.TODO(), l)
 		if err != nil {
 			return false, err
 		}
 		if len(ns.Items) == 0 {
 			return true, nil
 		}
-		log.Debugf("Waiting for %d namespaces labeled with %s to be deleted", len(ns.Items), s.LabelSelector)
+		log.Debugf("Waiting for %d namespaces labeled with %s to be deleted", len(ns.Items), l.LabelSelector)
 		return false, nil
 	})
 }
