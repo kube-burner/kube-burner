@@ -32,7 +32,7 @@ func PreLoadImages(job Executor) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = createDSs(imageList, job.Config.Name)
+	err = createDSs(imageList)
 	if err != nil {
 		log.Fatalf("Pre-load: %v", err)
 	}
@@ -71,7 +71,7 @@ func getJobImages(job Executor) ([]string, error) {
 	return imageList, nil
 }
 
-func createDSs(imageList []string, jobName string) error {
+func createDSs(imageList []string) error {
 	if err := createNamespace(ClientSet, preLoadNs, map[string]string{}); err != nil {
 		log.Fatal(err)
 	}
