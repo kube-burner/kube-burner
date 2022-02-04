@@ -73,7 +73,7 @@ func getJobImages(job Executor) ([]string, error) {
 
 func createDS(imageList []string, jobName string) error {
 	var containerList []corev1.Container
-	dsName := fmt.Sprintf("prepull-%s", jobName)
+	dsName := fmt.Sprintf("preload-%s", jobName)
 	if err := createNamespace(ClientSet, preLoadNs, map[string]string{}); err != nil {
 		log.Fatal(err)
 	}
