@@ -32,7 +32,7 @@ func PreLoadImages(job Executor) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = createDS(imageList, job.Config.Name)
+	err = createDSs(imageList, job.Config.Name)
 	if err != nil {
 		log.Fatalf("Pre-load: %v", err)
 	}
@@ -71,53 +71,51 @@ func getJobImages(job Executor) ([]string, error) {
 	return imageList, nil
 }
 
-func createDS(imageList []string, jobName string) error {
-	var containerList []corev1.Container
+func createDSs(imageList []string, jobName string) error {
 	dsName := fmt.Sprintf("preload-%s", jobName)
 	if err := createNamespace(ClientSet, preLoadNs, map[string]string{}); err != nil {
 		log.Fatal(err)
 	}
-	for i, image := range imageList {
+	for _, image := range imageList {
 		container := corev1.Container{
-			Name:            fmt.Sprintf("container-%d", i),
+			Name:            fmt.Sprintf("foobar"),
 			ImagePullPolicy: corev1.PullAlways,
 			Image:           image,
 		}
-		containerList = append(containerList, container)
-	}
-	ds := appsv1.DaemonSet{
-		TypeMeta: v1.TypeMeta{
-			Kind:       "DaemonSet",
-			APIVersion: "apps/v1",
-		},
-		ObjectMeta: v1.ObjectMeta{
-			Name: dsName,
-		},
-		Spec: appsv1.DaemonSetSpec{
-			Selector: &v1.LabelSelector{
-				MatchLabels: map[string]string{"app": dsName},
+		ds := appsv1.DaemonSet{
+			TypeMeta: v1.TypeMeta{
+				Kind:       "DaemonSet",
+				APIVersion: "apps/v1",
 			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
-					Labels: map[string]string{"app": dsName},
+			ObjectMeta: v1.ObjectMeta{
+				GenerateName: dsName,
+			},
+			Spec: appsv1.DaemonSetSpec{
+				Selector: &v1.LabelSelector{
+					MatchLabels: map[string]string{"app": dsName},
 				},
-				Spec: corev1.PodSpec{
-					InitContainers: containerList,
-					// Only Always restart policy is supported
-					Containers: []corev1.Container{
-						{
-							Name:  "sleep",
-							Image: "gcr.io/google_containers/pause-amd64:3.0",
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: v1.ObjectMeta{
+						Labels: map[string]string{"app": dsName},
+					},
+					Spec: corev1.PodSpec{
+						InitContainers: []corev1.Container{container},
+						// Only Always restart policy is supported
+						Containers: []corev1.Container{
+							{
+								Name:  "sleep",
+								Image: "gcr.io/google_containers/pause-amd64:3.0",
+							},
 						},
 					},
 				},
 			},
-		},
-	}
-	log.Infof("Pre-load: Creating DaemonSet %s in namespace %s", dsName, preLoadNs)
-	_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, v1.CreateOptions{})
-	if err != nil {
-		return err
+		}
+		log.Infof("Pre-load: Creating DaemonSet using image %s in namespace %s", image, preLoadNs)
+		_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, v1.CreateOptions{})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
