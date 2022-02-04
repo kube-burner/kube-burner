@@ -72,13 +72,13 @@ func getJobImages(job Executor) ([]string, error) {
 }
 
 func createDSs(imageList []string, jobName string) error {
-	dsName := fmt.Sprintf("preload-%s", jobName)
 	if err := createNamespace(ClientSet, preLoadNs, map[string]string{}); err != nil {
 		log.Fatal(err)
 	}
-	for _, image := range imageList {
+	for i, image := range imageList {
+		dsName := fmt.Sprintf("preload-%d", i)
 		container := corev1.Container{
-			Name:            fmt.Sprintf("foobar"),
+			Name:            "foobar",
 			ImagePullPolicy: corev1.PullAlways,
 			Image:           image,
 		}
