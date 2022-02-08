@@ -21,7 +21,7 @@ jobs:
     namespace: kubelet-density-cni
     waitWhenFinished: true
     podWait: false
-    preloadImages: true
+    preLoadImages: true
     preLoadPeriod: 2m
     objects:
 

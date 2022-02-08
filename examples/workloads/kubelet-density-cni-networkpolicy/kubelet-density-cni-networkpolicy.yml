@@ -33,7 +33,7 @@ jobs:
     namespace: kubelet-density-cni-networkpolicy
     waitWhenFinished: true
     podWait: false
-    preloadImages: true
+    preLoadImages: true
     preLoadPeriod: 2m
     objects:
 
