@@ -22,9 +22,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -67,6 +65,8 @@ func (ex *Executor) waitForObjects(ns string) {
 				go waitForVMI(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "VirtualMachineInstanceReplicaSet":
 				go waitForVMIRS(ns, ex.Config.MaxWaitTimeout, &wg)
+			case "Job":
+				go waitForJob(ns, ex.Config.MaxWaitTimeout, &wg)
 			default:
 				wg.Done()
 			}
@@ -148,18 +148,11 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
-		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
 		if err != nil {
 			return false, err
 		}
-		for _, pod := range pods.Items {
-			// TODO Check for all containers from the pod to be in ready state
-			if pod.Status.Phase != corev1.PodRunning {
-				log.Debugf("Waiting for pods in ns %s to be running", ns)
-				return false, nil
-			}
-		}
-		return true, nil
+		return len(pods.Items) == 0, nil
 	})
 }
 
@@ -173,7 +166,7 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *syn
 		Resource: types.OpenShiftBuildResource,
 	}
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
-		builds, err := dynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), v1.ListOptions{})
+		builds, err := dynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -198,14 +191,24 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *syn
 	})
 }
 
-func verifyConditionReady(gvr schema.GroupVersionResource, ns string, maxWaitTimeout time.Duration) {
+func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+	defer wg.Done()
+	gvr := schema.GroupVersionResource{
+		Group:    "batch",
+		Version:  "v1",
+		Resource: "jobs",
+	}
+	verifyCondition(gvr, ns, "Complete", maxWaitTimeout)
+}
+
+func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration) {
 	var uObj types.UnstructuredContent
 	wait.PollImmediate(10*time.Second, maxWaitTimeout, func() (bool, error) {
 		objs, err := dynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-	VERIFY_READY:
+	VERIFY:
 		for _, obj := range objs.Items {
 			jsonBuild, err := obj.MarshalJSON()
 			if err != nil {
@@ -215,8 +218,8 @@ func verifyConditionReady(gvr schema.GroupVersionResource, ns string, maxWaitTim
 			_ = json.Unmarshal(jsonBuild, &uObj)
 			for _, c := range uObj.Status.Conditions {
 				if c.Status == "True" {
-					if c.Type == "Ready" {
-						continue VERIFY_READY
+					if c.Type == condition {
+						continue VERIFY
 					}
 				}
 			}
@@ -234,7 +237,7 @@ func waitForVM(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Version:  types.KubevirtAPIVersion,
 		Resource: types.VirtualMachineResource,
 	}
-	verifyConditionReady(vmGVR, ns, maxWaitTimeout)
+	verifyCondition(vmGVR, ns, "Ready", maxWaitTimeout)
 }
 
 func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
@@ -244,7 +247,7 @@ func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Version:  types.KubevirtAPIVersion,
 		Resource: types.VirtualMachineInstanceResource,
 	}
-	verifyConditionReady(vmiGVR, ns, maxWaitTimeout)
+	verifyCondition(vmiGVR, ns, "Ready", maxWaitTimeout)
 }
 
 func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
