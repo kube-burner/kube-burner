@@ -1,0 +1,12 @@
+kind: Deployment
+apiVersion: apps/v1
+spec:
+  template:
+    spec:
+      containers:
+      - image: k8s.gcr.io/pause:3.1
+        name: api-intensive-2
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10M

@@ -37,6 +37,7 @@ type object struct {
 	unstructured   *unstructured.Unstructured
 	inputVars      map[string]interface{}
 	labelSelector  map[string]string
+	patchType      string
 }
 
 // Executor contains the information required to execute a job
@@ -72,6 +73,8 @@ func NewExecutorList(uuid string) []Executor {
 			ex = setupCreateJob(job)
 		} else if job.JobType == config.DeletionJob {
 			ex = setupDeleteJob(job)
+		} else if job.JobType == config.PatchJob {
+			ex = setupPatchJob(job)
 		} else {
 			log.Fatalf("Unknown jobType: %s", job.JobType)
 		}

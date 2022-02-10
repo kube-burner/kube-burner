@@ -28,6 +28,8 @@ const (
 	CreationJob JobType = "create"
 	// DeletionJob used to delete objects
 	DeletionJob JobType = "delete"
+	// PatchJob used to patch objects
+	PatchJob JobType = "patch"
 )
 
 // Spec configuration root
@@ -82,6 +84,8 @@ type Object struct {
 	InputVars map[string]interface{} `yaml:"inputVars" json:"inputVars,omitempty"`
 	// Kind object kind to delete
 	Kind string `yaml:"kind" json:"kind,omitempty"`
+	// The type of patch mode
+	PatchType string `yaml:"patchType" json:"patchType,omitempty"`
 	// APIVersion apiVersion of the object to remove
 	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with this labels will be removed
