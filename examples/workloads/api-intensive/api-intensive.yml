@@ -50,7 +50,7 @@ jobs:
         patchType: "application/apply-patch+yaml"
         apiVersion: apps/v1
       - kind: Deployment
-        objectTemplate: templates/deployment_patch_add_pod_3.yaml
+        objectTemplate: templates/deployment_patch_add_label.yaml
         labelSelector: {kube-burner-job: api-intensive}
         patchType: "application/strategic-merge-patch+json"
         apiVersion: apps/v1
