@@ -70,6 +70,7 @@ Each object element supports the following parameters:
 | objectTemplate       | Object template file or URL                                       | String  | deployment.yml or https://domain.com/deployment.yml | ""      |
 | replicas             | How replicas of this object to create per job iteration           | Integer | 10                                                  | -       |
 | inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -                                                   | -       |
+| namespaced           | Whether to create a namespaced object or not                      | Boolean | false                                               | true    |
 
 ### Default labels
 

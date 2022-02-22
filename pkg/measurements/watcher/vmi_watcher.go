@@ -1,4 +1,4 @@
-// Copyright 2021 The Kube-burner Authors.
+// Copyright 2022 The Kube-burner Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,10 +35,11 @@ var (
 func (p *Watcher) handleCreateVMI(obj interface{}) {
 	vmi := obj.(*kvv1.VirtualMachineInstance)
 	vmiID := getVMIID(*vmi)
+	t := time.Now().UTC()
 	if _, exists := p.GetMetric(vmiID); !exists {
 		if strings.Contains(vmi.Namespace, jobNamespace) {
 			vmiM := metrics.VMIMetric{
-				Timestamp:  time.Now().UTC(),
+				Timestamp:  t,
 				Namespace:  vmi.Namespace,
 				Name:       vmi.Name,
 				MetricName: jobMetricName,
@@ -51,7 +52,6 @@ func (p *Watcher) handleCreateVMI(obj interface{}) {
 	if m, exists := p.GetMetric(vmiID); exists {
 		vmiM := m.(*metrics.VMIMetric)
 		if vmiM.VMICreated == nil {
-			t := time.Now().UTC()
 			vmiM.VMICreated = &t
 		}
 		p.AddMetric(vmiID, vmiM)
@@ -61,6 +61,7 @@ func (p *Watcher) handleCreateVMI(obj interface{}) {
 func (p *Watcher) handleUpdateVMI(obj interface{}) {
 	vmi := obj.(*kvv1.VirtualMachineInstance)
 	vmiID := getVMIID(*vmi)
+	t := time.Now().UTC()
 	if m, exists := p.GetMetric(vmiID); exists && m != nil {
 		if m.(*metrics.VMIMetric).VMIReady == nil {
 			vmiM := m.(*metrics.VMIMetric)
@@ -69,28 +70,22 @@ func (p *Watcher) handleUpdateVMI(obj interface{}) {
 					switch c.Type {
 					case kvv1.VirtualMachineInstanceProvisioning:
 						if vmiM.VMIProvisioning == nil {
-							t := time.Now().UTC()
 							vmiM.VMIProvisioning = &t
 						}
 					case kvv1.VirtualMachineInstanceSynchronized:
 						if vmiM.VMISynchronized == nil {
-							t := time.Now().UTC()
 							vmiM.VMISynchronized = &t
 						}
 					case kvv1.VirtualMachineInstanceAgentConnected:
 						if vmiM.VMIAgentConnected == nil {
-							t := time.Now().UTC()
 							vmiM.VMIAgentConnected = &t
 						}
 					case kvv1.VirtualMachineInstanceAccessCredentialsSynchronized:
 						if vmiM.VMIAccessCredentialsSynchronized == nil {
-							t := time.Now().UTC()
 							vmiM.VMIAccessCredentialsSynchronized = &t
 						}
 					case kvv1.VirtualMachineInstanceReady:
-
 						if vmiM.VMIReady == nil {
-							t := time.Now().UTC()
 							vmiM.VMIReady = &t
 							log.Debugf("VMI %s is Ready", vmi.Name)
 							p.AddResourceStatePerNS(btypes.VirtualMachineInstanceResource, "Ready", vmi.Namespace, 1)
@@ -103,42 +98,34 @@ func (p *Watcher) handleUpdateVMI(obj interface{}) {
 			switch vmi.Status.Phase {
 			case kvv1.VmPhaseUnset:
 				if vmiM.VMIUnset == nil {
-					t := time.Now().UTC()
 					vmiM.VMIUnset = &t
 				}
 			case kvv1.Pending:
 				if vmiM.VMIPending == nil {
-					t := time.Now().UTC()
 					vmiM.VMIPending = &t
 				}
 			case kvv1.Scheduling:
 				if vmiM.VMIScheduling == nil {
-					t := time.Now().UTC()
 					vmiM.VMIScheduling = &t
 				}
 			case kvv1.Scheduled:
 				if vmiM.VMIScheduled == nil {
-					t := time.Now().UTC()
 					vmiM.VMIScheduled = &t
 				}
 			case kvv1.Running:
 				if vmiM.VMIRunning == nil {
-					t := time.Now().UTC()
 					vmiM.VMIRunning = &t
 				}
 			case kvv1.Succeeded:
 				if vmiM.VMISucceeded == nil {
-					t := time.Now().UTC()
 					vmiM.VMISucceeded = &t
 				}
 			case kvv1.Failed:
 				if vmiM.VMIFailed == nil {
-					t := time.Now().UTC()
 					vmiM.VMIFailed = &t
 				}
 			case kvv1.Unknown:
 				if vmiM.VMIUnknown == nil {
-					t := time.Now().UTC()
 					vmiM.VMIUnknown = &t
 				}
 			}

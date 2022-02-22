@@ -305,8 +305,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 	verification := true
 	var rc int
 	var err error
-	var wg, measurementsWg sync.WaitGroup
-	wg.Wait()
+	var measurementsWg sync.WaitGroup
 	var indexer *indexers.Indexer
 	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer, err = indexers.NewIndexer()

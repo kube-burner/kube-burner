@@ -1,4 +1,4 @@
-// Copyright 2021 The Kube-burner Authors.
+// Copyright 2022 The Kube-burner Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,10 +31,11 @@ import (
 func (p *Watcher) handleCreatePod(obj interface{}) {
 	pod := obj.(*k8sv1.Pod)
 	podID := getPodID(*pod)
+	t := time.Now().UTC()
 	if _, exists := p.GetMetric(string(podID)); !exists {
 		if strings.Contains(pod.Namespace, jobNamespace) {
 			podM := metrics.PodMetric{
-				Timestamp:  time.Now().UTC(),
+				Timestamp:  t,
 				Namespace:  pod.Namespace,
 				Name:       pod.Name,
 				MetricName: jobMetricName,
@@ -47,7 +48,6 @@ func (p *Watcher) handleCreatePod(obj interface{}) {
 	m, _ := p.GetMetric(string(podID))
 	podM := m.(*metrics.PodMetric)
 	if podM.PodCreated == nil {
-		t := time.Now().UTC()
 		podM.PodCreated = &t
 		p.AddMetric(string(podID), podM)
 	}
@@ -59,28 +59,25 @@ func (p *Watcher) handleUpdatePod(obj interface{}) {
 	if pm, exists := p.GetMetric(podID); exists && pm != nil {
 		if pm.(*metrics.PodMetric).PodReady == nil {
 			podM := pm.(*metrics.PodMetric)
+			t := time.Now().UTC()
 			for _, c := range pod.Status.Conditions {
 				if c.Status == v1.ConditionTrue {
 					switch c.Type {
 					case v1.PodScheduled:
 						if podM.PodScheduled == nil {
-							t := time.Now().UTC()
 							podM.PodScheduled = &t
 							podM.NodeName = pod.Spec.NodeName
 						}
 					case v1.PodInitialized:
 						if podM.PodInitialized == nil {
-							t := time.Now().UTC()
 							podM.PodInitialized = &t
 						}
 					case v1.ContainersReady:
 						if podM.PodContainersReady == nil {
-							t := time.Now().UTC()
 							podM.PodContainersReady = &t
 						}
 					case v1.PodReady:
 						log.Debugf("Pod %s is ready", pod.Name)
-						t := time.Now().UTC()
 						podM.PodReady = &t
 						p.AddResourceStatePerNS(btypes.PodResource, "Ready", pod.Namespace, 1)
 					}

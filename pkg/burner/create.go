@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,13 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-)
-
-const (
-	jobName      = "JobName"
-	replica      = "Replica"
-	jobIteration = "Iteration"
-	jobUUID      = "UUID"
 )
 
 func setupCreateJob(jobConfig config.Job) Executor {
@@ -81,6 +75,10 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			replicas:       o.Replicas,
 			unstructured:   uns,
 			inputVars:      o.InputVars,
+			namespaced:     o.Namespaced,
+		}
+		if o.Namespaced {
+			ex.nsObjects = true
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, gvk.Kind)
 		ex.Objects = append(ex.Objects, obj)
@@ -101,19 +99,15 @@ func (ex *Executor) RunCreateJob() {
 	if err != nil {
 		log.Fatalf("Error creating clientSet: %s", err)
 	}
-	if ex.Config.QPS == 0 {
-		log.Infof("QPS not set, using default client-go value: %v", rest.DefaultQPS)
+	if ex.Config.QPS == 0 || ex.Config.Burst == 0 {
+		log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
 	} else {
 		log.Infof("QPS: %v", RestConfig.QPS)
-	}
-	if ex.Config.Burst == 0 {
-		log.Infof("Burst rate not set, using default client-go value: %d", rest.DefaultBurst)
-	} else {
 		log.Infof("Burst: %v", RestConfig.Burst)
 	}
 	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	log.Infof("Running job %s", ex.Config.Name)
-	if !ex.Config.NamespacedIterations {
+	if ex.nsObjects && !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
 		nsLabels["name"] = ns
 		if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
@@ -123,7 +117,7 @@ func (ex *Executor) RunCreateJob() {
 	t0 := time.Now()
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		log.Debugf("Creating object replicas from iteration %d", i)
-		if ex.Config.NamespacedIterations {
+		if ex.nsObjects && ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			nsLabels["name"] = ns
 			if err = createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), nsLabels); err != nil {
@@ -135,7 +129,7 @@ func (ex *Executor) RunCreateJob() {
 			wg.Add(1)
 			go ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
-		// Wait for all replicaHandlers to finish before move forward to the next interation
+		// Wait for all replicaHandlers to finish before moving forward to next iteration
 		wg.Wait()
 		if ex.Config.PodWait {
 			log.Infof("Waiting %s all job actions to be completed", ex.Config.MaxWaitTimeout)
@@ -175,10 +169,7 @@ func (ex *Executor) RunCreateJob() {
 		}
 		wg.Wait()
 	}
-	tf := time.Now()
-	dt := tf.Sub(t0)
-	dts := dt.Seconds()
-	log.Infof("Finished the create job in %g seconds\n", dts)
+	log.Infof("Finished the create job in %g seconds\n", time.Since(t0).Seconds())
 }
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
@@ -214,14 +205,21 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				labels[k] = v
 			}
 			newObject.SetLabels(labels)
-			createRequest(obj.gvr, ns, newObject)
+			json.Marshal(newObject.Object)
+			createRequest(obj.gvr, ns, newObject, obj.namespaced)
 		}(r)
 	}
 }
 
-func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured) {
+func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, namespaced bool) {
+	var uns *unstructured.Unstructured
+	var err error
 	RetryWithExponentialBackOff(func() (bool, error) {
-		uns, err := dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if namespaced {
+			uns, err = dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
+		} else {
+			uns, err = dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+		}
 		if err != nil {
 			if errors.IsForbidden(err) {
 				log.Fatalf("Authorization error creating %s/%s: %s", obj.GetKind(), obj.GetName(), err)
