@@ -42,13 +42,14 @@ type object struct {
 
 // Executor contains the information required to execute a job
 type Executor struct {
-	Objects  []object
-	Start    time.Time
-	End      time.Time
-	Config   config.Job
-	selector *util.Selector
-	uuid     string
-	limiter  *rate.Limiter
+	Objects   []object
+	Start     time.Time
+	End       time.Time
+	Config    config.Job
+	selector  *util.Selector
+	uuid      string
+	limiter   *rate.Limiter
+	nsObjects bool
 }
 
 // ClientSet kubernetes clientset
