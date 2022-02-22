@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/watcher"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/remotecommand"
@@ -43,10 +44,10 @@ type pprof struct {
 }
 
 func init() {
-	measurementMap["pprof"] = &pprof{}
+	MeasurementMap[types.PprofMeasurement] = &pprof{}
 }
 
-func (p *pprof) setConfig(cfg types.Measurement) error {
+func (p *pprof) SetConfig(cfg types.Measurement) error {
 	p.directory = "pprof"
 	if cfg.PProfDirectory != "" {
 		p.directory = cfg.PProfDirectory
@@ -58,7 +59,7 @@ func (p *pprof) setConfig(cfg types.Measurement) error {
 	return nil
 }
 
-func (p *pprof) start(measurementWg *sync.WaitGroup) {
+func (p *pprof) Start(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var wg sync.WaitGroup
 	err := os.MkdirAll(p.directory, 0744)
@@ -88,7 +89,7 @@ func (p *pprof) start(measurementWg *sync.WaitGroup) {
 
 func getPods(target types.PProftarget) []corev1.Pod {
 	labelSelector := labels.Set(target.LabelSelector).String()
-	podList, err := factory.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), v1.ListOptions{LabelSelector: labelSelector})
+	podList, err := factory.ClientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), v1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		log.Errorf("Error found listing pods labeled with %s: %s", labelSelector, err)
 	}
@@ -149,7 +150,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				} else {
 					command = []string{"curl", "-sSLk", target.URL}
 				}
-				req := factory.clientSet.CoreV1().
+				req := factory.ClientSet.CoreV1().
 					RESTClient().
 					Post().
 					Resource("pods").
@@ -165,7 +166,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					Stdout:    true,
 				}, scheme.ParameterCodec)
 				log.Debugf("Executing %s in pod %s", command, pod.Name)
-				exec, err := remotecommand.NewSPDYExecutor(factory.restConfig, "POST", req.URL())
+				exec, err := remotecommand.NewSPDYExecutor(factory.RestConfig, "POST", req.URL())
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
 				}
@@ -184,7 +185,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 	wg.Wait()
 }
 
-func (p *pprof) stop() (int, error) {
+func (p *pprof) Stop() (int, error) {
 	p.stopChannel <- true
 	return 0, nil
 }
@@ -219,7 +220,7 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 		"/tmp/pprof.key": privKey,
 	}
 	for dest, f := range fMap {
-		req := factory.clientSet.CoreV1().
+		req := factory.ClientSet.CoreV1().
 			RESTClient().
 			Post().
 			Resource("pods").
@@ -233,7 +234,7 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 			Stderr:    true,
 			Stdout:    false,
 		}, scheme.ParameterCodec)
-		exec, err := remotecommand.NewSPDYExecutor(factory.restConfig, "POST", req.URL())
+		exec, err := remotecommand.NewSPDYExecutor(factory.RestConfig, "POST", req.URL())
 		if err != nil {
 			return fmt.Errorf("Failed to establish SPDYExecutor on %s: %s", pod.Name, err)
 		}
@@ -257,4 +258,14 @@ func (p *pprof) validateConfig() error {
 		}
 	}
 	return nil
+}
+
+// RegisterWatcher does not do anything for pprof
+func (p *pprof) RegisterWatcher(name string, w *watcher.Watcher) {
+	return
+}
+
+// GetWatcher does not do anything for pprof
+func (p *pprof) GetWatcher(name string) (*watcher.Watcher, bool) {
+	return nil, false
 }

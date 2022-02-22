@@ -22,27 +22,30 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/watcher"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 type measurementFactory struct {
-	jobConfig   *config.Job
-	clientSet   *kubernetes.Clientset
-	restConfig  *rest.Config
-	createFuncs map[string]measurement
-	indexer     *indexers.Indexer
-	uuid        string
+	JobConfig   *config.Job
+	ClientSet   *kubernetes.Clientset
+	RestConfig  *rest.Config
+	CreateFuncs map[string]Measurement
+	Indexer     *indexers.Indexer
+	UUID        string
 }
 
-type measurement interface {
-	start(*sync.WaitGroup)
-	stop() (int, error)
-	setConfig(types.Measurement) error
+type Measurement interface {
+	Start(*sync.WaitGroup)
+	Stop() (int, error)
+	SetConfig(types.Measurement) error
+	RegisterWatcher(name string, w *watcher.Watcher)
+	GetWatcher(name string) (*watcher.Watcher, bool)
 }
 
 var factory measurementFactory
-var measurementMap = make(map[string]measurement)
+var MeasurementMap = make(map[string]Measurement)
 var kubeburnerCfg *config.GlobalConfig = &config.ConfigSpec.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
@@ -50,45 +53,60 @@ func NewMeasurementFactory(restConfig *rest.Config, uuid string, indexer *indexe
 	log.Info("📈 Creating measurement factory")
 	clientSet := kubernetes.NewForConfigOrDie(restConfig)
 	factory = measurementFactory{
-		clientSet:   clientSet,
-		restConfig:  restConfig,
-		createFuncs: make(map[string]measurement),
-		indexer:     indexer,
-		uuid:        uuid,
+		ClientSet:   clientSet,
+		RestConfig:  restConfig,
+		CreateFuncs: make(map[string]Measurement),
+		Indexer:     indexer,
+		UUID:        uuid,
 	}
 	for _, measurement := range kubeburnerCfg.Measurements {
-		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
-			if err := factory.register(measurement, measurementFunc); err != nil {
-				log.Fatal(err.Error())
-			}
-		} else {
-			log.Warnf("Measurement not found: %s", measurement.Name)
-		}
+		CreateMeasurementIfNotExist(&measurement, measurement.Name)
 	}
 }
 
-func (mf *measurementFactory) register(measurement types.Measurement, measurementFunc measurement) error {
-	if _, exists := mf.createFuncs[measurement.Name]; exists {
+// CreateMeasurementIfNotExist creates a new measurement if structure is empty
+func CreateMeasurementIfNotExist(measurement *types.Measurement, measurementType string) {
+	if measurementFunc, exists := MeasurementMap[measurementType]; exists {
+		if measurement == nil || measurement.Name == "" {
+			measurement = defaultMeasurement(measurementType)
+		}
+		if err := factory.register(*measurement, measurementFunc); err != nil {
+			log.Fatal(err.Error())
+		}
+	} else {
+		log.Warnf("Measurement not found: %s", measurement.Name)
+	}
+}
+
+func defaultMeasurement(measurementType string) *types.Measurement {
+	return &types.Measurement{
+		Name:    measurementType,
+		ESIndex: "kube-burner",
+	}
+}
+
+func (mf *measurementFactory) register(measurement types.Measurement, measurementFunc Measurement) error {
+	if _, exists := mf.CreateFuncs[measurement.Name]; exists {
 		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
-		if err := measurementFunc.setConfig(measurement); err != nil {
-			return fmt.Errorf("Config validataion error: %s", err)
+		if err := measurementFunc.SetConfig(measurement); err != nil {
+			return fmt.Errorf("config validataion error: %s", err)
 		}
-		mf.createFuncs[measurement.Name] = measurementFunc
+		mf.CreateFuncs[measurement.Name] = measurementFunc
 		log.Infof("Registered measurement: %s", measurement.Name)
 	}
 	return nil
 }
 
 func SetJobConfig(jobConfig *config.Job) {
-	factory.jobConfig = jobConfig
+	factory.JobConfig = jobConfig
 }
 
 // Start starts registered measurements
 func Start(wg *sync.WaitGroup) {
-	for _, measurement := range factory.createFuncs {
+	for _, measurement := range factory.CreateFuncs {
 		wg.Add(1)
-		go measurement.start(wg)
+		go measurement.Start(wg)
 	}
 }
 
@@ -96,9 +114,9 @@ func Start(wg *sync.WaitGroup) {
 func Stop() int {
 	var err error
 	var r, rc int
-	for name, measurement := range factory.createFuncs {
+	for name, measurement := range factory.CreateFuncs {
 		log.Infof("Stopping measurement: %s", name)
-		if r, err = measurement.stop(); err != nil {
+		if r, err = measurement.Stop(); err != nil {
 			log.Errorf("Error stopping measurement %s: %s", name, err)
 		}
 		if r != 0 {
