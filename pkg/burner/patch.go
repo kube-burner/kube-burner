@@ -165,12 +165,12 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 			}
 		}
 	}
-
+	ns := originalItem.GetNamespace()
 	log.Debugf("Patching %s/%s in namespace %s", originalItem.GetKind(),
-		originalItem.GetName(), originalItem.GetNamespace())
+		originalItem.GetName(), ns)
 	ex.limiter.Wait(context.TODO())
 
-	uns, err := dynamicClient.Resource(obj.gvr).Namespace(originalItem.GetNamespace()).
+	uns, err := dynamicClient.Resource(obj.gvr).Namespace(ns).
 		Patch(context.TODO(), originalItem.GetName(),
 			types.PatchType(obj.patchType), data, patchOptions)
 	if err != nil {
@@ -178,10 +178,9 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 			log.Fatalf("Authorization error patching %s/%s: %s", originalItem.GetKind(), originalItem.GetName(), err)
 		} else if err != nil {
 			log.Errorf("Error patching object %s/%s in namespace %s: %s", originalItem.GetKind(),
-				originalItem.GetName(), originalItem.GetNamespace(), err)
+				originalItem.GetName(), ns, err)
 		}
 	} else {
-		ns := originalItem.GetNamespace()
 		log.Debugf("Patched %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 	}
 
