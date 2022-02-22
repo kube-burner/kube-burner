@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var preLoadNs string = "kube-burner"
+var preLoadNs string = "preload-kube-burner"
 
 // NestedPod represents a pod nested in a higher level object such as deployment or a daemonset
 type NestedPod struct {
