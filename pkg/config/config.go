@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// ConfigSpec configuration object
 var ConfigSpec Spec = Spec{
 	GlobalConfig: GlobalConfig{
 		MetricsDirectory: "collected-metrics",
@@ -69,7 +68,20 @@ func renderConfig(cfg []byte) ([]byte, error) {
 	return rendered, nil
 }
 
-// UnmarshalYAML implements Unmarshaller to customize defaults
+// UnmarshalYAML implements Unmarshaller to customize object defaults
+func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawObject Object
+	object := rawObject{
+		Namespaced: true,
+	}
+	if err := unmarshal(&object); err != nil {
+		return err
+	}
+	*o = Object(object)
+	return nil
+}
+
+// UnmarshalYAML implements Unmarshaller to customize job defaults
 func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type rawJob Job
 	raw := rawJob{
@@ -84,6 +96,9 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		MaxWaitTimeout:       3 * time.Hour,
 		PreLoadImages:        false,
 		PreLoadPeriod:        1 * time.Minute,
+		Objects: []Object{
+			{Namespaced: true},
+		},
 	}
 	if err := unmarshal(&raw); err != nil {
 		return err
@@ -115,7 +130,7 @@ func Parse(c string, jobsRequired bool) error {
 	}
 	if jobsRequired {
 		if len(ConfigSpec.Jobs) <= 0 {
-			return fmt.Errorf("No jobs found at configuration file")
+			return fmt.Errorf("No jobs found in the configuration file")
 		}
 		if err := validateDNS1123(); err != nil {
 			return err
@@ -127,6 +142,7 @@ func Parse(c string, jobsRequired bool) error {
 			}
 		}
 	}
+	fmt.Println(ConfigSpec.Jobs[0].Objects[0].Namespaced)
 	return nil
 }
 
