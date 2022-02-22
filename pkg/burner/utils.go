@@ -28,6 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubectl/pkg/scheme"
+
+	"github.com/cloud-bulldozer/kube-burner/pkg/burner/types"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
+	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 )
 
 const (
@@ -74,7 +78,7 @@ func (ex *Executor) Verify() bool {
 	var replicas int
 	success := true
 	log.Info("Verifying created objects")
-	for objectIndex, obj := range ex.objects {
+	for objectIndex, obj := range ex.Objects {
 		listOptions := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.Config.Name, objectIndex),
 			Limit:         objectLimit,
@@ -125,4 +129,18 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
 
 func isEmpty(raw []byte) bool {
 	return strings.TrimSpace(string(raw)) == ""
+}
+
+func CreateMeasurementIfNotExist(ex *Executor) {
+	// register Pod or VM latency measurement if obj type exist and measurement was not registered before
+	for _, obj := range ex.Objects {
+		switch obj.gvr.Resource {
+		case types.PodResource:
+			measurements.CreateMeasurementIfNotExist(nil, mtypes.PodLatency)
+		case types.VirtualMachineResource:
+			measurements.CreateMeasurementIfNotExist(nil, mtypes.VMLatency)
+		case types.VirtualMachineInstanceResource:
+			measurements.CreateMeasurementIfNotExist(nil, mtypes.VMLatency)
+		}
+	}
 }
