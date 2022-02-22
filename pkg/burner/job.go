@@ -38,18 +38,27 @@ type object struct {
 	inputVars      map[string]interface{}
 	labelSelector  map[string]string
 	patchType      string
+	namespaced     bool
 }
 
 // Executor contains the information required to execute a job
 type Executor struct {
-	objects  []object
-	Start    time.Time
-	End      time.Time
-	Config   config.Job
-	selector *util.Selector
-	uuid     string
-	limiter  *rate.Limiter
+	objects   []object
+	Start     time.Time
+	End       time.Time
+	Config    config.Job
+	selector  *util.Selector
+	uuid      string
+	limiter   *rate.Limiter
+	nsObjects bool
 }
+
+const (
+	jobName      = "JobName"
+	replica      = "Replica"
+	jobIteration = "Iteration"
+	jobUUID      = "UUID"
+)
 
 // ClientSet kubernetes clientset
 var ClientSet *kubernetes.Clientset
