@@ -45,7 +45,7 @@ func PreLoadImages(job Executor) {
 func getJobImages(job Executor) ([]string, error) {
 	var imageList []string
 	var unstructuredObject unstructured.Unstructured
-	for _, object := range job.objects {
+	for _, object := range job.Objects {
 		renderedObj, err := util.RenderTemplate(object.objectSpec, object.inputVars, util.MissingKeyZero)
 		if err != nil {
 			return imageList, err

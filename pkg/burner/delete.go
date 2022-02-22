@@ -47,7 +47,7 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 			labelSelector: o.LabelSelector,
 		}
 		log.Infof("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
-		ex.objects = append(ex.objects, obj)
+		ex.Objects = append(ex.Objects, obj)
 	}
 	return ex
 }
@@ -64,7 +64,7 @@ func (ex *Executor) RunDeleteJob() {
 	if err != nil {
 		log.Fatalf("Error creating DynamicClient: %s", err)
 	}
-	for _, obj := range ex.objects {
+	for _, obj := range ex.Objects {
 		labelSelector := labels.Set(obj.labelSelector).String()
 		listOptions := metav1.ListOptions{
 			LabelSelector: labelSelector,

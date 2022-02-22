@@ -73,7 +73,7 @@ func setupPatchJob(jobConfig config.Job) Executor {
 			patchType:      o.PatchType,
 		}
 		log.Infof("Job %s: Patch %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
-		ex.objects = append(ex.objects, obj)
+		ex.Objects = append(ex.Objects, obj)
 	}
 	return ex
 }
@@ -92,7 +92,7 @@ func (ex *Executor) RunPatchJob() {
 
 	log.Infof("Running patch job %s", ex.Config.Name)
 	var wg sync.WaitGroup
-	for _, obj := range ex.objects {
+	for _, obj := range ex.Objects {
 
 		labelSelector := labels.Set(obj.labelSelector).String()
 		listOptions := metav1.ListOptions{

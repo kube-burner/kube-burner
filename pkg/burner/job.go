@@ -42,7 +42,7 @@ type object struct {
 
 // Executor contains the information required to execute a job
 type Executor struct {
-	objects  []object
+	Objects  []object
 	Start    time.Time
 	End      time.Time
 	Config   config.Job
