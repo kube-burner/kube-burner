@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -82,7 +83,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			inputVars:      o.InputVars,
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, gvk.Kind)
-		ex.objects = append(ex.objects, obj)
+		ex.Objects = append(ex.Objects, obj)
 	}
 	return ex
 }
@@ -130,7 +131,7 @@ func (ex *Executor) RunCreateJob() {
 				continue
 			}
 		}
-		for objectIndex, obj := range ex.objects {
+		for objectIndex, obj := range ex.Objects {
 			wg.Add(1)
 			go ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
@@ -139,7 +140,7 @@ func (ex *Executor) RunCreateJob() {
 		if ex.Config.PodWait {
 			log.Infof("Waiting %s all job actions to be completed", ex.Config.MaxWaitTimeout)
 			log.Debugf("Waiting for actions in namespace %v to be completed", ns)
-			ex.waitForObjects(ns)
+			ex.waitForObjects(ns, measurements.MeasurementMap, true)
 		}
 		if ex.Config.JobIterationDelay > 0 {
 			log.Infof("Sleeping for %v", ex.Config.JobIterationDelay)
@@ -155,13 +156,15 @@ func (ex *Executor) RunCreateJob() {
 			sem = make(chan int, int(rest.DefaultQPS)/2)
 		}
 		for i := 1; i <= ex.Config.JobIterations; i++ {
+			waitPerIteration := false
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+				waitPerIteration = true
 			}
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				ex.waitForObjects(ns)
+				ex.waitForObjects(ns, measurements.MeasurementMap, waitPerIteration)
 				<-sem
 				wg.Done()
 			}(ns)

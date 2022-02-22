@@ -18,6 +18,19 @@ import (
 	"time"
 )
 
+const (
+	PodLatency                     = "podLatency"
+	PodLatencyMeasurement          = "podLatencyMeasurement"
+	PodLatencyQuantilesMeasurement = "podLatencyQuantilesMeasurement"
+	VMLatency                      = "vmLatency"
+	VMLatencyMeasurement           = "vmLatencyMeasurement"
+	VMLatencyQuantilesMeasurement  = "vmLatencyQuantilesMeasurement"
+	PprofMeasurement               = "pprof"
+	PodWatcher                     = "podWatcher"
+	VMWatcher                      = "vmWatcher"
+	VMIWatcher                     = "vmiWatcher"
+)
+
 // Measurement holds the measurement configuration
 type Measurement struct {
 	// Name is the name the measurement

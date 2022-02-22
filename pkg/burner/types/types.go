@@ -26,6 +26,14 @@ const (
 	VirtualMachineResource                   = "virtualmachines"
 	VirtualMachineInstanceResource           = "virtualmachineinstances"
 	VirtualMachineInstanceReplicaSetResource = "virtualmachineinstancereplicasets"
+
+	// PodResource holds the pod resource kind
+	PodResource = "pods"
+
+	// Job CRD
+	JobGroup      = "batch"
+	JobAPIVersion = "v1"
+	JobResource   = "jobs"
 )
 
 // Condition contains details for the current condition of this pod.

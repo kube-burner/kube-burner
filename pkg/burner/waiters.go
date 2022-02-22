@@ -27,12 +27,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner/types"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
+	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/watcher"
 )
 
-func (ex *Executor) waitForObjects(ns string) {
+func (ex *Executor) waitForObjects(ns string, mMap map[string]measurements.Measurement, waitPerIteration bool) {
 	waitFor := true
 	var wg sync.WaitGroup
-	for _, obj := range ex.objects {
+	for _, obj := range ex.Objects {
 		if len(ex.Config.WaitFor) > 0 {
 			waitFor = false
 			for _, kind := range ex.Config.WaitFor {
@@ -42,6 +45,14 @@ func (ex *Executor) waitForObjects(ns string) {
 				}
 			}
 		}
+
+		// if waiting after all iterations and each iteration use the same namespace the total number of replicas is
+		// the sum of replicas of all iterations
+		numReplicas := obj.replicas
+		if !waitPerIteration {
+			numReplicas = obj.replicas * ex.Config.JobIterations
+		}
+
 		if waitFor {
 			wg.Add(1)
 			switch obj.unstructured.GetKind() {
@@ -54,15 +65,18 @@ func (ex *Executor) waitForObjects(ns string) {
 			case "DaemonSet":
 				go waitForDS(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "Pod":
-				go waitForPod(ns, ex.Config.MaxWaitTimeout, &wg)
+				w, _ := mMap[mtypes.PodLatency].GetWatcher(mtypes.PodWatcher)
+				go waitForPod(ns, "Ready", ex.Config.MaxWaitTimeout, numReplicas, w, &wg)
 			case "Build":
-				go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
+				go waitForBuild(ns, ex.Config.MaxWaitTimeout, numReplicas, &wg)
 			case "BuildConfig":
-				go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
+				go waitForBuild(ns, ex.Config.MaxWaitTimeout, numReplicas, &wg)
 			case "VirtualMachine":
-				go waitForVM(ns, ex.Config.MaxWaitTimeout, &wg)
+				w, _ := mMap[mtypes.VMLatency].GetWatcher(mtypes.VMWatcher)
+				go waitForVM(ns, "Ready", ex.Config.MaxWaitTimeout, numReplicas, w, &wg)
 			case "VirtualMachineInstance":
-				go waitForVMI(ns, ex.Config.MaxWaitTimeout, &wg)
+				w, _ := mMap[mtypes.VMLatency].GetWatcher(mtypes.VMIWatcher)
+				go waitForVMI(ns, "Ready", ex.Config.MaxWaitTimeout, numReplicas, w, &wg)
 			case "VirtualMachineInstanceReplicaSet":
 				go waitForVMIRS(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "Job":
@@ -145,14 +159,17 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForPod(ns string, condition string, maxWaitTimeout time.Duration, expected int, podWatcher *watcher.Watcher, wg *sync.WaitGroup) {
 	defer wg.Done()
+	if podWatcher == nil {
+		log.Fatal("Pod watcher was not initialized")
+	}
 	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
-		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
-		if err != nil {
-			return false, err
+		n := (*podWatcher).GetResourceStatePerNSCount(types.PodResource, condition, ns)
+		if n == expected {
+			return true, nil
 		}
-		return len(pods.Items) == 0, nil
+		return false, nil
 	})
 }
 
@@ -194,9 +211,9 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *syn
 func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
 	gvr := schema.GroupVersionResource{
-		Group:    "batch",
-		Version:  "v1",
-		Resource: "jobs",
+		Group:    types.JobGroup,
+		Version:  types.JobAPIVersion,
+		Resource: types.JobResource,
 	}
 	verifyCondition(gvr, ns, "Complete", maxWaitTimeout)
 }
@@ -230,24 +247,26 @@ func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxW
 	})
 }
 
-func waitForVM(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForVM(ns string, condition string, maxWaitTimeout time.Duration, expected int, vmWatcher *watcher.Watcher, wg *sync.WaitGroup) {
 	defer wg.Done()
-	vmGVR := schema.GroupVersionResource{
-		Group:    types.KubevirtGroup,
-		Version:  types.KubevirtAPIVersion,
-		Resource: types.VirtualMachineResource,
-	}
-	verifyCondition(vmGVR, ns, "Ready", maxWaitTimeout)
+	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+		n := (*vmWatcher).GetResourceStatePerNSCount(types.VirtualMachineResource, condition, ns)
+		if n == expected {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
-func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForVMI(ns string, condition string, maxWaitTimeout time.Duration, expected int, vmiWatcher *watcher.Watcher, wg *sync.WaitGroup) {
 	defer wg.Done()
-	vmiGVR := schema.GroupVersionResource{
-		Group:    types.KubevirtGroup,
-		Version:  types.KubevirtAPIVersion,
-		Resource: types.VirtualMachineInstanceResource,
-	}
-	verifyCondition(vmiGVR, ns, "Ready", maxWaitTimeout)
+	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+		n := (*vmiWatcher).GetResourceStatePerNSCount(types.VirtualMachineInstanceResource, condition, ns)
+		if n == expected {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {

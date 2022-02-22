@@ -331,6 +331,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 		switch job.Config.JobType {
 		case config.CreationJob:
 			job.Cleanup()
+			burner.CreateMeasurementIfNotExist(&job)
 			measurements.Start(&measurementsWg)
 			measurementsWg.Wait()
 			job.RunCreateJob()
