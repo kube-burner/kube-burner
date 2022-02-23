@@ -142,7 +142,6 @@ func Parse(c string, jobsRequired bool) error {
 			}
 		}
 	}
-	fmt.Println(ConfigSpec.Jobs[0].Objects[0].Namespaced)
 	return nil
 }
 
