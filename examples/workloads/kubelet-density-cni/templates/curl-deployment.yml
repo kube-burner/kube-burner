@@ -22,13 +22,15 @@ spec:
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: false
-        readinessProbe:
+        startupProbe:
           exec:
             command: 
               - "/bin/sh"
               - "-c"
               - "curl ${WEBSERVER_HOSTNAME}:${WEBSERVER_PORT}"
           periodSeconds: 1
+          timeoutSeconds: 60
+          failureThreshold: 600
       restartPolicy: Always
   replicas: 1
   selector:
