@@ -74,7 +74,7 @@ func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify 
 }
 
 func (p *Prometheus) verifyConnection() error {
-	_, err := p.api.Config(context.TODO())
+	_, err := p.api.Runtimeinfo(context.TODO())
 	if err != nil {
 		return err
 	}
