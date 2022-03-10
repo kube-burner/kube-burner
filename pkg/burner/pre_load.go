@@ -39,7 +39,7 @@ func PreLoadImages(job Executor) {
 	log.Infof("Pre-load: Sleeping for %v", job.Config.PreLoadPeriod)
 	time.Sleep(job.Config.PreLoadPeriod)
 	log.Infof("Pre-load: Deleting namespace %s", preLoadNs)
-	CleanupNamespaces(ClientSet, v1.ListOptions{LabelSelector: fmt.Sprintf("kubernetes.io/metadata.name=%s", preLoadNs)})
+	CleanupNamespaces(ClientSet, v1.ListOptions{LabelSelector: "kube-burner-preload=yes"})
 }
 
 func getJobImages(job Executor) ([]string, error) {
@@ -72,7 +72,7 @@ func getJobImages(job Executor) ([]string, error) {
 }
 
 func createDSs(imageList []string) error {
-	if err := createNamespace(ClientSet, preLoadNs, map[string]string{}); err != nil {
+	if err := createNamespace(ClientSet, preLoadNs, map[string]string{"kube-burner-preload": "true"}); err != nil {
 		log.Fatal(err)
 	}
 	for i, image := range imageList {
