@@ -39,7 +39,7 @@ func PreLoadImages(job Executor) {
 	log.Infof("Pre-load: Sleeping for %v", job.Config.PreLoadPeriod)
 	time.Sleep(job.Config.PreLoadPeriod)
 	log.Infof("Pre-load: Deleting namespace %s", preLoadNs)
-	CleanupNamespaces(ClientSet, v1.ListOptions{LabelSelector: "kube-burner-preload=yes"})
+	CleanupNamespaces(ClientSet, v1.ListOptions{LabelSelector: "kube-burner-preload=true"})
 }
 
 func getJobImages(job Executor) ([]string, error) {
