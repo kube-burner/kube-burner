@@ -166,7 +166,7 @@ func (ex *Executor) RunCreateJob() {
 		}
 		wg.Wait()
 	}
-	log.Infof("Finished the create job in %g seconds\n", time.Since(t0).Seconds())
+	log.Infof("Finished the create job in %g seconds", time.Since(t0).Seconds())
 }
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
