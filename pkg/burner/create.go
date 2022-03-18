@@ -145,7 +145,7 @@ func (ex *Executor) RunCreateJob() {
 		log.Infof("Waiting %s for actions to be completed", ex.Config.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ex.Config.QPS)/2)
-		if RestConfig.QPS == 0 {
+		if RestConfig.QPS < 2 {
 			sem = make(chan int, int(rest.DefaultQPS)/2)
 		}
 		for i := 1; i <= ex.Config.JobIterations; i++ {
