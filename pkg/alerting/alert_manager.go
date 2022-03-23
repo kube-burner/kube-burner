@@ -94,9 +94,13 @@ func (a *AlertManager) readProfile(alertProfile string) error {
 
 // Evaluate evaluates expressions
 func (a *AlertManager) Evaluate(start, end time.Time) int {
+	elapsed := int(end.Sub(start).Minutes())
+	var renderedQuery bytes.Buffer
 	result := Passed
 	for _, alert := range a.alertProfile {
 		log.Infof("Evaluating expression: '%s'", alert.Expr)
+		t, _ := template.New("").Parse(alert.Expr)
+		t.Execute(&renderedQuery, map[string]int{"elapsed": elapsed})
 		v, err := a.prometheus.QueryRange(alert.Expr, start, end)
 		if err != nil {
 			log.Warnf("Error performing query %s: %s", alert.Expr, err)
@@ -133,7 +137,6 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 	}
 
 	for _, v := range data {
-		// TODO: improve value casting
 		templateData.Labels = make(map[string]string)
 		for k, v := range v.Metric {
 			templateData.Labels[string(k)] = string(v)
