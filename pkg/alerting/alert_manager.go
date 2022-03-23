@@ -17,6 +17,7 @@ package alerting
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strings"
 	"text/template"
 	"time"
@@ -98,10 +99,10 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 	var renderedQuery bytes.Buffer
 	result := Passed
 	for _, alert := range a.alertProfile {
-		log.Infof("Evaluating expression: '%s'", alert.Expr)
 		t, _ := template.New("").Parse(alert.Expr)
 		t.Execute(&renderedQuery, map[string]int{"elapsed": elapsed})
-		v, err := a.prometheus.QueryRange(alert.Expr, start, end)
+		log.Infof("Evaluating expression: '%s'", renderedQuery)
+		v, err := a.prometheus.QueryRange(renderedQuery.String(), start, end)
 		if err != nil {
 			log.Warnf("Error performing query %s: %s", alert.Expr, err)
 			continue
@@ -143,7 +144,8 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 		}
 		for _, val := range v.Values {
 			renderedDesc.Reset()
-			templateData.Value = float64(val.Value)
+			// Take 3 decimals
+			templateData.Value = math.Round(float64(val.Value)*1000) / 1000
 			if err := t.Execute(&renderedDesc, templateData); err != nil {
 				log.Errorf("Rendering error: %s", err)
 			}

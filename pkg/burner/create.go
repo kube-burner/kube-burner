@@ -113,7 +113,7 @@ func (ex *Executor) RunCreateJob() {
 			log.Fatal(err.Error())
 		}
 	}
-	t0 := time.Now()
+	t0 := time.Now().Round(time.Second)
 	for i := 1; i <= ex.Config.JobIterations; i++ {
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsObjects && ex.Config.NamespacedIterations {
@@ -166,7 +166,8 @@ func (ex *Executor) RunCreateJob() {
 		}
 		wg.Wait()
 	}
-	log.Infof("Finished the create job in %g seconds", time.Since(t0).Seconds())
+	t1 := time.Now().Round(time.Second)
+	log.Infof("Finished the create job in %g seconds", t1.Sub(t0).Seconds())
 }
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
