@@ -90,11 +90,13 @@ func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}
 				// Required to acccess the attribute by name
 				r := reflect.ValueOf(pq.(LatencyQuantiles))
 				v := r.FieldByName(phase.Metric).Int()
+				latency := float32(v) / 1000
+				msg := fmt.Sprintf("❗ %s %s latency (%.2fs) higher than configured threshold: %v", phase.Metric, phase.ConditionType, latency, phase.Threshold)
 				if v > phase.Threshold.Milliseconds() {
-					log.Warnf("%s %s latency (%dms) higher than configured threshold: %v", phase.Metric, phase.ConditionType, v, phase.Threshold)
+					log.Error(msg)
 					rc = 1
 				} else {
-					log.Infof("%s %s latency (%dms) meets the configured threshold: %v", phase.Metric, phase.ConditionType, v, phase.Threshold)
+					log.Info(msg)
 				}
 				continue
 			}

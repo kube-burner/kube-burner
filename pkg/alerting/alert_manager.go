@@ -100,11 +100,13 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 	result := Passed
 	for _, alert := range a.alertProfile {
 		t, _ := template.New("").Parse(alert.Expr)
-		t.Execute(&renderedQuery, map[string]int{"elapsed": elapsed})
-		log.Infof("Evaluating expression: '%s'", renderedQuery)
-		v, err := a.prometheus.QueryRange(renderedQuery.String(), start, end)
+		t.Execute(&renderedQuery, map[string]string{"elapsed": fmt.Sprintf("%dm", elapsed)})
+		expr := renderedQuery.String()
+		renderedQuery.Reset()
+		log.Infof("Evaluating expression: '%s'", expr)
+		v, err := a.prometheus.QueryRange(expr, start, end)
 		if err != nil {
-			log.Warnf("Error performing query %s: %s", alert.Expr, err)
+			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
 		alarmResult, err := parseMatrix(v, alert.Description, alert.Severity)
@@ -148,8 +150,9 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 			templateData.Value = math.Round(float64(val.Value)*1000) / 1000
 			if err := t.Execute(&renderedDesc, templateData); err != nil {
 				log.Errorf("Rendering error: %s", err)
+				result = Failed
 			}
-			msg := fmt.Sprintf("Alert triggered at %v: '%s'", val.Timestamp.Time(), renderedDesc.String())
+			msg := fmt.Sprintf("🚨 Alert triggered at %v: '%s'", val.Timestamp.Time(), renderedDesc.String())
 			switch severity {
 			case sevWarn:
 				log.Warn(msg)
