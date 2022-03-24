@@ -31,11 +31,11 @@ Alarm can be configured with a severity. Each one with different effects. At the
 
 ### Using the elapsed variable
 
-There's a special go-template variable that can be used within the prometheus expression, the variable _elapased_ is set to the value of the job duration (or the range given to check-alerts). This variable is specially useful in expressions using (aggregations over time functions)[https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time]
+There's a special go-template variable that can be used within the prometheus expression, the variable **elapased** is set to the value of the job duration (or the range given to check-alerts). This variable is specially useful in expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
 i.e:
 
 ```yaml
-- expr: avg_over_time(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))[{{ .elapsed }}m]) > 0.01
+- expr: avg_over_time(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))[{{ .elapsed }}:]) > 0.01
   description: avg. etcd fsync latency on {{$labels.pod}} higher than 10ms {{$value}}
   severity: error
 ```
