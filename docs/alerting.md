@@ -31,7 +31,7 @@ Alarm can be configured with a severity. Each one with different effects. At the
 
 ### Using the elapsed variable
 
-There's a special go-template variable that can be used within the prometheus expression, the variable **elapased** is set to the value of the job duration (or the range given to check-alerts). This variable is specially useful in expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
+There's a special go-template variable that can be used within the prometheus expression, the variable **elapsed** is set to the value of the job duration (or the range given to check-alerts). This variable is specially useful in expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
 i.e:
 
 ```yaml
