@@ -32,7 +32,7 @@ func (p *Watcher) handleCreatePod(obj interface{}) {
 	pod := obj.(*k8sv1.Pod)
 	podID := getPodID(*pod)
 	t := time.Now().UTC()
-	if _, exists := p.GetMetric(string(podID)); !exists {
+	if _, exists := p.GetMetric(podID); !exists {
 		if strings.Contains(pod.Namespace, jobNamespace) {
 			podM := metrics.PodMetric{
 				Timestamp:  t,
@@ -42,14 +42,14 @@ func (p *Watcher) handleCreatePod(obj interface{}) {
 				UUID:       jobUUID,
 				JobName:    jobName,
 			}
-			p.AddMetric(string(podID), &podM)
+			p.AddMetric(podID, &podM)
 		}
 	}
-	m, _ := p.GetMetric(string(podID))
+	m, _ := p.GetMetric(podID)
 	podM := m.(*metrics.PodMetric)
 	if podM.PodCreated == nil {
 		podM.PodCreated = &t
-		p.AddMetric(string(podID), podM)
+		p.AddMetric(podID, podM)
 	}
 }
 

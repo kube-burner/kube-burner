@@ -1,3 +1,7 @@
 - expr: count(prometheus_build_info) > 1
   severity: critical
   description: No prometheus instance found
+
+- expr: avg_over_time(prometheus_tsdb_wal_page_flushes_total[{{ .elapsed }}:])
+  severity: warning
+  description: Test

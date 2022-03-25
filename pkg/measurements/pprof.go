@@ -262,7 +262,6 @@ func (p *pprof) validateConfig() error {
 
 // RegisterWatcher does not do anything for pprof
 func (p *pprof) RegisterWatcher(name string, w *watcher.Watcher) {
-	return
 }
 
 // GetWatcher does not do anything for pprof

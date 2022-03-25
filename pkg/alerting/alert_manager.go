@@ -17,6 +17,7 @@ package alerting
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strings"
 	"text/template"
 	"time"
@@ -94,12 +95,18 @@ func (a *AlertManager) readProfile(alertProfile string) error {
 
 // Evaluate evaluates expressions
 func (a *AlertManager) Evaluate(start, end time.Time) int {
+	elapsed := int(end.Sub(start).Minutes())
+	var renderedQuery bytes.Buffer
 	result := Passed
 	for _, alert := range a.alertProfile {
-		log.Infof("Evaluating expression: '%s'", alert.Expr)
-		v, err := a.prometheus.QueryRange(alert.Expr, start, end)
+		t, _ := template.New("").Parse(alert.Expr)
+		t.Execute(&renderedQuery, map[string]string{"elapsed": fmt.Sprintf("%dm", elapsed)})
+		expr := renderedQuery.String()
+		renderedQuery.Reset()
+		log.Infof("Evaluating expression: '%s'", expr)
+		v, err := a.prometheus.QueryRange(expr, start, end)
 		if err != nil {
-			log.Warnf("Error performing query %s: %s", alert.Expr, err)
+			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
 		alarmResult, err := parseMatrix(v, alert.Description, alert.Severity)
@@ -133,18 +140,19 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 	}
 
 	for _, v := range data {
-		// TODO: improve value casting
 		templateData.Labels = make(map[string]string)
 		for k, v := range v.Metric {
 			templateData.Labels[string(k)] = string(v)
 		}
 		for _, val := range v.Values {
 			renderedDesc.Reset()
-			templateData.Value = float64(val.Value)
+			// Take 3 decimals
+			templateData.Value = math.Round(float64(val.Value)*1000) / 1000
 			if err := t.Execute(&renderedDesc, templateData); err != nil {
 				log.Errorf("Rendering error: %s", err)
+				result = Failed
 			}
-			msg := fmt.Sprintf("Alert triggered at %v: '%s'", val.Timestamp.Time(), renderedDesc.String())
+			msg := fmt.Sprintf("🚨 Alert triggered at %v: '%s'", val.Timestamp.Time(), renderedDesc.String())
 			switch severity {
 			case sevWarn:
 				log.Warn(msg)

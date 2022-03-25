@@ -28,6 +28,18 @@ Alarm can be configured with a severity. Each one with different effects. At the
 - error: Prints a error message with the alarm description to stdout and makes kube-burner rc = 1
 - critical: Prints a fatal message with the alarm description to stdout and exits execution inmediatly with rc != 0
 
+
+### Using the elapsed variable
+
+There's a special go-template variable that can be used within the prometheus expression, the variable **elapsed** is set to the value of the job duration (or the range given to check-alerts). This variable is specially useful in expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
+i.e:
+
+```yaml
+- expr: avg_over_time(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))[{{ .elapsed }}:]) > 0.01
+  description: avg. etcd fsync latency on {{$labels.pod}} higher than 10ms {{$value}}
+  severity: error
+```
+
 ## Checking alerts
 
 It's possible to look for alerts w/o triggering a kube-burner workload. To do so you can use the `check-alerts` option from the CLI, similar to the `index` CLI option, this one accepts the flags `--start` and `--end` to evaluate the alerts at a given time range.

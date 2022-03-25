@@ -28,10 +28,6 @@ import (
 	kvv1 "kubevirt.io/api/core/v1"
 )
 
-var (
-	timeLayout = "2006-01-02T15:04:05.000Z"
-)
-
 func (p *Watcher) handleCreateVMI(obj interface{}) {
 	vmi := obj.(*kvv1.VirtualMachineInstance)
 	vmiID := getVMIID(*vmi)
@@ -65,70 +61,77 @@ func (p *Watcher) handleUpdateVMI(obj interface{}) {
 	if m, exists := p.GetMetric(vmiID); exists && m != nil {
 		if m.(*metrics.VMIMetric).VMIReady == nil {
 			vmiM := m.(*metrics.VMIMetric)
-			for _, c := range vmi.Status.Conditions {
-				if c.Status == v1.ConditionTrue {
-					switch c.Type {
-					case kvv1.VirtualMachineInstanceProvisioning:
-						if vmiM.VMIProvisioning == nil {
-							vmiM.VMIProvisioning = &t
-						}
-					case kvv1.VirtualMachineInstanceSynchronized:
-						if vmiM.VMISynchronized == nil {
-							vmiM.VMISynchronized = &t
-						}
-					case kvv1.VirtualMachineInstanceAgentConnected:
-						if vmiM.VMIAgentConnected == nil {
-							vmiM.VMIAgentConnected = &t
-						}
-					case kvv1.VirtualMachineInstanceAccessCredentialsSynchronized:
-						if vmiM.VMIAccessCredentialsSynchronized == nil {
-							vmiM.VMIAccessCredentialsSynchronized = &t
-						}
-					case kvv1.VirtualMachineInstanceReady:
-						if vmiM.VMIReady == nil {
-							vmiM.VMIReady = &t
-							log.Debugf("VMI %s is Ready", vmi.Name)
-							p.AddResourceStatePerNS(btypes.VirtualMachineInstanceResource, "Ready", vmi.Namespace, 1)
-						}
-					}
-				}
-			}
-
+			p.setConditionTimeStamp(vmi, vmiM, &t)
 			// Although the pattern of using phase is deprecated, kubevirt still strongly relies on it.
-			switch vmi.Status.Phase {
-			case kvv1.VmPhaseUnset:
-				if vmiM.VMIUnset == nil {
-					vmiM.VMIUnset = &t
+			p.setPhaseTimeStamp(vmi, vmiM, &t)
+		}
+	}
+}
+
+func (p *Watcher) setConditionTimeStamp(vmi *kvv1.VirtualMachineInstance, vmiM *metrics.VMIMetric, t *time.Time) {
+	for _, c := range vmi.Status.Conditions {
+		if c.Status == v1.ConditionTrue {
+			switch c.Type {
+			case kvv1.VirtualMachineInstanceProvisioning:
+				if vmiM.VMIProvisioning == nil {
+					vmiM.VMIProvisioning = t
 				}
-			case kvv1.Pending:
-				if vmiM.VMIPending == nil {
-					vmiM.VMIPending = &t
+			case kvv1.VirtualMachineInstanceSynchronized:
+				if vmiM.VMISynchronized == nil {
+					vmiM.VMISynchronized = t
 				}
-			case kvv1.Scheduling:
-				if vmiM.VMIScheduling == nil {
-					vmiM.VMIScheduling = &t
+			case kvv1.VirtualMachineInstanceAgentConnected:
+				if vmiM.VMIAgentConnected == nil {
+					vmiM.VMIAgentConnected = t
 				}
-			case kvv1.Scheduled:
-				if vmiM.VMIScheduled == nil {
-					vmiM.VMIScheduled = &t
+			case kvv1.VirtualMachineInstanceAccessCredentialsSynchronized:
+				if vmiM.VMIAccessCredentialsSynchronized == nil {
+					vmiM.VMIAccessCredentialsSynchronized = t
 				}
-			case kvv1.Running:
-				if vmiM.VMIRunning == nil {
-					vmiM.VMIRunning = &t
-				}
-			case kvv1.Succeeded:
-				if vmiM.VMISucceeded == nil {
-					vmiM.VMISucceeded = &t
-				}
-			case kvv1.Failed:
-				if vmiM.VMIFailed == nil {
-					vmiM.VMIFailed = &t
-				}
-			case kvv1.Unknown:
-				if vmiM.VMIUnknown == nil {
-					vmiM.VMIUnknown = &t
+			case kvv1.VirtualMachineInstanceReady:
+				if vmiM.VMIReady == nil {
+					vmiM.VMIReady = t
+					log.Debugf("VMI %s is Ready", vmi.Name)
+					p.AddResourceStatePerNS(btypes.VirtualMachineInstanceResource, "Ready", vmi.Namespace, 1)
 				}
 			}
+		}
+	}
+}
+
+func (p *Watcher) setPhaseTimeStamp(vmi *kvv1.VirtualMachineInstance, vmiM *metrics.VMIMetric, t *time.Time) {
+	switch vmi.Status.Phase {
+	case kvv1.VmPhaseUnset:
+		if vmiM.VMIUnset == nil {
+			vmiM.VMIUnset = t
+		}
+	case kvv1.Pending:
+		if vmiM.VMIPending == nil {
+			vmiM.VMIPending = t
+		}
+	case kvv1.Scheduling:
+		if vmiM.VMIScheduling == nil {
+			vmiM.VMIScheduling = t
+		}
+	case kvv1.Scheduled:
+		if vmiM.VMIScheduled == nil {
+			vmiM.VMIScheduled = t
+		}
+	case kvv1.Running:
+		if vmiM.VMIRunning == nil {
+			vmiM.VMIRunning = t
+		}
+	case kvv1.Succeeded:
+		if vmiM.VMISucceeded == nil {
+			vmiM.VMISucceeded = t
+		}
+	case kvv1.Failed:
+		if vmiM.VMIFailed == nil {
+			vmiM.VMIFailed = t
+		}
+	case kvv1.Unknown:
+		if vmiM.VMIUnknown == nil {
+			vmiM.VMIUnknown = t
 		}
 	}
 }

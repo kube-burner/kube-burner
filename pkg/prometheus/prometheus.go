@@ -74,7 +74,7 @@ func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify 
 }
 
 func (p *Prometheus) verifyConnection() error {
-	_, err := p.api.Config(context.TODO())
+	_, err := p.api.Runtimeinfo(context.TODO())
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 	for _, md := range p.MetricProfile {
 		var metrics []interface{}
 		if md.Instant {
-			log.Infof("Instant query: %s", md.Query)
+			log.Debugf("Instant query: %s", md.Query)
 			if v, err = p.Query(md.Query, end); err != nil {
 				log.Warnf("Error found with query %s: %s", md.Query, err)
 				continue
@@ -129,7 +129,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 				log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
 			}
 		} else {
-			log.Infof("Range query: %s", md.Query)
+			log.Debugf("Range query: %s", md.Query)
 			p.QueryRange(md.Query, start, end)
 			v, err = p.QueryRange(md.Query, start, end)
 			if err != nil {
@@ -150,7 +150,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 				}
 				filename = path.Join(config.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
 			}
-			log.Infof("Writing to: %s", filename)
+			log.Debugf("Writing to: %s", filename)
 			f, err := os.Create(filename)
 			if err != nil {
 				log.Errorf("Error creating metrics file %s: %s", filename, err)

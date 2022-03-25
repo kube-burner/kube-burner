@@ -371,8 +371,8 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 		}
 	}
 	if p != nil {
-		log.Infof("Waiting %v extra before scraping prometheus", p.Step*2)
-		time.Sleep(p.Step * 2)
+		log.Infof("Waiting %v extra before scraping prometheus", p.Step)
+		time.Sleep(p.Step)
 		// Update end time of last job
 		jobList[len(jobList)-1].End = time.Now().UTC()
 		// If alertManager is configured
