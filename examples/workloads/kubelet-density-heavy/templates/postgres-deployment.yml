@@ -12,7 +12,7 @@ spec:
         node-role.kubernetes.io/worker: ""
       containers:
       - name: postgresql
-        image: registry.redhat.io/rhscl/postgresql-10-rhel7:latest
+        image: registry.access.redhat.com/rhscl/postgresql-10-rhel7:latest
         ports:
         - containerPort: 5432
           protocol: TCP
