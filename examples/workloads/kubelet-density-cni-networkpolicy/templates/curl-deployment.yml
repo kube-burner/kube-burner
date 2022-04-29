@@ -29,7 +29,7 @@ spec:
               - "-c"
               - "curl ${WEBSERVER_HOSTNAME}:${WEBSERVER_PORT}"
           periodSeconds: 1
-          timeoutSeconds: 60
+          timeoutSeconds: 1
           failureThreshold: 600
       restartPolicy: Always
   replicas: 1
