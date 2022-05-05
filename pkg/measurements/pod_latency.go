@@ -157,6 +157,10 @@ func (p *podLatency) stop() (int, error) {
 	if kubeburnerCfg.IndexerConfig.Enabled {
 		p.index()
 	}
+	for _, q := range p.latencyQuantiles {
+		pq := q.(metrics.LatencyQuantiles)
+		log.Infof("%s 50th: %v 99th: %v max: %v avg: %v ", pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
+	}
 	return rc, nil
 }
 
