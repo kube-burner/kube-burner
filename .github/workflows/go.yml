@@ -83,7 +83,7 @@ jobs:
     - name: Run golangci-lint
       # You may pin to the exact commit or the version.
       # uses: golangci/golangci-lint-action@04eca2038305127fb1e6683425b6864cd5612f2d
-      uses: golangci/golangci-lint-action@v2
+      uses: golangci/golangci-lint-action@v3
       with:
         # version of golangci-lint to use in form of v1.2.3
         version: v1.32
