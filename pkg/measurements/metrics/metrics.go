@@ -95,8 +95,6 @@ func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}
 				if v > phase.Threshold.Milliseconds() {
 					log.Error(msg)
 					rc = 1
-				} else {
-					log.Info(msg)
 				}
 				continue
 			}
