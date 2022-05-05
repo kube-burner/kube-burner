@@ -159,7 +159,7 @@ func (p *podLatency) stop() (int, error) {
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s 50th: %v 99th: %v max: %v avg: %v ", pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
 	}
 	return rc, nil
 }
