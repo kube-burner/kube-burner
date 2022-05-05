@@ -212,7 +212,7 @@ func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxW
 		for _, obj := range objs.Items {
 			jsonBuild, err := obj.MarshalJSON()
 			if err != nil {
-				log.Errorf("Error decoding Build object: %s", err)
+				log.Errorf("Error decoding object: %s", err)
 				return false, err
 			}
 			_ = json.Unmarshal(jsonBuild, &uObj)
