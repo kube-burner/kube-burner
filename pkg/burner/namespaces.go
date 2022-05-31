@@ -27,6 +27,7 @@ import (
 )
 
 func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLabels map[string]string) error {
+	nsLabels["pod-security.kubernetes.io/warn"] = "privileged"
 	ns := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
 	}
