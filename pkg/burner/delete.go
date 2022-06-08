@@ -76,7 +76,7 @@ func (ex *Executor) RunDeleteJob() {
 				return false, nil
 			}
 			return true, nil
-		})
+		}, 1*time.Second, 3, 0, 3)
 		if err != nil {
 			continue
 		}

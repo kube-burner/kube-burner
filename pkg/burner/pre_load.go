@@ -78,7 +78,7 @@ func createDSs(imageList []string) error {
 	for i, image := range imageList {
 		dsName := fmt.Sprintf("preload-%d", i)
 		container := corev1.Container{
-			Name:            "foobar",
+			Name:            "kube-burner-rocks",
 			ImagePullPolicy: corev1.PullAlways,
 			Image:           image,
 		}
