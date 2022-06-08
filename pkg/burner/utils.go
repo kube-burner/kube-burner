@@ -31,12 +31,7 @@ import (
 )
 
 const (
-	// Parameters for retrying with exponential backoff.
-	retryBackoffInitialDuration = 1 * time.Second
-	retryBackoffFactor          = 3
-	retryBackoffJitter          = 0
-	retryBackoffSteps           = 3
-	objectLimit                 = 500
+	objectLimit = 500
 )
 
 func prepareTemplate(original []byte) ([]byte, error) {
@@ -95,7 +90,7 @@ func (ex *Executor) Verify() bool {
 				}
 			}
 			return true, nil
-		})
+		}, 1*time.Second, 3, 0, 3)
 		// Mark success to false if we found an error
 		if err != nil {
 			success = false
@@ -113,12 +108,12 @@ func (ex *Executor) Verify() bool {
 }
 
 // RetryWithExponentialBackOff a utility for retrying the given function with exponential backoff.
-func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
+func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, factor, jitter float64, steps int) error {
 	backoff := wait.Backoff{
-		Duration: retryBackoffInitialDuration,
-		Factor:   retryBackoffFactor,
-		Jitter:   retryBackoffJitter,
-		Steps:    retryBackoffSteps,
+		Duration: duration,
+		Factor:   factor,
+		Jitter:   jitter,
+		Steps:    steps,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
 }

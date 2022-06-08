@@ -39,6 +39,11 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 		}
 		if errors.IsAlreadyExists(err) {
 			log.Infof("Namespace %s already exists", ns.Name)
+			nsSpec, _ := clientset.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
+			if nsSpec.Status.Phase == v1.NamespaceTerminating {
+				log.Warnf("Namespace %s is in %v state, retrying", namespaceName, v1.NamespaceTerminating)
+				return false, nil
+			}
 			return true, nil
 		} else if err != nil {
 			log.Errorf("Unexpected error creating namespace %s: %s", ns.Name, err)
@@ -46,7 +51,7 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 		}
 		log.Debugf("Created namespace: %s", ns.Name)
 		return true, err
-	})
+	}, 5*time.Second, 3, 0, 8)
 }
 
 // CleanupNamespaces deletes namespaces with the given selector

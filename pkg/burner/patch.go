@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
@@ -107,7 +108,7 @@ func (ex *Executor) RunPatchJob() {
 				return false, nil
 			}
 			return true, nil
-		})
+		}, 1*time.Second, 3, 0, 3)
 		if err != nil {
 			continue
 		}
