@@ -131,7 +131,7 @@ func (ex *Executor) RunCreateJob() {
 		// Wait for all replicaHandlers to finish before moving forward to next iteration
 		wg.Wait()
 		if ex.Config.PodWait {
-			log.Infof("Waiting %s all job actions to be completed", ex.Config.MaxWaitTimeout)
+			log.Infof("Waiting up to %s all job actions to be completed", ex.Config.MaxWaitTimeout)
 			log.Debugf("Waiting for actions in namespace %v to be completed", ns)
 			ex.waitForObjects(ns)
 		}
@@ -142,7 +142,7 @@ func (ex *Executor) RunCreateJob() {
 	}
 	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {
 		wg.Wait()
-		log.Infof("Waiting %s for actions to be completed", ex.Config.MaxWaitTimeout)
+		log.Infof("Waiting up to %s for actions to be completed", ex.Config.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ex.Config.QPS)/2)
 		if RestConfig.QPS < 2 {
