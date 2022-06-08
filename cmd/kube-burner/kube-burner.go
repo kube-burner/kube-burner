@@ -302,7 +302,6 @@ func alertCmd() *cobra.Command {
 }
 
 func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) {
-	verification := true
 	var rc int
 	var err error
 	var measurementsWg sync.WaitGroup
@@ -333,18 +332,18 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			measurements.Start(&measurementsWg)
 			measurementsWg.Wait()
 			job.RunCreateJob()
-			if job.Config.VerifyObjects {
-				verification = job.Verify()
-				// If verification failed and ErrorOnVerify is enabled. Exit with error, otherwise continue
-				if !verification && job.Config.ErrorOnVerify {
-					log.Fatal("Object verification failed. Exiting")
+			// If object verification is enabled
+			if job.Config.VerifyObjects && !job.Verify() {
+				errMsg := "Object verification failed"
+				// IF errorOnVerify is enabled. Set RC to 1
+				if job.Config.ErrorOnVerify {
+					errMsg += ". Setting return code to 1"
+					rc = 1
 				}
+				log.Error(errMsg)
 			}
 			// We stop and index measurements per job
-			rc = measurements.Stop()
-			// Verification failed
-			if job.Config.VerifyObjects && !verification {
-				log.Error("Object verification failed")
+			if measurements.Stop() == 1 {
 				rc = 1
 			}
 		case config.DeletionJob:
@@ -377,17 +376,19 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 		// If alertManager is configured
 		if alertM != nil {
 			log.Infof("Evaluating alerts")
-			rc = alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End)
+			if alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
+				rc = 1
+			}
 		}
 		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 		if len(p.MetricProfile) > 0 {
 			if err := p.ScrapeJobsMetrics(jobList, indexer); err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
 			}
 			if config.ConfigSpec.GlobalConfig.WriteToFile && config.ConfigSpec.GlobalConfig.CreateTarball {
 				err = prometheus.CreateTarball(config.ConfigSpec.GlobalConfig.MetricsDirectory)
 				if err != nil {
-					log.Fatal(err.Error())
+					log.Error(err.Error())
 				}
 			}
 		}
