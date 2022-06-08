@@ -52,8 +52,8 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | qps                  | Limit object creation queries per second                                         | Integer | 25       | 0       |
 | burst                | Maximum burst for throttle                                                       | Integer | 50       | 0       |
 | objects              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | -        | []      |
-| verifyObjects        | Verify object count after running each job. Return code will be 1 if failed      | Boolean | true     | true    |
-| errorOnVerify        | Exit with rc 1 before indexing when objects verification fails                   | Boolean | true     | false   |
+| verifyObjects        | Verify object count after running each job                                       | Boolean | true     | true    |
+| errorOnVerify        | Set RC to 1 when objects verification fails                                      | Boolean | true     | false   |
 | preLoadImages        | Kube-burner will create a DS before triggering the job to pull all the images of the job | Boolean | true | false |
 | preLoadPeriod        | How long to wait for the preload daemonset                                       | Duration | 2m      | 1m      |
 
