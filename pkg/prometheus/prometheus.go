@@ -15,6 +15,7 @@
 package prometheus
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -24,6 +25,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -113,36 +115,41 @@ func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Index
 func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *indexers.Indexer) error {
 	start := jobList[0].Start
 	end := jobList[len(jobList)-1].End
-	var filename string
+	elapsed := int(end.Sub(start).Minutes())
 	var err error
 	var v model.Value
+	var renderedQuery bytes.Buffer
 	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start, end)
 	for _, md := range p.MetricProfile {
 		var metrics []interface{}
+		t, _ := template.New("").Parse(md.Query)
+		t.Execute(&renderedQuery, map[string]string{"elapsed": fmt.Sprintf("%dm", elapsed)})
+		query := renderedQuery.String()
+		renderedQuery.Reset()
 		if md.Instant {
-			log.Debugf("Instant query: %s", md.Query)
-			if v, err = p.Query(md.Query, end); err != nil {
-				log.Warnf("Error found with query %s: %s", md.Query, err)
+			log.Debugf("Instant query: %s", query)
+			if v, err = p.Query(query, end); err != nil {
+				log.Warnf("Error found with query %s: %s", query, err)
 				continue
 			}
-			if err := p.parseVector(md.MetricName, md.Query, jobList, v, &metrics); err != nil {
-				log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
+			if err := p.parseVector(md.MetricName, query, jobList, v, &metrics); err != nil {
+				log.Warnf("Error found parsing result from query %s: %s", query, err)
 			}
 		} else {
-			log.Debugf("Range query: %s", md.Query)
-			p.QueryRange(md.Query, start, end)
-			v, err = p.QueryRange(md.Query, start, end)
+			log.Debugf("Range query: %s", query)
+			p.QueryRange(query, start, end)
+			v, err = p.QueryRange(query, start, end)
 			if err != nil {
-				log.Warnf("Error found with query %s: %s", md.Query, err)
+				log.Warnf("Error found with query %s: %s", query, err)
 				continue
 			}
-			if err := p.parseMatrix(md.MetricName, md.Query, jobList, v, &metrics); err != nil {
-				log.Warnf("Error found parsing result from query %s: %s", md.Query, err)
+			if err := p.parseMatrix(md.MetricName, query, jobList, v, &metrics); err != nil {
+				log.Warnf("Error found parsing result from query %s: %s", query, err)
 				continue
 			}
 		}
 		if config.ConfigSpec.GlobalConfig.WriteToFile {
-			filename = fmt.Sprintf("%s-%s.json", md.MetricName, p.uuid)
+			filename := fmt.Sprintf("%s-%s.json", md.MetricName, p.uuid)
 			if config.ConfigSpec.GlobalConfig.MetricsDirectory != "" {
 				err = os.MkdirAll(config.ConfigSpec.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {

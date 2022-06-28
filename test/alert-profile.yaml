@@ -2,6 +2,6 @@
   severity: critical
   description: No prometheus instance found
 
-- expr: avg_over_time(prometheus_tsdb_wal_page_flushes_total[{{ .elapsed }}:])
+- expr: avg_over_time(prometheus_tsdb_wal_page_flushes_total[{{ .elapsed }}:]) < 0
   severity: warning
   description: Test

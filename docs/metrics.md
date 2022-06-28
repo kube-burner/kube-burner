@@ -59,6 +59,16 @@ Apart from range queries, kube-burner has the ability perform instant queries by
   instant: true
 ```
 
+## Using the elapsed variable
+
+There's a special go-template variable that can be used within the prometheus expression, the variable **elapsed** is set to the value of the job duration (or the range given to index). This variable is specially useful in expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
+i.e: The following expression gets the top 3 CPU usage of cluster's kubelets
+
+```yaml
+- query: irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m]) * 100 and on (node) topk(3,avg_over_time(irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m])[{{ .elapsed }}:]) and on (node) kube_node_role{role="worker"})
+  metricName: kubeletCPU
+```
+
 Examples of metrics profiles can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples/). There're are also ElasticSearch based grafana dashboards available in the same examples directory.
 
 ## Job Summary

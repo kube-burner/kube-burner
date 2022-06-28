@@ -27,14 +27,13 @@ import (
 )
 
 func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLabels map[string]string) error {
-	nsLabels["pod-security.kubernetes.io/warn"] = "privileged"
 	ns := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
 	}
 	return RetryWithExponentialBackOff(func() (done bool, err error) {
 		_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
 		if errors.IsForbidden(err) {
-			log.Fatalf("Authorization error creating namespace %s: %s", ns.Name, err)
+			log.Fatalf("authorization error creating namespace %s: %s", ns.Name, err)
 			return false, err
 		}
 		if errors.IsAlreadyExists(err) {
@@ -46,7 +45,7 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 			}
 			return true, nil
 		} else if err != nil {
-			log.Errorf("Unexpected error creating namespace %s: %s", ns.Name, err)
+			log.Errorf("unexpected error creating namespace %s", ns.Name)
 			return false, nil
 		}
 		log.Debugf("Created namespace: %s", ns.Name)

@@ -1,10 +1,10 @@
 #!/bin/bash
 
 trap print_events ERR
-export QPS=5
-export BURST=10
+export QPS=2
+export BURST=2
 export TERM=screen-256color
-export JOB_ITERATIONS=4
+export JOB_ITERATIONS=9
 
 bold=$(tput bold)
 normal=$(tput sgr0)

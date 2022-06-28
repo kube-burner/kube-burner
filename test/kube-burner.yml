@@ -25,7 +25,7 @@ jobs:
     waitWhenFinished: true
     verifyObjects: true
     errorOnVerify: true
-    jobIterationDelay: 1s
+    jobIterationDelay: 10s
     maxWaitTimeout: 2m
     objects:
     
