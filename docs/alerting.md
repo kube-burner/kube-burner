@@ -26,12 +26,12 @@ Alarm can be configured with a severity. Each one with different effects. At the
 - info: Prints an info message with the alarm description to stdout. By default all expressions have this severity.
 - warning: Prints a warning message with the alarm description to stdout.
 - error: Prints a error message with the alarm description to stdout and makes kube-burner rc = 1
-- critical: Prints a fatal message with the alarm description to stdout and exits execution inmediatly with rc != 0
+- critical: Prints a fatal message with the alarm description to stdout and exits execution immediately with rc != 0
 
 
 ### Using the elapsed variable
 
-There's a special go-template variable that can be used within the prometheus expression, the variable **elapsed** is set to the value of the job duration (or the range given to check-alerts). This variable is specially useful in expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
+There's a special go-template variable that can be used within the prometheus expression, the variable **elapsed** is set to the value of the job duration (or the range given to check-alerts). This variable is especially useful in expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
 i.e:
 
 ```yaml
