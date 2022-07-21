@@ -74,7 +74,7 @@ This option can be used to collect and index the metrics from a given time range
 
 ## Check alerts
 
-This option can be used to evaluate alerts configured in in the given alert profile. Similar to `index` the time range is given by the start and end flags.
+This option can be used to evaluate alerts configured in the given alert profile. Similar to `index` the time range is given by the start and end flags.
 
 ## Destroy
 
