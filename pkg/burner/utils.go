@@ -82,7 +82,23 @@ func (ex *Executor) Verify() bool {
 					log.Errorf("Error verifying object: %s", err)
 					return false, nil
 				}
-				replicas += len(objList.Items)
+				c := 0
+				if obj.unstructured.GetKind() == "Pod" {
+					for _, o := range objList.Items {
+						log.Println("obj", o)
+						status, ok, err := unstructured.NestedMap(o.Object, "status")
+						log.Println("status", status)
+						if !ok {
+							log.Errorf("err: %v", err)
+						}
+						if status["phase"] == "Running" {
+							c++
+						}
+					}
+					replicas += c
+				} else {
+					replicas += len(objList.Items)
+				}
 				listOptions.Continue = objList.GetContinue()
 				// If continue is not set
 				if listOptions.Continue == "" {
