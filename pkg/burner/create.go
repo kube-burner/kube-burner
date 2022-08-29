@@ -90,6 +90,11 @@ func (ex *Executor) RunCreateJob() {
 	nsLabels := map[string]string{
 		"kube-burner-job":  ex.Config.Name,
 		"kube-burner-uuid": ex.uuid,
+		"pod-security.kubernetes.io/enforce": "privileged",
+		"pod-security.kubernetes.io/enforce-version": "latest", 
+		"pod-security.kubernetes.io/audit": "privileged",
+		"pod-security.kubernetes.io/warn": "privileged",
+		"security.openshift.io/scc.podSecurityLabelSync": "false",
 	}
 	var wg sync.WaitGroup
 	var ns string

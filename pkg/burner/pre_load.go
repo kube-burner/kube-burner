@@ -74,10 +74,18 @@ func getJobImages(job Executor) ([]string, error) {
 func createDSs(imageList []string, namespaceLabels map[string]string) error {
 	nsLabels := map[string]string{
 		"kube-burner-preload": "true",
+		"pod-security.kubernetes.io/enforce": "privileged",
+		"pod-security.kubernetes.io/enforce-version": "latest", 
+		"pod-security.kubernetes.io/audit": "privileged",
+		"pod-security.kubernetes.io/warn": "privileged",
+		"security.openshift.io/scc.podSecurityLabelSync": "false",
+
 	}
+	
 	for label, value := range namespaceLabels {
 		nsLabels[label] = value
 	}
+	
 	if err := createNamespace(ClientSet, preLoadNs, nsLabels); err != nil {
 		log.Fatal(err)
 	}
