@@ -45,7 +45,7 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 			}
 			return true, nil
 		} else if err != nil {
-			log.Errorf("unexpected error creating namespace %s", ns.Name)
+			log.Errorf("unexpected error creating namespace %s: %v", namespaceName, err)
 			return false, nil
 		}
 		log.Debugf("Created namespace: %s", ns.Name)

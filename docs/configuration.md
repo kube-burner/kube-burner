@@ -56,6 +56,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | errorOnVerify        | Set RC to 1 when objects verification fails                                      | Boolean | true     | false   |
 | preLoadImages        | Kube-burner will create a DS before triggering the job to pull all the images of the job | Boolean | true | false |
 | preLoadPeriod        | How long to wait for the preload daemonset                                       | Duration | 2m      | 1m      |
+| namespaceLabels      | Add custom labels to the namespaces created by kube-burner                       | Object   | {"foo": "bar"} | - |
 
 
 Examples of valid configuration files can be found at the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
