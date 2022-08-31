@@ -136,4 +136,6 @@ type Job struct {
 	PreLoadImages bool `yaml:"preLoadImages" json:"preLoadImages"`
 	// PreLoadPeriod determines the duration of the preload stage
 	PreLoadPeriod time.Duration `yaml:"preLoadPeriod" json:"preLoadPeriod"`
+	// NamespaceLabels add custom labels to namespaces created by kube-burner
+	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"namespaceLabels,omitempty"`
 }

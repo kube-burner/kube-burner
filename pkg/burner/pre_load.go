@@ -32,7 +32,7 @@ func PreLoadImages(job Executor) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = createDSs(imageList)
+	err = createDSs(imageList, job.Config.NamespaceLabels)
 	if err != nil {
 		log.Fatalf("Pre-load: %v", err)
 	}
@@ -71,8 +71,14 @@ func getJobImages(job Executor) ([]string, error) {
 	return imageList, nil
 }
 
-func createDSs(imageList []string) error {
-	if err := createNamespace(ClientSet, preLoadNs, map[string]string{"kube-burner-preload": "true"}); err != nil {
+func createDSs(imageList []string, namespaceLabels map[string]string) error {
+	nsLabels := map[string]string{
+		"kube-burner-preload": "true",
+	}
+	for label, value := range namespaceLabels {
+		nsLabels[label] = value
+	}
+	if err := createNamespace(ClientSet, preLoadNs, nsLabels); err != nil {
 		log.Fatal(err)
 	}
 	for i, image := range imageList {
