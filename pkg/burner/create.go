@@ -110,7 +110,8 @@ func (ex *Executor) RunCreateJob() {
 		nsLabels[label] = value
 	}
 	if ex.nsObjects && !ex.Config.NamespacedIterations {
-		nsLabels["name"] = ex.Config.Namespace
+		ns = ex.Config.Namespace
+		nsLabels["name"] = ns
 		if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
 			log.Fatal(err.Error())
 		}
