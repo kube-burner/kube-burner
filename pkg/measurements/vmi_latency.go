@@ -25,7 +25,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
-	k8sv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -207,7 +206,7 @@ func (p *vmiLatency) handleUpdateVMI(obj interface{}) {
 
 func (p *vmiLatency) handleCreateVMIPod(obj interface{}) {
 	var vmID string
-	pod := obj.(*k8sv1.Pod)
+	pod := obj.(*v1.Pod)
 	// in case the parent is a VM object
 	if id, exists := pod.Labels["kubevirt-vm"]; exists {
 		vmID = id
@@ -231,7 +230,7 @@ func (p *vmiLatency) handleCreateVMIPod(obj interface{}) {
 
 func (p *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 	var vmID string
-	pod := obj.(*k8sv1.Pod)
+	pod := obj.(*v1.Pod)
 	// in case the parent is a VM object
 	if id, exists := pod.Labels["kubevirt-vm"]; exists {
 		vmID = id
@@ -290,7 +289,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		restClient,
 		"vmWatcher",
 		"virtualmachines",
-		k8sv1.NamespaceAll,
+		v1.NamespaceAll,
 	)
 	p.vmWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVM,
@@ -307,7 +306,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		restClient,
 		"vmiWatcher",
 		"virtualmachineinstances",
-		k8sv1.NamespaceAll,
+		v1.NamespaceAll,
 	)
 	p.vmiWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVMI,
@@ -324,7 +323,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"podWatcher",
 		"pods",
-		k8sv1.NamespaceAll,
+		v1.NamespaceAll,
 	)
 	p.vmiPodWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVMIPod,
