@@ -376,6 +376,9 @@ func (p *vmiLatency) stop() (int, error) {
 	if kubeburnerCfg.IndexerConfig.Enabled {
 		p.index()
 	}
+	// Reset latency slices, required in multi-job benchmarks
+	p.latencyQuantiles = nil
+	p.normLatencies = nil
 	return rc, nil
 }
 
