@@ -96,6 +96,10 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		MaxWaitTimeout:       3 * time.Hour,
 		PreLoadImages:        false,
 		PreLoadPeriod:        1 * time.Minute,
+		Churn:                false,
+		ChurnPercent:         10,
+		ChurnDuration:        1 * time.Hour,
+		ChurnDelay:           5 * time.Minute,
 		Objects: []Object{
 			{Namespaced: true},
 		},

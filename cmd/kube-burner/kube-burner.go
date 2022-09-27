@@ -15,7 +15,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sync"
@@ -34,6 +36,7 @@ import (
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -312,7 +315,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			log.Fatal(err.Error())
 		}
 	}
-	_, restConfig, err := config.GetClientSet(0, 0)
+	clientSet, restConfig, err := config.GetClientSet(0, 0)
 	if err != nil {
 		log.Fatalf("Error creating k8s clientSet: %s", err)
 	}
@@ -331,7 +334,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			job.Cleanup()
 			measurements.Start(&measurementsWg)
 			measurementsWg.Wait()
-			job.RunCreateJob()
+			job.RunCreateJob(1, job.Config.JobIterations)
 			// If object verification is enabled
 			if job.Config.VerifyObjects && !job.Verify() {
 				errMsg := "Object verification failed"
@@ -341,6 +344,64 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 					rc = 1
 				}
 				log.Error(errMsg)
+			}
+			if job.Config.Churn {
+				log.Info("Starting to Churn job")
+				log.Infof("Churn Duration: %v", job.Config.ChurnDuration)
+				log.Infof("Churn Percent: %v", job.Config.ChurnPercent)
+				log.Infof("Churn Delay: %v", job.Config.ChurnDelay)
+				// Determine the number of job iterations to churn (min 1)
+				numToChurn := int((float64(job.Config.ChurnPercent) * float64(job.Config.JobIterations)) / float64(100))
+				if numToChurn < 1 {
+					numToChurn = 1
+				}
+				// Create timer for the churn duration
+				cTimer := time.NewTimer(job.Config.ChurnDuration)
+
+				rand.Seed(time.Now().UnixNano())
+				// Patch to label namespaces for deletion
+				delPatch := []byte(`[{"op":"add","path":"/metadata/labels","value":{"CHURNDELETE":"DELETE"}}]`)
+
+			churnComplete:
+				for {
+					select {
+					case <-cTimer.C:
+						log.Info("Churn job complete")
+						break churnComplete
+					default:
+						log.Debug("Next churn loop")
+					}
+					// Max amount of churn is 100% of namespaces
+					randStart := 1
+					if job.Config.JobIterations-numToChurn+1 > 0 {
+						randStart = rand.Intn(job.Config.JobIterations-numToChurn+1) + 1
+					} else {
+						numToChurn = job.Config.JobIterations
+					}
+
+					// if namespaced workload delete numToChurn namespaces
+					if job.Config.NamespacedIterations {
+						// delete numToChurn namespaces starting at randStart
+						for i := randStart; i < numToChurn+randStart; i++ {
+							nsName := fmt.Sprintf("%s-%d", job.Config.Namespace, i)
+							// Label namespaces to be deleted
+							_, err = clientSet.CoreV1().Namespaces().Patch(context.TODO(), nsName, types.JSONPatchType, delPatch, v1.PatchOptions{})
+							if err != nil {
+								log.Errorf("Error patching namespace %s. Error: %v", nsName, err)
+							}
+						}
+						listOptions := v1.ListOptions{LabelSelector: "CHURNDELETE=DELETE"}
+						// Delete namespaces based on the label we added
+						burner.CleanupNamespaces(clientSet, listOptions)
+					} else {
+						// single namespace TBD
+						log.Warn("Currently only Churning of namespace based workloads are supported")
+					}
+					log.Info("Re-creating deleted objects")
+					// Re-create objects that were deleted
+					job.RunCreateJob(randStart, numToChurn+randStart-1)
+					time.Sleep(job.Config.ChurnDelay)
+				}
 			}
 			// We stop and index measurements per job
 			if measurements.Stop() == 1 {

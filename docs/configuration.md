@@ -55,8 +55,12 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | verifyObjects        | Verify object count after running each job                                       | Boolean | true     | true    |
 | errorOnVerify        | Set RC to 1 when objects verification fails                                      | Boolean | true     | false   |
 | preLoadImages        | Kube-burner will create a DS before triggering the job to pull all the images of the job | Boolean | true | false |
-| preLoadPeriod        | How long to wait for the preload daemonset                                       | Duration | 2m      | 1m      |
-| namespaceLabels      | Add custom labels to the namespaces created by kube-burner                       | Object   | {"foo": "bar"} | - |
+| preLoadPeriod        | How long to wait for the preload daemonset                                       | Duration| 2m      | 1m      |
+| namespaceLabels      | Add custom labels to the namespaces created by kube-burner                       | Object  | {"foo": "bar"} | - |
+| churn                | Churn the workload. Only supports namespace based workloads                      | Boolean | true | false |
+| churnPercent         | Percentage of the jobIterations to churn each period                             | Integer | 10 | 10 |
+| churnDuration        | Length of time that the job is churned for                                       | Duration| 10m | 1h |
+| churnDelay           | Length of time to wait between each churn period                                 | Duration| 10m | 5m |
 
 
 Examples of valid configuration files can be found at the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
@@ -158,6 +162,33 @@ This job type supports the some of the same parameters as the create job type:
 - qps
 - burst
 - jobPause
+
+## Churning Jobs
+
+Churn or the deletion and re-creation of objects, is supported for namespace based jobs only. This ocurs after the job has completed
+but prior to uploading metrics, if applicable. It deletes a percentage of contiguous namespaces randomly chosen and re-creates them
+with all of the appropriate objects. It will then wait for a specified delay (or none if set to 0) before deleting and recreating the
+next randomly chosen set. This cycle continues until the churn duration has passed.
+
+An example implementation that would churn 20% of the 100 job iterations for 2 hours with no delay between sets:
+
+```yaml
+jobs:
+  - name: cluster-density
+    jobIterations: 100
+    namespacedIterations: true
+    namespace: churning
+    churn: true
+    churnPercent: 20
+    churnDuration: 2h
+    churnDelay: 0s
+  objects:
+  - objectTemplate: deployment.yml
+    replicas: 10
+
+  - objectTemplate: service.yml
+    replicas: 10
+```
 
 ## Injected variables
 

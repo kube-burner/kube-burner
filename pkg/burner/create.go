@@ -86,7 +86,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob() {
+func (ex *Executor) RunCreateJob(iterationStart int, iterationEnd int) {
 	nsLabels := map[string]string{
 		"kube-burner-job":  ex.Config.Name,
 		"kube-burner-uuid": ex.uuid,
@@ -117,7 +117,7 @@ func (ex *Executor) RunCreateJob() {
 		}
 	}
 	t0 := time.Now().Round(time.Second)
-	for i := 1; i <= ex.Config.JobIterations; i++ {
+	for i := iterationStart; i <= iterationEnd; i++ {
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsObjects && ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
@@ -151,7 +151,7 @@ func (ex *Executor) RunCreateJob() {
 		if RestConfig.QPS < 2 {
 			sem = make(chan int, int(rest.DefaultQPS)/2)
 		}
-		for i := 1; i <= ex.Config.JobIterations; i++ {
+		for i := iterationStart; i <= iterationEnd; i++ {
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			}
