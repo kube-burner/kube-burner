@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
+	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -32,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -237,4 +240,66 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 		log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		return true, err
 	}, 1*time.Second, 3, 0, 3)
+}
+
+// RunCreateJobWithChurn executes a churn creation job
+func (ex *Executor) RunCreateJobWithChurn() {
+	log.Info("Starting to Churn job")
+	log.Infof("Churn Duration: %v", ex.Config.ChurnDuration)
+	log.Infof("Churn Percent: %v", ex.Config.ChurnPercent)
+	log.Infof("Churn Delay: %v", ex.Config.ChurnDelay)
+
+	clientSet, _, err := config.GetClientSet(ex.Config.QPS, ex.Config.Burst)
+	if err != nil {
+		log.Fatalf("Error creating k8s clientSet: %s", err)
+	}
+
+	// Determine the number of job iterations to churn (min 1)
+	numToChurn := int(math.Max((float64(ex.Config.ChurnPercent) * float64(ex.Config.JobIterations) / float64(100)), 1.0))
+	// Create timer for the churn duration
+	cTimer := time.NewTimer(ex.Config.ChurnDuration)
+	rand.Seed(time.Now().UnixNano())
+	// Patch to label namespaces for deletion
+	delPatch := []byte(`[{"op":"add","path":"/metadata/labels","value":{"CHURNDELETE":"DELETE"}}]`)
+
+churnComplete:
+	for {
+		select {
+		case <-cTimer.C:
+			log.Info("Churn job complete")
+			break churnComplete
+		default:
+			log.Debug("Next churn loop")
+		}
+		// Max amount of churn is 100% of namespaces
+		randStart := 1
+		if ex.Config.JobIterations-numToChurn+1 > 0 {
+			randStart = rand.Intn(ex.Config.JobIterations-numToChurn+1) + 1
+		} else {
+			numToChurn = ex.Config.JobIterations
+		}
+		// if namespaced workload delete numToChurn namespaces
+		if ex.Config.NamespacedIterations {
+			// delete numToChurn namespaces starting at randStart
+			for i := randStart; i < numToChurn+randStart; i++ {
+				nsName := fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+				// Label namespaces to be deleted
+				_, err = clientSet.CoreV1().Namespaces().Patch(context.TODO(), nsName, types.JSONPatchType, delPatch, metav1.PatchOptions{})
+				if err != nil {
+					log.Errorf("Error patching namespace %s. Error: %v", nsName, err)
+				}
+
+			}
+			listOptions := metav1.ListOptions{LabelSelector: "CHURNDELETE=DELETE"}
+			// Delete namespaces based on the label we added
+			CleanupNamespaces(clientSet, listOptions)
+		} else {
+			// single namespace TBD
+			log.Warn("Currently only Churning of namespace based workloads are supported")
+		}
+		log.Info("Re-creating deleted objects")
+		// Re-create objects that were deleted
+		ex.RunCreateJob(randStart, numToChurn+randStart-1)
+		time.Sleep(ex.Config.ChurnDelay)
+	}
 }
