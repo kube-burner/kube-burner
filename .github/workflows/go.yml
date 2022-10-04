@@ -22,9 +22,9 @@ jobs:
       matrix:
         golang-version: [1.18]
         k8s-version:
-        - v1.20.0
-        - v1.19.0
-        - v1.18.0
+        - v1.24.0
+        - v1.23.0
+        - v1.22.0
     steps:
 
     - name: Set up Go 1.x
@@ -61,16 +61,12 @@ jobs:
     - name: Install
       run: sudo make install
 
-    - name: Setup kind
-      working-directory: test
-      run: ./setup-kind.sh
-      env:
-        KIND_VERSION: v0.11.1
-        K8S_VERSION: ${{matrix.k8s-version}}
-  
-    - name: Execute kube-burner test
+    - name: Execute tests
       working-directory: test
       run: ./run.sh
+      env:
+        KIND_VERSION: v0.16.0
+        K8S_VERSION: ${{matrix.k8s-version}}
 
   lint:
     name: Run golangci-lint
