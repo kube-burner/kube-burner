@@ -27,6 +27,10 @@ jobs:
     errorOnVerify: true
     jobIterationDelay: 10s
     maxWaitTimeout: 2m
+    churn: true
+    churnPercent: 20
+    churnDuration: 2m
+    churnDelay: 5s
     namespaceLabels:
       foo: bar
       complex.label/test: true

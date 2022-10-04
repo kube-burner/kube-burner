@@ -138,4 +138,12 @@ type Job struct {
 	PreLoadPeriod time.Duration `yaml:"preLoadPeriod" json:"preLoadPeriod"`
 	// NamespaceLabels add custom labels to namespaces created by kube-burner
 	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"namespaceLabels,omitempty"`
+	// Churn workload
+	Churn bool `yaml:"churn" json:"churn"`
+	// Churn percentage
+	ChurnPercent int `yaml:"churnPercent" json:"churnPercent"`
+	// Churn duration
+	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration"`
+	// Churn delay between sets
+	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay"`
 }

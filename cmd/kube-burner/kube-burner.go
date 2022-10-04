@@ -331,7 +331,7 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			job.Cleanup()
 			measurements.Start(&measurementsWg)
 			measurementsWg.Wait()
-			job.RunCreateJob()
+			job.RunCreateJob(1, job.Config.JobIterations)
 			// If object verification is enabled
 			if job.Config.VerifyObjects && !job.Verify() {
 				errMsg := "Object verification failed"
@@ -341,6 +341,9 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 					rc = 1
 				}
 				log.Error(errMsg)
+			}
+			if job.Config.Churn {
+				job.RunCreateJobWithChurn()
 			}
 			// We stop and index measurements per job
 			if measurements.Stop() == 1 {
