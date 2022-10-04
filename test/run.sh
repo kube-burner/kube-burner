@@ -3,6 +3,7 @@
 source base.sh
 
 set -e
+setup-kind
 rc=0
 uuid=$(uuidgen)
 
