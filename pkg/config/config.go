@@ -144,6 +144,9 @@ func Parse(c string, jobsRequired bool) error {
 				log.Warnf("Namespace %s length has > 63 characters, truncating it", job.Namespace)
 				job.Namespace = job.Namespace[:57]
 			}
+			if !job.NamespacedIterations && job.Churn {
+				log.Fatal("Error: Cannot have Churn enabled without Namespaced Iterations also enabled")
+			}
 		}
 	}
 	return nil

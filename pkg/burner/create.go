@@ -260,7 +260,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 	cTimer := time.NewTimer(ex.Config.ChurnDuration)
 	rand.Seed(time.Now().UnixNano())
 	// Patch to label namespaces for deletion
-	delPatch := []byte(`[{"op":"add","path":"/metadata/labels","value":{"CHURNDELETE":"DELETE"}}]`)
+	delPatch := []byte(`[{"op":"add","path":"/metadata/labels","value":{"churndelete":"delete"}}]`)
 
 churnComplete:
 	for {
@@ -278,25 +278,20 @@ churnComplete:
 		} else {
 			numToChurn = ex.Config.JobIterations
 		}
-		// if namespaced workload delete numToChurn namespaces
-		if ex.Config.NamespacedIterations {
-			// delete numToChurn namespaces starting at randStart
-			for i := randStart; i < numToChurn+randStart; i++ {
-				nsName := fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
-				// Label namespaces to be deleted
-				_, err = clientSet.CoreV1().Namespaces().Patch(context.TODO(), nsName, types.JSONPatchType, delPatch, metav1.PatchOptions{})
-				if err != nil {
-					log.Errorf("Error patching namespace %s. Error: %v", nsName, err)
-				}
-
+		// delete numToChurn namespaces starting at randStart
+		for i := randStart; i < numToChurn+randStart; i++ {
+			nsName := fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+			// Label namespaces to be deleted
+			_, err = clientSet.CoreV1().Namespaces().Patch(context.TODO(), nsName, types.JSONPatchType, delPatch, metav1.PatchOptions{})
+			if err != nil {
+				log.Errorf("Error patching namespace %s. Error: %v", nsName, err)
 			}
-			listOptions := metav1.ListOptions{LabelSelector: "CHURNDELETE=DELETE"}
-			// Delete namespaces based on the label we added
-			CleanupNamespaces(clientSet, listOptions)
-		} else {
-			// single namespace TBD
-			log.Warn("Currently only Churning of namespace based workloads are supported")
+
 		}
+		listOptions := metav1.ListOptions{LabelSelector: "churndelete=delete"}
+		// Delete namespaces based on the label we added
+		CleanupNamespaces(clientSet, listOptions)
+
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart-1)
