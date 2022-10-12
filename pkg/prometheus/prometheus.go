@@ -53,11 +53,12 @@ func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify 
 		Step: step,
 		uuid: uuid,
 	}
+
 	log.Info("👽 Initializing prometheus client")
 	cfg := api.Config{
 		Address: url,
 		RoundTripper: authTransport{
-			Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: tlsVerify}},
+			Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: &tls.Config{InsecureSkipVerify: tlsVerify}},
 			token:     token,
 			username:  username,
 			password:  password,
