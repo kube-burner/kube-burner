@@ -51,6 +51,8 @@ func (ex *Executor) waitForObjects(ns string) {
 				go waitForRS(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "ReplicationController":
 				go waitForRC(ns, ex.Config.MaxWaitTimeout, &wg)
+			case "StatefulSet":
+				go waitForStatefulSet(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "DaemonSet":
 				go waitForDS(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "Pod":
@@ -67,6 +69,8 @@ func (ex *Executor) waitForObjects(ns string) {
 				go waitForVMIRS(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "Job":
 				go waitForJob(ns, ex.Config.MaxWaitTimeout, &wg)
+			case "PersistentVolumeClaim":
+				go waitForPVC(ns, ex.Config.MaxWaitTimeout, &wg)
 			default:
 				wg.Done()
 			}
@@ -108,6 +112,34 @@ func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 			}
 		}
 		return true, nil
+	})
+}
+
+func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+	defer wg.Done()
+	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+		stss, err := ClientSet.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, sts := range stss.Items {
+			if *sts.Spec.Replicas != sts.Status.ReadyReplicas {
+				log.Debugf("Waiting for replicas from statefulSets in ns %s to be ready", ns)
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
+func waitForPVC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+	defer wg.Done()
+	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+		pvc, err := ClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Bound"})
+		if err != nil {
+			return false, err
+		}
+		return len(pvc.Items) == 0, nil
 	})
 }
 
