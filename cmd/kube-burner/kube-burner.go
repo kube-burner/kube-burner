@@ -82,6 +82,7 @@ func initCmd() *cobra.Command {
 	var url, metricsProfile, alertProfile, configFile string
 	var username, password, uuid, token, configMap, namespace string
 	var skipTLSVerify bool
+	var scrapePause time.Duration
 	var prometheusStep time.Duration
 	var prometheusClient *prometheus.Prometheus
 	var alertM *alerting.AlertManager
@@ -112,7 +113,7 @@ func initCmd() *cobra.Command {
 				log.Fatal(err.Error())
 			}
 			if url != "" {
-				prometheusClient, err = prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+				prometheusClient, err = prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, scrapePause, prometheusStep)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -139,6 +140,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file or URL")
 	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
+	cmd.Flags().DurationVarP(&scrapePause, "pause", "", 30*time.Second, "Pause before scrapping prometheus metrics")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
@@ -178,6 +180,7 @@ func indexCmd() *cobra.Command {
 	var start, end int64
 	var username, password, uuid, token string
 	var skipTLSVerify bool
+	var scrapePause time.Duration
 	var prometheusStep time.Duration
 	var indexer *indexers.Indexer
 	cmd := &cobra.Command{
@@ -195,7 +198,7 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err.Error())
 				}
 			}
-			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, scrapePause, prometheusStep)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -223,6 +226,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
+	cmd.Flags().DurationVarP(&scrapePause, "pause", "", 30*time.Second, "Pause before scrapping prometheus metrics")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
@@ -266,13 +270,14 @@ func alertCmd() *cobra.Command {
 	var username, password, uuid, token string
 	var skipTLSVerify bool
 	var alertM *alerting.AlertManager
+	var scrapePause time.Duration
 	var prometheusStep time.Duration
 	cmd := &cobra.Command{
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, scrapePause, prometheusStep)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -292,6 +297,7 @@ func alertCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "alerts.yaml", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
+	cmd.Flags().DurationVarP(&scrapePause, "pause", "", 30*time.Second, "Pause before scrapping prometheus metrics")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
@@ -372,8 +378,8 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 		}
 	}
 	if p != nil {
-		log.Infof("Waiting %v extra before scraping prometheus", p.Step)
-		time.Sleep(p.Step)
+		log.Infof("Waiting %v extra before scraping prometheus", p.Pause)
+		time.Sleep(p.Pause)
 		// Update end time of last job
 		jobList[len(jobList)-1].End = time.Now().UTC()
 		// If alertManager is configured

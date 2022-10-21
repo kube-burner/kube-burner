@@ -25,6 +25,7 @@ import (
 type Prometheus struct {
 	api           apiv1.API
 	MetricProfile metricProfile
+	Pause         time.Duration
 	Step          time.Duration
 	uuid          string
 }

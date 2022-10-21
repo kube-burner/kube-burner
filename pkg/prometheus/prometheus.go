@@ -48,10 +48,11 @@ func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify bool, step time.Duration) (*Prometheus, error) {
+func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify bool, pause time.Duration, step time.Duration) (*Prometheus, error) {
 	var p Prometheus = Prometheus{
-		Step: step,
-		uuid: uuid,
+		Pause: pause,
+		Step:  step,
+		uuid:  uuid,
 	}
 
 	log.Info("👽 Initializing prometheus client")
