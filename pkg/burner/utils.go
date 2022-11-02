@@ -49,11 +49,11 @@ func prepareTemplate(original []byte) ([]byte, error) {
 }
 
 func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
-	o, gvr, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
+	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
 	if err != nil {
 		log.Fatalf("Error decoding YAML: %s", err)
 	}
-	return o, gvr
+	return o, gvk
 }
 
 // Cleanup deletes old namespaces from a given job

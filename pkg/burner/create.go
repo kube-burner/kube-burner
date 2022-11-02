@@ -29,7 +29,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -75,10 +75,11 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			objectSpec:     t,
 			objectTemplate: o.ObjectTemplate,
 			replicas:       o.Replicas,
-			unstructured:   uns,
+			kind:           gvk.Kind,
 			inputVars:      o.InputVars,
 			namespaced:     o.Namespaced,
 		}
+		// If any of the objects is namespaced, we configure the job to create namepaces
 		if o.Namespaced {
 			ex.nsObjects = true
 		}
@@ -225,10 +226,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 			uns, err = dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
 		}
 		if err != nil {
-			if errors.IsForbidden(err) {
+			if kerrors.IsForbidden(err) {
 				log.Fatalf("Authorization error creating %s/%s: %s", obj.GetKind(), obj.GetName(), err)
 				return true, err
-			} else if errors.IsAlreadyExists(err) {
+			} else if kerrors.IsAlreadyExists(err) {
 				log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
 				return true, nil
 			} else if err != nil {
@@ -237,7 +238,11 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 			log.Error("Retrying object creation")
 			return false, nil
 		}
-		log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
+		if namespaced {
+			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
+		} else {
+			log.Debugf("Created %s/%s", uns.GetKind(), uns.GetName(), ns)
+		}
 		return true, err
 	}, 1*time.Second, 3, 0, 3)
 }

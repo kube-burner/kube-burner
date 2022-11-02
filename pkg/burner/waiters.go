@@ -36,7 +36,7 @@ func (ex *Executor) waitForObjects(ns string) {
 		if len(ex.Config.WaitFor) > 0 {
 			waitFor = false
 			for _, kind := range ex.Config.WaitFor {
-				if obj.unstructured.GetKind() == kind {
+				if obj.kind == kind {
 					waitFor = true
 					break
 				}
@@ -44,7 +44,7 @@ func (ex *Executor) waitForObjects(ns string) {
 		}
 		if waitFor {
 			wg.Add(1)
-			switch obj.unstructured.GetKind() {
+			switch obj.kind {
 			case "Deployment":
 				go waitForDeployments(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "ReplicaSet":

@@ -90,7 +90,7 @@ type Object struct {
 	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with this labels will be removed
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
-	// Namespaced
+	// Namespaced this object is namespaced
 	Namespaced bool `yaml:"namespaced" json:"namespaced"`
 }
 

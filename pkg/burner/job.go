@@ -21,7 +21,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"golang.org/x/time/rate"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/client-go/dynamic"
@@ -34,11 +33,11 @@ type object struct {
 	objectTemplate string
 	objectSpec     []byte
 	replicas       int
-	unstructured   *unstructured.Unstructured
 	inputVars      map[string]interface{}
 	labelSelector  map[string]string
 	patchType      string
 	namespaced     bool
+	kind           string
 }
 
 // Executor contains the information required to execute a job
