@@ -58,6 +58,9 @@ func getPrometheusURL() (string, error) {
 		Version:  routeVersion,
 		Resource: routeResource,
 	}).Namespace("openshift-monitoring").Get(context.TODO(), "prometheus-k8s", v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
 	prometheusHost, found, err := unstructured.NestedString(route.UnstructuredContent(), "spec", "host")
 	if !found {
 		return "", fmt.Errorf("host field not found in openshift-monitoring/prometheus-k8s route spec")
@@ -176,6 +179,7 @@ func GetNodesInfo() (nodeInfo, error) {
 	return nodeInfoData, err
 }
 
+// GetSDNInfo returns SDN type
 func GetSDNInfo() (string, error) {
 	networkData, err := dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "config.openshift.io",

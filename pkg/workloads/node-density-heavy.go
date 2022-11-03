@@ -9,27 +9,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewNodeDensity holds node-density workload
-func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
+// NewNodeDensity holds node-density-heavy workload
+func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 	var podsPerNode, workerNodeCount int
 	var podReadyThreshold time.Duration
-	var containerImage string
 	cmd := &cobra.Command{
-		Use:          "node-density",
-		Short:        "Runs node-density workload",
+		Use:          "node-density-heavy",
+		Short:        "Runs node-density-heavy workload",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			metadata.Benchmark = cmd.Name()
+			metadata.Benchmark = "node-density-heavy"
 			totalPods := workerNodeCount * podsPerNode
 			podCount, err := discovery.GetCurrentPodCount()
 			if err != nil {
 				return err
 			}
-			jobIterations := totalPods - podCount
+			// We divide by two the number of pods to deploy to obtain the workload iterations
+			jobIterations := (totalPods - podCount) / 2
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(jobIterations))
 			os.Setenv("POD_READY_THRESHOLD", fmt.Sprintf("%v", podReadyThreshold))
-			os.Setenv("CONTAINER_IMAGE", containerImage)
-			err = run("-c", "node-density.yml", "-a", "alerts.yml")
+			err = run("-c", "node-density-heavy.yml", "-a", "alerts.yml")
 			if err != nil {
 				fmt.Println(err)
 				metadata.Passed = false
@@ -43,8 +43,7 @@ func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
 	if err != nil {
 		fmt.Println("Error obtaining worker node count: ", err)
 	}
+	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 1*time.Hour, "Pod ready timeout threshold")
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
-	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 5*time.Second, "Pod ready timeout threshold")
-	cmd.Flags().StringVar(&containerImage, "container-image", "gcr.io/google_containers/pause:3.1", "Container image")
 	return cmd
 }

@@ -39,7 +39,7 @@ help:
 build: $(BIN_PATH)
 
 $(BIN_PATH): $(SOURCES)
-	@echo -e "\033[2mBuilding $(BIN_PATH)\033[0m\n"
+	@echo -e "\033[2mBuilding $(BIN_PATH)\033[0m"
 	@echo "GOPATH=$(GOPATH)"
 	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner
 

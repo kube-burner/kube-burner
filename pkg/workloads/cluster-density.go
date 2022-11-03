@@ -16,14 +16,13 @@ func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			metadata.Benchmark = "cluster-density"
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(iterations))
-			err := run("-c", "cluster-density.yml", "-a", "cluster-density-alerts.yml")
+			err := run("-c", "cluster-density.yml", "-a", "alerts.yml")
 			if err != nil {
 				fmt.Println(err)
 				metadata.Passed = false
 			} else {
 				metadata.Passed = true
 			}
-			wh.indexMetadata()
 			return err
 		},
 	}

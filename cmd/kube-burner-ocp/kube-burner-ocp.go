@@ -14,7 +14,8 @@ import (
 var cmd = &cobra.Command{
 	Use:   binName,
 	Short: "kube-burner OpenShift wrapper",
-	Long:  `kube-burner-ocp is a kube-burner wrapper meant to be used against OpenShift based clusters and serve as a shortcut to trigger well-known workloads`,
+	Long: `
+	This tool is a kube-burner wrapper meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads`,
 }
 
 var binName = filepath.Base(os.Args[0])
@@ -55,6 +56,7 @@ func main() {
 	qps := cmd.PersistentFlags().Int("qps", 20, "kube-burner QPS")
 	burst := cmd.PersistentFlags().Int("burst", 20, "Kube-burner Burst")
 	uuid := cmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
+	indexing := cmd.PersistentFlags().Bool("indexing", true, "Elastic Search indexing")
 	cmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Kube-burner log level")
 	cmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
@@ -64,19 +66,27 @@ func main() {
 			"QPS":       fmt.Sprintf("%d", *qps),
 			"BURST":     fmt.Sprintf("%d", *burst),
 			"UUID":      *uuid,
+			"INDEXING":  fmt.Sprintf("%v", *indexing),
 		}
 		wh = workloads.NewWorkloadHelper(logLevel, envVars)
-		err := wh.GatherMetadata()
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
+		if *esServer != "" {
+			err := wh.GatherMetadata()
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
 		}
 		wh.SetKubeBurnerFlags()
 	}
-	cmd.Flags().SortFlags = false
+	cmd.PersistentPostRun = func(cmd *cobra.Command, args []string) {
+		if *esServer != "" {
+			wh.IndexMetadata()
+		}
+	}
 	cmd.AddCommand(
 		workloads.NewClusterDensity(&wh),
 		workloads.NewNodeDensity(&wh),
+		workloads.NewNodeDensityHeavy(&wh),
 		completionCmd,
 		versionCmd,
 	)

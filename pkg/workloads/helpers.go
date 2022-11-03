@@ -62,12 +62,6 @@ func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 		kubeburnerCmd = append(kubeburnerCmd, "-t", prometheusToken)
 	}
 	kubeburnerCmd = append(kubeburnerCmd, "--log-level", wh.logLevel)
-	if wh.envVars["ES_SERVER"] != "" {
-		os.Setenv("INDEXING", "true")
-	} else {
-		// We delete the ES_SERVER env var just in case
-		os.Setenv("INDEXING", "false")
-	}
 	for k, v := range wh.envVars {
 		os.Setenv(k, v)
 	}
@@ -119,7 +113,7 @@ func (wh *WorkloadHelper) GatherMetadata() error {
 	return nil
 }
 
-func (wh *WorkloadHelper) indexMetadata() {
+func (wh *WorkloadHelper) IndexMetadata() {
 	metadata.EndDate = time.Now().UTC()
 	if wh.envVars["ES_SERVER"] == "" {
 		fmt.Println("No metadata will be indexed")
@@ -130,13 +124,12 @@ func (wh *WorkloadHelper) indexMetadata() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	ht := http.Client{
-		Transport: &http.Transport{
-			Proxy: nil,
-		},
-	}
-	_, err = ht.Post(esEndpoint, "application/json", bytes.NewBuffer(body))
+	resp, err := http.Post(esEndpoint, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		fmt.Println("Error indexing metadata: ", err)
+		fmt.Println("Error indexing metadata:", err)
+		return
+	}
+	if resp.StatusCode == http.StatusCreated {
+		fmt.Println("Cluster metadata indexed correctly")
 	}
 }
