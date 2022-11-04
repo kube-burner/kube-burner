@@ -37,7 +37,7 @@ type metadata struct {
 const jobSummary = "jobSummary"
 
 // IndexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time) error {
+func IndexMetadataInfo(configSpec config.Spec, indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time) error {
 	metadataInfo := []interface{}{
 		metadata{
 			UUID:        uuid,
@@ -47,13 +47,13 @@ func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float
 			Timestamp:   timestamp,
 		},
 	}
-	if config.ConfigSpec.GlobalConfig.WriteToFile {
+	if configSpec.GlobalConfig.WriteToFile {
 		filename := fmt.Sprintf("%s-metadata.json", jobConfig.Name)
-		if config.ConfigSpec.GlobalConfig.MetricsDirectory != "" {
-			if err := os.MkdirAll(config.ConfigSpec.GlobalConfig.MetricsDirectory, 0744); err != nil {
+		if configSpec.GlobalConfig.MetricsDirectory != "" {
+			if err := os.MkdirAll(configSpec.GlobalConfig.MetricsDirectory, 0744); err != nil {
 				return fmt.Errorf("Error creating metrics directory: %v: ", err)
 			}
-			filename = path.Join(config.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
+			filename = path.Join(configSpec.GlobalConfig.MetricsDirectory, filename)
 		}
 		log.Infof("Writing to: %s", filename)
 		f, err := os.Create(filename)
@@ -67,6 +67,6 @@ func IndexMetadataInfo(indexer *indexers.Indexer, uuid string, elapsedTime float
 		}
 	}
 	log.Infof("Indexing metadata information for job: %s", jobConfig.Name)
-	(*indexer).Index(config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex, metadataInfo)
+	(*indexer).Index(configSpec.GlobalConfig.IndexerConfig.DefaultIndex, metadataInfo)
 	return nil
 }

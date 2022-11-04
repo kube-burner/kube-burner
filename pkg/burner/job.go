@@ -68,7 +68,7 @@ var dynamicClient dynamic.Interface
 var RestConfig *rest.Config
 
 // NewExecutorList Returns a list of executors
-func NewExecutorList(uuid string) []Executor {
+func NewExecutorList(configSpec config.Spec, uuid string) []Executor {
 	var err error
 	var ex Executor
 	var executorList []Executor
@@ -76,7 +76,7 @@ func NewExecutorList(uuid string) []Executor {
 	if err != nil {
 		log.Fatalf("Error creating clientSet: %s", err)
 	}
-	for _, job := range config.ConfigSpec.Jobs {
+	for _, job := range configSpec.Jobs {
 		if job.JobType == config.CreationJob {
 			ex = setupCreateJob(job)
 		} else if job.JobType == config.DeletionJob {

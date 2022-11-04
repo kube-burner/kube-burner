@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
@@ -27,6 +28,7 @@ type Prometheus struct {
 	MetricProfile metricProfile
 	Step          time.Duration
 	uuid          string
+	configSpec    config.Spec
 }
 
 // This object implements RoundTripper

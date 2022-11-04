@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var ConfigSpec Spec = Spec{
+var configSpec Spec = Spec{
 	GlobalConfig: GlobalConfig{
 		MetricsDirectory: "collected-metrics",
 		RequestTimeout:   15 * time.Second,
@@ -113,33 +113,33 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Parse parses a configuration file
-func Parse(c string, jobsRequired bool) error {
+func Parse(c string, jobsRequired bool) (Spec, error) {
 	f, err := util.ReadConfig(c)
 	if err != nil {
-		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
+		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}
 	cfg, err := io.ReadAll(f)
 	if err != nil {
-		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
+		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}
 	renderedCfg, err := renderConfig(cfg)
 	if err != nil {
-		return err
+		return configSpec, err
 	}
 	cfgReader := bytes.NewReader(renderedCfg)
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
-	if err = yamlDec.Decode(&ConfigSpec); err != nil {
-		return fmt.Errorf("Error decoding configuration file %s: %s", c, err)
+	if err = yamlDec.Decode(&configSpec); err != nil {
+		return configSpec, fmt.Errorf("Error decoding configuration file %s: %s", c, err)
 	}
 	if jobsRequired {
-		if len(ConfigSpec.Jobs) <= 0 {
-			return fmt.Errorf("No jobs found in the configuration file")
+		if len(configSpec.Jobs) <= 0 {
+			return configSpec, fmt.Errorf("No jobs found in the configuration file")
 		}
 		if err := validateDNS1123(); err != nil {
-			return err
+			return configSpec, err
 		}
-		for _, job := range ConfigSpec.Jobs {
+		for _, job := range configSpec.Jobs {
 			if len(job.Namespace) > 62 {
 				log.Warnf("Namespace %s length has > 63 characters, truncating it", job.Namespace)
 				job.Namespace = job.Namespace[:57]
@@ -149,7 +149,7 @@ func Parse(c string, jobsRequired bool) error {
 			}
 		}
 	}
-	return nil
+	return configSpec, nil
 }
 
 // FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
@@ -187,7 +187,7 @@ func FetchConfigMap(configMap, namespace string) (string, string, error) {
 }
 
 func validateDNS1123() error {
-	for _, job := range ConfigSpec.Jobs {
+	for _, job := range configSpec.Jobs {
 		if errs := validation.IsDNS1123Subdomain(job.Name); len(errs) > 0 {
 			return fmt.Errorf("Job %s name validation error: %s", job.Name, fmt.Sprint(errs))
 		}
@@ -215,7 +215,7 @@ func GetClientSet(QPS float32, burst int) (*kubernetes.Clientset, *rest.Config, 
 		return &kubernetes.Clientset{}, restConfig, err
 	}
 	restConfig.QPS, restConfig.Burst = QPS, burst
-	restConfig.Timeout = ConfigSpec.GlobalConfig.RequestTimeout
+	restConfig.Timeout = configSpec.GlobalConfig.RequestTimeout
 	return kubernetes.NewForConfigOrDie(restConfig), restConfig, nil
 }
 

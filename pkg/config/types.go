@@ -71,6 +71,12 @@ type GlobalConfig struct {
 	Measurements []mtypes.Measurement `yaml:"measurements"`
 	// RequestTimeout of restclient
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
+	// PrometheusURL to interact with
+	PrometheusURL string `yaml:"prometheusURL"`
+	// BearerToken used to access prometheus
+	BearerToken string `yaml:"bearerToken"`
+	// MetricsProfile is the path to the metrics profile configuration
+	MetricsProfile string `yaml:"metricsProfile"`
 }
 
 // Object defines an object that kube-burner will create
