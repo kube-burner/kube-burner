@@ -18,7 +18,7 @@ In this section is described global job configuration, it holds the following pa
 
 | Option           | Description                                                                                              | Type           | Example        | Default     |
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|----------------|-------------|
-| writeToFile      | Whether to dump collected metrics to files                                                               | Boolean        | true           | true        |
+| writeToFile      | Whether to dump collected metrics to files                                                               | Boolean        | true           | false        |
 | createTarball    | Create metrics tarball, it has no effect if `writeToFile` is not enabled                                 | Boolean        | true           | false       |
 | metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics |
 | measurements     | List of measurements. Detailed in the [measurements section]                                             | List           | -              | []          |
@@ -43,8 +43,8 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | namespace            | Namespace base name to use                                                       | String  | firstjob | ""      |
 | namespacedIterations | Whether to create a namespace per job iteration                                  | Boolean | true     | true    |
 | cleanup              | Cleanup clean up old namespaces                                                  | Boolean | true     | true    |
-| podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | true     | true    |
-| waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | false   |
+| podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | true     | false   |
+| waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | true    |
 | maxWaitTimeout       | Maximum wait timeout in seconds. (If podWait is enabled this timeout will be reseted with each iteration) | Integer | 1h     | 12h |
 | waitFor              | List containing the objects Kind wait for. Wait for all if empty                 | List    | ["Deployment", "Build", "DaemonSet"]| []      |
 | jobIterationDelay    | How long to wait between each job iteration                                      | Duration| 2s       | 0s      |
@@ -53,15 +53,14 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | burst                | Maximum burst for throttle                                                       | Integer | 50       | 0       |
 | objects              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | -        | []      |
 | verifyObjects        | Verify object count after running each job                                       | Boolean | true     | true    |
-| errorOnVerify        | Set RC to 1 when objects verification fails                                      | Boolean | true     | false   |
-| preLoadImages        | Kube-burner will create a DS before triggering the job to pull all the images of the job | Boolean | true | false |
+| errorOnVerify        | Set RC to 1 when objects verification fails                                      | Boolean | true     | true    |
+| preLoadImages        | Kube-burner will create a DS before triggering the job to pull all the images of the job | Boolean | true | true |
 | preLoadPeriod        | How long to wait for the preload daemonset                                       | Duration| 2m      | 1m      |
 | namespaceLabels      | Add custom labels to the namespaces created by kube-burner                       | Object  | {"foo": "bar"} | - |
 | churn                | Churn the workload. Only supports namespace based workloads                      | Boolean | true | false |
 | churnPercent         | Percentage of the jobIterations to churn each period                             | Integer | 10 | 10 |
 | churnDuration        | Length of time that the job is churned for                                       | Duration| 10m | 1h |
 | churnDelay           | Length of time to wait between each churn period                                 | Duration| 10m | 5m |
-
 
 Examples of valid configuration files can be found at the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
 
@@ -72,7 +71,7 @@ Each object element supports the following parameters:
 
 | Option               | Description                                                       | Type    | Example                                             | Default |
 |----------------------|-------------------------------------------------------------------|---------|-----------------------------------------------------|---------|
-| objectTemplate       | Object template file or URL                                       | String  | deployment.yml or https://domain.com/deployment.yml | ""      |
+| objectTemplate       | Object template file or URL                                       | String  | deployment.yml or <https://domain.com/deployment.yml> | ""      |
 | replicas             | How replicas of this object to create per job iteration           | Integer | 10                                                  | -       |
 | inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -                                                   | -       |
 | namespaced           | Whether to create a namespaced object or not                      | Boolean | false                                               | true    |
@@ -103,7 +102,6 @@ Where:
 - labelSelector: Map with the labelSelector.
 - apiVersion: API version from the k8s object.
 
-
 The third type is __patch__, which can patch objects described in the objects list with the template described in the object list. The objects list would have the following structure:
 
 ```yaml
@@ -112,8 +110,7 @@ objects:
   labelSelector: {kube-burner-job: cluster-density}
   objectTemplate: templates/deployment_patch_add_label.json
   patchType: "application/strategic-merge-patch+json"
-  apiVersion: apps/v1
-
+  apiVersion: apps/v1s
 ```
 
 Where:
@@ -125,6 +122,7 @@ Where:
 - patchType: The kubernetes request patch type (see below).
 
 Valid patch types:
+
 - application/json-patch+json
 - application/merge-patch+json
 - application/strategic-merge-patch+json
@@ -157,7 +155,7 @@ jobs:
 
 This job type supports the some of the same parameters as the create job type:
 
-- **waitForDeletion**: Wait for objects to be deleted before finishing the job. Defaults to true
+- __waitForDeletion__: Wait for objects to be deleted before finishing the job. Defaults to true
 - name
 - qps
 - burst
@@ -199,7 +197,7 @@ All object templates are injected a series of variables by default:
 - JobName: Job name.
 - UUID: Benchmark UUID.
 
-In addition, you can also inject arbitrary variables with the option **inputVars** from the objectTemplate object:
+In addition, you can also inject arbitrary variables with the option __inputVars__ from the objectTemplate object:
 
 ```yaml
     - objectTemplate: service.yml
