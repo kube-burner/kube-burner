@@ -1,0 +1,14 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: postgres-{{.Iteration}}
+spec:
+  selector:
+    name: postgres-{{.Replica}}-{{.Iteration}}
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+  type: ClusterIP
+  sessionAffinity: None

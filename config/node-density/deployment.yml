@@ -1,0 +1,29 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: node-density-{{.Iteration}}
+  name: {{.JobName}}-{{.Iteration}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node-density-{{.Iteration}}
+  template:
+    metadata:
+      labels:
+        app: node-density-{{.Iteration}}
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      tolerations:
+      - key: os
+        value: Windows
+        effect: NoSchedule
+      containers:
+      - image: {{.containerImage}}
+        name: node-density
+        requests:
+          memory: "10Mi"
+          cpu: "10m"
+        imagePullPolicy: IfNotPresent
