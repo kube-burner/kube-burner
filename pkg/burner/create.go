@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"strconv"
@@ -58,7 +57,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
-		t, err := ioutil.ReadAll(f)
+		t, err := io.ReadAll(f)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}

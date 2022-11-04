@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,7 +42,7 @@ var ConfigSpec Spec = Spec{
 	GlobalConfig: GlobalConfig{
 		MetricsDirectory: "collected-metrics",
 		RequestTimeout:   15 * time.Second,
-		WriteToFile:      true,
+		WriteToFile:      false,
 		Measurements:     []mtypes.Measurement{},
 		IndexerConfig: IndexerConfig{
 			Enabled:            false,
@@ -87,14 +87,14 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	raw := rawJob{
 		Cleanup:              true,
 		NamespacedIterations: true,
-		PodWait:              true,
-		WaitWhenFinished:     false,
+		PodWait:              false,
+		WaitWhenFinished:     true,
 		VerifyObjects:        true,
-		ErrorOnVerify:        false,
+		ErrorOnVerify:        true,
 		JobType:              CreationJob,
 		WaitForDeletion:      true,
 		MaxWaitTimeout:       3 * time.Hour,
-		PreLoadImages:        false,
+		PreLoadImages:        true,
 		PreLoadPeriod:        1 * time.Minute,
 		Churn:                false,
 		ChurnPercent:         10,
@@ -118,7 +118,7 @@ func Parse(c string, jobsRequired bool) error {
 	if err != nil {
 		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}
-	cfg, err := ioutil.ReadAll(f)
+	cfg, err := io.ReadAll(f)
 	if err != nil {
 		return fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}

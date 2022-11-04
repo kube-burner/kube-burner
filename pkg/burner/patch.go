@@ -17,7 +17,6 @@ package burner
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +48,7 @@ func setupPatchJob(jobConfig config.Job) Executor {
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
-		t, err := ioutil.ReadAll(f)
+		t, err := io.ReadAll(f)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}

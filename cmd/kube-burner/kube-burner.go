@@ -91,11 +91,6 @@ func initCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
-			if configMap != "" {
-				if configFile != "" {
-					log.Fatal("The flags --config and --configmap can't be specified together")
-				}
-			}
 			if configMap == "" && configFile == "" {
 				log.Fatal("Either --configmap or --config flags are required")
 			}
@@ -143,6 +138,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "", "default", "Namespace where the configmap is")
+	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
@@ -256,7 +252,7 @@ func importCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVar(&tarball, "tarball", "", "Metrics tarball file")
-	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagsRequiredTogether("config", "tarball")
 	return cmd
 }
 
