@@ -48,10 +48,11 @@ func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(url, token, username, password, uuid string, tlsVerify bool, step time.Duration) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url, token, username, password, uuid string, tlsVerify bool, step time.Duration) (*Prometheus, error) {
 	var p Prometheus = Prometheus{
-		Step: step,
-		uuid: uuid,
+		Step:       step,
+		uuid:       uuid,
+		configSpec: configSpec,
 	}
 
 	log.Info("👽 Initializing prometheus client")
@@ -149,14 +150,14 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 				continue
 			}
 		}
-		if config.ConfigSpec.GlobalConfig.WriteToFile {
+		if p.configSpec.GlobalConfig.WriteToFile {
 			filename := fmt.Sprintf("%s-%s.json", md.MetricName, p.uuid)
-			if config.ConfigSpec.GlobalConfig.MetricsDirectory != "" {
-				err = os.MkdirAll(config.ConfigSpec.GlobalConfig.MetricsDirectory, 0744)
+			if p.configSpec.GlobalConfig.MetricsDirectory != "" {
+				err = os.MkdirAll(p.configSpec.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
 					return fmt.Errorf("Error creating metrics directory: %v: ", err)
 				}
-				filename = path.Join(config.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
+				filename = path.Join(p.configSpec.GlobalConfig.MetricsDirectory, filename)
 			}
 			log.Debugf("Writing to: %s", filename)
 			f, err := os.Create(filename)
@@ -171,8 +172,8 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 				log.Errorf("JSON encoding error: %s", err)
 			}
 		}
-		if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-			indexName := config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex
+		if p.configSpec.GlobalConfig.IndexerConfig.Enabled {
+			indexName := p.configSpec.GlobalConfig.IndexerConfig.DefaultIndex
 			if md.IndexName != "" {
 				indexName = strings.ToLower(md.IndexName)
 			}

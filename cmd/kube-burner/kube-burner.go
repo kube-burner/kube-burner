@@ -102,17 +102,26 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			err = config.Parse(configFile, true)
+			configSpec, err := config.Parse(configFile, true)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
+			if url == "" {
+				url = configSpec.GlobalConfig.PrometheusURL
+			}
+			if token == "" {
+				token = configSpec.GlobalConfig.BearerToken
+			}
+			if metricsProfile == "" {
+				metricsProfile = configSpec.GlobalConfig.MetricsProfile
+			}
 			if url != "" {
-				prometheusClient, err = prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+				prometheusClient, err = prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 				if err != nil {
 					log.Fatal(err)
 				}
 				// If indexer is enabled or writeTofile is enabled we read the profile
-				if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled || config.ConfigSpec.GlobalConfig.WriteToFile {
+				if configSpec.GlobalConfig.IndexerConfig.Enabled || configSpec.GlobalConfig.WriteToFile {
 					if err := prometheusClient.ReadProfile(metricsProfile); err != nil {
 						log.Fatal(err)
 					}
@@ -123,7 +132,7 @@ func initCmd() *cobra.Command {
 					}
 				}
 			}
-			steps(uuid, prometheusClient, alertM)
+			steps(configSpec, uuid, prometheusClient, alertM)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
@@ -151,7 +160,7 @@ func destroyCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if configFile != "" {
-				err := config.Parse(configFile, false)
+				_, err := config.Parse(configFile, false)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -181,17 +190,17 @@ func indexCmd() *cobra.Command {
 		Short: "Index kube-burner metrics",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := config.Parse(configFile, false)
+			configSpec, err := config.Parse(configFile, false)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-				indexer, err = indexers.NewIndexer()
+			if configSpec.GlobalConfig.IndexerConfig.Enabled {
+				indexer, err = indexers.NewIndexer(configSpec)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
 			}
-			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -204,8 +213,8 @@ func indexCmd() *cobra.Command {
 			if err := p.ScrapeMetrics(startTime, endTime, indexer, jobName); err != nil {
 				log.Error(err)
 			}
-			if config.ConfigSpec.GlobalConfig.WriteToFile && config.ConfigSpec.GlobalConfig.CreateTarball {
-				err = prometheus.CreateTarball(config.ConfigSpec.GlobalConfig.MetricsDirectory)
+			if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
+				err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -236,15 +245,15 @@ func importCmd() *cobra.Command {
 		Use:   "import",
 		Short: "Import metrics tarball",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := config.Parse(configFile, false)
+			configSpec, err := config.Parse(configFile, false)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			indexer, err := indexers.NewIndexer()
+			indexer, err := indexers.NewIndexer(configSpec)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			err = prometheus.ImportTarball(tarball, config.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer)
+			err = prometheus.ImportTarball(tarball, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -268,7 +277,7 @@ func alertCmd() *cobra.Command {
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			p, err := prometheus.NewPrometheusClient(url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			p, err := prometheus.NewPrometheusClient(config.Spec{}, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -297,13 +306,13 @@ func alertCmd() *cobra.Command {
 	return cmd
 }
 
-func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) {
+func steps(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) {
 	var rc int
 	var err error
 	var measurementsWg sync.WaitGroup
 	var indexer *indexers.Indexer
-	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-		indexer, err = indexers.NewIndexer()
+	if configSpec.GlobalConfig.IndexerConfig.Enabled {
+		indexer, err = indexers.NewIndexer(configSpec)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
@@ -312,8 +321,8 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 	if err != nil {
 		log.Fatalf("Error creating k8s clientSet: %s", err)
 	}
-	measurements.NewMeasurementFactory(restConfig, uuid, indexer)
-	jobList := burner.NewExecutorList(uuid)
+	measurements.NewMeasurementFactory(configSpec, restConfig, uuid, indexer)
+	jobList := burner.NewExecutorList(configSpec, uuid)
 	// Iterate through job list
 	for jobPosition, job := range jobList {
 		if job.Config.PreLoadImages {
@@ -358,10 +367,10 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 		elapsedTime := jobList[jobPosition].End.Sub(jobList[jobPosition].Start).Seconds()
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 	}
-	if config.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
+	if configSpec.GlobalConfig.IndexerConfig.Enabled {
 		for _, job := range jobList {
 			elapsedTime := job.End.Sub(job.Start).Seconds()
-			err := burner.IndexMetadataInfo(indexer, uuid, elapsedTime, job.Config, job.Start)
+			err := burner.IndexMetadataInfo(configSpec, indexer, uuid, elapsedTime, job.Config, job.Start)
 			if err != nil {
 				log.Errorf(err.Error())
 			}
@@ -384,8 +393,8 @@ func steps(uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager)
 			if err := p.ScrapeJobsMetrics(jobList, indexer); err != nil {
 				log.Error(err.Error())
 			}
-			if config.ConfigSpec.GlobalConfig.WriteToFile && config.ConfigSpec.GlobalConfig.CreateTarball {
-				err = prometheus.CreateTarball(config.ConfigSpec.GlobalConfig.MetricsDirectory)
+			if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
+				err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
 				if err != nil {
 					log.Error(err.Error())
 				}

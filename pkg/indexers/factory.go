@@ -22,19 +22,19 @@ import (
 // Indexer indexer interface
 type Indexer interface {
 	Index(string, []interface{})
-	new() error
+	new(config.Spec) error
 }
 
 var indexerMap = make(map[string]Indexer)
 
 // NewIndexer creates a new Indexer with the specified IndexerConfig
-func NewIndexer() (*Indexer, error) {
+func NewIndexer(configSpec config.Spec) (*Indexer, error) {
 	var indexer Indexer
 	var exists bool
-	cfg := config.ConfigSpec.GlobalConfig.IndexerConfig
+	cfg := configSpec.GlobalConfig.IndexerConfig
 	if indexer, exists = indexerMap[cfg.Type]; exists {
 		log.Infof("📁 Creating indexer: %s", cfg.Type)
-		err := indexer.new()
+		err := indexer.new(configSpec)
 		if err != nil {
 			return &indexer, err
 		}
