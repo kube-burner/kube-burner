@@ -200,6 +200,15 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err.Error())
 				}
 			}
+			if url == "" {
+				url = configSpec.GlobalConfig.PrometheusURL
+			}
+			if token == "" {
+				token = configSpec.GlobalConfig.BearerToken
+			}
+			if metricsProfile == "" {
+				metricsProfile = configSpec.GlobalConfig.MetricsProfile
+			}
 			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
 				log.Fatal(err)
@@ -266,9 +275,10 @@ func importCmd() *cobra.Command {
 }
 
 func alertCmd() *cobra.Command {
-	var url, alertProfile string
+	var configSpec config.Spec
+	var err error
+	var url, alertProfile, configFile, username, password, uuid, token string
 	var start, end int64
-	var username, password, uuid, token string
 	var skipTLSVerify bool
 	var alertM *alerting.AlertManager
 	var prometheusStep time.Duration
@@ -277,7 +287,19 @@ func alertCmd() *cobra.Command {
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			p, err := prometheus.NewPrometheusClient(config.Spec{}, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			if configFile != "" {
+				configSpec, err = config.Parse(configFile, false)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+			}
+			if url == "" {
+				url = configSpec.GlobalConfig.PrometheusURL
+			}
+			if token == "" {
+				token = configSpec.GlobalConfig.BearerToken
+			}
+			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -300,6 +322,7 @@ func alertCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.MarkFlagRequired("prometheus-url")
 	cmd.MarkFlagRequired("alert-profile")
 	cmd.Flags().SortFlags = false
@@ -340,7 +363,7 @@ func steps(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM
 			// If object verification is enabled
 			if job.Config.VerifyObjects && !job.Verify() {
 				errMsg := "Object verification failed"
-				// IF errorOnVerify is enabled. Set RC to 1
+				// If errorOnVerify is enabled. Set RC to 1
 				if job.Config.ErrorOnVerify {
 					errMsg += ". Setting return code to 1"
 					rc = 1

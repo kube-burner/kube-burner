@@ -80,7 +80,7 @@ func NewExecutorList(configSpec config.Spec, uuid string) []Executor {
 		if job.JobType == config.CreationJob {
 			ex = setupCreateJob(job)
 		} else if job.JobType == config.DeletionJob {
-			ex = setupDeleteJob(job)
+			ex = setupDeleteJob(&job)
 		} else if job.JobType == config.PatchJob {
 			ex = setupPatchJob(job)
 		} else {
