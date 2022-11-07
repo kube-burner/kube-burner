@@ -1,0 +1,51 @@
+---
+ 
+global:
+  writeToFile: true
+  metricsDirectory: collected-metrics
+  prometheusURL: http://localhost:9090
+  metricsProfile: metrics-profile.yaml
+  measurements:
+  - name: podLatency
+    esIndex: kube-burner
+
+  indexerConfig:
+    enabled: false
+
+jobs:
+  - name: not-namespaced
+    jobType: create
+    jobIterations: {{randInteger 1 2}}
+    qps: {{randInt 5 6 }}
+    burst: 15
+    namespacedIterations: false
+    cleanup: true
+    namespace: not-namespaced
+    podWait: true
+    waitWhenFinished: false
+    verifyObjects: true
+    errorOnVerify: true
+    preLoadImages: false
+    maxWaitTimeout: 2m
+    objects:
+    
+    - objectTemplate: objectTemplates/deployment.yml
+      replicas: 1
+      inputVars:
+        containerImage: gcr.io/google_containers/pause-amd64:3.0
+    
+     
+  - name: delete-job
+    jobType: delete
+    waitForDeletion: true
+    qps: 10
+    burst: 20
+    jobPause: 1ms
+    objects:
+
+    - kind: Deployment
+      labelSelector: {kube-burner-job: not-namespaced}
+      apiVersion: apps/v1
+
+    - kind: Namespace
+      labelSelector: {kube-burner-job: not-namespaced}
