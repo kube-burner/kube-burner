@@ -24,6 +24,9 @@ In this section is described global job configuration, it holds the following pa
 | measurements     | List of measurements. Detailed in the [measurements section]                                             | List           | -              | []          |
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section]                                      | Object         | -              | -           |
 | requestTimeout   | Client-go request timeout                                                                                | Duration       | 5s             | 15s         |
+| prometheusURL    | Prometheus URL endpoint, flag has precedence                                                             | String       | <http://prometheus.endpoint.com:9000>      | ""         |
+| bearerToken      | Bearer token to access the Prometheus endpoint                                                           | String       | thisIsAValidToken       | ""         |
+| metricsProfile   | Path to the metrics profile configuration file                                                           | String       | metrics.yml       | ""         |
 
 kube-burner connects to the k8s cluster using the following methods in this order:
 
