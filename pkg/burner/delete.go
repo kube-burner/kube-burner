@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func setupDeleteJob(jobConfig config.Job) Executor {
+func setupDeleteJob(jobConfig *config.Job) Executor {
 	log.Infof("Preparing delete job: %s", jobConfig.Name)
 	var ex Executor
 	for _, o := range jobConfig.Objects {
@@ -49,6 +49,7 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 		log.Infof("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
 	}
+	jobConfig.PreLoadImages = false
 	return ex
 }
 
