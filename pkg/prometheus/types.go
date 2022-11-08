@@ -29,6 +29,13 @@ type Prometheus struct {
 	Step          time.Duration
 	uuid          string
 	configSpec    config.Spec
+	JobList       []Job
+}
+
+type Job struct {
+	Start time.Time
+	End   time.Time
+	Name  string
 }
 
 // This object implements RoundTripper

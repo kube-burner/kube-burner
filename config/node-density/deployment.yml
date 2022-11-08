@@ -23,7 +23,8 @@ spec:
       containers:
       - image: {{.containerImage}}
         name: node-density
-        requests:
-          memory: "10Mi"
-          cpu: "10m"
+        resources:
+          requests:
+            memory: "10Mi"
+            cpu: "10m"
         imagePullPolicy: IfNotPresent

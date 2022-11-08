@@ -1,13 +1,13 @@
 package discovery
 
-type infraObj struct {
+type InfraObj struct {
 	Status struct {
 		InfrastructureName string `json:"infrastructureName"`
 		Platform           string `json:"platform"`
 	} `json:"status"`
 }
 
-type versionObj struct {
+type VersionObj struct {
 	OcpVersion string
 	K8sVersion string
 }
@@ -21,7 +21,7 @@ type clusterVersion struct {
 	} `json:"status"`
 }
 
-type nodeInfo struct {
+type NodeInfo struct {
 	WorkerCount int
 	InfraCount  int
 	TotalNodes  int

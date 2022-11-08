@@ -24,7 +24,7 @@ jobs:
     podWait: false
     waitWhenFinished: true
     preLoadImages: true
-    preLoadPeriod: 30s
+    preLoadPeriod: 10s
     namespaceLabels:
       security.openshift.io/scc.podSecurityLabelSync: false
       pod-security.kubernetes.io/enforce: privileged
@@ -32,7 +32,7 @@ jobs:
       pod-security.kubernetes.io/warn: privileged
     objects:
 
-      - objectTemplate: pod.yml
+      - objectTemplate: deployment.yml
         replicas: 1
         inputVars:
           containerImage: gcr.io/google_containers/pause:3.1

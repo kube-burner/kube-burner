@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -28,7 +27,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 
 	uid "github.com/satori/go.uuid"
@@ -113,18 +111,12 @@ func initCmd() *cobra.Command {
 				token = configSpec.GlobalConfig.BearerToken
 			}
 			if metricsProfile == "" {
-				metricsProfile = configSpec.GlobalConfig.MetricsProfile
+				configSpec.GlobalConfig.MetricsProfile = metricsProfile
 			}
 			if url != "" {
 				prometheusClient, err = prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 				if err != nil {
 					log.Fatal(err)
-				}
-				// If indexer is enabled or writeTofile is enabled we read the profile
-				if configSpec.GlobalConfig.IndexerConfig.Enabled || configSpec.GlobalConfig.WriteToFile {
-					if err := prometheusClient.ReadProfile(metricsProfile); err != nil {
-						log.Fatal(err)
-					}
 				}
 				if alertProfile != "" {
 					if alertM, err = alerting.NewAlertManager(alertProfile, prometheusClient); err != nil {
@@ -132,7 +124,11 @@ func initCmd() *cobra.Command {
 					}
 				}
 			}
-			steps(configSpec, uuid, prometheusClient, alertM)
+			rc, err := burner.Run(configSpec, uuid, prometheusClient, alertM)
+			if err != nil {
+				log.Fatalf(err.Error())
+			}
+			os.Exit(rc)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
@@ -206,20 +202,23 @@ func indexCmd() *cobra.Command {
 			if token == "" {
 				token = configSpec.GlobalConfig.BearerToken
 			}
-			if metricsProfile == "" {
-				metricsProfile = configSpec.GlobalConfig.MetricsProfile
+			if metricsProfile != "" {
+				configSpec.GlobalConfig.MetricsProfile = metricsProfile
 			}
 			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := p.ReadProfile(metricsProfile); err != nil {
-				log.Fatal(err)
-			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
 			log.Infof("Indexing metrics with UUID %s", uuid)
-			if err := p.ScrapeMetrics(startTime, endTime, indexer, jobName); err != nil {
+			p.JobList = []prometheus.Job{{
+				Start: startTime,
+				End:   endTime,
+				Name:  jobName,
+			},
+			}
+			if err := p.ScrapeJobsMetrics(indexer); err != nil {
 				log.Error(err)
 			}
 			if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
@@ -329,106 +328,6 @@ func alertCmd() *cobra.Command {
 	return cmd
 }
 
-func steps(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) {
-	var rc int
-	var err error
-	var measurementsWg sync.WaitGroup
-	var indexer *indexers.Indexer
-	if configSpec.GlobalConfig.IndexerConfig.Enabled {
-		indexer, err = indexers.NewIndexer(configSpec)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-	}
-	_, restConfig, err := config.GetClientSet(0, 0)
-	if err != nil {
-		log.Fatalf("Error creating k8s clientSet: %s", err)
-	}
-	measurements.NewMeasurementFactory(configSpec, restConfig, uuid, indexer)
-	jobList := burner.NewExecutorList(configSpec, uuid)
-	// Iterate through job list
-	for jobPosition, job := range jobList {
-		if job.Config.PreLoadImages {
-			burner.PreLoadImages(job)
-		}
-		jobList[jobPosition].Start = time.Now().UTC()
-		log.Infof("Triggering job: %s", job.Config.Name)
-		measurements.SetJobConfig(&job.Config)
-		switch job.Config.JobType {
-		case config.CreationJob:
-			job.Cleanup()
-			measurements.Start(&measurementsWg)
-			measurementsWg.Wait()
-			job.RunCreateJob(1, job.Config.JobIterations)
-			// If object verification is enabled
-			if job.Config.VerifyObjects && !job.Verify() {
-				errMsg := "Object verification failed"
-				// If errorOnVerify is enabled. Set RC to 1
-				if job.Config.ErrorOnVerify {
-					errMsg += ". Setting return code to 1"
-					rc = 1
-				}
-				log.Error(errMsg)
-			}
-			if job.Config.Churn {
-				job.RunCreateJobWithChurn()
-			}
-			// We stop and index measurements per job
-			if measurements.Stop() == 1 {
-				rc = 1
-			}
-		case config.DeletionJob:
-			job.RunDeleteJob()
-		case config.PatchJob:
-			job.RunPatchJob()
-		}
-		if job.Config.JobPause > 0 {
-			log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
-			time.Sleep(job.Config.JobPause)
-		}
-		jobList[jobPosition].End = time.Now().UTC()
-		elapsedTime := jobList[jobPosition].End.Sub(jobList[jobPosition].Start).Seconds()
-		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
-	}
-	if configSpec.GlobalConfig.IndexerConfig.Enabled {
-		for _, job := range jobList {
-			elapsedTime := job.End.Sub(job.Start).Seconds()
-			err := burner.IndexMetadataInfo(configSpec, indexer, uuid, elapsedTime, job.Config, job.Start)
-			if err != nil {
-				log.Errorf(err.Error())
-			}
-		}
-	}
-	if p != nil {
-		log.Infof("Waiting %v extra before scraping prometheus", p.Step)
-		time.Sleep(p.Step)
-		// Update end time of last job
-		jobList[len(jobList)-1].End = time.Now().UTC()
-		// If alertManager is configured
-		if alertM != nil {
-			log.Infof("Evaluating alerts")
-			if alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
-				rc = 1
-			}
-		}
-		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-		if len(p.MetricProfile) > 0 {
-			if err := p.ScrapeJobsMetrics(jobList, indexer); err != nil {
-				log.Error(err.Error())
-			}
-			if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
-				err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
-				if err != nil {
-					log.Error(err.Error())
-				}
-			}
-		}
-	}
-	log.Infof("Finished execution with UUID: %s", uuid)
-	log.Info("👋 Exiting kube-burner")
-	os.Exit(rc)
-}
-
 // executes rootCmd
 func main() {
 	rootCmd.AddCommand(
@@ -438,6 +337,7 @@ func main() {
 		indexCmd(),
 		alertCmd(),
 		importCmd(),
+		openShiftCmd(),
 	)
 	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: trace, debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {

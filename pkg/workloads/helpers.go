@@ -6,16 +6,17 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
+	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 )
 
 type WorkloadHelper struct {
-	envVars  map[string]string
-	logLevel string
+	envVars         map[string]string
+	prometheusURL   string
+	prometheusToken string
+	Metadata        clusterMetadata
 }
 
 type clusterMetadata struct {
@@ -37,14 +38,10 @@ type clusterMetadata struct {
 	Passed           bool      `json:"passed"`
 }
 
-var metadata clusterMetadata
-var kubeburnerCmd []string = []string{"init"}
-
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(logLevel string, envVars map[string]string) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string) WorkloadHelper {
 	return WorkloadHelper{
-		logLevel: logLevel,
-		envVars:  envVars,
+		envVars: envVars,
 	}
 }
 
@@ -52,36 +49,16 @@ func NewWorkloadHelper(logLevel string, envVars map[string]string) WorkloadHelpe
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	prometheusURL, prometheusToken, err := discovery.GetPrometheus()
 	if err != nil {
-		fmt.Println("Error obtaining Prometheus information:", err.Error())
-		os.Exit(1)
+		log.Fatal("Error obtaining Prometheus information:", err.Error())
 	}
-	if prometheusURL != "" {
-		kubeburnerCmd = append(kubeburnerCmd, "-u", prometheusURL)
-	}
-	if prometheusToken != "" {
-		kubeburnerCmd = append(kubeburnerCmd, "-t", prometheusToken)
-	}
-	kubeburnerCmd = append(kubeburnerCmd, "--log-level", wh.logLevel)
+	wh.prometheusURL = prometheusURL
+	wh.prometheusToken = prometheusToken
 	for k, v := range wh.envVars {
 		os.Setenv(k, v)
 	}
 }
 
-func run(cfg ...string) error {
-	kubeburnerCmd := append(kubeburnerCmd, cfg...)
-	cmd := exec.Command("kube-burner", kubeburnerCmd...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	fmt.Println("Running:", strings.Join(cmd.Args, " "))
-	err := cmd.Run()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (wh *WorkloadHelper) GatherMetadata() error {
-	metadata.UUID = wh.envVars["UUID"]
 	infra, err := discovery.GetInfraDetails()
 	if err != nil {
 		return err
@@ -98,38 +75,37 @@ func (wh *WorkloadHelper) GatherMetadata() error {
 	if err != nil {
 		return err
 	}
-	metadata.Platform = infra.Status.Platform
-	metadata.ClusterName = infra.Status.InfrastructureName
-	metadata.K8SVersion = version.K8sVersion
-	metadata.OCPVersion = version.OcpVersion
-	metadata.TotalNodes = nodeInfo.TotalNodes
-	metadata.WorkerNodesCount = nodeInfo.WorkerCount
-	metadata.InfraNodesCount = nodeInfo.InfraCount
-	metadata.MasterNodesType = nodeInfo.MasterType
-	metadata.WorkerNodesType = nodeInfo.WorkerType
-	metadata.InfraNodesType = nodeInfo.InfraType
-	metadata.SDNType = sdnType
-	metadata.Timestamp = time.Now().UTC()
+	wh.Metadata.Platform = infra.Status.Platform
+	wh.Metadata.ClusterName = infra.Status.InfrastructureName
+	wh.Metadata.K8SVersion = version.K8sVersion
+	wh.Metadata.OCPVersion = version.OcpVersion
+	wh.Metadata.TotalNodes = nodeInfo.TotalNodes
+	wh.Metadata.WorkerNodesCount = nodeInfo.WorkerCount
+	wh.Metadata.InfraNodesCount = nodeInfo.InfraCount
+	wh.Metadata.MasterNodesType = nodeInfo.MasterType
+	wh.Metadata.WorkerNodesType = nodeInfo.WorkerType
+	wh.Metadata.InfraNodesType = nodeInfo.InfraType
+	wh.Metadata.SDNType = sdnType
+	wh.Metadata.Timestamp = time.Now().UTC()
 	return nil
 }
 
 func (wh *WorkloadHelper) IndexMetadata() {
-	metadata.EndDate = time.Now().UTC()
+	wh.Metadata.EndDate = time.Now().UTC()
 	if wh.envVars["ES_SERVER"] == "" {
-		fmt.Println("No metadata will be indexed")
+		log.Info("No metadata will be indexed")
 	}
 	esEndpoint := fmt.Sprintf("%v/%v/document", wh.envVars["ES_SERVER"], wh.envVars["ES_INDEX"])
-	body, err := json.Marshal(metadata)
+	body, err := json.Marshal(wh.Metadata)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	resp, err := http.Post(esEndpoint, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		fmt.Println("Error indexing metadata:", err)
+		log.Error("Error indexing metadata:", err)
 		return
 	}
 	if resp.StatusCode == http.StatusCreated {
-		fmt.Println("Cluster metadata indexed correctly")
+		log.Info("Cluster metadata indexed correctly")
 	}
 }

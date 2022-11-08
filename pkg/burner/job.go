@@ -15,10 +15,16 @@
 package burner
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
+	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -67,14 +73,121 @@ var dynamicClient dynamic.Interface
 // RestConfig clieng-go rest configuration
 var RestConfig *rest.Config
 
-// NewExecutorList Returns a list of executors
-func NewExecutorList(configSpec config.Spec, uuid string) []Executor {
+func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) (int, error) {
+	var rc int
+	var err error
+	var measurementsWg sync.WaitGroup
+	var indexer *indexers.Indexer
+	if configSpec.GlobalConfig.IndexerConfig.Enabled {
+		indexer, err = indexers.NewIndexer(configSpec)
+		if err != nil {
+			return rc, err
+		}
+	}
+	_, restConfig, err := config.GetClientSet(0, 0)
+	if err != nil {
+		log.Fatalf("Error creating k8s clientSet: %s", err)
+	}
+	measurements.NewMeasurementFactory(configSpec, restConfig, uuid, indexer)
+	jobList, err := newExecutorList(configSpec, uuid)
+	if err != nil {
+		return rc, err
+	}
+	// Iterate job list
+	for jobPosition, job := range jobList {
+		if job.Config.PreLoadImages {
+			preLoadImages(job)
+		}
+		prometheusJob := prometheus.Job{
+			Start: time.Now().UTC(),
+		}
+		jobList[jobPosition].Start = time.Now().UTC()
+		log.Infof("Triggering job: %s", job.Config.Name)
+		measurements.SetJobConfig(&job.Config)
+		switch job.Config.JobType {
+		case config.CreationJob:
+			job.Cleanup()
+			measurements.Start(&measurementsWg)
+			measurementsWg.Wait()
+			job.RunCreateJob(1, job.Config.JobIterations)
+			// If object verification is enabled
+			if job.Config.VerifyObjects && !job.Verify() {
+				errMsg := "Object verification failed"
+				// If errorOnVerify is enabled. Set RC to 1
+				if job.Config.ErrorOnVerify {
+					errMsg += ". Setting return code to 1"
+					rc = 1
+				}
+				log.Error(errMsg)
+			}
+			if job.Config.Churn {
+				job.RunCreateJobWithChurn()
+			}
+			// We stop and index measurements per job
+			if measurements.Stop() == 1 {
+				rc = 1
+			}
+		case config.DeletionJob:
+			job.RunDeleteJob()
+		case config.PatchJob:
+			job.RunPatchJob()
+		}
+		if job.Config.JobPause > 0 {
+			log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
+			time.Sleep(job.Config.JobPause)
+		}
+		prometheusJob.End = time.Now().UTC()
+		elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Seconds()
+		p.JobList = append(p.JobList, prometheusJob)
+		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
+	}
+	if configSpec.GlobalConfig.IndexerConfig.Enabled {
+		for _, job := range jobList {
+			elapsedTime := job.End.Sub(job.Start).Seconds()
+			err := indexMetadataInfo(configSpec, indexer, uuid, elapsedTime, job.Config, job.Start)
+			if err != nil {
+				log.Errorf(err.Error())
+			}
+		}
+	}
+	if p != nil {
+		log.Infof("Waiting %v extra before scraping prometheus", p.Step)
+		time.Sleep(p.Step)
+		// Update end time of last job
+		jobList[len(jobList)-1].End = time.Now().UTC()
+		// If alertManager is configured
+		if alertM != nil {
+			log.Infof("Evaluating alerts")
+			if alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
+				rc = 1
+			}
+		}
+		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
+		if len(p.MetricProfile) > 0 {
+			if err := p.ScrapeJobsMetrics(indexer); err != nil {
+				log.Error(err.Error())
+			}
+			if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
+				err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
+				if err != nil {
+					log.Error(err.Error())
+				}
+			}
+		}
+	}
+	log.Infof("Finished execution with UUID: %s", uuid)
+	log.Info("👋 Exiting kube-burner")
+	return rc, nil
+}
+
+// newExecutorList Returns a list of executors
+func newExecutorList(configSpec config.Spec, uuid string) ([]Executor, error) {
 	var err error
 	var ex Executor
 	var executorList []Executor
 	ClientSet, RestConfig, err = config.GetClientSet(0, 0)
 	if err != nil {
-		log.Fatalf("Error creating clientSet: %s", err)
+		return executorList, fmt.Errorf("error creating clientSet: %s", err)
 	}
 	for _, job := range configSpec.Jobs {
 		if job.JobType == config.CreationJob {
@@ -97,5 +210,5 @@ func NewExecutorList(configSpec config.Spec, uuid string) []Executor {
 		ex.uuid = uuid
 		executorList = append(executorList, ex)
 	}
-	return executorList
+	return executorList, nil
 }

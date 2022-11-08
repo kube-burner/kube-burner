@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/cloud-bulldozer/kube-burner/log"
+
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,8 +33,7 @@ func init() {
 	}
 	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	clientset = kubernetes.NewForConfigOrDie(restConfig)
 	dynamicClient = dynamic.NewForConfigOrDie(restConfig)
@@ -68,7 +69,9 @@ func getPrometheusURL() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "https://" + prometheusHost, nil
+	endpoint := "https://" + prometheusHost
+	log.Debug("Prometheus endpoint: ", endpoint)
+	return endpoint, nil
 }
 
 // getBearerToken returns a valid bearer token from the openshift-monitoring/prometheus-k8s service account
@@ -82,12 +85,14 @@ func getBearerToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	log.Debug("Bearer token: ", response.Status.Token)
 	return response.Status.Token, nil
 }
 
 // GetWorkerNodeCount returns the number of worker nodes
 func GetWorkerNodeCount() (int, error) {
 	nodeList, err := clientset.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: "node-role.kubernetes.io/worker="})
+	log.Debug("Node count: ", len(nodeList.Items))
 	return len(nodeList.Items), err
 }
 
@@ -105,12 +110,13 @@ func GetCurrentPodCount() (int, error) {
 		}
 		podCount += len(podList.Items)
 	}
+	log.Debug("Current running pod count: ", podCount)
 	return podCount, nil
 }
 
 // GetInfraDetails returns cluster anme and platform
-func GetInfraDetails() (infraObj, error) {
-	var infraJSON infraObj
+func GetInfraDetails() (InfraObj, error) {
+	var infraJSON InfraObj
 	infra, err := dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "config.openshift.io",
 		Version:  "v1",
@@ -125,9 +131,9 @@ func GetInfraDetails() (infraObj, error) {
 }
 
 // GetVersionInfo obtains OCP and k8s version information
-func GetVersionInfo() (versionObj, error) {
+func GetVersionInfo() (VersionObj, error) {
 	var cv clusterVersion
-	var versionInfo versionObj
+	var versionInfo VersionObj
 	version, err := clientset.ServerVersion()
 	versionInfo.K8sVersion = version.GitVersion
 	if err != nil {
@@ -155,8 +161,8 @@ func GetVersionInfo() (versionObj, error) {
 }
 
 // GetNodesInfo returns node information
-func GetNodesInfo() (nodeInfo, error) {
-	var nodeInfoData nodeInfo
+func GetNodesInfo() (NodeInfo, error) {
+	var nodeInfoData NodeInfo
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		return nodeInfoData, err

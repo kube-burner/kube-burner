@@ -26,20 +26,21 @@ type NestedPod struct {
 	} `json:"spec"`
 }
 
-func PreLoadImages(job Executor) {
+func preLoadImages(job Executor) error {
 	log.Info("Pre-load: images from job ", job.Config.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("pre-load: %v", err)
 	}
 	err = createDSs(imageList, job.Config.NamespaceLabels)
 	if err != nil {
-		log.Fatalf("Pre-load: %v", err)
+		return fmt.Errorf("pre-load: %v", err)
 	}
 	log.Infof("Pre-load: Sleeping for %v", job.Config.PreLoadPeriod)
 	time.Sleep(job.Config.PreLoadPeriod)
 	log.Infof("Pre-load: Deleting namespace %s", preLoadNs)
 	CleanupNamespaces(ClientSet, v1.ListOptions{LabelSelector: "kube-burner-preload=true"})
+	return nil
 }
 
 func getJobImages(job Executor) ([]string, error) {

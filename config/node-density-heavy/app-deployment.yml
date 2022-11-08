@@ -57,7 +57,5 @@ spec:
   selector:
     matchLabels:
       name: perfapp-{{.Replica}}-{{.Iteration}}
-  triggers:
-  - type: ConfigChange
   strategy:
     type: RollingUpdate
