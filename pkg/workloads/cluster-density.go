@@ -28,12 +28,12 @@ func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			configSpec.GlobalConfig.MetricsProfile = "metrics.yml"
+			configSpec.GlobalConfig.MetricsProfile = metricsProfile
 			p, err := prometheus.NewPrometheusClient(configSpec, wh.prometheusURL, wh.prometheusToken, "", "", wh.Metadata.UUID, true, 30*time.Second)
 			if err != nil {
 				log.Fatal(err)
 			}
-			alertM, err := alerting.NewAlertManager("alerts.yml", p)
+			alertM, err := alerting.NewAlertManager(alertsProfile, p)
 			if err != nil {
 				log.Fatal(err)
 			}

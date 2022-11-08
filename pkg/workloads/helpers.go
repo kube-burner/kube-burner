@@ -12,6 +12,11 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 )
 
+const (
+	metricsProfile = "metrics.yml"
+	alertsProfile  = "alerts.yml"
+)
+
 type WorkloadHelper struct {
 	envVars         map[string]string
 	prometheusURL   string
