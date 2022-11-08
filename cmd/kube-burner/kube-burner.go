@@ -109,8 +109,9 @@ func initCmd() *cobra.Command {
 			}
 			if token == "" {
 				token = configSpec.GlobalConfig.BearerToken
+
 			}
-			if metricsProfile == "" {
+			if metricsProfile != "" {
 				configSpec.GlobalConfig.MetricsProfile = metricsProfile
 			}
 			if url != "" {
