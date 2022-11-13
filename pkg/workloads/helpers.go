@@ -9,7 +9,11 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
+	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
+	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 )
 
 const (
@@ -118,4 +122,31 @@ func (wh *WorkloadHelper) IndexMetadata() {
 	if resp.StatusCode == http.StatusCreated {
 		log.Info("Cluster metadata indexed correctly")
 	}
+}
+
+func (wh *WorkloadHelper) run(configFile string) {
+	var alertM *alerting.AlertManager
+	var rc int
+	configSpec, err := config.Parse(configFile, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+	configSpec.GlobalConfig.MetricsProfile = metricsProfile
+	p, err := prometheus.NewPrometheusClient(configSpec, wh.prometheusURL, wh.prometheusToken, "", "", wh.Metadata.UUID, true, 30*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if wh.alerting {
+		alertM, err = alerting.NewAlertManager(alertsProfile, p)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM)
+	if err != nil {
+		log.Fatal(err)
+	}
+	wh.Metadata.Passed = rc == 0
+	wh.IndexMetadata()
+	os.Exit(rc)
 }

@@ -7,20 +7,15 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
-	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
-	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/spf13/cobra"
 )
 
 // NewNodeDensity holds node-density workload
 func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
-	var podsPerNode, rc int
+	var podsPerNode int
 	var podReadyThreshold time.Duration
 	var containerImage string
-	var alertM *alerting.AlertManager
 	cmd := &cobra.Command{
 		Use:          "node-density",
 		Short:        "Runs node-density workload",
@@ -42,28 +37,7 @@ func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
 			os.Setenv("CONTAINER_IMAGE", containerImage)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			configSpec, err := config.Parse("node-density.yml", true)
-			if err != nil {
-				log.Fatal(err)
-			}
-			configSpec.GlobalConfig.MetricsProfile = metricsProfile
-			p, err := prometheus.NewPrometheusClient(configSpec, wh.prometheusURL, wh.prometheusToken, "", "", wh.Metadata.UUID, true, 30*time.Second)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if wh.alerting {
-				alertM, err = alerting.NewAlertManager(alertsProfile, p)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-			rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM)
-			if err != nil {
-				log.Fatal(err)
-			}
-			wh.Metadata.Passed = rc == 0
-			wh.IndexMetadata()
-			os.Exit(rc)
+			wh.run("node-density.yml")
 		},
 	}
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
