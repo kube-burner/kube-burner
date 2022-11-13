@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	metricsProfile = "metrics.yml"
-	alertsProfile  = "alerts.yml"
+	metricsProfile     = "metrics.yml"
+	alertsProfile      = "alerts.yml"
+	metadataMetricName = "clusterMetadata"
 )
 
 type WorkloadHelper struct {
@@ -22,9 +23,11 @@ type WorkloadHelper struct {
 	prometheusURL   string
 	prometheusToken string
 	Metadata        clusterMetadata
+	alerting        bool
 }
 
 type clusterMetadata struct {
+	MetricName       string    `json:"metricName,omitempty"`
 	UUID             string    `json:"uuid"`
 	Platform         string    `json:"platform"`
 	OCPVersion       string    `json:"ocpVersion"`
@@ -44,9 +47,10 @@ type clusterMetadata struct {
 }
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool) WorkloadHelper {
 	return WorkloadHelper{
-		envVars: envVars,
+		envVars:  envVars,
+		alerting: alerting,
 	}
 }
 
@@ -80,6 +84,7 @@ func (wh *WorkloadHelper) GatherMetadata() error {
 	if err != nil {
 		return err
 	}
+	wh.Metadata.MetricName = metadataMetricName
 	wh.Metadata.Platform = infra.Status.Platform
 	wh.Metadata.ClusterName = infra.Status.InfrastructureName
 	wh.Metadata.K8SVersion = version.K8sVersion

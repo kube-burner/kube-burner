@@ -16,6 +16,7 @@ import (
 // NewClusterDensity holds cluster-density workload
 func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 	var iterations, rc int
+	var alertM *alerting.AlertManager
 	cmd := &cobra.Command{
 		Use:   "cluster-density <flags>",
 		Short: "Runs cluster-density workload",
@@ -33,15 +34,17 @@ func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			alertM, err := alerting.NewAlertManager(alertsProfile, p)
-			if err != nil {
-				log.Fatal(err)
+			if wh.alerting {
+				alertM, err = alerting.NewAlertManager(alertsProfile, p)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 			rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM)
 			if err != nil {
 				log.Fatal(err)
 			}
-			wh.Metadata.Passed = rc != 0
+			wh.Metadata.Passed = rc == 0
 			wh.IndexMetadata()
 			os.Exit(rc)
 		},

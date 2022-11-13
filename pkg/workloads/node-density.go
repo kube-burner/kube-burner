@@ -17,15 +17,20 @@ import (
 
 // NewNodeDensity holds node-density workload
 func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
-	var podsPerNode, workerNodeCount, rc int
+	var podsPerNode, rc int
 	var podReadyThreshold time.Duration
 	var containerImage string
+	var alertM *alerting.AlertManager
 	cmd := &cobra.Command{
 		Use:          "node-density",
 		Short:        "Runs node-density workload",
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			wh.Metadata.Benchmark = cmd.Name()
+			workerNodeCount, err := discovery.GetWorkerNodeCount()
+			if err != nil {
+				log.Fatal("Error obtaining worker node count:", err)
+			}
 			totalPods := workerNodeCount * podsPerNode
 			podCount, err := discovery.GetCurrentPodCount()
 			if err != nil {
@@ -46,22 +51,20 @@ func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			alertM, err := alerting.NewAlertManager(alertsProfile, p)
-			if err != nil {
-				log.Fatal(err)
+			if wh.alerting {
+				alertM, err = alerting.NewAlertManager(alertsProfile, p)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 			rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM)
 			if err != nil {
 				log.Fatal(err)
 			}
-			wh.Metadata.Passed = rc != 0
+			wh.Metadata.Passed = rc == 0
 			wh.IndexMetadata()
 			os.Exit(rc)
 		},
-	}
-	workerNodeCount, err := discovery.GetWorkerNodeCount()
-	if err != nil {
-		log.Fatal("Error obtaining worker node count:", err)
 	}
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
 	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 5*time.Second, "Pod ready timeout threshold")

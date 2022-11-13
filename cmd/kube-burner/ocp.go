@@ -12,16 +12,17 @@ import (
 func openShiftCmd() *cobra.Command {
 	ocpCmd := &cobra.Command{
 		Use:   "ocp",
-		Short: "kube-burner OpenShift wrapper",
+		Short: "OpenShift wrapper",
 		Long:  `This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads`,
 	}
 	var wh workloads.WorkloadHelper
 	esServer := ocpCmd.PersistentFlags().String("es-server", "", "Elastic Search endpoint")
 	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
-	qps := ocpCmd.PersistentFlags().Int("qps", 20, "kube-burner QPS")
-	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Kube-burner Burst")
+	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
-	indexing := ocpCmd.PersistentFlags().Bool("indexing", true, "Elastic Search indexing")
+	indexing := ocpCmd.PersistentFlags().Bool("indexing", true, "Enable Elastic Search indexing")
+	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
+	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
@@ -32,7 +33,7 @@ func openShiftCmd() *cobra.Command {
 			"BURST":     fmt.Sprintf("%d", *burst),
 			"INDEXING":  fmt.Sprintf("%v", *indexing),
 		}
-		wh = workloads.NewWorkloadHelper(envVars)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting)
 		wh.Metadata.UUID = *uuid
 		if *esServer != "" {
 			err := wh.GatherMetadata()
