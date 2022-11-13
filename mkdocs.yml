@@ -9,6 +9,7 @@ nav:
   - Metrics: metrics.md
   - Indexers: indexers.md
   - Alerting: alerting.md
+  - OpenShift Wrapper: ocp.md
 - Development:
   - Contributing: contributing.md
 site_name: Kube-burner
