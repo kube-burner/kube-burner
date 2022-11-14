@@ -38,8 +38,7 @@ jobs:
       - objectTemplate: app-deployment.yml
         replicas: 1
         inputVars:
-          readinessPeriod: 10
-          livenessPeriod: 10
+          probesPeriod: {{.PROBES_PERIOD}}
 
       - objectTemplate: postgres-service.yml
         replicas: 1

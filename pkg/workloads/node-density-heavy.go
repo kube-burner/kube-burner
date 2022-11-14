@@ -12,7 +12,7 @@ import (
 
 // NewNodeDensity holds node-density-heavy workload
 func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
-	var podsPerNode int
+	var podsPerNode, probesPeriod int
 	var podReadyThreshold time.Duration
 	cmd := &cobra.Command{
 		Use:          "node-density-heavy",
@@ -33,12 +33,14 @@ func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 			jobIterations := (totalPods - podCount) / 2
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(jobIterations))
 			os.Setenv("POD_READY_THRESHOLD", fmt.Sprintf("%v", podReadyThreshold))
+			os.Setenv("PROBES_PERIOD", fmt.Sprint(probesPeriod))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			wh.run("node-density-heavy.yml")
 		},
 	}
 	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 1*time.Hour, "Pod ready timeout threshold")
+	cmd.Flags().IntVar(&probesPeriod, "probes-period", 10, "Perf app readiness/livenes probes period in seconds")
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
 	return cmd
 }

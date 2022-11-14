@@ -18,7 +18,7 @@ spec:
           httpGet:
             path: /ready
             port: 8080
-          periodSeconds: {{ .readinessPeriod }}
+          periodSeconds: {{ .probesPeriod }}
           failureThreshold: 1
           timeoutSeconds: 60
           initialDelaySeconds: 30
@@ -26,7 +26,7 @@ spec:
           httpGet:
             path: /health
             port: 8080
-          periodSeconds: {{ .livenessPeriod }}
+          periodSeconds: {{ .probesPeriod }}
           failureThreshold: 1
           timeoutSeconds: 15
           initialDelaySeconds: 30
