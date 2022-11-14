@@ -1,0 +1,21 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  labels:
+    app: node-density
+  name: node-density
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  tolerations:
+  - key: os
+    value: Windows
+    effect: NoSchedule
+  containers:
+  - image: quay.io/rsevilla/debug:latest
+    name: node-density
+    resources:
+      requests:
+        memory: "10Mi"
+        cpu: "10m"
+    imagePullPolicy: IfNotPresent

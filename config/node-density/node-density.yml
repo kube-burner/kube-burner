@@ -32,7 +32,7 @@ jobs:
       pod-security.kubernetes.io/warn: privileged
     objects:
 
-      - objectTemplate: deployment.yml
+      - objectTemplate: pod.yml
         replicas: 1
         inputVars:
           containerImage: gcr.io/google_containers/pause:3.1
