@@ -51,6 +51,7 @@ check_files() {
 }
 
 log "Running kube-burner init"
+
 timeout 500 kube-burner init -c kube-burner.yml --uuid ${uuid} --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
 check_files
 check_ns kube-burner-job=namespaced,kube-burner-uuid=${uuid} 10

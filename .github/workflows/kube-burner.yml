@@ -7,7 +7,7 @@ on:
     - "**.md"
     - "examples/**"
     - "hack/**"
-  pull_request:
+  pull_request_target:
     branches: [ master ]
     paths-ignore:
     - "**.md"
@@ -46,24 +46,6 @@ jobs:
   k8s-tests:
     needs: build
     runs-on: ubuntu-latest
-    steps:
-  
-    - name: Download kube-burner binary
-      uses: actions/download-artifact@v3
-      with:
-        name: kube-burner
-        path: /tmp/
-
-    - name: Execute tests
-      working-directory: test
-      run: ./run.sh
-      env:
-        KIND_VERSION: v0.16.0
-        K8S_VERSION: ${{matrix.k8s-version}}
-
-  ocp-wrapper-node-density:
-    needs: build
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         k8s-version:
@@ -76,6 +58,38 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
+  
+    - name: Download kube-burner binary
+      uses: actions/download-artifact@v3
+      with:
+        name: kube-burner
+        path: /tmp/
+
+    - name: Execute tests
+      working-directory: test
+      run: |
+        export PATH=${PATH}:/tmp/
+        chmod +x /tmp/kube-burner
+        ./run.sh
+      env:
+        KIND_VERSION: v0.16.0
+        K8S_VERSION: ${{matrix.k8s-version}}
+
+  ocp-wrapper-node-density:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Download kube-burner binary
+      uses: actions/download-artifact@v3
+      with:
+        name: kube-burner
+        path: /tmp/
 
     - name: Authenticate against OCP cluster
       run: oc login -u ${OPENSHIFT_USER} -p ${OPENSHIFT_PASSWORD} ${OPENSHIFT_SERVER} --insecure-skip-tls-verify=true
@@ -86,7 +100,10 @@ jobs:
 
     - name: Execute tests
       working-directory: test
-      run: ./run-ocp.sh
+      run: |
+        export PATH=${PATH}:/tmp/
+        chmod +x /tmp/kube-burner
+        ./run-ocp.sh
 
   lint:
     name: Run golangci-lint
