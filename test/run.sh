@@ -4,6 +4,7 @@ source base.sh
 
 set -e
 setup-kind
+setup-prometheue
 rc=0
 uuid=$(uuidgen)
 
@@ -37,7 +38,7 @@ check_running_pods() {
   fi
 }
 
-check_files () {
+check_files() {
   for f in collected-metrics/top2PrometheusCPU-${uuid}.json collected-metrics/prometheusRSS-${uuid}.json collected-metrics/prometheusRSS-${uuid}.json collected-metrics/namespaced-podLatency.json collected-metrics/namespaced-podLatency-summary.json; do
     log "Checking file ${f}"
     if [[ ! -f $f ]]; then

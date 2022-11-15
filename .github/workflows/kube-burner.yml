@@ -16,7 +16,6 @@ on:
 
 jobs:
   build:
-    name: Build
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -33,22 +32,7 @@ jobs:
         go-version: ${{matrix.golang-version}}
       id: go
 
-    - uses: actions/checkout@v2
-
-    - name: Cache prometheus
-      uses: actions/cache@v2
-      with:
-        path: prometheus-2.22.0.linux-amd64
-        key: prometheus
-
-    - name: Download prometheus
-      run: |
-        [[ -f prometheus-2.22.0.linux-amd64/prometheus ]] || curl -sSL https://github.com/prometheus/prometheus/releases/download/v2.22.0/prometheus-2.22.0.linux-amd64.tar.gz | tar xz
-
-    - name: Run prometheus
-      run: |
-        pushd prometheus-2.22.0.linux-amd64
-        ./prometheus --storage.tsdb.path=/tmp/promdata 2>/dev/null &
+    - uses: actions/checkout@v3
 
     - name: Build
       run: make build
@@ -60,6 +44,22 @@ jobs:
 
     - name: Install
       run: sudo make install
+    
+    - uses: actions/upload-artifact@v3
+      with:
+        name: kube-burner
+        path: /usr/bin/kube-burner
+
+  k8s-tests:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+  
+    - name: Download kube-burner binary
+      uses: actions/download-artifact@v3
+      with:
+        name: kube-burner
+        path: /usr/bin/kube-burner
 
     - name: Execute tests
       working-directory: test
@@ -67,6 +67,27 @@ jobs:
       env:
         KIND_VERSION: v0.16.0
         K8S_VERSION: ${{matrix.k8s-version}}
+
+  ocp-wrapper-node-density:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Authenticate against OCP cluster
+      run: oc login -u ${OPENSHIFT_USER} -p ${OPENSHIFT_PASSWORD} ${OPENSHIFT_SERVER} --insecure-skip-tls-verify=true
+      env:
+        OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+        OPENSHIFT_USER: ${{ secrets.OPENSHIFT_USER }}
+        OPENSHIFT_PASSWORD: ${{ secrets.OPENSHIFT_PASSWORD }}
+
+    - name: Execute tests
+      working-directory: test
+      run: ./run-ocp.sh
 
   lint:
     name: Run golangci-lint
