@@ -4,7 +4,7 @@ source base.sh
 
 set -e
 setup-kind
-setup-prometheue
+setup-prometheus
 rc=0
 uuid=$(uuidgen)
 

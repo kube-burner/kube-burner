@@ -30,5 +30,8 @@ setup-kind() {
 setup-prometheus() {
   echo "Setting up prometheus instance"
   curl -sSL https://github.com/prometheus/prometheus/releases/download/v2.22.0/prometheus-2.22.0.linux-amd64.tar.gz | tar xz
-  ./prometheus-2.22.0.linux-amd64/prometheus --storage.tsdb.path=/tmp/promdata 2>/dev/null &
+  pushd prometheus-2.22.0.linux-amd64
+  ./prometheus --storage.tsdb.path=/tmp/promdata 2>/dev/null &
+  sleep 10
+  popd
 }
