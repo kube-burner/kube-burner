@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -123,24 +124,24 @@ func (wh *WorkloadHelper) IndexMetadata() {
 	if wh.envVars["ES_SERVER"] == "" {
 		log.Info("No metadata will be indexed")
 	}
-	esEndpoint := fmt.Sprintf("%v/%v/document", wh.envVars["ES_SERVER"], wh.envVars["ES_INDEX"])
-	body, err := json.Marshal(wh.Metadata)
-	if err != nil {
-		log.Fatal(err)
-	}
+	esEndpoint := fmt.Sprintf("%v/%v/_doc", wh.envVars["ES_SERVER"], wh.envVars["ES_INDEX"])
+	body, _ := json.Marshal(wh.Metadata)
 	resp, err := http.Post(esEndpoint, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Error("Error indexing metadata:", err)
+		log.Error("Error indexing metadata: ", err)
 		return
 	}
 	if resp.StatusCode == http.StatusCreated {
 		log.Info("Cluster metadata indexed correctly")
+	} else {
+		b, _ := io.ReadAll(resp.Body)
+		log.Errorf("Error indexing metadata, code: %v body: %s", resp.StatusCode, b)
 	}
 }
 
 func (wh *WorkloadHelper) run(configFile string) {
-	var alertM *alerting.AlertManager
 	var rc int
+	var alertM *alerting.AlertManager
 	configSpec, err := config.Parse(configFile, true)
 	if err != nil {
 		log.Fatal(err)

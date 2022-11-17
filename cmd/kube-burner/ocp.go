@@ -17,6 +17,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
@@ -41,7 +42,7 @@ func openShiftCmd() *cobra.Command {
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
 		envVars := map[string]string{
-			"ES_SERVER": *esServer,
+			"ES_SERVER": strings.TrimSuffix(*esServer, "/"),
 			"ES_INDEX":  *esIndex,
 			"QPS":       fmt.Sprintf("%d", *qps),
 			"BURST":     fmt.Sprintf("%d", *burst),
