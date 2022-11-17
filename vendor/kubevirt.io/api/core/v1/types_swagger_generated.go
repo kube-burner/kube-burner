@@ -25,6 +25,7 @@ func (VirtualMachineInstanceSpec) SwaggerDoc() map[string]string {
 		"affinity":                      "If affinity is specifies, obey all the affinity rules",
 		"schedulerName":                 "If specified, the VMI will be dispatched by specified scheduler.\nIf not specified, the VMI will be dispatched by default scheduler.\n+optional",
 		"tolerations":                   "If toleration is specified, obey all the toleration rules.",
+		"topologySpreadConstraints":     "TopologySpreadConstraints describes how a group of VMIs will be spread across a given topology\ndomains. K8s scheduler will schedule VMI pods in a way which abides by the constraints.\n+optional\n+patchMergeKey=topologyKey\n+patchStrategy=merge\n+listType=map\n+listMapKey=topologyKey\n+listMapKey=whenUnsatisfiable",
 		"evictionStrategy":              "EvictionStrategy can be set to \"LiveMigrate\" if the VirtualMachineInstance should be\nmigrated instead of shut-off in case of a node drain.\n\n+optional",
 		"startStrategy":                 "StartStrategy can be set to \"Paused\" if Virtual Machine should be started in paused state.\n\n+optional",
 		"terminationGracePeriodSeconds": "Grace period observed after signalling a VirtualMachineInstance to stop after which the VirtualMachineInstance is force terminated.",
@@ -73,6 +74,7 @@ func (VirtualMachineInstanceStatus) SwaggerDoc() map[string]string {
 		"fsFreezeStatus":                "FSFreezeStatus is the state of the fs of the guest\nit can be either frozen or thawed\n+optional",
 		"topologyHints":                 "+optional",
 		"virtualMachineRevisionName":    "VirtualMachineRevisionName is used to get the vm revision of the vmi when doing\nan online vm snapshot\n+optional",
+		"runtimeUser":                   "RuntimeUser is used to determine what user will be used in launcher\n+optional",
 	}
 }
 
@@ -81,7 +83,8 @@ func (PersistentVolumeClaimInfo) SwaggerDoc() map[string]string {
 		"":                   "PersistentVolumeClaimInfo contains the relavant information virt-handler needs cached about a PVC",
 		"accessModes":        "AccessModes contains the desired access modes the volume should have.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1\n+listType=atomic\n+optional",
 		"volumeMode":         "VolumeMode defines what type of volume is required by the claim.\nValue of Filesystem is implied when not included in claim spec.\n+optional",
-		"capacity":           "Capacity represents the capacity set on the corresponding PVC spec\n+optional",
+		"capacity":           "Capacity represents the capacity set on the corresponding PVC status\n+optional",
+		"requests":           "Requests represents the resources requested by the corresponding PVC spec\n+optional",
 		"preallocated":       "Preallocated indicates if the PVC's storage is preallocated or not\n+optional",
 		"filesystemOverhead": "Percentage of filesystem's size to be reserved when resizing the PVC\n+optional",
 	}
@@ -98,6 +101,17 @@ func (VolumeStatus) SwaggerDoc() map[string]string {
 		"persistentVolumeClaimInfo": "PersistentVolumeClaimInfo is information about the PVC that handler requires during start flow",
 		"hotplugVolume":             "If the volume is hotplug, this will contain the hotplug status.",
 		"size":                      "Represents the size of the volume",
+		"memoryDumpVolume":          "If the volume is memorydump volume, this will contain the memorydump info.",
+	}
+}
+
+func (DomainMemoryDumpInfo) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":               "DomainMemoryDumpInfo represents the memory dump information",
+		"startTimestamp": "StartTimestamp is the time when the memory dump started",
+		"endTimestamp":   "EndTimestamp is the time when the memory dump completed",
+		"claimName":      "ClaimName is the name of the pvc the memory was dumped to",
+		"targetFileName": "TargetFileName is the name of the memory dump output",
 	}
 }
 
@@ -130,6 +144,8 @@ func (VirtualMachineInstanceNetworkInterface) SwaggerDoc() map[string]string {
 		"name":          "Name of the interface, corresponds to name of the network assigned to the interface",
 		"ipAddresses":   "List of all IP addresses of a Virtual Machine interface",
 		"interfaceName": "The interface name inside the Virtual Machine",
+		"infoSource":    "Specifies the origin of the interface data collected. values: domain, guest-agent, or both",
+		"queueCount":    "Specifies how many queues are allocated by MultiQueue",
 	}
 }
 
@@ -148,6 +164,7 @@ func (VirtualMachineInstanceGuestOSInfo) SwaggerDoc() map[string]string {
 
 func (VirtualMachineInstanceMigrationState) SwaggerDoc() map[string]string {
 	return map[string]string{
+		"":                               "+k8s:openapi-gen=true",
 		"startTimestamp":                 "The time the migration action began\n+nullable",
 		"endTimestamp":                   "The time the migration action ended\n+nullable",
 		"targetNodeDomainDetected":       "The Target Node has seen the Domain Start Event",
@@ -163,6 +180,10 @@ func (VirtualMachineInstanceMigrationState) SwaggerDoc() map[string]string {
 		"abortStatus":                    "Indicates the final status of the live migration abortion",
 		"migrationUid":                   "The VirtualMachineInstanceMigration object associated with this migration",
 		"mode":                           "Lets us know if the vmi is currently running pre or post copy migration",
+		"migrationPolicyName":            "Name of the migration policy. If string is empty, no policy is matched",
+		"migrationConfiguration":         "Migration configurations to apply",
+		"targetCPUSet":                   "If the VMI requires dedicated CPUs, this field will\nhold the dedicated CPU set on the target node\n+listType=atomic",
+		"targetNodeTopology":             "If the VMI requires dedicated CPUs, this field will\nhold the numa topology on the target node",
 	}
 }
 
@@ -246,15 +267,24 @@ func (VirtualMachineInstanceMigrationSpec) SwaggerDoc() map[string]string {
 	}
 }
 
+func (VirtualMachineInstanceMigrationPhaseTransitionTimestamp) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":                         "VirtualMachineInstanceMigrationPhaseTransitionTimestamp gives a timestamp in relation to when a phase is set on a vmi",
+		"phase":                    "Phase is the status of the VirtualMachineInstanceMigrationPhase in kubernetes world. It is not the VirtualMachineInstanceMigrationPhase status, but partially correlates to it.",
+		"phaseTransitionTimestamp": "PhaseTransitionTimestamp is the timestamp of when the phase change occurred",
+	}
+}
+
 func (VirtualMachineInstanceMigrationStatus) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"": "VirtualMachineInstanceMigration reprents information pertaining to a VMI's migration.",
+		"":                          "VirtualMachineInstanceMigration reprents information pertaining to a VMI's migration.",
+		"phaseTransitionTimestamps": "PhaseTransitionTimestamp is the timestamp of when the last phase change occurred\n+listType=atomic\n+optional",
 	}
 }
 
 func (VirtualMachineInstancePreset) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":     "VirtualMachineInstancePreset defines a VMI spec.domain to be applied to all VMIs that match the provided label selector\nMore info: https://kubevirt.io/user-guide/virtual_machines/presets/#overrides\n\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+genclient",
+		"":     "Deprecated for removal in v2, please use VirtualMachineInstanceType and VirtualMachinePreference instead.\n\nVirtualMachineInstancePreset defines a VMI spec.domain to be applied to all VMIs that match the provided label selector\nMore info: https://kubevirt.io/user-guide/virtual_machines/presets/#overrides\n\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+genclient",
 		"spec": "VirtualMachineInstance Spec contains the VirtualMachineInstance specification.",
 	}
 }
@@ -291,7 +321,8 @@ func (VirtualMachineSpec) SwaggerDoc() map[string]string {
 		"":                    "VirtualMachineSpec describes how the proper VirtualMachine\nshould look like",
 		"running":             "Running controls whether the associatied VirtualMachineInstance is created or not\nMutually exclusive with RunStrategy",
 		"runStrategy":         "Running state indicates the requested running state of the VirtualMachineInstance\nmutually exclusive with Running",
-		"flavor":              "FlavorMatcher references a flavor that is used to fill fields in Template",
+		"instancetype":        "InstancetypeMatcher references a instancetype that is used to fill fields in Template",
+		"preference":          "PreferenceMatcher references a set of preference that is used to fill fields in Template",
 		"template":            "Template is the direct specification of VirtualMachineInstance",
 		"dataVolumeTemplates": "dataVolumeTemplates is a list of dataVolumes that the VirtualMachineInstance template can reference.\nDataVolumes in this list are dynamically created for the VirtualMachine and are tied to the VirtualMachine's life-cycle.",
 	}
@@ -316,6 +347,7 @@ func (VirtualMachineStatus) SwaggerDoc() map[string]string {
 		"volumeRequests":         "VolumeRequests indicates a list of volumes add or remove from the VMI template and\nhotplug on an active running VMI.\n+listType=atomic",
 		"volumeSnapshotStatuses": "VolumeSnapshotStatuses indicates a list of statuses whether snapshotting is\nsupported by each volume.",
 		"startFailure":           "StartFailure tracks consecutive VMI startup failures for the purposes of\ncrash loop backoffs\n+nullable\n+optional",
+		"memoryDumpRequest":      "MemoryDumpRequest tracks memory dump request phase and info of getting a memory\ndump to the given pvc\n+nullable\n+optional",
 	}
 }
 
@@ -416,19 +448,20 @@ func (KubeVirtWorkloadUpdateStrategy) SwaggerDoc() map[string]string {
 
 func (KubeVirtSpec) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"imageTag":               "The image tag to use for the continer images installed.\nDefaults to the same tag as the operator's container image.",
-		"imageRegistry":          "The image registry to pull the container images from\nDefaults to the same registry the operator's container image is pulled from.",
-		"imagePullPolicy":        "The ImagePullPolicy to use.",
-		"monitorNamespace":       "The namespace Prometheus is deployed in\nDefaults to openshift-monitor",
-		"monitorAccount":         "The name of the Prometheus service account that needs read-access to KubeVirt endpoints\nDefaults to prometheus-k8s",
-		"workloadUpdateStrategy": "WorkloadUpdateStrategy defines at the cluster level how to handle\nautomated workload updates",
-		"uninstallStrategy":      "Specifies if kubevirt can be deleted if workloads are still present.\nThis is mainly a precaution to avoid accidental data loss",
-		"productVersion":         "Designate the apps.kubevirt.io/version label for KubeVirt components.\nUseful if KubeVirt is included as part of a product.\nIf ProductVersion is not specified, KubeVirt's version will be used.",
-		"productName":            "Designate the apps.kubevirt.io/part-of label for KubeVirt components.\nUseful if KubeVirt is included as part of a product.\nIf ProductName is not specified, the part-of label will be omitted.",
-		"productComponent":       "Designate the apps.kubevirt.io/component label for KubeVirt components.\nUseful if KubeVirt is included as part of a product.\nIf ProductComponent is not specified, the component label default value is kubevirt.",
-		"configuration":          "holds kubevirt configurations.\nsame as the virt-configMap",
-		"infra":                  "selectors and tolerations that should apply to KubeVirt infrastructure components\n+optional",
-		"workloads":              "selectors and tolerations that should apply to KubeVirt workloads\n+optional",
+		"imageTag":                "The image tag to use for the continer images installed.\nDefaults to the same tag as the operator's container image.",
+		"imageRegistry":           "The image registry to pull the container images from\nDefaults to the same registry the operator's container image is pulled from.",
+		"imagePullPolicy":         "The ImagePullPolicy to use.",
+		"monitorNamespace":        "The namespace Prometheus is deployed in\nDefaults to openshift-monitor",
+		"serviceMonitorNamespace": "The namespace the service monitor will be deployed\n When ServiceMonitorNamespace is set, then we'll install the service monitor object in that namespace\notherwise we will use the monitoring namespace.",
+		"monitorAccount":          "The name of the Prometheus service account that needs read-access to KubeVirt endpoints\nDefaults to prometheus-k8s",
+		"workloadUpdateStrategy":  "WorkloadUpdateStrategy defines at the cluster level how to handle\nautomated workload updates",
+		"uninstallStrategy":       "Specifies if kubevirt can be deleted if workloads are still present.\nThis is mainly a precaution to avoid accidental data loss",
+		"productVersion":          "Designate the apps.kubevirt.io/version label for KubeVirt components.\nUseful if KubeVirt is included as part of a product.\nIf ProductVersion is not specified, KubeVirt's version will be used.",
+		"productName":             "Designate the apps.kubevirt.io/part-of label for KubeVirt components.\nUseful if KubeVirt is included as part of a product.\nIf ProductName is not specified, the part-of label will be omitted.",
+		"productComponent":        "Designate the apps.kubevirt.io/component label for KubeVirt components.\nUseful if KubeVirt is included as part of a product.\nIf ProductComponent is not specified, the component label default value is kubevirt.",
+		"configuration":           "holds kubevirt configurations.\nsame as the virt-configMap",
+		"infra":                   "selectors and tolerations that should apply to KubeVirt infrastructure components\n+optional",
+		"workloads":               "selectors and tolerations that should apply to KubeVirt workloads\n+optional",
 	}
 }
 
@@ -517,6 +550,13 @@ func (StopOptions) SwaggerDoc() map[string]string {
 	}
 }
 
+func (MigrateOptions) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":       "MigrateOptions may be provided on migrate request.",
+		"dryRun": "When present, indicates that modifications should not be\npersisted. An invalid or unrecognized dryRun directive will\nresult in an error response and no further processing of the\nrequest. Valid values are:\n- All: all dry run stages will be processed\n+optional\n+listType=atomic",
+	}
+}
+
 func (VirtualMachineInstanceGuestAgentInfo) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":                  "VirtualMachineInstanceGuestAgentInfo represents information from the installed guest agent\n\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object",
@@ -573,19 +613,38 @@ func (FreezeUnfreezeTimeout) SwaggerDoc() map[string]string {
 	}
 }
 
+func (VirtualMachineMemoryDumpRequest) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":               "VirtualMachineMemoryDumpRequest represent the memory dump request phase and info",
+		"claimName":      "ClaimName is the name of the pvc that will contain the memory dump",
+		"phase":          "Phase represents the memory dump phase",
+		"remove":         "Remove represents request of dissociating the memory dump pvc\n+optional",
+		"startTimestamp": "StartTimestamp represents the time the memory dump started\n+optional",
+		"endTimestamp":   "EndTimestamp represents the time the memory dump was completed\n+optional",
+		"fileName":       "FileName represents the name of the output file\n+optional",
+		"message":        "Message is a detailed message about failure of the memory dump\n+optional",
+	}
+}
+
 func (AddVolumeOptions) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":             "AddVolumeOptions is provided when dynamically hot plugging a volume and disk",
 		"name":         "Name represents the name that will be used to map the\ndisk to the corresponding volume. This overrides any name\nset inside the Disk struct itself.",
 		"disk":         "Disk represents the hotplug disk that will be plugged into the running VMI",
 		"volumeSource": "VolumeSource represents the source of the volume to map to the disk.",
+		"dryRun":       "When present, indicates that modifications should not be\npersisted. An invalid or unrecognized dryRun directive will\nresult in an error response and no further processing of the\nrequest. Valid values are:\n- All: all dry run stages will be processed\n+optional\n+listType=atomic",
 	}
+}
+
+func (ScreenshotOptions) SwaggerDoc() map[string]string {
+	return map[string]string{}
 }
 
 func (RemoveVolumeOptions) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":     "RemoveVolumeOptions is provided when dynamically hot unplugging volume and disk",
-		"name": "Name represents the name that maps to both the disk and volume that\nshould be removed",
+		"":       "RemoveVolumeOptions is provided when dynamically hot unplugging volume and disk",
+		"name":   "Name represents the name that maps to both the disk and volume that\nshould be removed",
+		"dryRun": "When present, indicates that modifications should not be\npersisted. An invalid or unrecognized dryRun directive will\nresult in an error response and no further processing of the\nrequest. Valid values are:\n- All: all dry run stages will be processed\n+optional\n+listType=atomic",
 	}
 }
 
@@ -617,6 +676,7 @@ func (ReloadableComponentConfiguration) SwaggerDoc() map[string]string {
 func (KubeVirtConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{
 		"":                            "KubeVirtConfiguration holds all kubevirt configurations",
+		"evictionStrategy":            "EvictionStrategy defines at the cluster level if the VirtualMachineInstance should be\nmigrated instead of shut-off in case of a node drain. If the VirtualMachineInstance specific\nfield is set it overrides the cluster level one.",
 		"supportedGuestAgentVersions": "deprecated",
 	}
 }
@@ -625,9 +685,28 @@ func (SMBiosConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{}
 }
 
+func (TLSConfiguration) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":              "TLSConfiguration holds TLS options",
+		"minTLSVersion": "MinTLSVersion is a way to specify the minimum protocol version that is acceptable for TLS connections.\nProtocol versions are based on the following most common TLS configurations:\n\n  https://ssl-config.mozilla.org/\n\nNote that SSLv3.0 is not a supported protocol version due to well known\nvulnerabilities such as POODLE: https://en.wikipedia.org/wiki/POODLE\n+kubebuilder:validation:Enum=VersionTLS10;VersionTLS11;VersionTLS12;VersionTLS13",
+		"ciphers":       "+listType=set",
+	}
+}
+
 func (MigrationConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"": "MigrationConfiguration holds migration options",
+		"":                                  "MigrationConfiguration holds migration options.\nCan be overridden for specific groups of VMs though migration policies.\nVisit https://kubevirt.io/user-guide/operations/migration_policies/ for more information.",
+		"nodeDrainTaintKey":                 "NodeDrainTaintKey defines the taint key that indicates a node should be drained.\nNote: this option relies on the deprecated node taint feature. Default: kubevirt.io/drain",
+		"parallelOutboundMigrationsPerNode": "ParallelOutboundMigrationsPerNode is the maximum number of concurrent outgoing live migrations\nallowed per node. Defaults to 2",
+		"parallelMigrationsPerCluster":      "ParallelMigrationsPerCluster is the total number of concurrent live migrations\nallowed cluster-wide. Defaults to 5",
+		"allowAutoConverge":                 "AllowAutoConverge allows the platform to compromise performance/availability of VMIs to\nguarantee successful VMI live migrations. Defaults to false",
+		"bandwidthPerMigration":             "BandwidthPerMigration limits the amount of network bandwith live migrations are allowed to use.\nThe value is in quantity per second. Defaults to 0 (no limit)",
+		"completionTimeoutPerGiB":           "CompletionTimeoutPerGiB is the maximum number of seconds per GiB a migration is allowed to take.\nIf a live-migration takes longer to migrate than this value multiplied by the size of the VMI,\nthe migration will be cancelled, unless AllowPostCopy is true. Defaults to 800",
+		"progressTimeout":                   "ProgressTimeout is the maximum number of seconds a live migration is allowed to make no progress.\nHitting this timeout means a migration transferred 0 data for that many seconds. The migration is\nthen considered stuck and therefore cancelled. Defaults to 150",
+		"unsafeMigrationOverride":           "UnsafeMigrationOverride allows live migrations to occur even if the compatibility check\nindicates the migration will be unsafe to the guest. Defaults to false",
+		"allowPostCopy":                     "AllowPostCopy enables post-copy live migrations. Such migrations allow even the busiest VMIs\nto successfully live-migrate. However, events like a network failure can cause a VMI crash.\nIf set to true, migrations will still start in pre-copy, but switch to post-copy when\nCompletionTimeoutPerGiB triggers. Defaults to false",
+		"disableTLS":                        "When set to true, DisableTLS will disable the additional layer of live migration encryption\nprovided by KubeVirt. This is usually a bad idea. Defaults to false",
+		"network":                           "Network is the name of the CNI network to use for live migrations. By default, migrations go\nthrough the pod network.",
 	}
 }
 
@@ -639,9 +718,15 @@ func (DiskVerification) SwaggerDoc() map[string]string {
 
 func (DeveloperConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                           "DeveloperConfiguration holds developer options",
-		"useEmulation":               "UseEmulation can be set to true to allow fallback to software emulation\nin case hardware-assisted emulation is not available.",
-		"minimumClusterTSCFrequency": "Allow overriding the automatically determined minimum TSC frequency of the cluster\nand fixate the minimum to this frequency.",
+		"":                                "DeveloperConfiguration holds developer options",
+		"featureGates":                    "FeatureGates is the list of experimental features to enable. Defaults to none",
+		"pvcTolerateLessSpaceUpToPercent": "LessPVCSpaceToleration determines how much smaller, in percentage, disk PVCs are\nallowed to be compared to the requested size (to account for various overheads).\nDefaults to 10",
+		"minimumReservePVCBytes":          "MinimumReservePVCBytes is the amount of space, in bytes, to leave unused on disks.\nDefaults to 131072 (128KiB)",
+		"memoryOvercommit":                "MemoryOvercommit is the percentage of memory we want to give VMIs compared to the amount\ngiven to its parent pod (virt-launcher). For example, a value of 102 means the VMI will\n\"see\" 2% more memory than its parent pod. Values under 100 are effectively \"undercommits\".\nOvercommits can lead to memory exhaustion, which in turn can lead to crashes. Use carefully.\nDefaults to 100",
+		"nodeSelectors":                   "NodeSelectors allows restricting VMI creation to nodes that match a set of labels.\nDefaults to none",
+		"useEmulation":                    "UseEmulation can be set to true to allow fallback to software emulation\nin case hardware-assisted emulation is not available. Defaults to false",
+		"cpuAllocationRatio":              "For each requested virtual CPU, CPUAllocationRatio defines how much physical CPU to request per VMI\nfrom the hosting node. The value is in fraction of a CPU thread (or core on non-hyperthreaded nodes).\nFor example, a value of 1 means 1 physical CPU thread per VMI CPU thread.\nA value of 100 would be 1% of a physical thread allocated for each requested VMI thread.\nThis option has no effect on VMIs that request dedicated CPUs. More information at:\nhttps://kubevirt.io/user-guide/operations/node_overcommit/#node-cpu-allocation-ratio\nDefaults to 10",
+		"minimumClusterTSCFrequency":      "Allow overriding the automatically determined minimum TSC frequency of the cluster\nand fixate the minimum to this frequency.",
 	}
 }
 
@@ -654,7 +739,7 @@ func (LogVerbosity) SwaggerDoc() map[string]string {
 
 func (PermittedHostDevices) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                "PermittedHostDevices holds inforamtion about devices allowed for passthrough",
+		"":                "PermittedHostDevices holds information about devices allowed for passthrough",
 		"pciHostDevices":  "+listType=atomic",
 		"mediatedDevices": "+listType=atomic",
 	}
@@ -677,7 +762,16 @@ func (MediatedHostDevice) SwaggerDoc() map[string]string {
 
 func (MediatedDevicesConfiguration) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                     "MediatedDevicesConfiguration holds inforamtion about MDEV types to be defined, if available",
+		"":                        "MediatedDevicesConfiguration holds information about MDEV types to be defined, if available",
+		"mediatedDevicesTypes":    "+listType=atomic",
+		"nodeMediatedDeviceTypes": "+optional\n+listType=atomic",
+	}
+}
+
+func (NodeMediatedDeviceTypesConfig) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":                     "NodeMediatedDeviceTypesConfig holds information about MDEV types to be defined in a specifc node that matches the NodeSelector field.\n+k8s:openapi-gen=true",
+		"nodeSelector":         "NodeSelector is a selector which must be true for the vmi to fit on a node.\nSelector which must match a node's labels for the vmi to be scheduled on that node.\nMore info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
 		"mediatedDevicesTypes": "+listType=atomic",
 	}
 }
@@ -706,11 +800,20 @@ func (ClusterProfilerRequest) SwaggerDoc() map[string]string {
 	return map[string]string{}
 }
 
-func (FlavorMatcher) SwaggerDoc() map[string]string {
+func (InstancetypeMatcher) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":        "FlavorMatcher references a flavor that is used to fill fields in the VMI template.",
-		"name":    "Name is the name of the VirtualMachineFlavor or VirtualMachineClusterFlavor",
-		"kind":    "Kind specifies which flavor resource is referenced.\nAllowed values are: \"VirtualMachineFlavor\" and \"VirtualMachineClusterFlavor\".\nIf not specified, \"VirtualMachineClusterFlavor\" is used by default.\n\n+optional",
-		"profile": "Profile is the name of a custom profile in the flavor. If left empty, the default profile is used.\n+optional",
+		"":             "InstancetypeMatcher references a instancetype that is used to fill fields in the VMI template.",
+		"name":         "Name is the name of the VirtualMachineInstancetype or VirtualMachineClusterInstancetype",
+		"kind":         "Kind specifies which instancetype resource is referenced.\nAllowed values are: \"VirtualMachineInstancetype\" and \"VirtualMachineClusterInstancetype\".\nIf not specified, \"VirtualMachineClusterInstancetype\" is used by default.\n\n+optional",
+		"revisionName": "RevisionName specifies a ControllerRevision containing a specific copy of the\nVirtualMachineInstancetype or VirtualMachineClusterInstancetype to be used. This is initially\ncaptured the first time the instancetype is applied to the VirtualMachineInstance.\n\n+optional",
+	}
+}
+
+func (PreferenceMatcher) SwaggerDoc() map[string]string {
+	return map[string]string{
+		"":             "PreferenceMatcher references a set of preference that is used to fill fields in the VMI template.",
+		"name":         "Name is the name of the VirtualMachinePreference or VirtualMachineClusterPreference",
+		"kind":         "Kind specifies which preference resource is referenced.\nAllowed values are: \"VirtualMachinePreference\" and \"VirtualMachineClusterPreference\".\nIf not specified, \"VirtualMachineClusterPreference\" is used by default.\n\n+optional",
+		"revisionName": "RevisionName specifies a ControllerRevision containing a specific copy of the\nVirtualMachinePreference or VirtualMachineClusterPreference to be used. This is\ninitially captured the first time the instancetype is applied to the VirtualMachineInstance.\n\n+optional",
 	}
 }
