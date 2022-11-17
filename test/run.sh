@@ -4,6 +4,7 @@ source base.sh
 
 set -e
 setup-kind
+setup-prometheus
 rc=0
 uuid=$(uuidgen)
 
@@ -37,7 +38,7 @@ check_running_pods() {
   fi
 }
 
-check_files () {
+check_files() {
   for f in collected-metrics/top2PrometheusCPU-${uuid}.json collected-metrics/prometheusRSS-${uuid}.json collected-metrics/prometheusRSS-${uuid}.json collected-metrics/namespaced-podLatency.json collected-metrics/namespaced-podLatency-summary.json; do
     log "Checking file ${f}"
     if [[ ! -f $f ]]; then
@@ -50,6 +51,7 @@ check_files () {
 }
 
 log "Running kube-burner init"
+
 timeout 500 kube-burner init -c kube-burner.yml --uuid ${uuid} --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
 check_files
 check_ns kube-burner-job=namespaced,kube-burner-uuid=${uuid} 10

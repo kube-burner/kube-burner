@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
@@ -49,7 +48,7 @@ func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
 func NewPrometheusClient(configSpec config.Spec, url, token, username, password, uuid string, tlsVerify bool, step time.Duration) (*Prometheus, error) {
-	var p Prometheus = Prometheus{
+	p := Prometheus{
 		Step:       step,
 		uuid:       uuid,
 		configSpec: configSpec,
@@ -74,6 +73,12 @@ func NewPrometheusClient(configSpec config.Spec, url, token, username, password,
 	if err := p.verifyConnection(); err != nil {
 		return &p, err
 	}
+	if configSpec.GlobalConfig.IndexerConfig.Enabled || configSpec.GlobalConfig.WriteToFile {
+		if err := p.ReadProfile(configSpec.GlobalConfig.MetricsProfile); err != nil {
+			log.Fatal(err)
+		}
+
+	}
 	return &p, nil
 }
 
@@ -95,28 +100,15 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&p.MetricProfile); err != nil {
-		return fmt.Errorf("Error decoding metrics profile %s: %s", metricsProfile, err)
+		return fmt.Errorf("error decoding metrics profile %s: %s", metricsProfile, err)
 	}
 	return nil
 }
 
-// ScrapeMetrics defined in the metrics profile from start to end
-func (p *Prometheus) ScrapeMetrics(start, end time.Time, indexer *indexers.Indexer, jobName string) error {
-	scraper := []burner.Executor{
-		{
-			Start: start,
-			End:   end,
-			Config: config.Job{
-				Name: jobName},
-		},
-	}
-	return p.ScrapeJobsMetrics(scraper, indexer)
-}
-
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
-func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *indexers.Indexer) error {
-	start := jobList[0].Start
-	end := jobList[len(jobList)-1].End
+func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
+	start := p.JobList[0].Start
+	end := p.JobList[len(p.JobList)-1].End
 	elapsed := int(end.Sub(start).Minutes())
 	var err error
 	var v model.Value
@@ -134,7 +126,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 				log.Warnf("Error found with query %s: %s", query, err)
 				continue
 			}
-			if err := p.parseVector(md.MetricName, query, jobList, v, &metrics); err != nil {
+			if err := p.parseVector(md.MetricName, query, v, &metrics); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", query, err)
 			}
 		} else {
@@ -145,7 +137,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 				log.Warnf("Error found with query %s: %s", query, err)
 				continue
 			}
-			if err := p.parseMatrix(md.MetricName, query, jobList, v, &metrics); err != nil {
+			if err := p.parseMatrix(md.MetricName, query, v, &metrics); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", query, err)
 				continue
 			}
@@ -155,7 +147,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 			if p.configSpec.GlobalConfig.MetricsDirectory != "" {
 				err = os.MkdirAll(p.configSpec.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
-					return fmt.Errorf("Error creating metrics directory: %v: ", err)
+					return fmt.Errorf("error creating metrics directory: %v: ", err)
 				}
 				filename = path.Join(p.configSpec.GlobalConfig.MetricsDirectory, filename)
 			}
@@ -183,16 +175,16 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList []burner.Executor, indexer *index
 	return nil
 }
 
-func (p *Prometheus) parseVector(metricName, query string, jobList []burner.Executor, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseVector(metricName, query string, value model.Value, metrics *[]interface{}) error {
 	var jobName string
 	data, ok := value.(model.Vector)
 	if !ok {
-		return fmt.Errorf("Unsupported result format: %s", value.Type().String())
+		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, v := range data {
-		for _, job := range jobList {
-			if v.Timestamp.Time().Before(job.End) {
-				jobName = job.Config.Name
+		for _, prometheusJob := range p.JobList {
+			if v.Timestamp.Time().Before(prometheusJob.End) {
+				jobName = prometheusJob.Name
 			}
 		}
 		m := metric{
@@ -219,17 +211,17 @@ func (p *Prometheus) parseVector(metricName, query string, jobList []burner.Exec
 	return nil
 }
 
-func (p *Prometheus) parseMatrix(metricName, query string, jobList []burner.Executor, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, metrics *[]interface{}) error {
 	var jobName string
 	data, ok := value.(model.Matrix)
 	if !ok {
-		return fmt.Errorf("Unsupported result format: %s", value.Type().String())
+		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, v := range data {
 		for _, val := range v.Values {
-			for _, job := range jobList {
+			for _, job := range p.JobList {
 				if val.Timestamp.Time().Before(job.End) {
-					jobName = job.Config.Name
+					jobName = job.Name
 				}
 			}
 			m := metric{

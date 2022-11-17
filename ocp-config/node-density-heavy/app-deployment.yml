@@ -1,0 +1,61 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: perfapp-{{.Replica}}-{{.Iteration}}
+spec:
+  template:
+    metadata:
+      labels:
+        name: perfapp-{{.Replica}}-{{.Iteration}}
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      containers:
+      - name: perfapp
+        image: quay.io/rsevilla/perfapp@sha256:02848a9c90dd4e345eac4f1dffbf10eab19859612113a427b3e9fa6490fb8c08
+        imagePullPolicy: IfNotPresent
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          periodSeconds: {{ .probesPeriod }}
+          failureThreshold: 1
+          timeoutSeconds: 60
+          initialDelaySeconds: 30
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          periodSeconds: {{ .probesPeriod }}
+          failureThreshold: 1
+          timeoutSeconds: 15
+          initialDelaySeconds: 30
+        resources:
+          requests:
+            memory: "10Mi"
+            cpu: "10m"
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: POSTGRESQL_USER
+          value: admin
+        - name: POSTGRESQL_PASSWORD
+          value: secret
+        - name: POSTGRESQL_DATABASE
+          value: node-density
+        - name: POSTGRESQL_HOSTNAME
+          value: postgres-{{.Iteration}}
+        - name: POSTGRESQL_PORT
+          value: '5432'
+        - name: POSTGRESQL_RETRY_INTERVAL
+          value: '5'
+        securityContext:
+          privileged: false
+      restartPolicy: Always
+  replicas: 1
+  selector:
+    matchLabels:
+      name: perfapp-{{.Replica}}-{{.Iteration}}
+  strategy:
+    type: RollingUpdate

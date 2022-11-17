@@ -36,8 +36,8 @@ type metadata struct {
 
 const jobSummary = "jobSummary"
 
-// IndexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func IndexMetadataInfo(configSpec config.Spec, indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time) error {
+// indexMetadataInfo Generates and indexes a document with metadata information of the passed job
+func indexMetadataInfo(configSpec config.Spec, indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time) error {
 	metadataInfo := []interface{}{
 		metadata{
 			UUID:        uuid,

@@ -37,7 +37,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-//RenderTemplate renders a go-template and adds several custom functions
+// RenderTemplate renders a go-template and adds several custom functions
 func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
 	var rendered bytes.Buffer
 	funcMap := sprig.GenericFuncMap()
