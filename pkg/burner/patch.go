@@ -37,13 +37,13 @@ import (
 func setupPatchJob(jobConfig config.Job) Executor {
 	var f io.Reader
 	var err error
-	log.Infof("Preparing patch job: %s", jobConfig.Name)
+	log.Debugf("Preparing patch job: %s", jobConfig.Name)
 	var ex Executor
 	for _, o := range jobConfig.Objects {
 		if o.APIVersion == "" {
 			o.APIVersion = "v1"
 		}
-		log.Debugf("Processing template: %s", o.ObjectTemplate)
+		log.Debugf("Rendering template: %s", o.ObjectTemplate)
 		f, err = util.ReadConfig(o.ObjectTemplate)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)

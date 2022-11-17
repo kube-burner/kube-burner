@@ -3,7 +3,7 @@ Kube-burner uses `golangci-lint` to run linters. Prior to send a PR, ensure to e
 
 # Requirements
 
-- `golang >= 1.16`
+- `golang >= 1.19`
 - `golang-ci-lint`
 - `make`
 

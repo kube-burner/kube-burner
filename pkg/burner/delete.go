@@ -31,7 +31,7 @@ import (
 )
 
 func setupDeleteJob(jobConfig *config.Job) Executor {
-	log.Infof("Preparing delete job: %s", jobConfig.Name)
+	log.Debugf("Preparing delete job: %s", jobConfig.Name)
 	var ex Executor
 	for _, o := range jobConfig.Objects {
 		if o.APIVersion == "" {
@@ -46,7 +46,7 @@ func setupDeleteJob(jobConfig *config.Job) Executor {
 			gvr:           gvr,
 			labelSelector: o.LabelSelector,
 		}
-		log.Infof("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
+		log.Debugf("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
 	}
 	jobConfig.PreLoadImages = false

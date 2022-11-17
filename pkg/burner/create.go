@@ -42,7 +42,7 @@ import (
 func setupCreateJob(jobConfig config.Job) Executor {
 	var f io.Reader
 	var err error
-	log.Infof("Preparing create job: %s", jobConfig.Name)
+	log.Debugf("Preparing create job: %s", jobConfig.Name)
 	selector := util.NewSelector()
 	selector.Configure("", fmt.Sprintf("kube-burner-job=%s", jobConfig.Name), "")
 	ex := Executor{
@@ -53,7 +53,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
 		}
-		log.Debugf("Processing template: %s", o.ObjectTemplate)
+		log.Debugf("Rendering template: %s", o.ObjectTemplate)
 		f, err = util.ReadConfig(o.ObjectTemplate)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)

@@ -20,6 +20,8 @@
 package v1
 
 import (
+	"encoding/json"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,6 +36,8 @@ const (
 	CPUModeHostModel                       = "host-model"
 	DefaultCPUModel                        = CPUModeHostModel
 )
+
+const HotplugDiskDir = "/var/run/kubevirt/hotplug-disks/"
 
 /*
  ATTENTION: Rerun code generators when comments on structs or fields are modified.
@@ -194,6 +198,9 @@ type DomainSpec struct {
 	// Chassis specifies the chassis info passed to the domain.
 	// +optional
 	Chassis *Chassis `json:"chassis,omitempty"`
+	// Launch Security setting of the vmi.
+	// +optional
+	LaunchSecurity *LaunchSecurity `json:"launchSecurity,omitempty"`
 }
 
 // Chassis specifies the chassis info passed to the domain.
@@ -399,7 +406,7 @@ type Devices struct {
 	UseVirtioTransitional *bool `json:"useVirtioTransitional,omitempty"`
 	// DisableHotplug disabled the ability to hotplug disks.
 	DisableHotplug bool `json:"disableHotplug,omitempty"`
-	// Disks describes disks, cdroms, floppy and luns which are connected to the vmi.
+	// Disks describes disks, cdroms and luns which are connected to the vmi.
 	Disks []Disk `json:"disks,omitempty"`
 	// Watchdog describes a watchdog device which can be added to the vmi.
 	Watchdog *Watchdog `json:"watchdog,omitempty"`
@@ -420,6 +427,10 @@ type Devices struct {
 	// Defaults to true.
 	// +optional
 	AutoattachMemBalloon *bool `json:"autoattachMemBalloon,omitempty"`
+	// Whether to attach an Input Device.
+	// Defaults to false.
+	// +optional
+	AutoattachInputDevice *bool `json:"autoattachInputDevice,omitempty"`
 	// Whether to have random number generator from host
 	// +optional
 	Rng *Rng `json:"rng,omitempty"`
@@ -448,13 +459,16 @@ type Devices struct {
 	// Whether to emulate a sound device.
 	// +optional
 	Sound *SoundDevice `json:"sound,omitempty"`
+	// Whether to emulate a TPM device.
+	// +optional
+	TPM *TPMDevice `json:"tpm,omitempty"`
 }
 
 // Represent a subset of client devices that can be accessed by VMI. At the
 // moment only, USB devices using Usbredir's library and tooling. Another fit
 // would be a smartcard with libcacard.
 //
-// The struct is currently empty as there is no imediate request for
+// The struct is currently empty as there is no immediate request for
 // user-facing APIs. This structure simply turns on USB redirection of
 // UsbClientPassthroughMaxNumberOf devices.
 type ClientPassthroughDevices struct {
@@ -476,13 +490,29 @@ type SoundDevice struct {
 	Model string `json:"model,omitempty"`
 }
 
+type TPMDevice struct{}
+
+type InputBus string
+
+const (
+	InputBusUSB    InputBus = "usb"
+	InputBusVirtio InputBus = "virtio"
+)
+
+type InputType string
+
+const (
+	InputTypeTablet   InputType = "tablet"
+	InputTypeKeyboard InputType = "keyboard"
+)
+
 type Input struct {
 	// Bus indicates the bus of input device to emulate.
 	// Supported values: virtio, usb.
-	Bus string `json:"bus,omitempty"`
+	Bus InputBus `json:"bus,omitempty"`
 	// Type indicated the type of input device.
 	// Supported values: tablet.
-	Type string `json:"type"`
+	Type InputType `json:"type"`
 	// Name is the device name
 	Name string `json:"name"`
 }
@@ -501,6 +531,9 @@ type GPU struct {
 	Name              string       `json:"name"`
 	DeviceName        string       `json:"deviceName"`
 	VirtualGPUOptions *VGPUOptions `json:"virtualGPUOptions,omitempty"`
+	// If specified, the virtual network interface address and its tag will be provided to the guest via config drive
+	// +optional
+	Tag string `json:"tag,omitempty"`
 }
 
 type VGPUOptions struct {
@@ -522,6 +555,9 @@ type HostDevice struct {
 	Name string `json:"name"`
 	// DeviceName is the resource name of the host device exposed by a device plugin
 	DeviceName string `json:"deviceName"`
+	// If specified, the virtual network interface address and its tag will be provided to the guest via config drive
+	// +optional
+	Tag string `json:"tag,omitempty"`
 }
 
 type Disk struct {
@@ -558,6 +594,9 @@ type Disk struct {
 	// If specified, the virtual disk will be presented with the given block sizes.
 	// +optional
 	BlockSize *BlockSize `json:"blockSize,omitempty"`
+	// If specified the disk is made sharable and multiple write from different VMs are permitted
+	// +optional
+	Shareable *bool `json:"shareable,omitempty"`
 }
 
 // CustomBlockSize represents the desired logical and physical block size for a VM disk.
@@ -580,16 +619,23 @@ type DiskDevice struct {
 	Disk *DiskTarget `json:"disk,omitempty"`
 	// Attach a volume as a LUN to the vmi.
 	LUN *LunTarget `json:"lun,omitempty"`
-	// Attach a volume as a floppy to the vmi.
-	Floppy *FloppyTarget `json:"floppy,omitempty"`
 	// Attach a volume as a cdrom to the vmi.
 	CDRom *CDRomTarget `json:"cdrom,omitempty"`
 }
 
+type DiskBus string
+
+const (
+	DiskBusSCSI   DiskBus = "scsi"
+	DiskBusSATA   DiskBus = "sata"
+	DiskBusVirtio DiskBus = "virtio"
+	DiskBusUSB    DiskBus = "usb"
+)
+
 type DiskTarget struct {
 	// Bus indicates the type of disk device to emulate.
-	// supported values: virtio, sata, scsi.
-	Bus string `json:"bus,omitempty"`
+	// supported values: virtio, sata, scsi, usb.
+	Bus DiskBus `json:"bus,omitempty"`
 	// ReadOnly.
 	// Defaults to false.
 	ReadOnly bool `json:"readonly,omitempty"`
@@ -598,40 +644,37 @@ type DiskTarget struct {
 	PciAddress string `json:"pciAddress,omitempty"`
 }
 
+type LaunchSecurity struct {
+	// AMD Secure Encrypted Virtualization (SEV).
+	SEV *SEV `json:"sev,omitempty"`
+}
+
+type SEV struct {
+}
+
 type LunTarget struct {
 	// Bus indicates the type of disk device to emulate.
 	// supported values: virtio, sata, scsi.
-	Bus string `json:"bus,omitempty"`
+	Bus DiskBus `json:"bus,omitempty"`
 	// ReadOnly.
 	// Defaults to false.
 	ReadOnly bool `json:"readonly,omitempty"`
 }
 
-type FloppyTarget struct {
-	// ReadOnly.
-	// Defaults to false.
-	ReadOnly bool `json:"readonly,omitempty"`
-	// Tray indicates if the tray of the device is open or closed.
-	// Allowed values are "open" and "closed".
-	// Defaults to closed.
-	// +optional
-	Tray TrayState `json:"tray,omitempty"`
-}
-
-// TrayState indicates if a tray of a cdrom or floppy is open or closed.
+// TrayState indicates if a tray of a cdrom is open or closed.
 type TrayState string
 
 const (
-	// TrayStateOpen indicates that the tray of a cdrom or floppy is open.
+	// TrayStateOpen indicates that the tray of a cdrom is open.
 	TrayStateOpen TrayState = "open"
-	// TrayStateClosed indicates that the tray of a cdrom or floppy is closed.
+	// TrayStateClosed indicates that the tray of a cdrom is closed.
 	TrayStateClosed TrayState = "closed"
 )
 
 type CDRomTarget struct {
 	// Bus indicates the type of disk device to emulate.
 	// supported values: virtio, sata, scsi.
-	Bus string `json:"bus,omitempty"`
+	Bus DiskBus `json:"bus,omitempty"`
 	// ReadOnly.
 	// Defaults to true.
 	ReadOnly *bool `json:"readonly,omitempty"`
@@ -711,6 +754,8 @@ type VolumeSource struct {
 	// DownwardMetrics adds a very small disk to VMIs which contains a limited view of host and guest
 	// metrics. The disk content is compatible with vhostmd (https://github.com/vhostmd/vhostmd) and vm-dump-metrics.
 	DownwardMetrics *DownwardMetricsVolumeSource `json:"downwardMetrics,omitempty"`
+	// MemoryDump is attached to the virt launcher and is populated with a memory dump of the vmi
+	MemoryDump *MemoryDumpVolumeSource `json:"memoryDump,omitempty"`
 }
 
 // HotplugVolumeSource Represents the source of a volume to mount which are capable
@@ -744,6 +789,13 @@ type PersistentVolumeClaimVolumeSource struct {
 	// Hotpluggable indicates whether the volume can be hotplugged and hotunplugged.
 	// +optional
 	Hotpluggable bool `json:"hotpluggable,omitempty"`
+}
+
+type MemoryDumpVolumeSource struct {
+	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace.
+	// Directly attached to the virt launcher
+	// +optional
+	PersistentVolumeClaimVolumeSource `json:",inline"`
 }
 
 type EphemeralVolumeSource struct {
@@ -1138,6 +1190,24 @@ type DHCPOptions struct {
 	PrivateOptions []DHCPPrivateOptions `json:"privateOptions,omitempty"`
 }
 
+func (d *DHCPOptions) UnmarshalJSON(data []byte) error {
+	type DHCPOptionsAlias DHCPOptions
+	var dhcpOptionsAlias DHCPOptionsAlias
+
+	if err := json.Unmarshal(data, &dhcpOptionsAlias); err != nil {
+		return err
+	}
+
+	for i, ntpServer := range dhcpOptionsAlias.NTPServers {
+		if sanitizedIP, err := sanitizeIP(ntpServer); err == nil {
+			dhcpOptionsAlias.NTPServers[i] = sanitizedIP
+		}
+	}
+
+	*d = DHCPOptions(dhcpOptionsAlias)
+	return nil
+}
+
 // DHCPExtraOptions defines Extra DHCP options for a VM.
 type DHCPPrivateOptions struct {
 	// Option is an Integer value from 224-254
@@ -1156,19 +1226,28 @@ type InterfaceBindingMethod struct {
 	Masquerade *InterfaceMasquerade `json:"masquerade,omitempty"`
 	SRIOV      *InterfaceSRIOV      `json:"sriov,omitempty"`
 	Macvtap    *InterfaceMacvtap    `json:"macvtap,omitempty"`
+	Passt      *InterfacePasst      `json:"passt,omitempty"`
 }
 
+// InterfaceBridge connects to a given network via a linux bridge.
 type InterfaceBridge struct{}
 
+// InterfaceSlirp connects to a given network using QEMU user networking mode.
 type InterfaceSlirp struct{}
 
+// InterfaceMasquerade connects to a given network using netfilter rules to nat the traffic.
 type InterfaceMasquerade struct{}
 
+// InterfaceSRIOV connects to a given network by passing-through an SR-IOV PCI device via vfio.
 type InterfaceSRIOV struct{}
 
+// InterfaceMacvtap connects to a given network by extending the Kubernetes node's L2 networks via a macvtap interface.
 type InterfaceMacvtap struct{}
 
-// Port repesents a port to expose from the virtual machine.
+// InterfacePasst connects to a given network.
+type InterfacePasst struct{}
+
+// Port represents a port to expose from the virtual machine.
 // Default protocol TCP.
 // The port field is mandatory
 type Port struct {
@@ -1318,6 +1397,22 @@ type PodNetwork struct {
 	// IPv6 CIDR for the vm network.
 	// Defaults to fd10:0:2::/120 if not specified.
 	VMIPv6NetworkCIDR string `json:"vmIPv6NetworkCIDR,omitempty"`
+}
+
+func (podNet *PodNetwork) UnmarshalJSON(data []byte) error {
+	type PodNetworkAlias PodNetwork
+	var podNetAlias PodNetworkAlias
+
+	if err := json.Unmarshal(data, &podNetAlias); err != nil {
+		return err
+	}
+
+	if sanitizedCIDR, err := sanitizeCIDR(podNetAlias.VMNetworkCIDR); err == nil {
+		podNetAlias.VMNetworkCIDR = sanitizedCIDR
+	}
+
+	*podNet = PodNetwork(podNetAlias)
+	return nil
 }
 
 // Rng represents the random device passed from host
