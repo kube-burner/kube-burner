@@ -78,6 +78,8 @@ jobs:
   ocp-wrapper-node-density:
     needs: build
     runs-on: ubuntu-latest
+    concurrency:
+      group: ocp-e2e-ci
     steps:
 
     - name: Check out code
