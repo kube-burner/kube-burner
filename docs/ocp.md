@@ -33,13 +33,13 @@ Use "kube-burner ocp [command] --help" for more information about a command.
 
 ## Usage
 
-In order to trigger one of the supported workloads using this subcommand you have to run kube-burner within the directory of the desired workload. The workloads are stored in the config directory of this repository. i.e:
+In order to trigger one of the supported workloads using this subcommand you have to run kube-burner within the directory of the desired workload. The workloads are stored in the ocp-config directory of this repository. i.e:
 
 Running node-density with 100 pods per node
 
 ```console
-~/kube-burner $ cd config/node-density
-~/kube-burner/config/node-density $ kube-burner ocp node-density --pods-per-node=100
+~/kube-burner $ cd ocp-config/node-density
+~/kube-burner/ocp-config/node-density $ kube-burner ocp node-density --pods-per-node=100
 ```
 
 With the command above, the wrapper will calculate the required number of pods to deploy across all worker nodes of the cluster.
