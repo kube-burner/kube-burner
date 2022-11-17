@@ -7,19 +7,15 @@ linters:
   disable-all: true
   enable:
     - nakedret
-    - varcheck
-    - deadcode
-    - structcheck
+    - unused
     - misspell
     - ineffassign
     - goconst
     - goimports
     - dupl
     - unparam
-    - golint
+    - revive
     - staticcheck
-    - unused
     - gosimple
     - unconvert
     - gocyclo
-    - structcheck

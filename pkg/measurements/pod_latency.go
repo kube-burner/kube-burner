@@ -224,7 +224,7 @@ func (p *podLatency) calcQuantiles() {
 
 func (p *podLatency) validateConfig() error {
 	var metricFound bool
-	var latencyMetrics []string = []string{"P99", "P95", "P50", "Avg", "Max"}
+	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
 	for _, th := range p.config.LatencyThresholds {
 		if th.ConditionType == string(v1.ContainersReady) || th.ConditionType == string(v1.PodInitialized) || th.ConditionType == string(v1.PodReady) || th.ConditionType == string(v1.PodScheduled) {
 			for _, lm := range latencyMetrics {

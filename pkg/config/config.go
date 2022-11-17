@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var configSpec Spec = Spec{
+var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		MetricsDirectory: "collected-metrics",
 		RequestTimeout:   15 * time.Second,

@@ -460,7 +460,7 @@ func (p *vmiLatency) calcQuantiles() {
 
 func (p *vmiLatency) validateConfig() error {
 	var metricFound bool
-	var latencyMetrics []string = []string{"P99", "P95", "P50", "Avg", "Max"}
+	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
 	for _, th := range p.config.LatencyThresholds {
 		if th.ConditionType == string(kvv1.Pending) ||
 			th.ConditionType == string(kvv1.Scheduling) ||
