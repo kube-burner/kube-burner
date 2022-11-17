@@ -28,6 +28,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
 
     - name: Build
       run: make build
@@ -60,6 +61,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
   
     - name: Download kube-burner binary
       uses: actions/download-artifact@v3
@@ -88,6 +90,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
 
     - name: Download kube-burner binary
       uses: actions/download-artifact@v3
@@ -123,7 +126,7 @@ jobs:
       uses: golangci/golangci-lint-action@v3
       with:
         # version of golangci-lint to use in form of v1.2.3
-        version: v1.32
+        version: v1.50.1
         # if set to true and the action runs on a pull request - the action outputs only newly found issues
         only-new-issues: true
         # golangci-lint command line arguments
