@@ -35,18 +35,18 @@ func openShiftCmd() *cobra.Command {
 	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
 	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
-	indexing := ocpCmd.PersistentFlags().Bool("indexing", true, "Enable Elastic Search indexing")
 	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
 	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
+		indexing := *esServer != ""
 		envVars := map[string]string{
 			"ES_SERVER": strings.TrimSuffix(*esServer, "/"),
 			"ES_INDEX":  *esIndex,
 			"QPS":       fmt.Sprintf("%d", *qps),
 			"BURST":     fmt.Sprintf("%d", *burst),
-			"INDEXING":  fmt.Sprintf("%v", *indexing),
+			"INDEXING":  fmt.Sprintf("%v", indexing),
 		}
 		wh = workloads.NewWorkloadHelper(envVars, *alerting)
 		wh.Metadata.UUID = *uuid
