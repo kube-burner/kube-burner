@@ -260,7 +260,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 	}
 
 	// Determine the number of job iterations to churn (min 1)
-	numToChurn := int(math.Max((float64(ex.Config.ChurnPercent) * float64(ex.Config.JobIterations) / float64(100)), 1.0))
+	numToChurn := int(math.Max(float64(ex.Config.ChurnPercent*ex.Config.JobIterations/100), 1))
 	// Create timer for the churn duration
 	cTimer := time.NewTimer(ex.Config.ChurnDuration)
 	rand.Seed(time.Now().UnixNano())

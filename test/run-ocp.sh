@@ -23,6 +23,6 @@ oc delete ns -l kube-burner-uuid=${UUID}
 popd
 echo "Running cluster-density wrapper"
 pushd ../ocp-config/cluster-density
-kube-burner ocp cluster-density --iterations=3 ${COMMON_FLAGS}
+kube-burner ocp cluster-density --iterations=3 --churn-duration=5m ${COMMON_FLAGS}
 oc delete ns -l kube-burner-uuid=${UUID}
 popd

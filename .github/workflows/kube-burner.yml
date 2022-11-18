@@ -78,7 +78,7 @@ jobs:
         KIND_VERSION: v0.16.0
         K8S_VERSION: ${{matrix.k8s-version}}
 
-  ocp-wrapper-node-density:
+  ocp-wrapper:
     needs: build
     runs-on: ubuntu-latest
     concurrency:
