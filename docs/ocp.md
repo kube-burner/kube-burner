@@ -20,7 +20,6 @@ Flags:
       --es-index string    Elastic Search index
       --es-server string   Elastic Search endpoint
   -h, --help               help for ocp
-      --indexing           Enable Elastic Search indexing (default true)
       --qps int            QPS (default 20)
       --uuid string        Benchmark UUID (default "ff60bd1c-df27-4713-be3e-6b92acdd4d72")
 
