@@ -17,25 +17,36 @@ package workloads
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 )
 
 // NewClusterDensity holds cluster-density workload
 func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
-	var iterations int
+	var iterations, churnPercent int
+	var churn bool
+	var churnDelay, churnDuration time.Duration
 	cmd := &cobra.Command{
-		Use:   "cluster-density <flags>",
+		Use:   "cluster-density",
 		Short: "Runs cluster-density workload",
 		PreRun: func(cmd *cobra.Command, args []string) {
 			wh.Metadata.Benchmark = cmd.Name()
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(iterations))
+			os.Setenv("CHURN", fmt.Sprint(churn))
+			os.Setenv("CHURN_DURATION", fmt.Sprintf("%v", churnDuration))
+			os.Setenv("CHURN_DELAY", fmt.Sprintf("%v", churnDelay))
+			os.Setenv("CHURN_PERCENT", fmt.Sprint(churnPercent))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			wh.run("cluster-density.yml")
 		},
 	}
 	cmd.Flags().IntVar(&iterations, "iterations", 0, "Cluster-density iterations")
+	cmd.Flags().BoolVar(&churn, "churn", true, "Enable churning")
+	cmd.Flags().DurationVar(&churnDuration, "churn-duration", 1*time.Hour, "Churn duration")
+	cmd.Flags().DurationVar(&churnDelay, "churn-delay", 30*time.Second, "Time to wait between each churn")
+	cmd.Flags().IntVar(&churnPercent, "churn-percent", 10, "Percentage of job iterations that kube-burner will churn each round")
 	cmd.MarkFlagRequired("iterations")
 	return cmd
 }
