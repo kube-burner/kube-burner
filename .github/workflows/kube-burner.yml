@@ -33,7 +33,7 @@ jobs:
       run: make build
 
     - name: Build container images
-      run: make image
+      run: make images
       env:
         VERSION: snapshot
 
