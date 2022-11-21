@@ -21,6 +21,7 @@ ORG ?= cloud-bulldozer
 CONTAINER_NAME = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)
 
 all: lint build
+image: container push
 
 help:
 	@echo "Commands for $(BIN_PATH):"
@@ -29,8 +30,8 @@ help:
 	@echo '    make clean                    Clean the compiled binaries'
 	@echo '    make build                    Compile the project for arch, default amd64'
 	@echo '    make install                  Installs kube-burner binary in the system, default amd64'
-	@echo '    make image                    Build container image'
-	@echo '    make push                     Push container image'
+	@echo '    make images                   Build images for arch, default amd64'
+	@echo '    make push                     Push images for arch, default amd64'
 	@echo '    make manifest                 Create and push manifest for the different architectures supported'
 	@echo '    make help                     Show this message'
 
@@ -57,7 +58,7 @@ deps-update:
 install:
 	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
 
-image:
+container:
 	@echo -e "\n\033[2mBuilding container $(CONTAINER_NAME)\033[0m"
 	$(ENGINE) build -f Containerfile . -t=$(CONTAINER_NAME)
 
