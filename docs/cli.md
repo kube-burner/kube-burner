@@ -23,7 +23,7 @@ Available Commands:
 
 Flags:
   -h, --help   help for kube-burner
-  --log-level string   Allowed values: debug, info, warn, error, fatal (default "info")
+  --lo-level string   Allowed values: debug, info, warn, error, fatal (default "info")
 
 Use "kube-burner [command] --help" for more information about a command.
 ```
@@ -36,7 +36,7 @@ This option is meant to run Kube-burner benchmark, and it supports the these fla
 - config: Path or URL to a valid configuration file.
 - configmap: Name of the Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional
 - namespace: Name of namespace where the configmap is.
-- log-level: Logging level. Default `info`
+- loglevel: Logging level. Default `info`
 - prometheus-url: Prometheus full URL. i.e. `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
 - metrics-profile: Path to a valid metrics profile file. Default `metrics.yaml`
 - token: Prometheus Bearer token.

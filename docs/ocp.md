@@ -24,7 +24,7 @@ Flags:
       --uuid string        Benchmark UUID (default "ff60bd1c-df27-4713-be3e-6b92acdd4d72")
 
 Global Flags:
-      --log-level string   Allowed values: trace, debug, info, warn, error, fatal (default "info")
+      --loglevel string   Allowed values: trace, debug, info, warn, error, fatal (default "info")
 
 Use "kube-burner ocp [command] --help" for more information about a command.
 

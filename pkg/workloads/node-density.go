@@ -19,7 +19,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/spf13/cobra"

@@ -20,11 +20,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
+	kubeburnerlog "github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
@@ -342,7 +343,7 @@ func main() {
 	)
 	logLevel := rootCmd.PersistentFlags().String("loglevel", "info", "Allowed values: trace, debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		log.SetLogLevel(*logLevel)
+		kubeburnerlog.SetLogLevel(*logLevel)
 	}
 	rootCmd.AddCommand(completionCmd)
 	cobra.OnInitialize()
