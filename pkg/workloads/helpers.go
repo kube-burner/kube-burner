@@ -84,7 +84,11 @@ func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	prometheusURL, prometheusToken, err := wh.discoveryAgent.GetPrometheus()
 	if err != nil {
-		log.Fatal("Error obtaining Prometheus information:", err.Error())
+		log.Fatal("Error obtaining Prometheus information: ", err.Error())
+	}
+	wh.envVars["INGRESS_DOMAIN"], err = discovery.GetDefaultIngressDomain()
+	if err != nil {
+		log.Fatal("Error obtaining default ingress domain: ", err.Error())
 	}
 	wh.prometheusURL = prometheusURL
 	wh.prometheusToken = prometheusToken
