@@ -17,6 +17,9 @@
 - query: histogram_quantile(0.99, sum(rate(kubeproxy_network_programming_duration_seconds_bucket[2m])) by (le)) > 0
   metricName: serviceSyncLatency
 
+- query: histogram_quantile(0.99, sum(rate(ovnkube_master_network_programming_duration_seconds_bucket{kind="service"}[2m])) by (le))
+  metricName: serviceSyncLatency
+
 # Containers & pod metrics
 
 - query: (sum(irate(container_cpu_usage_seconds_total{name!="",container!~"POD|",namespace=~"openshift-(etcd|.*apiserver|ovn-kubernetes|sdn|ingress|.*controller-manager|.*scheduler)"}[2m]) * 100) by (container, pod, namespace, node)) > 0
