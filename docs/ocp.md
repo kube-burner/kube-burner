@@ -4,7 +4,7 @@ The kube-burner binary brings a very opinionated OpenShift wrapper designed to s
 This wrapper is hosted under the `kube-burner ocp` subcommand that currently looks like:
 
 ```console
-$ ./bin/amd64/kube-burner ocp
+$ kube-burner ocp
 This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads
 
 Usage:
@@ -32,20 +32,30 @@ Use "kube-burner ocp [command] --help" for more information about a command.
 
 ## Usage
 
-In order to trigger one of the supported workloads using this subcommand you have to run kube-burner within the directory of the desired workload. The workloads are stored in the ocp-config directory of this repository. i.e:
+In order to trigger one of the supported workloads using this subcommand you have to run kube-burner using the subcommand ocp. The workloads are embed in the kube-burner binary:
 
 Running node-density with 100 pods per node
 
 ```console
-~/kube-burner $ cd ocp-config/node-density
-~/kube-burner/ocp-config/node-density $ kube-burner ocp node-density --pods-per-node=100
+$ kube-burner ocp node-density --pods-per-node=100
+$
 ```
 
 With the command above, the wrapper will calculate the required number of pods to deploy across all worker nodes of the cluster.
 
-This wrapper provides the following benefits:
+This wrapper provides the following benefits among others:
 
 - Provides a simplified execution of the supported workloads
 - Indexes OpenShift metadata along with the Benchmark result, this document can be found with the following query: `uuid: <benchmkark-uuid> AND metricName.keyword: "clusterMetadata"`
 - Prevents modifying configuration files to tweak some of the parameters of the workloads
 - Discovers the Prometheus URL and authentication token, so the user does not have to perform those operations before using them.
+
+It's also possible to customize the configuration before running the workload by extracting and them running it:
+
+```console
+$ kube-burner ocp node-density --extract
+$ ls
+alerts.yml  metrics.yml  node-density.yml  pod.yml
+$ vi node-density.yml                               # Perform modifications accordingly
+$ kube-burner ocp node-density --pods-per-node=100  # Run workload
+```
