@@ -15,14 +15,20 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"log"
 	"strings"
+
+	_ "embed"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
 )
+
+//go:embed ocp-config/*
+var OCPConfig embed.FS
 
 func openShiftCmd() *cobra.Command {
 	ocpCmd := &cobra.Command{
@@ -48,7 +54,7 @@ func openShiftCmd() *cobra.Command {
 			"BURST":     fmt.Sprintf("%d", *burst),
 			"INDEXING":  fmt.Sprintf("%v", indexing),
 		}
-		wh = workloads.NewWorkloadHelper(envVars, *alerting)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig)
 		wh.Metadata.UUID = *uuid
 		if *esServer != "" {
 			err := wh.GatherMetadata()
