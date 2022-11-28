@@ -16,9 +16,10 @@ package workloads
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
+
+	"github.com/cloud-bulldozer/kube-burner/log"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/spf13/cobra"
@@ -28,11 +29,18 @@ import (
 func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 	var podsPerNode, probesPeriod int
 	var podReadyThreshold time.Duration
+	var extract bool
 	cmd := &cobra.Command{
 		Use:          "node-density-heavy",
 		Short:        "Runs node-density-heavy workload",
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
+			if extract {
+				if err := wh.extractWorkload(cmd.Name()); err != nil {
+					log.Fatal(err)
+				}
+				os.Exit(0)
+			}
 			wh.Metadata.Benchmark = cmd.Name()
 			workerNodeCount, err := discovery.GetWorkerNodeCount()
 			if err != nil {
@@ -50,11 +58,12 @@ func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 			os.Setenv("PROBES_PERIOD", fmt.Sprint(probesPeriod))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			wh.run("node-density-heavy.yml")
+			wh.run(cmd.Name())
 		},
 	}
 	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 1*time.Hour, "Pod ready timeout threshold")
 	cmd.Flags().IntVar(&probesPeriod, "probes-period", 10, "Perf app readiness/livenes probes period in seconds")
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
+	cmd.Flags().BoolVar(&extract, "extract", false, "Extract workload in the current directory")
 	return cmd
 }

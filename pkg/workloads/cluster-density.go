@@ -19,18 +19,26 @@ import (
 	"os"
 	"time"
 
+	"github.com/cloud-bulldozer/kube-burner/log"
+
 	"github.com/spf13/cobra"
 )
 
 // NewClusterDensity holds cluster-density workload
 func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 	var iterations, churnPercent int
-	var churn bool
+	var churn, extract bool
 	var churnDelay, churnDuration time.Duration
 	cmd := &cobra.Command{
 		Use:   "cluster-density",
 		Short: "Runs cluster-density workload",
 		PreRun: func(cmd *cobra.Command, args []string) {
+			if extract {
+				if err := wh.extractWorkload(cmd.Name()); err != nil {
+					log.Fatal(err)
+				}
+				os.Exit(0)
+			}
 			wh.Metadata.Benchmark = cmd.Name()
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(iterations))
 			os.Setenv("CHURN", fmt.Sprint(churn))
@@ -39,7 +47,7 @@ func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 			os.Setenv("CHURN_PERCENT", fmt.Sprint(churnPercent))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			wh.run("cluster-density.yml")
+			wh.run(cmd.Name())
 		},
 	}
 	cmd.Flags().IntVar(&iterations, "iterations", 0, "Cluster-density iterations")
@@ -47,6 +55,7 @@ func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 	cmd.Flags().DurationVar(&churnDuration, "churn-duration", 1*time.Hour, "Churn duration")
 	cmd.Flags().DurationVar(&churnDelay, "churn-delay", 30*time.Second, "Time to wait between each churn")
 	cmd.Flags().IntVar(&churnPercent, "churn-percent", 10, "Percentage of job iterations that kube-burner will churn each round")
+	cmd.Flags().BoolVar(&extract, "extract", false, "Extract workload in the current directory")
 	cmd.MarkFlagRequired("iterations")
 	return cmd
 }

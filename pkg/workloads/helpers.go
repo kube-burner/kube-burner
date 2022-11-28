@@ -16,11 +16,13 @@ package workloads
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -35,6 +37,7 @@ const (
 	metricsProfile     = "metrics.yml"
 	alertsProfile      = "alerts.yml"
 	metadataMetricName = "clusterMetadata"
+	ocpCfgDir          = "ocp-config"
 )
 
 type WorkloadHelper struct {
@@ -43,6 +46,7 @@ type WorkloadHelper struct {
 	prometheusToken string
 	Metadata        clusterMetadata
 	alerting        bool
+	ocpConfig       embed.FS
 }
 
 type clusterMetadata struct {
@@ -66,10 +70,11 @@ type clusterMetadata struct {
 }
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS) WorkloadHelper {
 	return WorkloadHelper{
-		envVars:  envVars,
-		alerting: alerting,
+		envVars:   envVars,
+		alerting:  alerting,
+		ocpConfig: ocpConfig,
 	}
 }
 
@@ -139,10 +144,17 @@ func (wh *WorkloadHelper) IndexMetadata() {
 	}
 }
 
-func (wh *WorkloadHelper) run(configFile string) {
+func (wh *WorkloadHelper) run(workload string) {
 	var rc int
 	var alertM *alerting.AlertManager
-	configSpec, err := config.Parse(configFile, true)
+	cfg := fmt.Sprintf("%s.yml", workload)
+	if _, err := os.Stat(cfg); err != nil {
+		log.Debug("Workload not available in the current directory, extracting it")
+		if err := wh.extractWorkload(workload); err != nil {
+			log.Fatalf("Error extracting workload: %v", err)
+		}
+	}
+	configSpec, err := config.Parse(cfg, true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -164,4 +176,21 @@ func (wh *WorkloadHelper) run(configFile string) {
 	wh.Metadata.Passed = rc == 0
 	wh.IndexMetadata()
 	os.Exit(rc)
+}
+
+func (wh *WorkloadHelper) extractWorkload(workload string) error {
+	dirContent, err := wh.ocpConfig.ReadDir(path.Join(ocpCfgDir, workload))
+	if err != nil {
+		return err
+	}
+	for _, f := range dirContent {
+		fileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, workload, f.Name()))
+		fd, err := os.Create(f.Name())
+		if err != nil {
+			return err
+		}
+		fd.Write(fileContent)
+		fd.Close()
+	}
+	return nil
 }
