@@ -49,7 +49,7 @@ func NewNodeDensityCNI(wh *WorkloadHelper) *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			os.Setenv("JOB_ITERATIONS", fmt.Sprint(totalPods-podCount))
+			os.Setenv("JOB_ITERATIONS", fmt.Sprint((totalPods-podCount)/2))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			wh.run(cmd.Name())

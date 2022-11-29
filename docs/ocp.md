@@ -51,7 +51,9 @@ This wrapper provides the following benefits among others:
 - Prevents modifying configuration files to tweak some of the parameters of the workloads
 - Discovers the Prometheus URL and authentication token, so the user does not have to perform those operations before using them.
 
-It's also possible to customize the configuration before running the workload by extracting and them running it:
+## Customizing workloads
+
+It's possible to customize the workload configuration before running the workload by extracting, updating and finally running it:
 
 ```console
 $ kube-burner ocp node-density --extract
