@@ -1,0 +1,38 @@
+---
+global:
+  writeToFile: false
+  indexerConfig:
+    enabled: {{.INDEXING}}
+    esServers: ["{{.ES_SERVER}}"]
+    insecureSkipVerify: true
+    defaultIndex: {{.ES_INDEX}}
+    type: elastic
+  measurements:
+    - name: podLatency
+      esIndex: {{.ES_INDEX}}
+jobs:
+  - name: node-density-cni
+    namespace: node-density-cni
+    jobIterations: {{.JOB_ITERATIONS}}
+    qps: {{.QPS}}
+    burst: {{.BURST}}
+    namespacedIterations: false
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: true
+    preLoadPeriod: 30s
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+
+      - objectTemplate: webserver-deployment.yml
+        replicas: 1
+
+      - objectTemplate: webserver-service.yml
+        replicas: 1
+
+      - objectTemplate: curl-deployment.yml
+        replicas: 1

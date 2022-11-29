@@ -14,6 +14,7 @@ Available Commands:
   cluster-density    Runs cluster-density workload
   node-density       Runs node-density workload
   node-density-heavy Runs node-density-heavy workload
+  node-density-cni   Runs node-density-cni workload
 
 Flags:
       --burst int          Burst (default 20)
