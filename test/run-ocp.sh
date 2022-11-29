@@ -20,3 +20,6 @@ oc delete ns -l kube-burner-uuid=${UUID}
 echo "Running cluster-density wrapper"
 kube-burner ocp cluster-density --iterations=3 --churn-duration=5m ${COMMON_FLAGS}
 oc delete ns -l kube-burner-uuid=${UUID}
+echo "Running node-density-cni wrapper"
+kube-burner ocp node-density-cni --pods-per-node=75 ${COMMON_FLAGS}
+oc delete ns -l kube-burner-uuid=${UUID}

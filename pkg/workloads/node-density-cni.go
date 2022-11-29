@@ -17,7 +17,6 @@ package workloads
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 
@@ -25,14 +24,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewNodeDensity holds node-density-heavy workload
-func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
-	var podsPerNode, probesPeriod int
-	var podReadyThreshold time.Duration
+// NewNodeDensity holds node-density-cni workload
+func NewNodeDensityCNI(wh *WorkloadHelper) *cobra.Command {
+	var podsPerNode int
 	var extract bool
 	cmd := &cobra.Command{
-		Use:          "node-density-heavy",
-		Short:        "Runs node-density-heavy workload",
+		Use:          "node-density-cni",
+		Short:        "Runs node-density-cni workload",
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if extract {
@@ -51,17 +49,12 @@ func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			// We divide by two the number of pods to deploy to obtain the workload iterations
-			os.Setenv("JOB_ITERATIONS", fmt.Sprint((totalPods-podCount)/2))
-			os.Setenv("POD_READY_THRESHOLD", fmt.Sprintf("%v", podReadyThreshold))
-			os.Setenv("PROBES_PERIOD", fmt.Sprint(probesPeriod))
+			os.Setenv("JOB_ITERATIONS", fmt.Sprint(totalPods-podCount))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			wh.run(cmd.Name())
 		},
 	}
-	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 1*time.Hour, "Pod ready timeout threshold")
-	cmd.Flags().IntVar(&probesPeriod, "probes-period", 10, "Perf app readiness/livenes probes period in seconds")
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
 	cmd.Flags().BoolVar(&extract, "extract", false, "Extract workload in the current directory")
 	return cmd
