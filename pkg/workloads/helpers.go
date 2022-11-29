@@ -124,10 +124,11 @@ func (wh *WorkloadHelper) GatherMetadata() error {
 	return nil
 }
 
-func (wh *WorkloadHelper) IndexMetadata() {
+func (wh *WorkloadHelper) indexMetadata() {
 	wh.Metadata.EndDate = time.Now().UTC()
 	if wh.envVars["ES_SERVER"] == "" {
 		log.Info("No metadata will be indexed")
+		return
 	}
 	esEndpoint := fmt.Sprintf("%v/%v/_doc", wh.envVars["ES_SERVER"], wh.envVars["ES_INDEX"])
 	body, _ := json.Marshal(wh.Metadata)
@@ -174,7 +175,7 @@ func (wh *WorkloadHelper) run(workload string) {
 		log.Fatal(err)
 	}
 	wh.Metadata.Passed = rc == 0
-	wh.IndexMetadata()
+	wh.indexMetadata()
 	os.Exit(rc)
 }
 

@@ -64,11 +64,6 @@ func openShiftCmd() *cobra.Command {
 		}
 		wh.SetKubeBurnerFlags()
 	}
-	ocpCmd.PersistentPostRun = func(cmd *cobra.Command, args []string) {
-		if *esServer != "" {
-			wh.IndexMetadata()
-		}
-	}
 	ocpCmd.AddCommand(
 		workloads.NewClusterDensity(&wh),
 		workloads.NewNodeDensity(&wh),
