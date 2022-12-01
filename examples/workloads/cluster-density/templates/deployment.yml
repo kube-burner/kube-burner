@@ -15,8 +15,6 @@ spec:
       labels:
         app: {{.name}}-{{.Replica}}
     spec:
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
       containers:
       - args:
         - sleep
@@ -31,6 +29,13 @@ spec:
           mountPath: /configmap1
         - name: configmap-2
           mountPath: /configmap2
+        resources:
+          requests:
+            cpu: "2"
+            memory: "8Gi"
+          limits:
+            cpu: "2"
+            memory: "8Gi"
         imagePullPolicy: IfNotPresent
         ports:
          - containerPort: 8080
@@ -69,4 +74,8 @@ spec:
         operator: "Exists"
         effect: "NoExecute"
         tolerationSeconds: 900
+      - effect: NoSchedule
+        key: node_type
+        operator: Equal
+        value: ondemand_m5_8x_asg
 

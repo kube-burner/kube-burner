@@ -8,8 +8,6 @@ spec:
       labels:
         name: perfapp-{{.Replica}}-{{.Iteration}}
     spec:
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
       containers:
       - name: perfapp
         image: quay.io/rsevilla/perfapp:latest
@@ -38,8 +36,20 @@ spec:
         - name: POSTGRESQL_RETRY_INTERVAL
           value: '5'
         imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "2"
+            memory: "8Gi"
+          limits:
+            cpu: "2"
+            memory: "8Gi"
         securityContext:
           privileged: false
+      tolerations:
+        - effect: NoSchedule
+          key: node_type
+          operator: Equal
+          value: ondemand_m5_8x_asg
       restartPolicy: Always
   replicas: 1
   selector:

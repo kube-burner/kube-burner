@@ -8,8 +8,6 @@ spec:
       labels:
         name: postgres-{{.Replica}}-{{.Iteration}}
     spec:
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
       containers:
       - name: postgresql
         image: registry.access.redhat.com/rhscl/postgresql-10-rhel7:latest
@@ -24,8 +22,20 @@ spec:
         - name: POSTGRESQL_DATABASE
           value: kubelet-density
         imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "2"
+            memory: "8Gi"
+          limits:
+            cpu: "2"
+            memory: "8Gi"
         securityContext:
           privileged: false
+      tolerations:
+        - effect: NoSchedule
+          key: node_type
+          operator: Equal
+          value: ondemand_m5_8x_asg
       restartPolicy: Always
   replicas: 1
   selector:

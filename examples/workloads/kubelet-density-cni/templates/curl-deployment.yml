@@ -8,8 +8,6 @@ spec:
       labels:
         name: curl-{{.Replica}}-{{.Iteration}}
     spec:
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
       containers:
       - name: curlapp
         image: quay.io/cloud-bulldozer/curl:latest
@@ -31,6 +29,11 @@ spec:
           periodSeconds: 1
           timeoutSeconds: 1
           failureThreshold: 600
+      tolerations:
+        - effect: NoSchedule
+          key: node_type
+          operator: Equal
+          value: ondemand_m5_8x_asg
       restartPolicy: Always
   replicas: 1
   selector:

@@ -3,7 +3,7 @@ global:
   writeToFile: true
   metricsDirectory: collected-metrics
   indexerConfig:
-    enabled: true
+    enabled: false
     esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
     insecureSkipVerify: true
     defaultIndex: kube-burner
@@ -14,7 +14,7 @@ global:
 
 jobs:
   - name: api-intensive
-    jobIterations: 700
+    jobIterations: 10
     qps: 4
     burst: 4
     namespacedIterations: true
