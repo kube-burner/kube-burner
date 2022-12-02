@@ -22,6 +22,7 @@ import (
 
 	_ "embed"
 
+	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
@@ -54,7 +55,8 @@ func openShiftCmd() *cobra.Command {
 			"BURST":     fmt.Sprintf("%d", *burst),
 			"INDEXING":  fmt.Sprintf("%v", indexing),
 		}
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig)
+		discoveryAgent := discovery.NewDiscoveryAgent()
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent)
 		wh.Metadata.UUID = *uuid
 		if *esServer != "" {
 			err := wh.GatherMetadata()

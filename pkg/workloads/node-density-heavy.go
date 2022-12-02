@@ -21,7 +21,6 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/spf13/cobra"
 )
 
@@ -42,12 +41,12 @@ func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 				os.Exit(0)
 			}
 			wh.Metadata.Benchmark = cmd.Name()
-			workerNodeCount, err := discovery.GetWorkerNodeCount()
+			workerNodeCount, err := wh.discoveryAgent.GetWorkerNodeCount()
 			if err != nil {
 				log.Fatal("Error obtaining worker node count:", err)
 			}
 			totalPods := workerNodeCount * podsPerNode
-			podCount, err := discovery.GetCurrentPodCount()
+			podCount, err := wh.discoveryAgent.GetCurrentPodCount()
 			if err != nil {
 				log.Fatal(err)
 			}

@@ -21,7 +21,6 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/spf13/cobra"
 )
 
@@ -43,17 +42,16 @@ func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
 				os.Exit(0)
 			}
 			wh.Metadata.Benchmark = cmd.Name()
-			workerNodeCount, err := discovery.GetWorkerNodeCount()
+			workerNodeCount, err := wh.discoveryAgent.GetWorkerNodeCount()
 			if err != nil {
 				log.Fatal("Error obtaining worker node count:", err)
 			}
 			totalPods := workerNodeCount * podsPerNode
-			podCount, err := discovery.GetCurrentPodCount()
+			podCount, err := wh.discoveryAgent.GetCurrentPodCount()
 			if err != nil {
 				log.Fatal(err)
 			}
-			jobIterations := totalPods - podCount
-			os.Setenv("JOB_ITERATIONS", fmt.Sprint(jobIterations))
+			os.Setenv("JOB_ITERATIONS", fmt.Sprint(totalPods-podCount))
 			os.Setenv("POD_READY_THRESHOLD", fmt.Sprintf("%v", podReadyThreshold))
 			os.Setenv("CONTAINER_IMAGE", containerImage)
 		},
