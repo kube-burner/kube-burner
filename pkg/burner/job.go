@@ -140,7 +140,10 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 		}
 		prometheusJob.End = time.Now().UTC()
 		elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Seconds()
-		p.JobList = append(p.JobList, prometheusJob)
+		// Don't append to Prometheus jobList when prometheus it's not initialized
+		if p != nil {
+			p.JobList = append(p.JobList, prometheusJob)
+		}
 		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 	}
 	if configSpec.GlobalConfig.IndexerConfig.Enabled {
