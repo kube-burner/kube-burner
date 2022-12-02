@@ -47,6 +47,7 @@ type WorkloadHelper struct {
 	Metadata        clusterMetadata
 	alerting        bool
 	ocpConfig       embed.FS
+	discoveryAgent  discovery.Agent
 }
 
 type clusterMetadata struct {
@@ -70,17 +71,18 @@ type clusterMetadata struct {
 }
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent) WorkloadHelper {
 	return WorkloadHelper{
-		envVars:   envVars,
-		alerting:  alerting,
-		ocpConfig: ocpConfig,
+		envVars:        envVars,
+		alerting:       alerting,
+		ocpConfig:      ocpConfig,
+		discoveryAgent: da,
 	}
 }
 
 // SetKubeBurnerFlags configures the required environment variables and flags for kube-burner
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
-	prometheusURL, prometheusToken, err := discovery.GetPrometheus()
+	prometheusURL, prometheusToken, err := wh.discoveryAgent.GetPrometheus()
 	if err != nil {
 		log.Fatal("Error obtaining Prometheus information:", err.Error())
 	}
@@ -92,19 +94,19 @@ func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 }
 
 func (wh *WorkloadHelper) GatherMetadata() error {
-	infra, err := discovery.GetInfraDetails()
+	infra, err := wh.discoveryAgent.GetInfraDetails()
 	if err != nil {
 		return err
 	}
-	version, err := discovery.GetVersionInfo()
+	version, err := wh.discoveryAgent.GetVersionInfo()
 	if err != nil {
 		return err
 	}
-	nodeInfo, err := discovery.GetNodesInfo()
+	nodeInfo, err := wh.discoveryAgent.GetNodesInfo()
 	if err != nil {
 		return err
 	}
-	sdnType, err := discovery.GetSDNInfo()
+	sdnType, err := wh.discoveryAgent.GetSDNInfo()
 	if err != nil {
 		return err
 	}

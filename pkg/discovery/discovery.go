@@ -35,10 +35,15 @@ import (
 )
 
 var tokenExpiration = 10 * time.Hour
-var clientset *kubernetes.Clientset
-var dynamicClient dynamic.Interface
 
-func init() {
+type Agent struct {
+	clientSet     *kubernetes.Clientset
+	dynamicClient dynamic.Interface
+}
+
+var discoveryAgent Agent
+
+func NewDiscoveryAgent() Agent {
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
@@ -49,17 +54,20 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	clientset = kubernetes.NewForConfigOrDie(restConfig)
-	dynamicClient = dynamic.NewForConfigOrDie(restConfig)
+	discoveryAgent = Agent{
+		clientSet:     kubernetes.NewForConfigOrDie(restConfig),
+		dynamicClient: dynamic.NewForConfigOrDie(restConfig),
+	}
+	return discoveryAgent
 }
 
 // GetPrometheus Returns Prometheus URL and valid Bearer token
-func GetPrometheus() (string, string, error) {
-	prometheusURL, err := getPrometheusURL()
+func (da *Agent) GetPrometheus() (string, string, error) {
+	prometheusURL, err := getPrometheusURL(da.dynamicClient)
 	if err != nil {
 		return "", "", err
 	}
-	prometheusToken, err := getBearerToken()
+	prometheusToken, err := getBearerToken(da.clientSet)
 	if err != nil {
 		return "", "", err
 	}
@@ -67,7 +75,7 @@ func GetPrometheus() (string, string, error) {
 }
 
 // getPrometheusURL Returns a valid prometheus endpoint from the openshift-monitoring/prometheus-k8s route
-func getPrometheusURL() (string, error) {
+func getPrometheusURL(dynamicClient dynamic.Interface) (string, error) {
 	route, err := dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    routeGroup,
 		Version:  routeVersion,
@@ -89,7 +97,7 @@ func getPrometheusURL() (string, error) {
 }
 
 // getBearerToken returns a valid bearer token from the openshift-monitoring/prometheus-k8s service account
-func getBearerToken() (string, error) {
+func getBearerToken(clientset *kubernetes.Clientset) (string, error) {
 	request := authenticationv1.TokenRequest{
 		Spec: authenticationv1.TokenRequestSpec{
 			ExpirationSeconds: pointer.Int64Ptr(int64(tokenExpiration.Seconds())),
@@ -104,21 +112,21 @@ func getBearerToken() (string, error) {
 }
 
 // GetWorkerNodeCount returns the number of worker nodes
-func GetWorkerNodeCount() (int, error) {
-	nodeList, err := clientset.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: "node-role.kubernetes.io/worker="})
+func (da *Agent) GetWorkerNodeCount() (int, error) {
+	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: "node-role.kubernetes.io/worker="})
 	log.Debug("Node count: ", len(nodeList.Items))
 	return len(nodeList.Items), err
 }
 
 // GetCurrentPodCount returns the number of current running pods across all worker nodes
-func GetCurrentPodCount() (int, error) {
+func (da *Agent) GetCurrentPodCount() (int, error) {
 	var podCount int
-	nodeList, err := clientset.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: "node-role.kubernetes.io/worker="})
+	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: "node-role.kubernetes.io/worker="})
 	if err != nil {
 		return podCount, err
 	}
 	for _, node := range nodeList.Items {
-		podList, err := clientset.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), v1.ListOptions{FieldSelector: "status.phase=Running,spec.nodeName=" + node.Name})
+		podList, err := da.clientSet.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), v1.ListOptions{FieldSelector: "status.phase=Running,spec.nodeName=" + node.Name})
 		if err != nil {
 			return podCount, err
 		}
@@ -129,9 +137,9 @@ func GetCurrentPodCount() (int, error) {
 }
 
 // GetInfraDetails returns cluster anme and platform
-func GetInfraDetails() (InfraObj, error) {
+func (da *Agent) GetInfraDetails() (InfraObj, error) {
 	var infraJSON InfraObj
-	infra, err := dynamicClient.Resource(schema.GroupVersionResource{
+	infra, err := da.dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "config.openshift.io",
 		Version:  "v1",
 		Resource: "infrastructures",
@@ -145,15 +153,15 @@ func GetInfraDetails() (InfraObj, error) {
 }
 
 // GetVersionInfo obtains OCP and k8s version information
-func GetVersionInfo() (VersionObj, error) {
+func (da *Agent) GetVersionInfo() (VersionObj, error) {
 	var cv clusterVersion
 	var versionInfo VersionObj
-	version, err := clientset.ServerVersion()
+	version, err := da.clientSet.ServerVersion()
 	versionInfo.K8sVersion = version.GitVersion
 	if err != nil {
 		return versionInfo, err
 	}
-	clusterVersion, err := dynamicClient.Resource(
+	clusterVersion, err := da.dynamicClient.Resource(
 		schema.GroupVersionResource{
 			Group:    "config.openshift.io",
 			Version:  "v1",
@@ -175,9 +183,9 @@ func GetVersionInfo() (VersionObj, error) {
 }
 
 // GetNodesInfo returns node information
-func GetNodesInfo() (NodeInfo, error) {
+func (da *Agent) GetNodesInfo() (NodeInfo, error) {
 	var nodeInfoData NodeInfo
-	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{})
+	nodes, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		return nodeInfoData, err
 	}
@@ -200,8 +208,8 @@ func GetNodesInfo() (NodeInfo, error) {
 }
 
 // GetSDNInfo returns SDN type
-func GetSDNInfo() (string, error) {
-	networkData, err := dynamicClient.Resource(schema.GroupVersionResource{
+func (da *Agent) GetSDNInfo() (string, error) {
+	networkData, err := da.dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "config.openshift.io",
 		Version:  "v1",
 		Resource: "networks",
