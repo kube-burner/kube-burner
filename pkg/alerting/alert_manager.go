@@ -33,9 +33,7 @@ import (
 type severityLevel string
 
 const (
-	// Passed alert
-	Passed = 0
-	// Failed alert
+	Passed                    = 0
 	Failed                    = 1
 	sevWarn     severityLevel = "warning"
 	sevError    severityLevel = "error"

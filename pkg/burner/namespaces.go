@@ -54,12 +54,12 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 }
 
 // CleanupNamespaces deletes namespaces with the given selector
-func CleanupNamespaces(clientset *kubernetes.Clientset, l metav1.ListOptions) {
-	ns, _ := clientset.CoreV1().Namespaces().List(context.TODO(), l)
+func CleanupNamespaces(l metav1.ListOptions) {
+	ns, _ := ClientSet.CoreV1().Namespaces().List(context.TODO(), l)
 	if len(ns.Items) > 0 {
 		log.Infof("Deleting namespaces with label %s", l.LabelSelector)
 		for _, ns := range ns.Items {
-			err := clientset.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
+			err := ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 			if errors.IsNotFound(err) {
 				log.Warnf("Namespace %s not found", ns.Name)
 				continue
@@ -70,14 +70,14 @@ func CleanupNamespaces(clientset *kubernetes.Clientset, l metav1.ListOptions) {
 		}
 	}
 	if len(ns.Items) > 0 {
-		waitForDeleteNamespaces(clientset, l)
+		waitForDeleteNamespaces(l)
 	}
 }
 
-func waitForDeleteNamespaces(clientset *kubernetes.Clientset, l metav1.ListOptions) {
+func waitForDeleteNamespaces(l metav1.ListOptions) {
 	log.Info("Waiting for namespaces to be definitely deleted")
 	wait.PollImmediateInfinite(time.Second, func() (bool, error) {
-		ns, err := clientset.CoreV1().Namespaces().List(context.TODO(), l)
+		ns, err := ClientSet.CoreV1().Namespaces().List(context.TODO(), l)
 		if err != nil {
 			return false, err
 		}

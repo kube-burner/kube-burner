@@ -128,6 +128,7 @@ func (wh *WorkloadHelper) IndexMetadata() {
 	wh.Metadata.EndDate = time.Now().UTC()
 	if wh.envVars["ES_SERVER"] == "" {
 		log.Info("No metadata will be indexed")
+		return
 	}
 	esEndpoint := fmt.Sprintf("%v/%v/_doc", wh.envVars["ES_SERVER"], wh.envVars["ES_INDEX"])
 	body, _ := json.Marshal(wh.Metadata)

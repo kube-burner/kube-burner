@@ -77,6 +77,8 @@ type GlobalConfig struct {
 	BearerToken string `yaml:"bearerToken"`
 	// MetricsProfile is the path to the metrics profile configuration
 	MetricsProfile string `yaml:"metricsProfile"`
+	// GC garbage collect created namespaces
+	GC bool `yaml:"gc" json:"gc"`
 }
 
 // Object defines an object that kube-burner will create

@@ -43,6 +43,7 @@ func openShiftCmd() *cobra.Command {
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
 	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
 	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
+	gc := ocpCmd.PersistentFlags().Bool("gc", true, "Garbage collect created namespaces")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
@@ -53,6 +54,7 @@ func openShiftCmd() *cobra.Command {
 			"QPS":       fmt.Sprintf("%d", *qps),
 			"BURST":     fmt.Sprintf("%d", *burst),
 			"INDEXING":  fmt.Sprintf("%v", indexing),
+			"GC":        fmt.Sprintf("%v", *gc),
 		}
 		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig)
 		wh.Metadata.UUID = *uuid

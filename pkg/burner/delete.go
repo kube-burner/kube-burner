@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
 )
 
 func setupDeleteJob(jobConfig *config.Job) Executor {
@@ -57,20 +56,12 @@ func setupDeleteJob(jobConfig *config.Job) Executor {
 func (ex *Executor) RunDeleteJob() {
 	var wg sync.WaitGroup
 	var itemList *unstructured.UnstructuredList
-	_, RestConfig, err := config.GetClientSet(ex.Config.QPS, ex.Config.Burst)
-	if err != nil {
-		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
-	}
-	dynamicClient, err = dynamic.NewForConfig(RestConfig)
-	if err != nil {
-		log.Fatalf("Error creating DynamicClient: %s", err)
-	}
 	for _, obj := range ex.objects {
 		labelSelector := labels.Set(obj.labelSelector).String()
 		listOptions := metav1.ListOptions{
 			LabelSelector: labelSelector,
 		}
-		err = RetryWithExponentialBackOff(func() (done bool, err error) {
+		err := RetryWithExponentialBackOff(func() (done bool, err error) {
 			itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 			if err != nil {
 				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)

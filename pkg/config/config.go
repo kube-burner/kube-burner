@@ -41,6 +41,7 @@ import (
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		MetricsDirectory: "collected-metrics",
+		GC:               false,
 		RequestTimeout:   15 * time.Second,
 		WriteToFile:      false,
 		Measurements:     []mtypes.Measurement{},

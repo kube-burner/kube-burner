@@ -88,10 +88,6 @@ func initCmd() *cobra.Command {
 		Short: "Launch benchmark",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
-			if configMap == "" && configFile == "" {
-				log.Fatal("Either --configmap or --config flags are required")
-			}
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
 				if err != nil {
@@ -151,6 +147,7 @@ func initCmd() *cobra.Command {
 
 func destroyCmd() *cobra.Command {
 	var uuid, configFile string
+	var err error
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy old namespaces labeled with the given UUID.",
@@ -163,11 +160,11 @@ func destroyCmd() *cobra.Command {
 				}
 			}
 			listOptions := v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%s", uuid)}
-			clientSet, _, err := config.GetClientSet(0, 0)
+			burner.ClientSet, _, err = config.GetClientSet(0, 0)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
-			burner.CleanupNamespaces(clientSet, listOptions)
+			burner.CleanupNamespaces(listOptions)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
