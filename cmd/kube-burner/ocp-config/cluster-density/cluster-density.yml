@@ -1,6 +1,7 @@
 ---
 global:
   writeToFile: false
+  gc: {{.GC}}
   indexerConfig:
     enabled: {{.INDEXING}}
     esServers: ["{{.ES_SERVER}}"]

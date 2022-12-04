@@ -13,13 +13,11 @@ COMMON_FLAGS="--es-server=${ES_SERVER} --es-index=${ES_INDEX} --alerting=false -
 
 echo "Running node-density wrapper"
 kube-burner ocp node-density --pods-per-node=75 --pod-ready-threshold=10s --container-image=gcr.io/google_containers/pause:3.0 ${COMMON_FLAGS}
-oc delete ns -l kube-burner-uuid=${UUID}
 echo "Running node-density-heavy wrapper"
 kube-burner ocp node-density-heavy --pods-per-node=75 ${COMMON_FLAGS} --qps=5 --burst=5
-oc delete ns -l kube-burner-uuid=${UUID}
 echo "Running cluster-density wrapper"
 kube-burner ocp cluster-density --iterations=3 --churn-duration=5m ${COMMON_FLAGS}
-oc delete ns -l kube-burner-uuid=${UUID}
+# Disable gc and avoid metric indexing
 echo "Running node-density-cni wrapper"
-kube-burner ocp node-density-cni --pods-per-node=75 ${COMMON_FLAGS}
+kube-burner ocp node-density-cni --pods-per-node=75 --gc=false
 oc delete ns -l kube-burner-uuid=${UUID}

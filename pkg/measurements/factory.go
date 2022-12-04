@@ -46,9 +46,13 @@ var measurementMap = make(map[string]measurement)
 var kubeburnerCfg *config.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(configSpec config.Spec, restConfig *rest.Config, uuid string, indexer *indexers.Indexer) {
+func NewMeasurementFactory(configSpec config.Spec, uuid string, indexer *indexers.Indexer) {
 	kubeburnerCfg = &configSpec.GlobalConfig
 	log.Info("📈 Creating measurement factory")
+	_, restConfig, err := config.GetClientSet(0, 0)
+	if err != nil {
+		log.Fatalf("Error creating clientSet: %s", err)
+	}
 	clientSet := kubernetes.NewForConfigOrDie(restConfig)
 	factory = measurementFactory{
 		clientSet:   clientSet,

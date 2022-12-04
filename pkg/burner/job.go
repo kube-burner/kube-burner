@@ -28,6 +28,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 	"golang.org/x/time/rate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/client-go/dynamic"
@@ -66,13 +67,9 @@ const (
 	jobUUID      = "UUID"
 )
 
-// ClientSet kubernetes clientset
 var ClientSet *kubernetes.Clientset
-
 var dynamicClient dynamic.Interface
-
-// RestConfig clieng-go rest configuration
-var RestConfig *rest.Config
+var restConfig *rest.Config
 
 func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) (int, error) {
 	var rc int
@@ -83,20 +80,24 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 	if configSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer, err = indexers.NewIndexer(configSpec)
 		if err != nil {
-			return rc, err
+			return 1, err
 		}
 	}
-	_, restConfig, err := config.GetClientSet(0, 0)
-	if err != nil {
-		log.Fatalf("Error creating k8s clientSet: %s", err)
-	}
-	measurements.NewMeasurementFactory(configSpec, restConfig, uuid, indexer)
-	jobList, err := newExecutorList(configSpec, uuid)
-	if err != nil {
-		return rc, err
-	}
+	measurements.NewMeasurementFactory(configSpec, uuid, indexer)
+	jobList := newExecutorList(configSpec, uuid)
 	// Iterate job list
 	for jobPosition, job := range jobList {
+		if job.Config.QPS == 0 || job.Config.Burst == 0 {
+			log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
+		} else {
+			log.Infof("QPS: %v", job.Config.QPS)
+			log.Infof("Burst: %v", job.Config.Burst)
+		}
+		ClientSet, restConfig, err = config.GetClientSet(job.Config.QPS, job.Config.Burst)
+		if err != nil {
+			log.Fatalf("Error creating clientSet: %s", err)
+		}
+		dynamicClient = dynamic.NewForConfigOrDie(restConfig)
 		if job.Config.PreLoadImages {
 			preLoadImages(job)
 		}
@@ -181,19 +182,18 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 		}
 	}
 	log.Infof("Finished execution with UUID: %s", uuid)
+	if configSpec.GlobalConfig.GC {
+		log.Info("Garbage collecting created namespaces")
+		CleanupNamespaces(v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
+	}
 	log.Info("👋 Exiting kube-burner")
 	return rc, nil
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, uuid string) ([]Executor, error) {
-	var err error
+func newExecutorList(configSpec config.Spec, uuid string) []Executor {
 	var ex Executor
 	var executorList []Executor
-	ClientSet, RestConfig, err = config.GetClientSet(0, 0)
-	if err != nil {
-		return executorList, fmt.Errorf("error creating clientSet: %s", err)
-	}
 	for _, job := range configSpec.Jobs {
 		if job.JobType == config.CreationJob {
 			ex = setupCreateJob(job)
@@ -215,5 +215,5 @@ func newExecutorList(configSpec config.Spec, uuid string) ([]Executor, error) {
 		ex.uuid = uuid
 		executorList = append(executorList, ex)
 	}
-	return executorList, nil
+	return executorList
 }

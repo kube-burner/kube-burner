@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -90,7 +89,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob(iterationStart int, iterationEnd int) {
+func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	nsLabels := map[string]string{
 		"kube-burner-job":  ex.Config.Name,
 		"kube-burner-uuid": ex.uuid,
@@ -98,17 +97,6 @@ func (ex *Executor) RunCreateJob(iterationStart int, iterationEnd int) {
 	var wg sync.WaitGroup
 	var ns string
 	var err error
-	ClientSet, RestConfig, err = config.GetClientSet(ex.Config.QPS, ex.Config.Burst)
-	if err != nil {
-		log.Fatalf("Error creating clientSet: %s", err)
-	}
-	if ex.Config.QPS == 0 || ex.Config.Burst == 0 {
-		log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
-	} else {
-		log.Infof("QPS: %v", RestConfig.QPS)
-		log.Infof("Burst: %v", RestConfig.Burst)
-	}
-	dynamicClient = dynamic.NewForConfigOrDie(RestConfig)
 	log.Infof("Running job %s", ex.Config.Name)
 	for label, value := range ex.Config.NamespaceLabels {
 		nsLabels[label] = value
@@ -152,7 +140,7 @@ func (ex *Executor) RunCreateJob(iterationStart int, iterationEnd int) {
 		log.Infof("Waiting up to %s for actions to be completed", ex.Config.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ex.Config.QPS)/2)
-		if RestConfig.QPS < 2 {
+		if restConfig.QPS < 2 {
 			sem = make(chan int, int(rest.DefaultQPS)/2)
 		}
 		for i := iterationStart; i <= iterationEnd; i++ {
@@ -249,16 +237,11 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 
 // RunCreateJobWithChurn executes a churn creation job
 func (ex *Executor) RunCreateJobWithChurn() {
+	var err error
 	log.Info("Starting to Churn job")
 	log.Infof("Churn Duration: %v", ex.Config.ChurnDuration)
 	log.Infof("Churn Percent: %v", ex.Config.ChurnPercent)
 	log.Infof("Churn Delay: %v", ex.Config.ChurnDelay)
-
-	clientSet, _, err := config.GetClientSet(ex.Config.QPS, ex.Config.Burst)
-	if err != nil {
-		log.Fatalf("Error creating k8s clientSet: %s", err)
-	}
-
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.Config.ChurnPercent*ex.Config.JobIterations/100), 1))
 	// Create timer for the churn duration
@@ -287,16 +270,14 @@ churnComplete:
 		for i := randStart; i < numToChurn+randStart; i++ {
 			nsName := fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			// Label namespaces to be deleted
-			_, err = clientSet.CoreV1().Namespaces().Patch(context.TODO(), nsName, types.JSONPatchType, delPatch, metav1.PatchOptions{})
+			_, err = ClientSet.CoreV1().Namespaces().Patch(context.TODO(), nsName, types.JSONPatchType, delPatch, metav1.PatchOptions{})
 			if err != nil {
 				log.Errorf("Error patching namespace %s. Error: %v", nsName, err)
 			}
-
 		}
 		listOptions := metav1.ListOptions{LabelSelector: "churndelete=delete"}
 		// Delete namespaces based on the label we added
-		CleanupNamespaces(clientSet, listOptions)
-
+		CleanupNamespaces(listOptions)
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart-1)

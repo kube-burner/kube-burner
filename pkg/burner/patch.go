@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
 )
 
 func setupPatchJob(jobConfig config.Job) Executor {
@@ -81,15 +80,6 @@ func setupPatchJob(jobConfig config.Job) Executor {
 // RunPatchJob executes a patch job
 func (ex *Executor) RunPatchJob() {
 	var itemList *unstructured.UnstructuredList
-	_, RestConfig, err := config.GetClientSet(ex.Config.QPS, ex.Config.Burst)
-	if err != nil {
-		log.Fatalf("Error creating restConfig for kube-burner: %s", err)
-	}
-	dynamicClient, err = dynamic.NewForConfig(RestConfig)
-	if err != nil {
-		log.Fatalf("Error creating DynamicClient: %s", err)
-	}
-
 	log.Infof("Running patch job %s", ex.Config.Name)
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
@@ -100,7 +90,7 @@ func (ex *Executor) RunPatchJob() {
 		}
 
 		// Try to find the list of resources by GroupVersionResource.
-		err = RetryWithExponentialBackOff(func() (done bool, err error) {
+		err := RetryWithExponentialBackOff(func() (done bool, err error) {
 			itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 			if err != nil {
 				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
