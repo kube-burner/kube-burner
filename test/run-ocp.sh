@@ -19,5 +19,5 @@ echo "Running cluster-density wrapper"
 kube-burner ocp cluster-density --iterations=3 --churn-duration=5m ${COMMON_FLAGS}
 # Disable gc and avoid metric indexing
 echo "Running node-density-cni wrapper"
-kube-burner ocp node-density-cni --pods-per-node=75 --gc=false
+kube-burner ocp node-density-cni --pods-per-node=75 --gc=false --uuid=${UUID}
 oc delete ns -l kube-burner-uuid=${UUID}
