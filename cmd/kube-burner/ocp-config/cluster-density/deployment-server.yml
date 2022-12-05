@@ -2,28 +2,26 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{.name}}-{{.Replica}}
+  name: server-{{.Replica}}
 spec:
   replicas: {{.podReplicas}}
   selector:
     matchLabels:
-      app: {{.name}}-{{.Iteration}}-{{.Replica}}
+      app: cluster-density-{{.Replica}}
   template:
     metadata:
       labels:
-        app: {{.name}}-{{.Iteration}}-{{.Replica}}
+        app: cluster-density-{{.Replica}}
+        name: nginx
     spec:
       nodeSelector:
         node-role.kubernetes.io/worker: ""
       containers:
-      - args:
-        - sleep
-        - infinity
-        image: k8s.gcr.io/pause:3.1
+      - image: quay.io/cloud-bulldozer/nginx:latest
         resources:
           requests:
-            memory: "10Mi"
-            cpu: "10m"
+            memory: "25Mi"
+            cpu: "25m"
         volumeMounts:
         - name: secret-1
           mountPath: /secret1
@@ -49,15 +47,15 @@ spec:
           protocol: TCP
         - containerPort: 8443
           protocol: TCP
-        name: {{.name}}
+        name: cluster-density
         env:
-        - name: ENVVAR1_{{.name}}
+        - name: ENVVAR1
           value: "{{rand 250}}"
-        - name: ENVVAR2_{{.name}}
+        - name: ENVVAR2
           value: "{{rand 250}}"
-        - name: ENVVAR3_{{.name}}
+        - name: ENVVAR3
           value: "{{rand 250}}"
-        - name: ENVVAR4_{{.name}}
+        - name: ENVVAR4
           value: "{{rand 250}}"
       volumes:
       - name: secret-1

@@ -39,24 +39,34 @@ jobs:
       - objectTemplate: build.yml
         replicas: 1
 
-      - objectTemplate: deployment.yml
-        replicas: 5
+      - objectTemplate: deployment-server.yml
+        replicas: 3
         inputVars:
           podReplicas: 2
-          name: cluster-density
+
+      - objectTemplate: deployment-client.yml
+        replicas: 2
+        inputVars:
+          podReplicas: 2
+          ingressDomain: {{.INGRESS_DOMAIN}}
 
       - objectTemplate: service.yml
         replicas: 5
-        inputVars:
-          name: cluster-density
         
       - objectTemplate: route.yml
-        replicas: 1
-        inputVars:
-          name: cluster-density
+        replicas: 2
 
       - objectTemplate: secret.yml
         replicas: 10
 
       - objectTemplate: configmap.yml
         replicas: 10
+
+      - objectTemplate: np-deny-all.yml
+        replicas: 1
+
+      - objectTemplate: np-allow-from-clients.yml
+        replicas: 2
+
+      - objectTemplate: np-allow-from-ingress.yml
+        replicas: 1

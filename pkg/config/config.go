@@ -149,7 +149,7 @@ func Parse(c string, jobsRequired bool) (Spec, error) {
 				log.Fatal("Cannot have Churn enabled without Namespaced Iterations also enabled")
 			}
 			if job.JobIterations < 1 && job.JobType == CreationJob {
-				log.Fatal("Job %s has < 1 iterations")
+				log.Fatalf("Job %s has < 1 iterations", job.Name)
 			}
 		}
 	}

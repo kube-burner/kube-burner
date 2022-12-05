@@ -1,0 +1,21 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: allow-from-clients-{{.Replica}}
+spec:
+  podSelector:
+    matchLabels:
+      name: nginx
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cluster-density-{{.Iteration}}
+      podSelector:
+        matchLabels:
+          name: client-{{.Replica}}
+  - ports:
+    - protocol: TCP
+      port: 8443
+    - protocol: TCP
+      port: 8080

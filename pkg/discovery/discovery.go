@@ -219,7 +219,23 @@ func (da *Agent) GetSDNInfo() (string, error) {
 	}
 	networkType, found, err := unstructured.NestedString(networkData.UnstructuredContent(), "status", "networkType")
 	if !found {
-		return "", fmt.Errorf("networkType field not found in config.openshift.io/v1/network status")
+		return "", fmt.Errorf("networkType field not found in config.openshift.io/v1/network/networks/cluster status")
 	}
 	return networkType, err
+}
+
+func GetDefaultIngressDomain() (string, error) {
+	ingressController, err := dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "operator.openshift.io",
+		Version:  "v1",
+		Resource: "ingresscontrollers",
+	}).Namespace("openshift-ingress-operator").Get(context.TODO(), "default", v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	ingressDomain, found, err := unstructured.NestedString(ingressController.UnstructuredContent(), "status", "domain")
+	if !found {
+		return "", fmt.Errorf("domain field not found in operator.openshift.io/v1/namespaces/openshift-ingress-operator/ingresscontrollers/default status")
+	}
+	return ingressDomain, err
 }

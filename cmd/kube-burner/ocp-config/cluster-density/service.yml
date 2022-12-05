@@ -2,10 +2,10 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: {{.name}}-{{.Iteration}}-{{.Replica}}
+  name: cluster-density-{{.Replica}}
 spec:
   selector:
-    app: {{.name}}-{{.Iteration}}-{{.Replica}}
+    name: nginx
   ports:
   - name: http
     protocol: TCP
