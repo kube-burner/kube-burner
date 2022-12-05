@@ -224,8 +224,9 @@ func (da *Agent) GetSDNInfo() (string, error) {
 	return networkType, err
 }
 
-func GetDefaultIngressDomain() (string, error) {
-	ingressController, err := dynamicClient.Resource(schema.GroupVersionResource{
+// GetDefaultIngressDomain return default ingress domain
+func (da *Agent) GetDefaultIngressDomain() (string, error) {
+	ingressController, err := da.dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "operator.openshift.io",
 		Version:  "v1",
 		Resource: "ingresscontrollers",
