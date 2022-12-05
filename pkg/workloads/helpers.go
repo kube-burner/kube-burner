@@ -86,7 +86,7 @@ func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	if err != nil {
 		log.Fatal("Error obtaining Prometheus information: ", err.Error())
 	}
-	wh.envVars["INGRESS_DOMAIN"], err = discovery.GetDefaultIngressDomain()
+	wh.envVars["INGRESS_DOMAIN"], err = wh.discoveryAgent.GetDefaultIngressDomain()
 	if err != nil {
 		log.Fatal("Error obtaining default ingress domain: ", err.Error())
 	}
