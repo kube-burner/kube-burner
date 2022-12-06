@@ -16,6 +16,7 @@ package workloads
 
 import (
 	"bytes"
+	"crypto/tls"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -138,7 +139,12 @@ func (wh *WorkloadHelper) indexMetadata() {
 	}
 	esEndpoint := fmt.Sprintf("%v/%v/_doc", wh.envVars["ES_SERVER"], wh.envVars["ES_INDEX"])
 	body, _ := json.Marshal(wh.Metadata)
-	resp, err := http.Post(esEndpoint, "application/json", bytes.NewBuffer(body))
+	client := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	resp, err := client.Post(esEndpoint, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		log.Error("Error indexing metadata: ", err)
 		return
