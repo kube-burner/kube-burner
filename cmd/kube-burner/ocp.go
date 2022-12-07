@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	_ "embed"
 
@@ -42,6 +43,7 @@ func openShiftCmd() *cobra.Command {
 	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
 	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
+	timeout := ocpCmd.PersistentFlags().Duration("timeout", 2*time.Hour, "Benchmark timeout")
 	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
 	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
 	gc := ocpCmd.PersistentFlags().Bool("gc", true, "Garbage collect created namespaces")
@@ -58,7 +60,7 @@ func openShiftCmd() *cobra.Command {
 			"GC":        fmt.Sprintf("%v", *gc),
 		}
 		discoveryAgent := discovery.NewDiscoveryAgent()
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, *timeout)
 		wh.Metadata.UUID = *uuid
 		if *esServer != "" {
 			err := wh.GatherMetadata()

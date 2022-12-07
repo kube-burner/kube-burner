@@ -57,9 +57,7 @@ func (ex *Executor) waitForObjects(ns string) {
 				go waitForDS(ns, ex.Config.MaxWaitTimeout, &wg)
 			case "Pod":
 				go waitForPod(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "Build":
-				go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
-			case "BuildConfig":
+			case "Build", "BuildConfig":
 				go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
 			case "VirtualMachine":
 				go waitForVM(ns, ex.Config.MaxWaitTimeout, &wg)

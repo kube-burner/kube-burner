@@ -45,6 +45,7 @@ type WorkloadHelper struct {
 	envVars         map[string]string
 	prometheusURL   string
 	prometheusToken string
+	timeout         time.Duration
 	Metadata        clusterMetadata
 	alerting        bool
 	ocpConfig       embed.FS
@@ -72,12 +73,13 @@ type clusterMetadata struct {
 }
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent, timeout time.Duration) WorkloadHelper {
 	return WorkloadHelper{
 		envVars:        envVars,
 		alerting:       alerting,
 		ocpConfig:      ocpConfig,
 		discoveryAgent: da,
+		timeout:        timeout,
 	}
 }
 
@@ -182,7 +184,7 @@ func (wh *WorkloadHelper) run(workload string) {
 			log.Fatal(err)
 		}
 	}
-	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM)
+	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM, wh.timeout)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -71,120 +71,132 @@ var ClientSet *kubernetes.Clientset
 var dynamicClient dynamic.Interface
 var restConfig *rest.Config
 
-func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager) (int, error) {
-	var rc int
+//nolint:gocyclo
+func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager, timeout time.Duration) (int, error) {
 	var err error
+	var rc int
 	var measurementsWg sync.WaitGroup
 	var indexer *indexers.Indexer
+	res := make(chan int, 1)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
-	if configSpec.GlobalConfig.IndexerConfig.Enabled {
-		indexer, err = indexers.NewIndexer(configSpec)
-		if err != nil {
-			return 1, err
-		}
-	}
-	measurements.NewMeasurementFactory(configSpec, uuid, indexer)
-	jobList := newExecutorList(configSpec, uuid)
-	// Iterate job list
-	for jobPosition, job := range jobList {
-		if job.Config.QPS == 0 || job.Config.Burst == 0 {
-			log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
-		} else {
-			log.Infof("QPS: %v", job.Config.QPS)
-			log.Infof("Burst: %v", job.Config.Burst)
-		}
-		ClientSet, restConfig, err = config.GetClientSet(job.Config.QPS, job.Config.Burst)
-		if err != nil {
-			log.Fatalf("Error creating clientSet: %s", err)
-		}
-		dynamicClient = dynamic.NewForConfigOrDie(restConfig)
-		if job.Config.PreLoadImages {
-			preLoadImages(job)
-		}
-		prometheusJob := prometheus.Job{
-			Start: time.Now().UTC(),
-		}
-		jobList[jobPosition].Start = time.Now().UTC()
-		log.Infof("Triggering job: %s", job.Config.Name)
-		measurements.SetJobConfig(&job.Config)
-		switch job.Config.JobType {
-		case config.CreationJob:
-			job.Cleanup()
-			measurements.Start(&measurementsWg)
-			measurementsWg.Wait()
-			job.RunCreateJob(1, job.Config.JobIterations)
-			// If object verification is enabled
-			if job.Config.VerifyObjects && !job.Verify() {
-				errMsg := "Object verification failed"
-				// If errorOnVerify is enabled. Set RC to 1
-				if job.Config.ErrorOnVerify {
-					errMsg += ". Setting return code to 1"
-					rc = 1
-				}
-				log.Error(errMsg)
-			}
-			if job.Config.Churn {
-				job.RunCreateJobWithChurn()
-			}
-			// We stop and index measurements per job
-			if measurements.Stop() == 1 {
-				rc = 1
-			}
-		case config.DeletionJob:
-			job.RunDeleteJob()
-		case config.PatchJob:
-			job.RunPatchJob()
-		}
-		if job.Config.JobPause > 0 {
-			log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
-			time.Sleep(job.Config.JobPause)
-		}
-		prometheusJob.End = time.Now().UTC()
-		elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Seconds()
-		// Don't append to Prometheus jobList when prometheus it's not initialized
-		if p != nil {
-			p.JobList = append(p.JobList, prometheusJob)
-		}
-		log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
-	}
-	if configSpec.GlobalConfig.IndexerConfig.Enabled {
-		for _, job := range jobList {
-			elapsedTime := job.End.Sub(job.Start).Seconds()
-			err := indexMetadataInfo(configSpec, indexer, uuid, elapsedTime, job.Config, job.Start)
+	go func(chan int) {
+		var innerRC int
+		if configSpec.GlobalConfig.IndexerConfig.Enabled {
+			indexer, err = indexers.NewIndexer(configSpec)
 			if err != nil {
-				log.Errorf(err.Error())
+				log.Fatal(err)
 			}
 		}
-	}
-	if p != nil {
-		log.Infof("Waiting %v extra before scraping prometheus", p.Step)
-		time.Sleep(p.Step)
-		// Update end time of last job
-		jobList[len(jobList)-1].End = time.Now().UTC()
-		// If alertManager is configured
-		if alertM != nil {
-			log.Infof("Evaluating alerts")
-			if alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
-				rc = 1
+		measurements.NewMeasurementFactory(configSpec, uuid, indexer)
+		jobList := newExecutorList(configSpec, uuid)
+		// Iterate job list
+		for jobPosition, job := range jobList {
+			if job.Config.QPS == 0 || job.Config.Burst == 0 {
+				log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
+			} else {
+				log.Infof("QPS: %v", job.Config.QPS)
+				log.Infof("Burst: %v", job.Config.Burst)
 			}
+			ClientSet, restConfig, err = config.GetClientSet(job.Config.QPS, job.Config.Burst)
+			if err != nil {
+				log.Fatalf("Error creating clientSet: %s", err)
+			}
+			dynamicClient = dynamic.NewForConfigOrDie(restConfig)
+			if job.Config.PreLoadImages {
+				preLoadImages(job)
+			}
+			prometheusJob := prometheus.Job{
+				Start: time.Now().UTC(),
+			}
+			jobList[jobPosition].Start = time.Now().UTC()
+			log.Infof("Triggering job: %s", job.Config.Name)
+			measurements.SetJobConfig(&job.Config)
+			switch job.Config.JobType {
+			case config.CreationJob:
+				job.Cleanup()
+				measurements.Start(&measurementsWg)
+				measurementsWg.Wait()
+				job.RunCreateJob(1, job.Config.JobIterations)
+				// If object verification is enabled
+				if job.Config.VerifyObjects && !job.Verify() {
+					errMsg := "Object verification failed"
+					// If errorOnVerify is enabled. Set RC to 1
+					if job.Config.ErrorOnVerify {
+						errMsg += ". Setting return code to 1"
+						innerRC = 1
+					}
+					log.Error(errMsg)
+				}
+				if job.Config.Churn {
+					job.RunCreateJobWithChurn()
+				}
+				// We stop and index measurements per job
+				if measurements.Stop() == 1 {
+					innerRC = 1
+				}
+			case config.DeletionJob:
+				job.RunDeleteJob()
+			case config.PatchJob:
+				job.RunPatchJob()
+			}
+			if job.Config.JobPause > 0 {
+				log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
+				time.Sleep(job.Config.JobPause)
+			}
+			prometheusJob.End = time.Now().UTC()
+			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Seconds()
+			// Don't append to Prometheus jobList when prometheus it's not initialized
+			if p != nil {
+				p.JobList = append(p.JobList, prometheusJob)
+			}
+			log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 		}
-		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-		if len(p.MetricProfile) > 0 {
-			if err := p.ScrapeJobsMetrics(indexer); err != nil {
-				log.Error(err.Error())
-			}
-			if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
-				err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
+		if configSpec.GlobalConfig.IndexerConfig.Enabled {
+			for _, job := range jobList {
+				elapsedTime := job.End.Sub(job.Start).Seconds()
+				err := indexMetadataInfo(configSpec, indexer, uuid, elapsedTime, job.Config, job.Start)
 				if err != nil {
+					log.Errorf(err.Error())
+				}
+			}
+		}
+		if p != nil {
+			log.Infof("Waiting %v extra before scraping prometheus", p.Step)
+			time.Sleep(p.Step)
+			// Update end time of last job
+			jobList[len(jobList)-1].End = time.Now().UTC()
+			// If alertManager is configured
+			if alertM != nil {
+				log.Infof("Evaluating alerts")
+				if alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
+					innerRC = 1
+				}
+			}
+			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
+			if len(p.MetricProfile) > 0 {
+				if err := p.ScrapeJobsMetrics(indexer); err != nil {
 					log.Error(err.Error())
 				}
+				if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
+					err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
+					if err != nil {
+						log.Error(err.Error())
+					}
+				}
 			}
 		}
-	}
-	log.Infof("Finished execution with UUID: %s", uuid)
-	if configSpec.GlobalConfig.GC {
-		log.Info("Garbage collecting created namespaces")
-		CleanupNamespaces(v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
+		log.Infof("Finished execution with UUID: %s", uuid)
+		if configSpec.GlobalConfig.GC {
+			log.Info("Garbage collecting created namespaces")
+			CleanupNamespaces(v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
+		}
+		res <- innerRC
+	}(res)
+	select {
+	case rc = <-res:
+	case <-time.After(timeout):
+		log.Errorf("%v timeout reached", timeout)
+		rc = 2
 	}
 	log.Info("👋 Exiting kube-burner")
 	return rc, nil
