@@ -15,6 +15,8 @@
 package indexers
 
 import (
+	"fmt"
+
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 )
@@ -39,7 +41,7 @@ func NewIndexer(configSpec config.Spec) (*Indexer, error) {
 			return &indexer, err
 		}
 	} else {
-		log.Fatalf("Indexer not found: %s", cfg.Type)
+		return &indexer, fmt.Errorf("Indexer not found: %s", cfg.Type)
 	}
 	return &indexer, nil
 }

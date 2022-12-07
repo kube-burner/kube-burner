@@ -83,6 +83,7 @@ func initCmd() *cobra.Command {
 	var prometheusStep time.Duration
 	var prometheusClient *prometheus.Prometheus
 	var alertM *alerting.AlertManager
+	var timeout time.Duration
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -121,7 +122,7 @@ func initCmd() *cobra.Command {
 					}
 				}
 			}
-			rc, err := burner.Run(configSpec, uuid, prometheusClient, alertM)
+			rc, err := burner.Run(configSpec, uuid, prometheusClient, alertM, timeout)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -137,6 +138,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "", 2*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "", "default", "Namespace where the configmap is")

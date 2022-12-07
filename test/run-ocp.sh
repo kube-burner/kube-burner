@@ -1,8 +1,11 @@
 #!/bin/bash
 
-trap 'cleanup' ERR
+trap 'die' ERR
 
-cleanup() {
+die() {
+  if [ -n $1 ]; then
+    echo $1
+  fi
   oc delete ns -l kube-burner-uuid=${UUID} --ignore-not-found
   exit 1
 }
@@ -22,3 +25,7 @@ kube-burner ocp cluster-density --iterations=3 --churn-duration=5m ${COMMON_FLAG
 echo "Running node-density-cni wrapper"
 kube-burner ocp node-density-cni --pods-per-node=75 --gc=false --uuid=${UUID}
 oc delete ns -l kube-burner-uuid=${UUID}
+rc=$(kube-burner ocp cluster-density --iterations=1 --churn-duration=5m ${COMMON_FLAGS} --timeout=1s)
+if [ ${rc} != 2 ]; then
+  die "Kube-burner timed out but its exit code was ${rc} != 2"
+fi

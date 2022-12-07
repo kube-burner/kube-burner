@@ -44,6 +44,7 @@ This option is meant to run Kube-burner benchmark, and it supports the these fla
 - password: Prometheus password for basic authentication.
 - skip-tls-verify: Skip TLS verification for prometheus. Default `true`
 - step: Prometheus step size. Default `30s`
+- timeout: Kube-burner benchmark global timeout. When timing out, return code is 2. Default `2h`
 
 **Note**: Both basic authentication and Bearer authentication need credentials able to query the given Prometheus API.
 
