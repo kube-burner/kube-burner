@@ -119,7 +119,7 @@ func (ex *Executor) RunCreateJob(iterationStart int, iterationEnd int) {
 			log.Fatal(err.Error())
 		}
 	}
-	t0 := time.Now().Round(time.Second)
+	start := time.Now().Round(time.Second)
 	for i := iterationStart; i <= iterationEnd; i++ {
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsObjects && ex.Config.NamespacedIterations {
@@ -131,11 +131,8 @@ func (ex *Executor) RunCreateJob(iterationStart int, iterationEnd int) {
 			}
 		}
 		for objectIndex, obj := range ex.objects {
-			wg.Add(1)
-			go ex.replicaHandler(objectIndex, obj, ns, i, &wg)
+			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
-		// Wait for all replicaHandlers to finish before moving forward to next iteration
-		wg.Wait()
 		if ex.Config.PodWait {
 			log.Infof("Waiting up to %s all job actions to be completed", ex.Config.MaxWaitTimeout)
 			log.Debugf("Waiting for actions in namespace %v to be completed", ns)
@@ -146,8 +143,9 @@ func (ex *Executor) RunCreateJob(iterationStart int, iterationEnd int) {
 			time.Sleep(ex.Config.JobIterationDelay)
 		}
 	}
+	// Wait for all replicas to be created
+	wg.Wait()
 	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {
-		wg.Wait()
 		log.Infof("Waiting up to %s for actions to be completed", ex.Config.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ex.Config.QPS)/2)
@@ -172,15 +170,16 @@ func (ex *Executor) RunCreateJob(iterationStart int, iterationEnd int) {
 		}
 		wg.Wait()
 	}
-	t1 := time.Now().Round(time.Second)
-	log.Infof("Finished the create job in %g seconds", t1.Sub(t0).Seconds())
+	log.Infof("Finished the create job in %v", time.Since(start).Round(time.Second))
 }
 
-func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
+	var wg sync.WaitGroup
 	for r := 1; r <= obj.replicas; r++ {
 		wg.Add(1)
 		go func(r int) {
+			defer wg.Done()
+			var newObject = new(unstructured.Unstructured)
 			labels := map[string]string{
 				"kube-burner-uuid":  ex.uuid,
 				"kube-burner-job":   ex.Config.Name,
@@ -190,15 +189,12 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				jobName:      ex.Config.Name,
 				jobIteration: iteration,
 				jobUUID:      ex.uuid,
+				replica:      r,
 			}
 			for k, v := range obj.inputVars {
 				templateData[k] = v
 			}
-			// We are using the same wait group for this inner goroutine, maybe we should consider using a new one
-			defer wg.Done()
 			ex.limiter.Wait(context.TODO())
-			newObject := &unstructured.Unstructured{}
-			templateData[replica] = r
 			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
 			if err != nil {
 				log.Fatalf("Template error in %s: %s", obj.objectTemplate, err)
@@ -210,9 +206,19 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			}
 			newObject.SetLabels(labels)
 			json.Marshal(newObject.Object)
-			createRequest(obj.gvr, ns, newObject, obj.namespaced)
+			// replicaWg is necessary because we want to wait for all replicas
+			// to be crated before running any other action such as verify objects,
+			// wait for ready, etc. Without this wait group, running for example,
+			// verify objects can lead into a race condition when some objects
+			// hasn't been created yet
+			replicaWg.Add(1)
+			go func() {
+				createRequest(obj.gvr, ns, newObject, obj.namespaced)
+				replicaWg.Done()
+			}()
 		}(r)
 	}
+	wg.Wait()
 }
 
 func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, namespaced bool) {
