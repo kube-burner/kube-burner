@@ -113,7 +113,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	var err error
 	var v model.Value
 	var renderedQuery bytes.Buffer
-	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start, end)
+	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 	for _, md := range p.MetricProfile {
 		var metrics []interface{}
 		t, _ := template.New("").Parse(md.Query)
