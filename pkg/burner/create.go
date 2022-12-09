@@ -251,15 +251,14 @@ func (ex *Executor) RunCreateJobWithChurn() {
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.Config.ChurnPercent*ex.Config.JobIterations/100), 1))
 	// Create timer for the churn duration
-	cTimer := time.NewTimer(ex.Config.ChurnDuration)
-	rand.Seed(time.Now().UnixNano())
+	timer := time.After(ex.Config.ChurnDuration)
 	// Patch to label namespaces for deletion
 	delPatch := []byte(`[{"op":"add","path":"/metadata/labels","value":{"churndelete":"delete"}}]`)
 
 churnComplete:
 	for {
 		select {
-		case <-cTimer.C:
+		case <-timer:
 			log.Info("Churn job complete")
 			break churnComplete
 		default:
