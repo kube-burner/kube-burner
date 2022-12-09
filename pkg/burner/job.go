@@ -105,10 +105,10 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 			if job.Config.PreLoadImages {
 				preLoadImages(job)
 			}
-			prometheusJob := prometheus.Job{
-				Start: time.Now().UTC(),
-			}
 			jobList[jobPosition].Start = time.Now().UTC()
+			prometheusJob := prometheus.Job{
+				Start: jobList[jobPosition].Start,
+			}
 			log.Infof("Triggering job: %s", job.Config.Name)
 			measurements.SetJobConfig(&job.Config)
 			switch job.Config.JobType {
@@ -143,7 +143,8 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 				log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
 				time.Sleep(job.Config.JobPause)
 			}
-			prometheusJob.End = time.Now().UTC()
+			jobList[jobPosition].End = time.Now().UTC()
+			prometheusJob.End = jobList[jobPosition].End
 			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Seconds()
 			// Don't append to Prometheus jobList when prometheus it's not initialized
 			if p != nil {
