@@ -198,7 +198,7 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 		log.Errorf("%v timeout reached", timeout)
 		rc = 2
 	}
-	log.Info("👋 Exiting kube-burner")
+	log.Info("👋 Exiting kube-burner ", uuid)
 	return rc, nil
 }
 
