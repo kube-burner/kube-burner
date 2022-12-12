@@ -31,7 +31,7 @@ spec:
             command:
             - "/bin/sh"
             - "-c"
-            - "curl --fail -sSk ${SERVICE_ENDPOINT} -o /dev/null && curl --fail -sSk ${ROUTE_ENDPOINT} -o /dev/null"
+            - "curl --fail -sS ${SERVICE_ENDPOINT} -o /dev/null && curl --fail -sSk ${ROUTE_ENDPOINT} -o /dev/null"
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
@@ -66,7 +66,7 @@ spec:
         - name: ROUTE_ENDPOINT
           value: "https://cluster-density-{{.Replica}}-cluster-density-{{.Iteration}}.{{ .ingressDomain }}/256.html"
         - name: SERVICE_ENDPOINT
-          value: "https://cluster-density-{{randInteger 1 5}}/256.html"
+          value: "http://cluster-density-{{randInteger 1 5}}/256.html"
       volumes:
       - name: secret-1
         secret:
