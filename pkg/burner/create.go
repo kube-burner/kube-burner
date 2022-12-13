@@ -261,7 +261,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 			log.Info("Churn job complete")
 			return
 		default:
-			log.Infof("Next churn loop, workload churning started %v ago", time.Since(now))
+			log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
 		}
 		// Max amount of churn is 100% of namespaces
 		randStart := 1

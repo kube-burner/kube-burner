@@ -16,6 +16,4 @@ spec:
           name: client-{{.Replica}}
   - ports:
     - protocol: TCP
-      port: 8443
-    - protocol: TCP
       port: 8080
