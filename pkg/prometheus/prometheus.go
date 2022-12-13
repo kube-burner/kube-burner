@@ -131,7 +131,6 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 			}
 		} else {
 			log.Debugf("Range query: %s", query)
-			p.QueryRange(query, start, end)
 			v, err = p.QueryRange(query, start, end)
 			if err != nil {
 				log.Warnf("Error found with query %s: %s", query, err)
