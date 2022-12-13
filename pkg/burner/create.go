@@ -245,24 +245,23 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 func (ex *Executor) RunCreateJobWithChurn() {
 	var err error
 	log.Info("Starting to Churn job")
-	log.Infof("Churn Duration: %v", ex.Config.ChurnDuration)
-	log.Infof("Churn Percent: %v", ex.Config.ChurnPercent)
-	log.Infof("Churn Delay: %v", ex.Config.ChurnDelay)
+	log.Infof("Churn duration: %v", ex.Config.ChurnDuration)
+	log.Infof("Churn percent: %v", ex.Config.ChurnPercent)
+	log.Infof("Churn delay: %v", ex.Config.ChurnDelay)
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.Config.ChurnPercent*ex.Config.JobIterations/100), 1))
+	now := time.Now().UTC()
 	// Create timer for the churn duration
 	timer := time.After(ex.Config.ChurnDuration)
 	// Patch to label namespaces for deletion
 	delPatch := []byte(`[{"op":"add","path":"/metadata/labels","value":{"churndelete":"delete"}}]`)
-
-churnComplete:
 	for {
 		select {
 		case <-timer:
 			log.Info("Churn job complete")
-			break churnComplete
+			return
 		default:
-			log.Debug("Next churn loop")
+			log.Infof("Next churn loop, workload churning started %v ago", time.Since(now))
 		}
 		// Max amount of churn is 100% of namespaces
 		randStart := 1
@@ -286,6 +285,7 @@ churnComplete:
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart-1)
+		log.Infof("Sleeping for %v", ex.Config.ChurnDelay)
 		time.Sleep(ex.Config.ChurnDelay)
 	}
 }
