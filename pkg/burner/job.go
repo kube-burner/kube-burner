@@ -65,6 +65,7 @@ const (
 	replica      = "Replica"
 	jobIteration = "Iteration"
 	jobUUID      = "UUID"
+	rcTimeout    = 2
 )
 
 var ClientSet *kubernetes.Clientset
@@ -79,7 +80,7 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 	var indexer *indexers.Indexer
 	res := make(chan int, 1)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
-	go func(chan int) {
+	go func() {
 		var innerRC int
 		if configSpec.GlobalConfig.IndexerConfig.Enabled {
 			indexer, err = indexers.NewIndexer(configSpec)
@@ -192,12 +193,12 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 			CleanupNamespaces(v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
 		}
 		res <- innerRC
-	}(res)
+	}()
 	select {
 	case rc = <-res:
 	case <-time.After(timeout):
 		log.Errorf("%v timeout reached", timeout)
-		rc = 2
+		rc = rcTimeout
 	}
 	log.Info("👋 Exiting kube-burner ", uuid)
 	return rc, nil
