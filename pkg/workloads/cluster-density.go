@@ -53,7 +53,7 @@ func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 	cmd.Flags().IntVar(&iterations, "iterations", 0, "Cluster-density iterations")
 	cmd.Flags().BoolVar(&churn, "churn", true, "Enable churning")
 	cmd.Flags().DurationVar(&churnDuration, "churn-duration", 1*time.Hour, "Churn duration")
-	cmd.Flags().DurationVar(&churnDelay, "churn-delay", 30*time.Second, "Time to wait between each churn")
+	cmd.Flags().DurationVar(&churnDelay, "churn-delay", 2*time.Minute, "Time to wait between each churn")
 	cmd.Flags().IntVar(&churnPercent, "churn-percent", 10, "Percentage of job iterations that kube-burner will churn each round")
 	cmd.Flags().BoolVar(&extract, "extract", false, "Extract workload in the current directory")
 	cmd.MarkFlagRequired("iterations")
