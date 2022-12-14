@@ -117,6 +117,12 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 				job.Cleanup()
 				measurements.Start(&measurementsWg)
 				measurementsWg.Wait()
+				if job.Config.Churn {
+					log.Info("Churning enabled")
+					log.Infof("Churn duration: %v", job.Config.ChurnDuration)
+					log.Infof("Churn percent: %v", job.Config.ChurnPercent)
+					log.Infof("Churn delay: %v", job.Config.ChurnDelay)
+				}
 				job.RunCreateJob(1, job.Config.JobIterations)
 				// If object verification is enabled
 				if job.Config.VerifyObjects && !job.Verify() {

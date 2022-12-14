@@ -244,13 +244,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 // RunCreateJobWithChurn executes a churn creation job
 func (ex *Executor) RunCreateJobWithChurn() {
 	var err error
-	log.Info("Starting to Churn job")
-	log.Infof("Churn duration: %v", ex.Config.ChurnDuration)
-	log.Infof("Churn percent: %v", ex.Config.ChurnPercent)
-	log.Infof("Churn delay: %v", ex.Config.ChurnDelay)
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.Config.ChurnPercent*ex.Config.JobIterations/100), 1))
 	now := time.Now().UTC()
+	rand.Seed(now.UnixNano())
 	// Create timer for the churn duration
 	timer := time.After(ex.Config.ChurnDuration)
 	// Patch to label namespaces for deletion
