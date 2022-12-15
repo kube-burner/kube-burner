@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
 )
 
 func setupCreateJob(jobConfig config.Job) Executor {
@@ -137,10 +136,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {
 		log.Infof("Waiting up to %s for actions to be completed", ex.Config.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(ex.Config.QPS)/2)
-		if restConfig.QPS < 2 {
-			sem = make(chan int, int(rest.DefaultQPS)/2)
-		}
+		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
 		for i := iterationStart; i <= iterationEnd; i++ {
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
