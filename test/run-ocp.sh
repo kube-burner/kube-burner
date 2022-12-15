@@ -21,6 +21,8 @@ echo "Running node-density-heavy wrapper"
 kube-burner ocp node-density-heavy --pods-per-node=75 ${COMMON_FLAGS} --qps=5 --burst=5
 echo "Running cluster-density wrapper"
 kube-burner ocp cluster-density --iterations=3 --churn-duration=2m ${COMMON_FLAGS}
+echo "Running cluster-density wrapper w/o network-policies"
+kube-burner ocp cluster-density --iterations=2 churning=false --uuid=${UUID} --network-policies=false
 # Disable gc and avoid metric indexing
 echo "Running node-density-cni wrapper"
 kube-burner ocp node-density-cni --pods-per-node=75 --gc=false --uuid=${UUID} --alerting=false
