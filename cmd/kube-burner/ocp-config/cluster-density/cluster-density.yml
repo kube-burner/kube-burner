@@ -61,7 +61,7 @@ jobs:
 
       - objectTemplate: configmap.yml
         replicas: 10
-
+{{ if eq .NETWORK_POLICIES "true" }}
       - objectTemplate: np-deny-all.yml
         replicas: 1
 
@@ -70,3 +70,4 @@ jobs:
 
       - objectTemplate: np-allow-from-ingress.yml
         replicas: 1
+{{ end }}
