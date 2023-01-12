@@ -8,8 +8,16 @@ spec:
       labels:
         name: postgres-{{.Replica}}-{{.Iteration}}
     spec:
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
+      affinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+            - key: node-role.kubernetes.io/infra
+              operator: DoesNotExist
+            - key: node-role.kubernetes.io/workload
+              operator: DoesNotExist
       containers:
       - name: postgresql
         image: registry.redhat.io/rhel8/postgresql-10@sha256:4b912c80085b88a03309aeb7907efcc29dd3342fa3952b6ea067afb1914bfe53

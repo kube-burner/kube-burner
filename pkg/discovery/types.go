@@ -45,8 +45,9 @@ type NodeInfo struct {
 }
 
 const (
-	routeGroup      = "route.openshift.io"
-	routeVersion    = "v1"
-	routeResource   = "routes"
-	completedUpdate = "Completed"
+	routeGroup         = "route.openshift.io"
+	routeVersion       = "v1"
+	routeResource      = "routes"
+	completedUpdate    = "Completed"
+	workerNodeSelector = "node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!="
 )
