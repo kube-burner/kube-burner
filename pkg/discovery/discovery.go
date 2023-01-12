@@ -113,15 +113,15 @@ func getBearerToken(clientset *kubernetes.Clientset) (string, error) {
 
 // GetWorkerNodeCount returns the number of worker nodes
 func (da *Agent) GetWorkerNodeCount() (int, error) {
-	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: "node-role.kubernetes.io/worker="})
-	log.Debug("Node count: ", len(nodeList.Items))
+	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: workerNodeSelector})
+	log.Infof("Listed nodes after using selector %s: %d", workerNodeSelector, len(nodeList.Items))
 	return len(nodeList.Items), err
 }
 
 // GetCurrentPodCount returns the number of current running pods across all worker nodes
 func (da *Agent) GetCurrentPodCount() (int, error) {
 	var podCount int
-	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: "node-role.kubernetes.io/worker="})
+	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: workerNodeSelector})
 	if err != nil {
 		return podCount, err
 	}
