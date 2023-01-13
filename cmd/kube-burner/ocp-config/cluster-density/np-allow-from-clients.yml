@@ -13,7 +13,7 @@ spec:
           kubernetes.io/metadata.name: cluster-density-{{.Iteration}}
       podSelector:
         matchLabels:
-          name: client-{{.Replica}}
+          name: client
   - ports:
     - protocol: TCP
       port: 8080

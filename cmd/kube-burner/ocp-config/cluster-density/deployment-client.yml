@@ -6,11 +6,12 @@ spec:
   replicas: {{.podReplicas}}
   selector:
     matchLabels:
-      name: client-{{.Replica}}
+      app: client-{{.Replica}}
   template:
     metadata:
       labels:
-        name: client-{{.Replica}}
+        app: client-{{.Replica}}
+        name: client
     spec:
       nodeSelector:
         node-role.kubernetes.io/worker: ""
