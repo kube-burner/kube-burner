@@ -84,6 +84,7 @@ func initCmd() *cobra.Command {
 	var prometheusClient *prometheus.Prometheus
 	var alertM *alerting.AlertManager
 	var timeout time.Duration
+	garbageCollect := make(chan bool)
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -125,6 +126,9 @@ func initCmd() *cobra.Command {
 			rc, err := burner.Run(configSpec, uuid, prometheusClient, alertM, timeout)
 			if err != nil {
 				log.Fatalf(err.Error())
+			}
+			if configSpec.GlobalConfig.GC {
+				burner.GarbageCollect(uuid)
 			}
 			os.Exit(rc)
 		},

@@ -184,12 +184,16 @@ func (wh *WorkloadHelper) run(workload string) {
 			log.Fatal(err)
 		}
 	}
+	// Wait for workload to finish before running garbage collection
 	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM, wh.timeout)
 	if err != nil {
 		log.Fatal(err)
 	}
 	wh.Metadata.Passed = rc == 0
 	wh.indexMetadata()
+	if configSpec.GlobalConfig.GC {
+		burner.GarbageCollect(wh.Metadata.UUID)
+	}
 	os.Exit(rc)
 }
 

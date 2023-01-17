@@ -194,10 +194,6 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 			}
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)
-		if configSpec.GlobalConfig.GC {
-			log.Info("Garbage collecting created namespaces")
-			CleanupNamespaces(v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
-		}
 		res <- innerRC
 	}()
 	select {
@@ -208,6 +204,11 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 	}
 	log.Info("👋 Exiting kube-burner ", uuid)
 	return rc, nil
+}
+
+func GarbageCollect(uuid string) {
+	log.Info("Garbage collecting created namespaces")
+	CleanupNamespaces(v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
 }
 
 // newExecutorList Returns a list of executors
