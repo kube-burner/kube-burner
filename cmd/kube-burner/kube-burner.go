@@ -141,7 +141,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
-	cmd.Flags().StringVarP(&namespace, "namespace", "", "default", "Namespace where the configmap is")
+	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	cmd.Flags().SortFlags = false
 	return cmd
