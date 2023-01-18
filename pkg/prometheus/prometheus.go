@@ -73,11 +73,10 @@ func NewPrometheusClient(configSpec config.Spec, url, token, username, password,
 	if err := p.verifyConnection(); err != nil {
 		return &p, err
 	}
-	if configSpec.GlobalConfig.IndexerConfig.Enabled || configSpec.GlobalConfig.WriteToFile {
-		if err := p.ReadProfile(configSpec.GlobalConfig.MetricsProfile); err != nil {
+	if configSpec.GlobalConfig.MetricsProfile != "" {
+		if err := p.readProfile(configSpec.GlobalConfig.MetricsProfile); err != nil {
 			log.Fatal(err)
 		}
-
 	}
 	return &p, nil
 }
@@ -92,7 +91,7 @@ func (p *Prometheus) verifyConnection() error {
 }
 
 // ReadProfile reads and parses metric profile configuration
-func (p *Prometheus) ReadProfile(metricsProfile string) error {
+func (p *Prometheus) readProfile(metricsProfile string) error {
 	f, err := util.ReadConfig(metricsProfile)
 	if err != nil {
 		log.Fatalf("Error reading metrics profile %s: %s", metricsProfile, err)

@@ -16,13 +16,12 @@ package main
 
 import (
 	"embed"
+	_ "embed"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
-	_ "embed"
-
+	log "github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
@@ -60,7 +59,7 @@ func openShiftCmd() *cobra.Command {
 			"GC":        fmt.Sprintf("%v", *gc),
 		}
 		discoveryAgent := discovery.NewDiscoveryAgent()
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, *timeout)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout)
 		wh.Metadata.UUID = *uuid
 		if *esServer != "" {
 			err := wh.GatherMetadata()
@@ -69,6 +68,9 @@ func openShiftCmd() *cobra.Command {
 			}
 		}
 		wh.SetKubeBurnerFlags()
+	}
+	ocpCmd.PostRun = func(cmd *cobra.Command, args []string) {
+		log.Info("👋 Exiting kube-burner ", uuid)
 	}
 	ocpCmd.AddCommand(
 		workloads.NewClusterDensity(&wh),

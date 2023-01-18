@@ -73,21 +73,14 @@ var dynamicClient dynamic.Interface
 var restConfig *rest.Config
 
 //nolint:gocyclo
-func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager, timeout time.Duration) (int, error) {
+func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration) (int, error) {
 	var err error
 	var rc int
 	var measurementsWg sync.WaitGroup
-	var indexer *indexers.Indexer
 	res := make(chan int, 1)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
-		if configSpec.GlobalConfig.IndexerConfig.Enabled {
-			indexer, err = indexers.NewIndexer(configSpec)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
 		measurements.NewMeasurementFactory(configSpec, uuid, indexer)
 		jobList := newExecutorList(configSpec, uuid)
 		// Iterate job list
@@ -206,7 +199,6 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 		log.Errorf("%v timeout reached", timeout)
 		rc = rcTimeout
 	}
-	log.Info("👋 Exiting kube-burner ", uuid)
 	return rc, nil
 }
 
