@@ -66,11 +66,12 @@ func init() {
 }
 
 func (p *podLatency) handleCreatePod(obj interface{}) {
+	now := time.Now().UTC()
 	pod := obj.(*v1.Pod)
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
 		if strings.Contains(pod.Namespace, factory.jobConfig.Namespace) {
 			p.metrics[string(pod.UID)] = podMetric{
-				Timestamp:  time.Now().UTC(),
+				Timestamp:  now,
 				Namespace:  pod.Namespace,
 				Name:       pod.Name,
 				MetricName: podLatencyMeasurement,
@@ -89,20 +90,22 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 				switch c.Type {
 				case v1.PodScheduled:
 					if pm.scheduled.IsZero() {
-						pm.scheduled = time.Now().UTC()
+						pm.scheduled = c.LastTransitionTime.Time.UTC()
 						pm.NodeName = pod.Spec.NodeName
 					}
 				case v1.PodInitialized:
 					if pm.initialized.IsZero() {
-						pm.initialized = time.Now().UTC()
+						pm.initialized = c.LastTransitionTime.Time.UTC()
 					}
 				case v1.ContainersReady:
 					if pm.containersReady.IsZero() {
-						pm.containersReady = time.Now().UTC()
+						pm.containersReady = c.LastTransitionTime.Time.UTC()
 					}
 				case v1.PodReady:
-					log.Debugf("Pod %s is ready", pod.Name)
-					pm.podReady = time.Now().UTC()
+					if pm.podReady.IsZero() {
+						log.Debugf("Pod %s is ready", pod.Name)
+						pm.podReady = c.LastTransitionTime.Time.UTC()
+					}
 				}
 			}
 		}
@@ -162,8 +165,7 @@ func (p *podLatency) stop() (int, error) {
 		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
 	}
 	// Reset latency slices, required in multi-job benchmarks
-	p.latencyQuantiles = nil
-	p.normLatencies = nil
+	p.latencyQuantiles, p.normLatencies = nil, nil
 	return rc, nil
 }
 
@@ -175,13 +177,26 @@ func (p *podLatency) index() {
 
 func (p *podLatency) normalizeMetrics() {
 	for _, m := range p.metrics {
-		// If a does not reach the Running state (this timestamp wasn't set), we skip that pod
+		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {
 			continue
 		}
-		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
+		// latencyTime should be always larger than zero, however, in some cases, it might be a
+		// negative value due to the precision of timestamp can only get to the level of second,
+		// the microsecond and nanosecond have been discarded purposely in kubelet, this is
+		// because apiserver does not support RFC339NANO.
 		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
+		if m.ContainersReadyLatency < 0 {
+			m.ContainersReadyLatency = 0
+		}
+		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
+		if m.SchedulingLatency < 0 {
+			m.SchedulingLatency = 0
+		}
 		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
+		if m.InitializedLatency < 0 {
+			m.InitializedLatency = 0
+		}
 		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
 		p.normLatencies = append(p.normLatencies, m)
 	}
