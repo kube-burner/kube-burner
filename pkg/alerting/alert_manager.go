@@ -63,7 +63,7 @@ type alert struct {
 type AlertManager struct {
 	alertProfile alertProfile
 	prometheus   *prometheus.Prometheus
-	indexer      indexers.Indexer
+	indexer      *indexers.Indexer
 	indexName    string
 	uuid         string
 }
@@ -84,7 +84,7 @@ func NewAlertManager(alertProfileCfg string, uuid, indexName string, indexer *in
 	a := AlertManager{
 		prometheus: prometheusClient,
 		uuid:       uuid,
-		indexer:    *indexer,
+		indexer:    indexer,
 		indexName:  indexName,
 	}
 	if err := a.readProfile(alertProfileCfg); err != nil {
@@ -199,5 +199,5 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 
 func (a *AlertManager) index(alertSet []interface{}) {
 	log.Info("Indexing alerts in ", a.indexName)
-	a.indexer.Index(a.indexName, alertSet)
+	(*a.indexer).Index(a.indexName, alertSet)
 }

@@ -69,9 +69,6 @@ func openShiftCmd() *cobra.Command {
 		}
 		wh.SetKubeBurnerFlags()
 	}
-	ocpCmd.PostRun = func(cmd *cobra.Command, args []string) {
-		log.Info("👋 Exiting kube-burner ", uuid)
-	}
 	ocpCmd.AddCommand(
 		workloads.NewClusterDensity(&wh),
 		workloads.NewNodeDensity(&wh),
