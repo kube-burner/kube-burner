@@ -197,8 +197,7 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 	return result, alertSet, nil
 }
 
-func (a *AlertManager) index(alertSet []interface{}) error {
+func (a *AlertManager) index(alertSet []interface{}) {
 	log.Info("Indexing alerts in ", a.indexName)
 	a.indexer.Index(a.indexName, alertSet)
-	return nil
 }

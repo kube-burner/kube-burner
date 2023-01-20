@@ -63,3 +63,21 @@ INFO[2020-12-10 11:47:26] Evaluating expression: 'avg_over_time(histogram_quanti
 m:]) > 30'                                                                                                                                                                                                                                    
 INFO[2020-12-10 11:47:27] Evaluating expression: 'avg_over_time(histogram_quantile(0.99,rate(coredns_kubernetes_dns_programming_duration_seconds_bucket[2m]))[5m:]) > 1'
 ```
+
+## Indexing alerts
+
+When indexing is enabled, the alerts fired by kube-burner are automatically indexed in the index configured in `defaultIndex`. The documents of these alerts have the following shape:
+
+```json
+{
+        "_index": "ripsaw-kube-burner",
+        "_id": "2b7d233495e2a7349a43bb8a988d82b76b6ddff2557d21a062e41ce9d2c8ed6a",
+        "_score": 16.409307,
+        "_source": {
+          "timestamp": "2023-01-19T22:20:10+01:00",
+          "uuid": "c0dd0d60-ddf5-488e-bf2f-b8960fc2b5ab",
+          "severity": "warning",
+          "description": "5 minutes avg. 99th etcd fsync latency on etcd-ip-10-0-133-30.us-west-2.compute.internal higher than 10ms. 0.004s"
+        }
+      },
+```
