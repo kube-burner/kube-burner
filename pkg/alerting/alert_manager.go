@@ -34,11 +34,12 @@ import (
 type severityLevel string
 
 const (
-	Passed                    = 0
-	Failed                    = 1
-	sevWarn     severityLevel = "warning"
-	sevError    severityLevel = "error"
-	sevCritical severityLevel = "critical"
+	Passed                        = 0
+	Failed                        = 1
+	sevWarn         severityLevel = "warning"
+	sevError        severityLevel = "error"
+	sevCritical     severityLevel = "critical"
+	alertMetricName               = "alert"
 )
 
 // alertProfile expression list
@@ -57,6 +58,7 @@ type alert struct {
 	UUID        string    `json:"uuid"`
 	Severity    string    `json:"severity"`
 	Description string    `json:"description"`
+	MetricName  string    `json:"metricName"`
 }
 
 // AlertManager configuration
@@ -179,6 +181,7 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 				Timestamp:   val.Timestamp.Time(),
 				Severity:    string(severity),
 				Description: renderedDesc.String(),
+				MetricName:  alertMetricName,
 			})
 			switch severity {
 			case sevWarn:
