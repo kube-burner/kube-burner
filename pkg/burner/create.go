@@ -35,11 +35,17 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 )
 
 func setupCreateJob(jobConfig config.Job) Executor {
 	var f io.Reader
 	var err error
+	waitClientSet, waitRestConfig, err = config.GetClientSet(jobConfig.QPS*2, jobConfig.Burst*2)
+	if err != nil {
+		log.Fatalf("Error creating wait clientSet: %s", err.Error())
+	}
+	waitDynamicClient = dynamic.NewForConfigOrDie(waitRestConfig)
 	log.Debugf("Preparing create job: %s", jobConfig.Name)
 	selector := util.NewSelector()
 	selector.Configure("", fmt.Sprintf("kube-burner-job=%s", jobConfig.Name), "")

@@ -69,8 +69,11 @@ const (
 )
 
 var ClientSet *kubernetes.Clientset
+var waitClientSet *kubernetes.Clientset
 var dynamicClient dynamic.Interface
+var waitDynamicClient dynamic.Interface
 var restConfig *rest.Config
+var waitRestConfig *rest.Config
 
 //nolint:gocyclo
 func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration) (int, error) {
