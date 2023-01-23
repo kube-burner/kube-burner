@@ -36,7 +36,7 @@ func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if extract {
-				if err := wh.extractWorkload(cmd.Name()); err != nil {
+				if err := wh.extractWorkload(cmd.Name(), "metrics.yml"); err != nil {
 					log.Fatal(err)
 				}
 				os.Exit(0)
@@ -56,7 +56,7 @@ func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
 			os.Setenv("CONTAINER_IMAGE", containerImage)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			wh.run(cmd.Name())
+			wh.run(cmd.Name(), "metrics.yml")
 		},
 	}
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")

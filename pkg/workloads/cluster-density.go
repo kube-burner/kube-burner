@@ -34,7 +34,7 @@ func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 		Short: "Runs cluster-density workload",
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if extract {
-				if err := wh.extractWorkload(cmd.Name()); err != nil {
+				if err := wh.extractWorkload(cmd.Name(), "metrics-aggregated.yml"); err != nil {
 					log.Fatal(err)
 				}
 				os.Exit(0)
@@ -48,7 +48,7 @@ func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
 			os.Setenv("NETWORK_POLICIES", fmt.Sprint(networkPolicies))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			wh.run(cmd.Name())
+			wh.run(cmd.Name(), "metrics-aggregated.yml")
 		},
 	}
 	cmd.Flags().IntVar(&iterations, "iterations", 0, "Cluster-density iterations")
