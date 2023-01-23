@@ -200,6 +200,7 @@ func (wh *WorkloadHelper) run(workload string) {
 	}
 	wh.Metadata.Passed = rc == 0
 	wh.indexMetadata()
+	log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
 	os.Exit(rc)
 }
 

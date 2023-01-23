@@ -174,7 +174,7 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 				}
 			}
 			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-			if len(p.MetricProfile) > 0 {
+			if configSpec.GlobalConfig.IndexerConfig.Enabled || configSpec.GlobalConfig.WriteToFile {
 				if err := p.ScrapeJobsMetrics(indexer); err != nil {
 					log.Error(err.Error())
 				}
