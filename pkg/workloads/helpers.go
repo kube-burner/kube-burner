@@ -31,6 +31,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
+	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 )
 
@@ -50,6 +51,7 @@ type WorkloadHelper struct {
 	alerting        bool
 	ocpConfig       embed.FS
 	discoveryAgent  discovery.Agent
+	indexing        bool
 }
 
 type clusterMetadata struct {
@@ -73,13 +75,14 @@ type clusterMetadata struct {
 }
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent, timeout time.Duration) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent, indexing bool, timeout time.Duration) WorkloadHelper {
 	return WorkloadHelper{
 		envVars:        envVars,
 		alerting:       alerting,
 		ocpConfig:      ocpConfig,
 		discoveryAgent: da,
 		timeout:        timeout,
+		indexing:       indexing,
 	}
 }
 
@@ -161,6 +164,7 @@ func (wh *WorkloadHelper) indexMetadata() {
 
 func (wh *WorkloadHelper) run(workload string) {
 	var rc int
+	var indexer *indexers.Indexer
 	var alertM *alerting.AlertManager
 	cfg := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(cfg); err != nil {
@@ -173,23 +177,30 @@ func (wh *WorkloadHelper) run(workload string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if wh.indexing {
+		indexer, err = indexers.NewIndexer(configSpec)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+	}
 	configSpec.GlobalConfig.MetricsProfile = metricsProfile
 	p, err := prometheus.NewPrometheusClient(configSpec, wh.prometheusURL, wh.prometheusToken, "", "", wh.Metadata.UUID, true, 30*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
 	if wh.alerting {
-		alertM, err = alerting.NewAlertManager(alertsProfile, p)
+		alertM, err = alerting.NewAlertManager(alertsProfile, wh.Metadata.UUID, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM, wh.timeout)
+	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM, indexer, wh.timeout)
 	if err != nil {
 		log.Fatal(err)
 	}
 	wh.Metadata.Passed = rc == 0
 	wh.indexMetadata()
+	log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
 	os.Exit(rc)
 }
 

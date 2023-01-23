@@ -83,11 +83,17 @@ func initCmd() *cobra.Command {
 	var prometheusStep time.Duration
 	var prometheusClient *prometheus.Prometheus
 	var alertM *alerting.AlertManager
+	var indexer *indexers.Indexer
 	var timeout time.Duration
+	var rc int
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
-		Args:  cobra.NoArgs,
+		PostRun: func(cmd *cobra.Command, args []string) {
+			log.Info("👋 Exiting kube-burner ", uuid)
+			os.Exit(rc)
+		},
+		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
@@ -106,10 +112,15 @@ func initCmd() *cobra.Command {
 			}
 			if token == "" {
 				token = configSpec.GlobalConfig.BearerToken
-
 			}
 			if metricsProfile != "" {
 				configSpec.GlobalConfig.MetricsProfile = metricsProfile
+			}
+			if configSpec.GlobalConfig.IndexerConfig.Enabled {
+				indexer, err = indexers.NewIndexer(configSpec)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
 			}
 			if url != "" {
 				prometheusClient, err = prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
@@ -117,16 +128,15 @@ func initCmd() *cobra.Command {
 					log.Fatal(err)
 				}
 				if alertProfile != "" {
-					if alertM, err = alerting.NewAlertManager(alertProfile, prometheusClient); err != nil {
+					if alertM, err = alerting.NewAlertManager(alertProfile, uuid, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, prometheusClient); err != nil {
 						log.Fatalf("Error creating alert manager: %s", err)
 					}
 				}
 			}
-			rc, err := burner.Run(configSpec, uuid, prometheusClient, alertM, timeout)
+			rc, err = burner.Run(configSpec, uuid, prometheusClient, alertM, indexer, timeout)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
-			os.Exit(rc)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
@@ -185,6 +195,9 @@ func indexCmd() *cobra.Command {
 		Use:   "index",
 		Short: "Index kube-burner metrics",
 		Args:  cobra.NoArgs,
+		PostRun: func(cmd *cobra.Command, args []string) {
+			log.Info("👋 Exiting kube-burner ", uuid)
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec, err := config.Parse(configFile, false)
 			if err != nil {
@@ -281,13 +294,23 @@ func alertCmd() *cobra.Command {
 	var skipTLSVerify bool
 	var alertM *alerting.AlertManager
 	var prometheusStep time.Duration
+	var indexer *indexers.Indexer
 	cmd := &cobra.Command{
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
+		PostRun: func(cmd *cobra.Command, args []string) {
+			log.Info("👋 Exiting kube-burner ", uuid)
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if configFile != "" {
 				configSpec, err = config.Parse(configFile, false)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+			}
+			if configSpec.GlobalConfig.IndexerConfig.Enabled {
+				indexer, err = indexers.NewIndexer(configSpec)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -304,14 +327,15 @@ func alertCmd() *cobra.Command {
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, p); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			rc := alertM.Evaluate(startTime, endTime)
-			log.Info("👋 Exiting kube-burner")
+			log.Info("👋 Exiting kube-burner ", uuid)
 			os.Exit(rc)
 		},
 	}
+	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")

@@ -8,7 +8,10 @@ global:
     esIndex: kube-burner
 
   indexerConfig:
-    enabled: false
+    type: elastic
+    enabled: true
+    esServers: ["https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443"]
+    defaultIndex: "kube-burner-ocp"
 
 jobs:
   - name: namespaced
