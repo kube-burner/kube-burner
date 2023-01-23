@@ -162,14 +162,14 @@ func (wh *WorkloadHelper) indexMetadata() {
 	}
 }
 
-func (wh *WorkloadHelper) run(workload string) {
+func (wh *WorkloadHelper) run(workload, metrics string) {
 	var rc int
 	var indexer *indexers.Indexer
 	var alertM *alerting.AlertManager
 	cfg := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(cfg); err != nil {
 		log.Debug("Workload not available in the current directory, extracting it")
-		if err := wh.extractWorkload(workload); err != nil {
+		if err := wh.extractWorkload(workload, metrics); err != nil {
 			log.Fatalf("Error extracting workload: %v", err)
 		}
 	}
@@ -204,7 +204,7 @@ func (wh *WorkloadHelper) run(workload string) {
 	os.Exit(rc)
 }
 
-func (wh *WorkloadHelper) extractWorkload(workload string) error {
+func (wh *WorkloadHelper) extractWorkload(workload, metrics string) error {
 	dirContent, err := wh.ocpConfig.ReadDir(path.Join(ocpCfgDir, workload))
 	if err != nil {
 		return err
@@ -218,5 +218,19 @@ func (wh *WorkloadHelper) extractWorkload(workload string) error {
 		fd.Write(fileContent)
 		fd.Close()
 	}
+	fileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, metrics))
+	fd, err := os.Create(metricsProfile)
+	if err != nil {
+		return err
+	}
+	fd.Write(fileContent)
+	fd.Close()
+	fileContent, _ = wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, alertsProfile))
+	fd, err = os.Create(alertsProfile)
+	if err != nil {
+		return err
+	}
+	fd.Write(fileContent)
+	fd.Close()
 	return nil
 }
