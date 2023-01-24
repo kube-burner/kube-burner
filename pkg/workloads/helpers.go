@@ -209,28 +209,27 @@ func (wh *WorkloadHelper) extractWorkload(workload, metrics string) error {
 	if err != nil {
 		return err
 	}
-	for _, f := range dirContent {
-		fileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, workload, f.Name()))
-		fd, err := os.Create(f.Name())
+	createFile := func(filePath, fileName string) error {
+		fileContent, _ := wh.ocpConfig.ReadFile(filePath)
+		fd, err := os.Create(fileName)
 		if err != nil {
 			return err
 		}
+		defer fd.Close()
 		fd.Write(fileContent)
-		fd.Close()
+		return nil
 	}
-	fileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, metrics))
-	fd, err := os.Create(metricsProfile)
-	if err != nil {
+	for _, f := range dirContent {
+		err := createFile(path.Join(ocpCfgDir, workload, f.Name()), f.Name())
+		if err != nil {
+			return err
+		}
+	}
+	if err = createFile(path.Join(ocpCfgDir, metrics), metricsProfile); err != nil {
 		return err
 	}
-	fd.Write(fileContent)
-	fd.Close()
-	fileContent, _ = wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, alertsProfile))
-	fd, err = os.Create(alertsProfile)
-	if err != nil {
+	if err = createFile(path.Join(ocpCfgDir, alertsProfile), alertsProfile); err != nil {
 		return err
 	}
-	fd.Write(fileContent)
-	fd.Close()
 	return nil
 }

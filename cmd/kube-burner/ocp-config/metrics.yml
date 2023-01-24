@@ -75,9 +75,11 @@
 
 - query: node_memory_MemTotal_bytes and on (instance) label_replace(kube_node_role{role="worker"}, "instance", "$1", "node", "(.+)")
   metricName: nodeMemoryTotal-Workers
+  instant: true
 
 - query: node_memory_MemTotal_bytes and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")
   metricName: nodeMemoryTotal-Infra
+  instant: true
 
 # Etcd metrics
 
