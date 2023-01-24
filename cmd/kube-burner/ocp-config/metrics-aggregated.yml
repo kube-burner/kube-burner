@@ -72,9 +72,21 @@
 
 - query: avg(node_memory_MemTotal_bytes) by (instance) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")
   metricName: nodeMemoryTotal-Infra
+  instant: true
 
-- query: irate(container_runtime_crio_operations_latency_microseconds{operation_type="network_setup_pod"}[2m]) > 0
-  metricName: containerNetworkSetupLatency
+# Kubelet & CRI-O runtime metrics
+
+- query: irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m]) * 100 and on (node) topk(3,avg_over_time(irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m])[{{ .elapsed }}:]) and on (node) kube_node_role{role="worker"})
+  metricName: kubeletCPU
+
+- query: process_resident_memory_bytes{service="kubelet",job="kubelet"} and on (node) topk(3,max_over_time(irate(process_resident_memory_bytes{service="kubelet",job="kubelet"}[2m])[{{ .elapsed }}:]) and on (node) kube_node_role{role="worker"})
+  metricName: kubeletMemory
+
+- query: irate(process_cpu_seconds_total{service="kubelet",job="crio"}[2m]) * 100 and on (node) topk(3,avg_over_time(irate(process_cpu_seconds_total{service="kubelet",job="crio"}[2m])[{{ .elapsed }}:]) and on (node) kube_node_role{role="worker"})
+  metricName: crioCPU
+
+- query: process_resident_memory_bytes{service="kubelet",job="crio"} and on (node) topk(3,max_over_time(irate(process_resident_memory_bytes{service="kubelet",job="crio"}[2m])[{{ .elapsed }}:]) and on (node) kube_node_role{role="worker"})
+  metricName: crioMemory
 
 # Etcd metrics
 
