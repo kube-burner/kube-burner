@@ -198,6 +198,9 @@ func (p *podLatency) normalizeMetrics() {
 			m.InitializedLatency = 0
 		}
 		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
+		if m.PodReadyLatency < 0 {
+			m.PodReadyLatency = 0
+		}
 		p.normLatencies = append(p.normLatencies, m)
 	}
 }
