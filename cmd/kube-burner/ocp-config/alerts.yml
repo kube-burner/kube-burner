@@ -50,3 +50,8 @@
 - expr: histogram_quantile(0.99, sum(rate(kubeproxy_network_programming_duration_seconds_bucket[2m])) by (le)) > 10
   description: 99th Kubeproxy network programming latency higher than 10 seconds. {{$value}}s 
   severity: warning
+
+# Prometheus alerts
+- expr: ALERTS{severity="critical"} > 0
+  description: Critical prometheus alert. {{$labels.alertname}}
+  severity: warning
