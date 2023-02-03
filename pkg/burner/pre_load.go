@@ -53,7 +53,10 @@ func preLoadImages(job Executor) error {
 	log.Infof("Pre-load: Sleeping for %v", job.Config.PreLoadPeriod)
 	time.Sleep(job.Config.PreLoadPeriod)
 	log.Infof("Pre-load: Deleting namespace %s", preLoadNs)
-	CleanupNamespaces(v1.ListOptions{LabelSelector: "kube-burner-preload=true"})
+	// 5 minutes should be more than enough to cleanup this namespace
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: "kube-burner-preload=true"})
 	return nil
 }
 

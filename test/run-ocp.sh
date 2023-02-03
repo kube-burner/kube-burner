@@ -24,7 +24,7 @@ kube-burner ocp cluster-density --iterations=3 --churn-duration=2m ${COMMON_FLAG
 echo "Running cluster-density wrapper w/o network-policies"
 kube-burner ocp cluster-density --iterations=2 --churn=false --uuid=${UUID} --network-policies=false
 # Disable gc and avoid metric indexing
-echo "Running node-density-cni wrapper"
+echo "Running node-density-cni wrapper with gc=false"
 kube-burner ocp node-density-cni --pods-per-node=75 --gc=false --uuid=${UUID} --alerting=false
 oc delete ns -l kube-burner-uuid=${UUID}
 trap - ERR
