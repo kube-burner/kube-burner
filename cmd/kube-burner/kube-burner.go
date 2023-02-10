@@ -212,14 +212,14 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err.Error())
 				}
 			}
-			
-			if ((metricsEndpoint != "" && url != "") || (metricsEndpoint == "" && url == "")) {
+
+			if (metricsEndpoint != "" && url != "") || (metricsEndpoint == "" && url == "") {
 				log.Fatal("Please use either of --metrics-endpoint or --prometheus-url flags to index the metrics")
 			}
 
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if (metricsEndpoint != "") {
+			if metricsEndpoint != "" {
 				f, err := util.ReadConfig(metricsEndpoint)
 				if err != nil {
 					log.Fatalf("Error reading metrics endpoints %s: %s", metricsEndpoint, err)
@@ -238,7 +238,7 @@ func indexCmd() *cobra.Command {
 				}
 				metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
 					Endpoint: url,
-					Token: token,
+					Token:    token,
 				})
 			}
 
@@ -260,17 +260,17 @@ func indexCmd() *cobra.Command {
 					eachEntry.Start = startTime
 					eachEntry.End = endTime
 				}
-				log.Infof("Scraping for the prometheus entry with params - {Endpoint:%v, Profile:%v, Start:%v, End:%v}\n", 
-				eachEntry.Endpoint, 
-				eachEntry.Profile, 
-				eachEntry.Start, 
-				eachEntry.End)
+				log.Infof("Scraping for the prometheus entry with params - {Endpoint:%v, Profile:%v, Start:%v, End:%v}\n",
+					eachEntry.Endpoint,
+					eachEntry.Profile,
+					eachEntry.Start,
+					eachEntry.End)
 				log.Infof("Indexing metrics with UUID %s", uuid)
 				p.JobList = []prometheus.Job{{
 					Start: eachEntry.Start,
 					End:   eachEntry.End,
 					Name:  jobName,
-					},
+				},
 				}
 				if err := p.ScrapeJobsMetrics(indexer); err != nil {
 					log.Error(err)
