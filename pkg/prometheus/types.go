@@ -54,6 +54,15 @@ type metricProfile []struct {
 	Instant    bool   `yaml:"instant"`
 }
 
+// MetricEndpoint describes prometheus endpoint to scrape
+type MetricEndpoint struct {
+	Endpoint   string `yaml:"endpoint"`
+	Token 	   string `yaml:"token"`
+	Profile    string `yaml:"profile"`
+	Start      time.Time   `yaml:"start"`
+	End		   time.Time `yaml:"end"`
+}
+
 type metric struct {
 	Timestamp  time.Time         `json:"timestamp"`
 	Labels     map[string]string `json:"labels"`

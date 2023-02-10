@@ -24,6 +24,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -31,6 +32,7 @@ import (
 
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -185,12 +187,13 @@ func destroyCmd() *cobra.Command {
 }
 
 func indexCmd() *cobra.Command {
-	var url, metricsProfile, configFile, jobName string
+	var url, metricsEndpoint, metricsProfile, configFile, jobName string
 	var start, end int64
 	var username, password, uuid, token string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
 	var indexer *indexers.Indexer
+	var metricsEndpoints []prometheus.MetricEndpoint
 	cmd := &cobra.Command{
 		Use:   "index",
 		Short: "Index kube-burner metrics",
@@ -209,35 +212,74 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err.Error())
 				}
 			}
-			if url == "" {
-				url = configSpec.GlobalConfig.PrometheusURL
+			
+			if ((metricsEndpoint != "" && url != "") || (metricsEndpoint == "" && url == "")) {
+				log.Fatal("Please use either of --metrics-endpoint or --prometheus-url flags to index the metrics")
 			}
-			if token == "" {
-				token = configSpec.GlobalConfig.BearerToken
-			}
-			if metricsProfile != "" {
-				configSpec.GlobalConfig.MetricsProfile = metricsProfile
-			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
-			if err != nil {
-				log.Fatal(err)
-			}
+
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			log.Infof("Indexing metrics with UUID %s", uuid)
-			p.JobList = []prometheus.Job{{
-				Start: startTime,
-				End:   endTime,
-				Name:  jobName,
-			},
-			}
-			if err := p.ScrapeJobsMetrics(indexer); err != nil {
-				log.Error(err)
-			}
-			if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
-				err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
+			if (metricsEndpoint != "") {
+				f, err := util.ReadConfig(metricsEndpoint)
 				if err != nil {
-					log.Fatal(err.Error())
+					log.Fatalf("Error reading metrics endpoints %s: %s", metricsEndpoint, err)
+				}
+				yamlDec := yaml.NewDecoder(f)
+				yamlDec.KnownFields(true)
+				if err := yamlDec.Decode(&metricsEndpoints); err != nil {
+					log.Fatal("error decoding metrics endpoints %s: %s", metricsEndpoint, err)
+				}
+			} else {
+				if url == "" {
+					url = configSpec.GlobalConfig.PrometheusURL
+				}
+				if token == "" {
+					token = configSpec.GlobalConfig.BearerToken
+				}
+				metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
+					Endpoint: url,
+					Token: token,
+				})
+			}
+
+			for _, eachEntry := range metricsEndpoints {
+
+				if eachEntry.Profile != "" {
+					configSpec.GlobalConfig.MetricsProfile = eachEntry.Profile
+				} else if metricsProfile != "" {
+					configSpec.GlobalConfig.MetricsProfile = metricsProfile
+					eachEntry.Profile = metricsProfile
+				}
+
+				p, err := prometheus.NewPrometheusClient(configSpec, eachEntry.Endpoint, eachEntry.Token, username, password, uuid, skipTLSVerify, prometheusStep)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				if eachEntry.Start == eachEntry.End {
+					eachEntry.Start = startTime
+					eachEntry.End = endTime
+				}
+				log.Infof("Scraping for the prometheus entry with params - {Endpoint:%v, Profile:%v, Start:%v, End:%v}\n", 
+				eachEntry.Endpoint, 
+				eachEntry.Profile, 
+				eachEntry.Start, 
+				eachEntry.End)
+				log.Infof("Indexing metrics with UUID %s", uuid)
+				p.JobList = []prometheus.Job{{
+					Start: eachEntry.Start,
+					End:   eachEntry.End,
+					Name:  jobName,
+					},
+				}
+				if err := p.ScrapeJobsMetrics(indexer); err != nil {
+					log.Error(err)
+				}
+				if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
+					err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
+					if err != nil {
+						log.Fatal(err.Error())
+					}
 				}
 			}
 		},
@@ -248,13 +290,13 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file")
+	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
-	cmd.MarkFlagRequired("prometheus-url")
 	cmd.MarkFlagRequired("config")
 	cmd.Flags().SortFlags = false
 	return cmd
