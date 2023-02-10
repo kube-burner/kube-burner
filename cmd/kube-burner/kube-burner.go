@@ -212,7 +212,12 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err.Error())
 				}
 			}
-
+			if metricsEndpoint == "" {
+				metricsEndpoint = configSpec.GlobalConfig.MetricsEndpoint
+			}
+			if url == "" {
+				url = configSpec.GlobalConfig.PrometheusURL
+			}
 			if (metricsEndpoint != "" && url != "") || (metricsEndpoint == "" && url == "") {
 				log.Fatal("Please use either of --metrics-endpoint or --prometheus-url flags to index the metrics")
 			}
@@ -230,9 +235,6 @@ func indexCmd() *cobra.Command {
 					log.Fatal("error decoding metrics endpoints %s: %s", metricsEndpoint, err)
 				}
 			} else {
-				if url == "" {
-					url = configSpec.GlobalConfig.PrometheusURL
-				}
 				if token == "" {
 					token = configSpec.GlobalConfig.BearerToken
 				}

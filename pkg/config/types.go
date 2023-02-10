@@ -77,6 +77,8 @@ type GlobalConfig struct {
 	BearerToken string `yaml:"bearerToken"`
 	// MetricsProfile is the path to the metrics profile configuration
 	MetricsProfile string `yaml:"metricsProfile"`
+	// MetricsEndpoint is path to the metrics endpoint configuration YAML
+	MetricsEndpoint string `yaml:"metricsEndpoint"`
 	// GC garbage collect created namespaces
 	GC bool `yaml:"gc" json:"gc"`
 }
