@@ -1,0 +1,8 @@
+- endpoint: http://localhost:9090
+  token: <token>
+  profile: metrics.yaml
+  start: 126213213
+  end: 234324324
+- endpoint: http://localhost:9090
+  token: <token>
+  profile: metrics-ovn.yaml

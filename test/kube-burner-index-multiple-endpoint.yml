@@ -1,0 +1,9 @@
+global:
+  writeToFile: false
+  metricsEndpoint: /home/vchalla/metrics-endpoints.yaml
+  indexerConfig:
+    enabled: true
+    esServers: [https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443] 
+    insecureSkipVerify: true
+    defaultIndex: ripsaw-kube-burner
+    type: elastic
