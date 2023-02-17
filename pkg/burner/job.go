@@ -15,6 +15,7 @@
 package burner
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -110,7 +111,11 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 			measurements.SetJobConfig(&job.Config)
 			switch job.Config.JobType {
 			case config.CreationJob:
-				job.Cleanup()
+				if job.Config.Cleanup {
+					ctx, cancel := context.WithTimeout(context.Background(), timeout)
+					defer cancel()
+					CleanupNamespaces(ctx, job.selector.ListOptions)
+				}
 				measurements.Start(&measurementsWg)
 				measurementsWg.Wait()
 				if job.Config.Churn {
@@ -191,10 +196,6 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 			}
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)
-		if configSpec.GlobalConfig.GC {
-			log.Info("Garbage collecting created namespaces")
-			CleanupNamespaces(v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
-		}
 		res <- innerRC
 	}()
 	select {
@@ -202,6 +203,13 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 	case <-time.After(timeout):
 		log.Errorf("%v timeout reached", timeout)
 		rc = rcTimeout
+	}
+	if configSpec.GlobalConfig.GC {
+		// Use timeout/4 to garbage collect namespaces
+		ctx, cancel := context.WithTimeout(context.Background(), timeout/4)
+		defer cancel()
+		log.Info("Garbage collecting created namespaces")
+		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
 	}
 	return rc, nil
 }

@@ -54,30 +54,40 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 }
 
 // CleanupNamespaces deletes namespaces with the given selector
-func CleanupNamespaces(l metav1.ListOptions) {
-	ns, _ := ClientSet.CoreV1().Namespaces().List(context.TODO(), l)
+func CleanupNamespaces(ctx context.Context, l metav1.ListOptions) {
+	ns, _ := ClientSet.CoreV1().Namespaces().List(ctx, l)
 	if len(ns.Items) > 0 {
 		log.Infof("Deleting namespaces with label %s", l.LabelSelector)
 		for _, ns := range ns.Items {
-			err := ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
+			err := ClientSet.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 			if errors.IsNotFound(err) {
 				log.Warnf("Namespace %s not found", ns.Name)
 				continue
 			}
+			if ctx.Err() == context.DeadlineExceeded {
+				log.Fatalf("Timeout cleaning up namespaces: %v", err)
+			}
 			if err != nil {
-				log.Errorf("Error cleaning up namespaces: %s", err)
+				log.Errorf("Error cleaning up namespaces: %v", err)
 			}
 		}
 	}
 	if len(ns.Items) > 0 {
-		waitForDeleteNamespaces(l)
+		if err := waitForDeleteNamespaces(ctx, l); err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				log.Fatalf("Timeout cleaning up namespaces: %v", err)
+			}
+			if err != nil {
+				log.Errorf("Error cleaning up namespaces: %v", err)
+			}
+		}
 	}
 }
 
-func waitForDeleteNamespaces(l metav1.ListOptions) {
+func waitForDeleteNamespaces(ctx context.Context, l metav1.ListOptions) error {
 	log.Info("Waiting for namespaces to be definitely deleted")
-	wait.PollImmediateInfinite(time.Second, func() (bool, error) {
-		ns, err := ClientSet.CoreV1().Namespaces().List(context.TODO(), l)
+	err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
+		ns, err := ClientSet.CoreV1().Namespaces().List(ctx, l)
 		if err != nil {
 			return false, err
 		}
@@ -87,4 +97,5 @@ func waitForDeleteNamespaces(l metav1.ListOptions) {
 		log.Debugf("Waiting for %d namespaces labeled with %s to be deleted", len(ns.Items), l.LabelSelector)
 		return false, nil
 	})
+	return err
 }
