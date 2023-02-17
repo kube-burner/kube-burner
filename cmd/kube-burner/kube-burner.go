@@ -184,7 +184,7 @@ func destroyCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
-	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
