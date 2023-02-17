@@ -153,6 +153,7 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 			}
 			jobList[jobPosition].End = time.Now().UTC()
 			prometheusJob.End = jobList[jobPosition].End
+			prometheusJob.JobConfig = job.Config
 			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Seconds()
 			// Don't append to Prometheus jobList when prometheus it's not initialized
 			if p != nil {
