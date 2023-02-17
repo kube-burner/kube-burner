@@ -45,14 +45,15 @@ type podMetric struct {
 	containersReady        time.Time
 	ContainersReadyLatency int `json:"containersReadyLatency"`
 	podReady               time.Time
-	PodReadyLatency        int        `json:"podReadyLatency"`
-	MetricName             string     `json:"metricName"`
-	JobName                string     `json:"jobName"`
-	JobConfig              config.Job `json:"jobConfig"`
-	UUID                   string     `json:"uuid"`
-	Namespace              string     `json:"namespace"`
-	Name                   string     `json:"podName"`
-	NodeName               string     `json:"nodeName"`
+	PodReadyLatency        int         `json:"podReadyLatency"`
+	MetricName             string      `json:"metricName"`
+	JobName                string      `json:"jobName"`
+	JobConfig              config.Job  `json:"jobConfig"`
+	UUID                   string      `json:"uuid"`
+	Namespace              string      `json:"namespace"`
+	Name                   string      `json:"podName"`
+	NodeName               string      `json:"nodeName"`
+	Metadata               interface{} `json:"metadata,omitempty"`
 }
 
 type podLatency struct {
@@ -82,6 +83,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 				UUID:       factory.uuid,
 				JobConfig:  *jc,
 				JobName:    factory.jobConfig.Name,
+				Metadata:   factory.metadata,
 			}
 		}
 	}
@@ -163,6 +165,7 @@ func (p *podLatency) stop() (int, error) {
 		}
 	}
 	if kubeburnerCfg.IndexerConfig.Enabled {
+		log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
 		p.index()
 	}
 	for _, q := range p.latencyQuantiles {
@@ -229,6 +232,7 @@ func (p *podLatency) calcQuantiles() {
 			JobName:      factory.jobConfig.Name,
 			JobConfig:    *jc,
 			MetricName:   podLatencyQuantilesMeasurement,
+			Metadata:     factory.metadata,
 		}
 		sort.Ints(v)
 		length := len(v)

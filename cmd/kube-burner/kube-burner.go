@@ -124,7 +124,7 @@ func initCmd() *cobra.Command {
 				}
 			}
 			if url != "" {
-				prometheusClient, err = prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+				prometheusClient, err = prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep, map[string]interface{}{})
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -134,7 +134,7 @@ func initCmd() *cobra.Command {
 					}
 				}
 			}
-			rc, err = burner.Run(configSpec, uuid, prometheusClient, alertM, indexer, timeout)
+			rc, err = burner.Run(configSpec, uuid, prometheusClient, alertM, indexer, timeout, map[string]interface{}{})
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -223,7 +223,7 @@ func indexCmd() *cobra.Command {
 			if metricsProfile != "" {
 				configSpec.GlobalConfig.MetricsProfile = metricsProfile
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep, map[string]interface{}{})
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -261,6 +261,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
 	cmd.MarkFlagRequired("prometheus-url")
 	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagsMutuallyExclusive("prometheus-url", "config")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
@@ -326,7 +327,7 @@ func alertCmd() *cobra.Command {
 			if token == "" {
 				token = configSpec.GlobalConfig.BearerToken
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep, map[string]interface{}{})
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -368,7 +369,7 @@ func main() {
 		importCmd(),
 		openShiftCmd(),
 	)
-	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: trace, debug, info, warn, error, fatal")
+	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		log.SetLogLevel(*logLevel)
 	}

@@ -163,6 +163,13 @@ func (wh *WorkloadHelper) indexMetadata() {
 }
 
 func (wh *WorkloadHelper) run(workload, metrics string) {
+	metadata := map[string]interface{}{
+		"platform":   wh.Metadata.Platform,
+		"ocpVersion": wh.Metadata.OCPVersion,
+		"k8sVersion": wh.Metadata.K8SVersion,
+		"totalNodes": wh.Metadata.TotalNodes,
+		"sdnType":    wh.Metadata.SDNType,
+	}
 	var rc int
 	var indexer *indexers.Indexer
 	var alertM *alerting.AlertManager
@@ -184,7 +191,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 		}
 	}
 	configSpec.GlobalConfig.MetricsProfile = metricsProfile
-	p, err := prometheus.NewPrometheusClient(configSpec, wh.prometheusURL, wh.prometheusToken, "", "", wh.Metadata.UUID, true, 30*time.Second)
+	p, err := prometheus.NewPrometheusClient(configSpec, wh.prometheusURL, wh.prometheusToken, "", "", wh.Metadata.UUID, true, 30*time.Second, metadata)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -194,7 +201,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 			log.Fatal(err)
 		}
 	}
-	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM, indexer, wh.timeout)
+	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM, indexer, wh.timeout, metadata)
 	if err != nil {
 		log.Fatal(err)
 	}
