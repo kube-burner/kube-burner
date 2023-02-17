@@ -1,6 +1,7 @@
 global:
   writeToFile: false
-  metricsEndpoint: /home/vchalla/metrics-endpoints.yaml
+  metricsEndpoint: metrics-endpoints.yaml
+  alertProfile: alert-profile.yml
   indexerConfig:
     enabled: true
     esServers: [https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443] 

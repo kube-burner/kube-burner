@@ -79,6 +79,8 @@ type GlobalConfig struct {
 	MetricsProfile string `yaml:"metricsProfile"`
 	// MetricsEndpoint is path to the metrics endpoint configuration YAML
 	MetricsEndpoint string `yaml:"metricsEndpoint"`
+	// AlertProfile is path to the alert profile
+	AlertProfile string `yaml:"alertProfile"`
 	// GC garbage collect created namespaces
 	GC bool `yaml:"gc" json:"gc"`
 }

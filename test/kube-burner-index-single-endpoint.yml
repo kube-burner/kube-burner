@@ -1,7 +1,6 @@
 global:
   writeToFile: false
   prometheusURL: http://localhost:9090
-  bearerToken: <token>
   metricsProfile: metrics.yaml
   indexerConfig:
     enabled: true

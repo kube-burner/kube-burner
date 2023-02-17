@@ -17,10 +17,16 @@ COMMON_FLAGS="--es-server=${ES_SERVER} --es-index=${ES_INDEX} --alerting=false -
 
 echo "Running node-density wrapper"
 kube-burner ocp node-density --pods-per-node=75 --pod-ready-threshold=10s --container-image=gcr.io/google_containers/pause:3.0 ${COMMON_FLAGS}
+echo "Running node-density wrapper for multiple endpoints case"
+kube-burner ocp node-density --pods-per-node=75 --pod-ready-threshold=10s --container-image=gcr.io/google_containers/pause:3.0 ${COMMON_FLAGS} --metrics-endpoint metrics-endpoints.yaml
 echo "Running node-density-heavy wrapper"
 kube-burner ocp node-density-heavy --pods-per-node=75 ${COMMON_FLAGS} --qps=5 --burst=5
+echo "Running node-density-heavy wrapper for multiple endpoints case"
+kube-burner ocp node-density-heavy --pods-per-node=75 ${COMMON_FLAGS} --qps=5 --burst=5 --metrics-endpoint metrics-endpoints.yaml
 echo "Running cluster-density wrapper"
 kube-burner ocp cluster-density --iterations=3 --churn-duration=2m ${COMMON_FLAGS}
+echo "Running cluster-density wrapper for multiple endpoints case"
+kube-burner ocp cluster-density --iterations=1 --churn-duration=2m --metrics-endpoint metrics-endpoints.yaml ${COMMON_FLAGS}
 echo "Running cluster-density wrapper w/o network-policies"
 kube-burner ocp cluster-density --iterations=2 --churn=false --uuid=${UUID} --network-policies=false
 # Disable gc and avoid metric indexing

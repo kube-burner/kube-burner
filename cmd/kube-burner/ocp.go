@@ -40,6 +40,7 @@ func openShiftCmd() *cobra.Command {
 	var wh workloads.WorkloadHelper
 	esServer := ocpCmd.PersistentFlags().String("es-server", "", "Elastic Search endpoint")
 	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
+	metricsEndpoint := ocpCmd.PersistentFlags().String("metrics-endpoint", "", "YAML file with a list of metric endpoints")
 	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
 	timeout := ocpCmd.PersistentFlags().Duration("timeout", 2*time.Hour, "Benchmark timeout")
@@ -59,7 +60,7 @@ func openShiftCmd() *cobra.Command {
 			"GC":        fmt.Sprintf("%v", *gc),
 		}
 		discoveryAgent := discovery.NewDiscoveryAgent()
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout, *metricsEndpoint)
 		wh.Metadata.UUID = *uuid
 		if *esServer != "" {
 			err := wh.GatherMetadata()

@@ -27,8 +27,8 @@ type Prometheus struct {
 	api           apiv1.API
 	MetricProfile metricProfile
 	Step          time.Duration
-	uuid          string
-	configSpec    config.Spec
+	UUID          string
+	ConfigSpec    config.Spec
 	JobList       []Job
 }
 
@@ -56,11 +56,12 @@ type metricProfile []struct {
 
 // MetricEndpoint describes prometheus endpoint to scrape
 type MetricEndpoint struct {
-	Endpoint string    `yaml:"endpoint"`
-	Token    string    `yaml:"token"`
-	Profile  string    `yaml:"profile"`
-	Start    time.Time `yaml:"start"`
-	End      time.Time `yaml:"end"`
+	Endpoint     string `yaml:"endpoint"`
+	Token        string `yaml:"token"`
+	Profile      string `yaml:"profile"`
+	AlertProfile string `yaml:"alertProfile"`
+	Start        int64  `yaml:"start"`
+	End          int64  `yaml:"end"`
 }
 
 type metric struct {
