@@ -33,9 +33,10 @@ type Prometheus struct {
 }
 
 type Job struct {
-	Start time.Time
-	End   time.Time
-	Name  string
+	Start     time.Time
+	End       time.Time
+	Name      string
+	JobConfig config.Job
 }
 
 // This object implements RoundTripper
@@ -62,4 +63,5 @@ type metric struct {
 	Query      string            `json:"query"`
 	MetricName string            `json:"metricName,omitempty"`
 	JobName    string            `json:"jobName,omitempty"`
+	JobConfig  config.Job        `json:"jobConfig,omitempty"`
 }
