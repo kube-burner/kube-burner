@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source base.sh
+
+setup-prometheus
 trap 'die' ERR
 
 die() {
