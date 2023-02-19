@@ -68,7 +68,7 @@ log "Running kube-burner init"
 timeout 500 kube-burner init -c kube-burner.yml --uuid ${uuid} --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
 test_init_checks
 log "Running kube-burner init for multiple endpoints case"
-timeout 500 kube-burner init -c kube-burner-index-multiple-endpoint.yml --uuid ${uuid} --log-level=debug
+timeout 500 kube-burner init -c kube-burner.yml --uuid ${uuid} --log-level=debug -e metrics-endpoints.yaml
 test_init_checks
 log "Running kube-burner index test with single prometheus endpoint"
 kube-burner index -c kube-burner-index-single-endpoint.yml -u http://localhost:9090 -m metrics-profile.yaml

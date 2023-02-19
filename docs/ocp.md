@@ -13,16 +13,20 @@ Usage:
 Available Commands:
   cluster-density    Runs cluster-density workload
   node-density       Runs node-density workload
-  node-density-heavy Runs node-density-heavy workload
   node-density-cni   Runs node-density-cni workload
+  node-density-heavy Runs node-density-heavy workload
 
 Flags:
-      --burst int          Burst (default 20)
-      --es-index string    Elastic Search index
-      --es-server string   Elastic Search endpoint
-  -h, --help               help for ocp
-      --qps int            QPS (default 20)
-      --uuid string        Benchmark UUID (default "ff60bd1c-df27-4713-be3e-6b92acdd4d72")
+      --alerting                  Enable alerting (default true)
+      --burst int                 Burst (default 20)
+      --es-index string           Elastic Search index
+      --es-server string          Elastic Search endpoint
+      --gc                        Garbage collect created namespaces (default true)
+  -h, --help                      help for ocp
+      --metrics-endpoint string   YAML file with a list of metric endpoints
+      --qps int                   QPS (default 20)
+      --timeout duration          Benchmark timeout (default 2h0m0s)
+      --uuid string               Benchmark UUID (default "ff60bd1c-df27-4713-be3e-6b92acdd4d72")
 
 Global Flags:
       --log-level string   Allowed values: trace, debug, info, warn, error, fatal (default "info")
@@ -39,8 +43,14 @@ Running node-density with 100 pods per node
 
 ```console
 $ kube-burner ocp node-density --pods-per-node=100
-$
 ```
+
+Running cluster-density with multiple endpoints support
+
+```console
+$ kube-burner ocp cluster-density --iterations=1 --churn-duration=2m0s --es-index kube-burner --es-server https://www.esurl.com:443 --metrics-endpoint metrics-endpoints.yaml
+```
+
 
 With the command above, the wrapper will calculate the required number of pods to deploy across all worker nodes of the cluster.
 
