@@ -39,6 +39,7 @@ type MetricsScraperRequest struct {
 	StartTime       int64
 	EndTime         int64
 	JobName         string
+	ActionIndex     bool
 }
 
 // MetricsScraperResponse holds parsed data realted to scraper and target indexer

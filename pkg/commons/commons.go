@@ -25,7 +25,7 @@ import (
 )
 
 // Processes common config and executes according to the caller
-func ProcessMetricsScraperConfig(metricsScraperRequest MetricsScraperRequest, caller string) MetricsScraperResponse {
+func ProcessMetricsScraperConfig(metricsScraperRequest MetricsScraperRequest) MetricsScraperResponse {
 	var indexer *indexers.Indexer
 	var metricsEndpoints []prometheus.MetricEndpoint
 	var prometheusClients []*prometheus.Prometheus
@@ -70,7 +70,7 @@ func ProcessMetricsScraperConfig(metricsScraperRequest MetricsScraperRequest, ca
 		if err != nil {
 			log.Fatal(err)
 		}
-		if caller == "index" {
+		if metricsScraperRequest.ActionIndex {
 			if eachEntry.Start == eachEntry.End {
 				eachEntry.Start = metricsScraperRequest.StartTime
 				eachEntry.End = metricsScraperRequest.EndTime

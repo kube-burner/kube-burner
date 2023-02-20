@@ -114,7 +114,7 @@ func initCmd() *cobra.Command {
 				Token:           token,
 				Username:        username,
 				UUID:            uuid,
-			}, "init")
+			})
 
 			rc, err = burner.Run(metricsScraperResponse.ConfigSpec, uuid, metricsScraperResponse.PrometheusClients, metricsScraperResponse.AlertMs, metricsScraperResponse.Indexer, timeout)
 			if err != nil {
@@ -196,7 +196,8 @@ func indexCmd() *cobra.Command {
 				StartTime:       start,
 				EndTime:         end,
 				JobName:         jobName,
-			}, "index")
+				ActionIndex:     true,
+			})
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
