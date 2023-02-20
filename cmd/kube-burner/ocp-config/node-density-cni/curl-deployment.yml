@@ -40,7 +40,7 @@ spec:
             command: 
               - "/bin/sh"
               - "-c"
-              - "curl ${WEBSERVER_HOSTNAME}:${WEBSERVER_PORT}"
+              - "curl --fail -sS ${WEBSERVER_HOSTNAME}:${WEBSERVER_PORT} -o /dev/null"
           periodSeconds: 1
           timeoutSeconds: 1
           failureThreshold: 600
