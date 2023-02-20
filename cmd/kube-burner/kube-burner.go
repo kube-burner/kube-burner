@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -143,6 +144,7 @@ func initCmd() *cobra.Command {
 
 func destroyCmd() *cobra.Command {
 	var uuid, configFile string
+	var timeout time.Duration
 	var err error
 	cmd := &cobra.Command{
 		Use:   "destroy",
@@ -160,10 +162,13 @@ func destroyCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
-			burner.CleanupNamespaces(listOptions)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			burner.CleanupNamespaces(ctx, listOptions)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
 }

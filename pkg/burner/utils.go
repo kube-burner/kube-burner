@@ -56,13 +56,6 @@ func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Objec
 	return o, gvk
 }
 
-// Cleanup deletes old namespaces from a given job
-func (ex *Executor) Cleanup() {
-	if ex.Config.Cleanup {
-		CleanupNamespaces(ex.selector.ListOptions)
-	}
-}
-
 // Verify verifies the number of created objects
 func (ex *Executor) Verify() bool {
 	var objList *unstructured.UnstructuredList

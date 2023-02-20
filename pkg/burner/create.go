@@ -278,9 +278,12 @@ func (ex *Executor) RunCreateJobWithChurn() {
 				log.Errorf("Error patching namespace %s. Error: %v", nsName, err)
 			}
 		}
-		listOptions := metav1.ListOptions{LabelSelector: "churndelete=delete"}
+		// 1 hour timeout to delete namespaces
+		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+		defer cancel()
 		// Delete namespaces based on the label we added
-		CleanupNamespaces(listOptions)
+		log.Info("Garbage collecting created namespaces")
+		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"})
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart-1)

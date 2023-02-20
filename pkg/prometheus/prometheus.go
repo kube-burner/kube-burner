@@ -175,6 +175,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 
 func (p *Prometheus) parseVector(metricName, query string, value model.Value, metrics *[]interface{}) error {
 	var jobName string
+	var jobConfig config.Job
 	data, ok := value.(model.Vector)
 	if !ok {
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
@@ -183,6 +184,8 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 		for _, prometheusJob := range p.JobList {
 			if v.Timestamp.Time().Before(prometheusJob.End) {
 				jobName = prometheusJob.Name
+				jobConfig = prometheusJob.JobConfig
+				jobConfig.Objects = nil // no need to insert this into the metric.
 			}
 		}
 		m := metric{
@@ -191,6 +194,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 			Query:      query,
 			MetricName: metricName,
 			JobName:    jobName,
+			JobConfig:  jobConfig,
 		}
 		for k, v := range v.Metric {
 			if k == "__name__" {
@@ -211,6 +215,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 
 func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, metrics *[]interface{}) error {
 	var jobName string
+	var jobConfig config.Job
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
@@ -220,6 +225,8 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 			for _, job := range p.JobList {
 				if val.Timestamp.Time().Before(job.End) {
 					jobName = job.Name
+					jobConfig = job.JobConfig
+					jobConfig.Objects = nil // no need to insert this into the metric.
 				}
 			}
 			m := metric{
@@ -228,6 +235,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 				Query:      query,
 				MetricName: metricName,
 				JobName:    jobName,
+				JobConfig:  jobConfig,
 				Timestamp:  val.Timestamp.Time(),
 			}
 			for k, v := range v.Metric {

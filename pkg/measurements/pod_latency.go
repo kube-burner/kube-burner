@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	v1 "k8s.io/api/core/v1"
@@ -44,13 +45,14 @@ type podMetric struct {
 	containersReady        time.Time
 	ContainersReadyLatency int `json:"containersReadyLatency"`
 	podReady               time.Time
-	PodReadyLatency        int    `json:"podReadyLatency"`
-	MetricName             string `json:"metricName"`
-	JobName                string `json:"jobName"`
-	UUID                   string `json:"uuid"`
-	Namespace              string `json:"namespace"`
-	Name                   string `json:"podName"`
-	NodeName               string `json:"nodeName"`
+	PodReadyLatency        int        `json:"podReadyLatency"`
+	MetricName             string     `json:"metricName"`
+	JobName                string     `json:"jobName"`
+	JobConfig              config.Job `json:"jobConfig"`
+	UUID                   string     `json:"uuid"`
+	Namespace              string     `json:"namespace"`
+	Name                   string     `json:"podName"`
+	NodeName               string     `json:"nodeName"`
 }
 
 type podLatency struct {
@@ -68,6 +70,8 @@ func init() {
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	now := time.Now().UTC()
 	pod := obj.(*v1.Pod)
+	jc := factory.jobConfig
+	jc.Objects = nil // metric doesn't need this data
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
 		if strings.Contains(pod.Namespace, factory.jobConfig.Namespace) {
 			p.metrics[string(pod.UID)] = podMetric{
@@ -76,6 +80,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 				Name:       pod.Name,
 				MetricName: podLatencyMeasurement,
 				UUID:       factory.uuid,
+				JobConfig:  *jc,
 				JobName:    factory.jobConfig.Name,
 			}
 		}
@@ -208,6 +213,8 @@ func (p *podLatency) normalizeMetrics() {
 func (p *podLatency) calcQuantiles() {
 	quantiles := []float64{0.5, 0.95, 0.99}
 	quantileMap := map[v1.PodConditionType][]int{}
+	jc := factory.jobConfig
+	jc.Objects = nil
 	for _, normLatency := range p.normLatencies {
 		quantileMap[v1.PodScheduled] = append(quantileMap[v1.PodScheduled], normLatency.(podMetric).SchedulingLatency)
 		quantileMap[v1.ContainersReady] = append(quantileMap[v1.ContainersReady], normLatency.(podMetric).ContainersReadyLatency)
@@ -220,6 +227,7 @@ func (p *podLatency) calcQuantiles() {
 			UUID:         factory.uuid,
 			Timestamp:    time.Now().UTC(),
 			JobName:      factory.jobConfig.Name,
+			JobConfig:    *jc,
 			MetricName:   podLatencyQuantilesMeasurement,
 		}
 		sort.Ints(v)
