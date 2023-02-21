@@ -185,7 +185,8 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 			if v.Timestamp.Time().Before(prometheusJob.End) {
 				jobName = prometheusJob.Name
 				jobConfig = prometheusJob.JobConfig
-				jobConfig.Objects = nil // no need to insert this into the metric.
+				jobConfig.NamespaceLabels = nil // no need to insert this into the metric
+				jobConfig.Objects = nil         // no need to insert this into the metric
 			}
 		}
 		m := metric{
