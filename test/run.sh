@@ -72,6 +72,6 @@ test_init_checks
 log "Running kube-burner index test with single prometheus endpoint"
 kube-burner index -c kube-burner-index-single-endpoint.yml -u http://localhost:9090 -m metrics-profile.yaml
 log "Running kube-burner index test with metric-endpoints yaml"
-kube-burner index -c kube-burner-index-single-endpoint.yml -e metrics-endpoints.yaml
+kube-burner index -c kube-burner.yml -e metrics-endpoints.yaml
 kube-burner index -c kube-burner-index-multiple-endpoint.yml
 exit ${rc}
