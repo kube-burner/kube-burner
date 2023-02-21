@@ -103,7 +103,7 @@ func initCmd() *cobra.Command {
 				configFile = "config.yml"
 			}
 
-			metricsScraperResponse := commons.ProcessMetricsScraperConfig(commons.MetricsScraperRequest{
+			metricsScraper := commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
 				ConfigFile:      configFile,
 				Password:        password,
 				PrometheusStep:  prometheusStep,
@@ -117,7 +117,7 @@ func initCmd() *cobra.Command {
 				UUID:            uuid,
 			})
 
-			rc, err = burner.Run(metricsScraperResponse.ConfigSpec, uuid, metricsScraperResponse.PrometheusClients, metricsScraperResponse.AlertMs, metricsScraperResponse.Indexer, timeout)
+			rc, err = burner.Run(metricsScraper.ConfigSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -187,7 +187,7 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			_ = commons.ProcessMetricsScraperConfig(commons.MetricsScraperRequest{
+			_ = commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
 				ConfigFile:      configFile,
 				Password:        password,
 				PrometheusStep:  prometheusStep,

@@ -21,6 +21,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"gopkg.in/yaml.v3"
+	"time"
 )
 
 // Updates parameter in place with new value if its is empty
@@ -53,10 +54,10 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 // Scrapes prometheus metrics
 func ScrapeMetrics(p *prometheus.Prometheus, indexer *indexers.Indexer) {
 	log.Infof("Scraping for the prometheus entry with params - {Endpoint:%v, Profile:%v, Start:%v, End:%v}\n",
-		p.ConfigSpec.GlobalConfig.PrometheusURL,
+		p.Endpoint,
 		p.ConfigSpec.GlobalConfig.MetricsProfile,
-		p.JobList[0].Start,
-		p.JobList[len(p.JobList)-1].End)
+		p.JobList[0].Start.Format(time.RFC3339),
+		p.JobList[len(p.JobList)-1].End.Format(time.RFC3339))
 	log.Infof("Indexing metrics with UUID %s", p.UUID)
 	if err := p.ScrapeJobsMetrics(indexer); err != nil {
 		log.Error(err)

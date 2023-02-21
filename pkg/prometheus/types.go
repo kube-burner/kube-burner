@@ -25,6 +25,7 @@ import (
 // Prometheus describes the prometheus connection
 type Prometheus struct {
 	api           apiv1.API
+	Endpoint      string
 	MetricProfile metricProfile
 	Step          time.Duration
 	UUID          string

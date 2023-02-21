@@ -68,10 +68,13 @@ $ kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
 To scrape metrics from multiple endpoints init command can be triggered as below.
+
+```console
+$ kube-burner init -c cluster-density.yml -e metrics-endpoints.yaml
 ```
-kube-burner init -c cluster-density.yml -e metrics-endpoints.yaml
-```
+
 And a metrics-endpoints.yaml file with valid keys for the `init` command would look something like this.
+
 ```
 - endpoint: http://localhost:9090
   token: <token>
@@ -80,6 +83,7 @@ And a metrics-endpoints.yaml file with valid keys for the `init` command would l
 - endpoint: http://remotehost:9090
   token: <token>
 ```
+
 Note: Options `profile`, `alertProfile` are optional. If not provided will be taken from the CLI flags first or else will be populated with the default values. And also apart from valid keys rest all will be ignored.
 
 ## Index

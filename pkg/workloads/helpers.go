@@ -203,10 +203,10 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 		})
 	}
 
-	for _, eachEntry := range metricsEndpoints {
+	for _, metricsEndpoint := range metricsEndpoints {
 		// Updating the prometheus endpoint actually being used in spec.
-		configSpec.GlobalConfig.PrometheusURL = eachEntry.Endpoint
-		p, err := prometheus.NewPrometheusClient(configSpec, eachEntry.Endpoint, eachEntry.Token, "", "", wh.Metadata.UUID, true, 30*time.Second)
+		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, "", "", wh.Metadata.UUID, true, 30*time.Second)
 		if err != nil {
 			log.Fatal(err)
 		}

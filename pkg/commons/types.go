@@ -24,7 +24,7 @@ import (
 )
 
 // MetricScraperConfig holds data related to scraper and target indexer
-type MetricsScraperRequest struct {
+type MetricsScraperConfig struct {
 	ConfigFile      string
 	Password        string
 	PrometheusStep  time.Duration
@@ -43,7 +43,7 @@ type MetricsScraperRequest struct {
 }
 
 // MetricsScraperResponse holds parsed data realted to scraper and target indexer
-type MetricsScraperResponse struct {
+type MetricsScraper struct {
 	PrometheusClients []*prometheus.Prometheus
 	AlertMs           []*alerting.AlertManager
 	Indexer           *indexers.Indexer

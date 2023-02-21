@@ -61,7 +61,7 @@ test_init_checks() {
   check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid=${uuid}
   log "Evaluating alerts"
   kube-burner check-alerts -u http://localhost:9090 -a alert-profile.yaml --start $(date -d "-2 minutes" +%s)
-  exit ${rc}
+  [ $rc -eq 1 ] && exit ${rc}
 }
 
 log "Running kube-burner init"
@@ -75,3 +75,4 @@ kube-burner index -c kube-burner-index-single-endpoint.yml -u http://localhost:9
 log "Running kube-burner index test with metric-endpoints yaml"
 kube-burner index -c kube-burner-index-single-endpoint.yml -e metrics-endpoints.yaml
 kube-burner index -c kube-burner-index-multiple-endpoint.yml
+exit ${rc}

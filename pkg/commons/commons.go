@@ -25,13 +25,13 @@ import (
 )
 
 // Processes common config and executes according to the caller
-func ProcessMetricsScraperConfig(metricsScraperRequest MetricsScraperRequest) MetricsScraperResponse {
+func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) MetricsScraper {
 	var indexer *indexers.Indexer
 	var metricsEndpoints []prometheus.MetricEndpoint
 	var prometheusClients []*prometheus.Prometheus
 	var alertMs []*alerting.AlertManager
 	var alertM *alerting.AlertManager
-	configSpec, err := config.Parse(metricsScraperRequest.ConfigFile, false)
+	configSpec, err := config.Parse(metricsScraperConfig.ConfigFile, false)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -41,54 +41,52 @@ func ProcessMetricsScraperConfig(metricsScraperRequest MetricsScraperRequest) Me
 			log.Fatal(err.Error())
 		}
 	}
-	updateParamIfEmpty(&metricsScraperRequest.MetricsEndpoint, configSpec.GlobalConfig.MetricsEndpoint)
-	updateParamIfEmpty(&metricsScraperRequest.URL, configSpec.GlobalConfig.PrometheusURL)
-	validateMetricsEndpoint(metricsScraperRequest.MetricsEndpoint, metricsScraperRequest.URL)
+	updateParamIfEmpty(&metricsScraperConfig.MetricsEndpoint, configSpec.GlobalConfig.MetricsEndpoint)
+	updateParamIfEmpty(&metricsScraperConfig.URL, configSpec.GlobalConfig.PrometheusURL)
+	validateMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, metricsScraperConfig.URL)
 
-	if metricsScraperRequest.MetricsEndpoint != "" {
-		DecodeMetricsEndpoint(metricsScraperRequest.MetricsEndpoint, &metricsEndpoints)
+	if metricsScraperConfig.MetricsEndpoint != "" {
+		DecodeMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, &metricsEndpoints)
 	} else {
-		updateParamIfEmpty(&metricsScraperRequest.Token, configSpec.GlobalConfig.BearerToken)
+		updateParamIfEmpty(&metricsScraperConfig.Token, configSpec.GlobalConfig.BearerToken)
 		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
-			Endpoint: metricsScraperRequest.URL,
-			Token:    metricsScraperRequest.Token,
+			Endpoint: metricsScraperConfig.URL,
+			Token:    metricsScraperConfig.Token,
 		})
 	}
 
-	for _, eachEntry := range metricsEndpoints {
+	for _, metricsEndpoint := range metricsEndpoints {
 
-		if eachEntry.Profile != "" {
-			configSpec.GlobalConfig.MetricsProfile = eachEntry.Profile
-		} else if metricsScraperRequest.MetricsProfile != "" {
-			configSpec.GlobalConfig.MetricsProfile = metricsScraperRequest.MetricsProfile
-			eachEntry.Profile = metricsScraperRequest.MetricsProfile
+		if metricsEndpoint.Profile != "" {
+			configSpec.GlobalConfig.MetricsProfile = metricsEndpoint.Profile
+		} else if metricsScraperConfig.MetricsProfile != "" {
+			configSpec.GlobalConfig.MetricsProfile = metricsScraperConfig.MetricsProfile
+			metricsEndpoint.Profile = metricsScraperConfig.MetricsProfile
 		}
-		// Updating the prometheus endpoint actually being used in spec.
-		configSpec.GlobalConfig.PrometheusURL = eachEntry.Endpoint
 
-		p, err := prometheus.NewPrometheusClient(configSpec, eachEntry.Endpoint, eachEntry.Token, metricsScraperRequest.Username, metricsScraperRequest.Password, metricsScraperRequest.UUID, metricsScraperRequest.SkipTLSVerify, metricsScraperRequest.PrometheusStep)
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, metricsScraperConfig.Username, metricsScraperConfig.Password, metricsScraperConfig.UUID, metricsScraperConfig.SkipTLSVerify, metricsScraperConfig.PrometheusStep)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if metricsScraperRequest.ActionIndex {
-			if eachEntry.Start == eachEntry.End {
-				eachEntry.Start = metricsScraperRequest.StartTime
-				eachEntry.End = metricsScraperRequest.EndTime
+		if metricsScraperConfig.ActionIndex {
+			if metricsEndpoint.Start == metricsEndpoint.End {
+				metricsEndpoint.Start = metricsScraperConfig.StartTime
+				metricsEndpoint.End = metricsScraperConfig.EndTime
 			}
 
 			p.JobList = []prometheus.Job{{
-				Start: time.Unix(eachEntry.Start, 0),
-				End:   time.Unix(eachEntry.End, 0),
-				Name:  metricsScraperRequest.JobName,
+				Start: time.Unix(metricsEndpoint.Start, 0),
+				End:   time.Unix(metricsEndpoint.End, 0),
+				Name:  metricsScraperConfig.JobName,
 			},
 			}
 			ScrapeMetrics(p, indexer)
 			HandleTarball(configSpec)
 		} else {
-			updateParamIfEmpty(&eachEntry.AlertProfile, metricsScraperRequest.AlertProfile)
-			updateParamIfEmpty(&eachEntry.AlertProfile, configSpec.GlobalConfig.AlertProfile)
-			if eachEntry.AlertProfile != "" {
-				if alertM, err = alerting.NewAlertManager(eachEntry.AlertProfile, metricsScraperRequest.UUID, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p); err != nil {
+			updateParamIfEmpty(&metricsEndpoint.AlertProfile, metricsScraperConfig.AlertProfile)
+			updateParamIfEmpty(&metricsEndpoint.AlertProfile, configSpec.GlobalConfig.AlertProfile)
+			if metricsEndpoint.AlertProfile != "" {
+				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.UUID, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
 				}
 			}
@@ -97,7 +95,7 @@ func ProcessMetricsScraperConfig(metricsScraperRequest MetricsScraperRequest) Me
 			alertM = nil
 		}
 	}
-	return MetricsScraperResponse{
+	return MetricsScraper{
 		PrometheusClients: prometheusClients,
 		AlertMs:           alertMs,
 		Indexer:           indexer,

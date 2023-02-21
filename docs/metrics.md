@@ -165,8 +165,9 @@ We also have the option to scrape from multiple prometheus endpoints and pubish 
 Note: The CLI flag has precedence over the parameter specified in the config file.
 
 e.g.
-```
-kube-burner index -c config.yaml --job-name=test-job -e metrics-endpoints.yaml 
+
+```console
+$ kube-burner index -c config.yaml --job-name=test-job -e metrics-endpoints.yaml 
 INFO[2023-02-09 19:19:23] 📁 Creating indexer: elastic                  
 INFO[2023-02-09 19:19:24] 👽 Initializing prometheus client             
 INFO[2023-02-09 19:19:24] Scraping for the prometheus entry with params - {Endpoint:https://prometheus-k8s-openshift-monitoring.apps.vchalla-test.perfscale.devcluster.openshift.com, Profile:/home/vchalla/e2e-benchmarking/workloads/kube-burner/metrics-profiles/metrics.yaml, Start:2023-02-09 18:19:23 -0500 EST, End:2023-02-09 19:19:23 -0500 EST} 
@@ -178,7 +179,9 @@ INFO[2023-02-09 19:19:27] Indexing metrics with UUID 6ac5fb8a-eca4-4381-b99c-63c
 INFO[2023-02-09 19:19:27] 🔍 Scraping prometheus metrics for benchmark from 2023-02-09T18:19:23-05:00 to 2023-02-09T19:19:23-05:00 
 INFO[2023-02-09 19:23:06] 👋 Exiting kube-burner 6ac5fb8a-eca4-4381-b99c-63c1116bfeec 
 ```
+
 And the metrics-endpoints.yaml file with valid keys for the `index` command would look something like this.
+
 ```
 - endpoint: http://localhost:9090
   token: <token>
@@ -188,4 +191,5 @@ And the metrics-endpoints.yaml file with valid keys for the `index` command woul
 - endpoint: http://remotehost:9090
   token: <token>
 ```
+
 Note: Options `profile`, `start` and `end` are optional. If not provided will be taken from the CLI flags first or else will be populated with the default values. And also apart from valid keys rest all will be ignored.
