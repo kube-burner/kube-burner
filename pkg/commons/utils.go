@@ -15,13 +15,14 @@
 package commons
 
 import (
+	"time"
+
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"gopkg.in/yaml.v3"
-	"time"
 )
 
 // Updates parameter in place with new value if its is empty
