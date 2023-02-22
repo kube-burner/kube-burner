@@ -228,7 +228,8 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 				if val.Timestamp.Time().Before(job.End) {
 					jobName = job.Name
 					jobConfig = job.JobConfig
-					jobConfig.Objects = nil // no need to insert this into the metric.
+					jobConfig.NamespaceLabels = nil // no need to insert this into the metric
+					jobConfig.Objects = nil         // no need to insert this into the metric.
 				}
 			}
 			m := metric{
