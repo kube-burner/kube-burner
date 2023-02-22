@@ -5,14 +5,10 @@ metadata:
   name: cluster-density-{{.Replica}}
 spec:
   selector:
-    app: cluster-density-{{.Replica}}
+    name: nginx
   ports:
   - name: http
     protocol: TCP
     port: 80
     targetPort: 8080
-  - name: https
-    protocol: TCP
-    port: 443
-    targetPort: 8443
   type: ClusterIP

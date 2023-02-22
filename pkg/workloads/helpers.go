@@ -37,7 +37,6 @@ import (
 )
 
 const (
-	metricsProfile     = "metrics.yml"
 	alertsProfile      = "alerts.yml"
 	metadataMetricName = "clusterMetadata"
 	ocpCfgDir          = "ocp-config"
@@ -191,7 +190,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 	cfg := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(cfg); err != nil {
 		log.Debug("Workload not available in the current directory, extracting it")
-		if err := wh.extractWorkload(workload, metrics); err != nil {
+		if err := wh.ExtractWorkload(workload, metrics); err != nil {
 			log.Fatalf("Error extracting workload: %v", err)
 		}
 	}
@@ -205,7 +204,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 			log.Fatal(err.Error())
 		}
 	}
-	configSpec.GlobalConfig.MetricsProfile = metricsProfile
+	configSpec.GlobalConfig.MetricsProfile = metrics
 	p, err := prometheus.NewPrometheusClient(configSpec, wh.prometheusURL, wh.prometheusToken, "", "", wh.Metadata.UUID, true, 30*time.Second, metadata)
 	if err != nil {
 		log.Fatal(err)
@@ -226,7 +225,8 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 	os.Exit(rc)
 }
 
-func (wh *WorkloadHelper) extractWorkload(workload, metrics string) error {
+// ExtractWorkload extracts the given workload and metrics profile to the current diretory
+func (wh *WorkloadHelper) ExtractWorkload(workload, metrics string) error {
 	dirContent, err := wh.ocpConfig.ReadDir(path.Join(ocpCfgDir, workload))
 	if err != nil {
 		return err
@@ -247,7 +247,7 @@ func (wh *WorkloadHelper) extractWorkload(workload, metrics string) error {
 			return err
 		}
 	}
-	if err = createFile(path.Join(ocpCfgDir, metrics), metricsProfile); err != nil {
+	if err = createFile(path.Join(ocpCfgDir, metrics), metrics); err != nil {
 		return err
 	}
 	if err = createFile(path.Join(ocpCfgDir, alertsProfile), alertsProfile); err != nil {

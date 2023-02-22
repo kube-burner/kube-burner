@@ -19,45 +19,34 @@ import (
 	"os"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
-
 	"github.com/spf13/cobra"
 )
 
 // NewClusterDensity holds cluster-density workload
-func NewClusterDensity(wh *WorkloadHelper) *cobra.Command {
+func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 	var iterations, churnPercent int
-	var churn, extract, networkPolicies bool
+	var churn bool
 	var churnDelay, churnDuration time.Duration
 	cmd := &cobra.Command{
-		Use:   "cluster-density",
-		Short: "Runs cluster-density workload",
+		Use:   variant,
+		Short: fmt.Sprintf("Runs %v workload", variant),
 		PreRun: func(cmd *cobra.Command, args []string) {
-			if extract {
-				if err := wh.extractWorkload(cmd.Name(), "metrics-aggregated.yml"); err != nil {
-					log.Fatal(err)
-				}
-				os.Exit(0)
-			}
 			wh.Metadata.Benchmark = cmd.Name()
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(iterations))
 			os.Setenv("CHURN", fmt.Sprint(churn))
 			os.Setenv("CHURN_DURATION", fmt.Sprintf("%v", churnDuration))
 			os.Setenv("CHURN_DELAY", fmt.Sprintf("%v", churnDelay))
 			os.Setenv("CHURN_PERCENT", fmt.Sprint(churnPercent))
-			os.Setenv("NETWORK_POLICIES", fmt.Sprint(networkPolicies))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			wh.run(cmd.Name(), "metrics-aggregated.yml")
+			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])
 		},
 	}
-	cmd.Flags().IntVar(&iterations, "iterations", 0, "Cluster-density iterations")
+	cmd.Flags().IntVar(&iterations, "iterations", 0, fmt.Sprintf("%v iterations", variant))
 	cmd.Flags().BoolVar(&churn, "churn", true, "Enable churning")
 	cmd.Flags().DurationVar(&churnDuration, "churn-duration", 1*time.Hour, "Churn duration")
 	cmd.Flags().DurationVar(&churnDelay, "churn-delay", 2*time.Minute, "Time to wait between each churn")
 	cmd.Flags().IntVar(&churnPercent, "churn-percent", 10, "Percentage of job iterations that kube-burner will churn each round")
-	cmd.Flags().BoolVar(&networkPolicies, "network-policies", true, "Enable network policies in the workload")
-	cmd.Flags().BoolVar(&extract, "extract", false, "Extract workload in the current directory")
 	cmd.MarkFlagRequired("iterations")
 	return cmd
 }

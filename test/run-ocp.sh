@@ -19,10 +19,13 @@ echo "Running node-density wrapper"
 kube-burner ocp node-density --pods-per-node=75 --pod-ready-threshold=10s --container-image=gcr.io/google_containers/pause:3.0 ${COMMON_FLAGS}
 echo "Running node-density-heavy wrapper"
 kube-burner ocp node-density-heavy --pods-per-node=75 ${COMMON_FLAGS} --qps=5 --burst=5
+<<<<<<< HEAD
 echo "Running cluster-density wrapper and user metadata"
 kube-burner ocp cluster-density --iterations=3 --churn-duration=2m ${COMMON_FLAGS} --user-metadata=user-metadata.yml
 echo "Running cluster-density wrapper w/o network-policies"
 kube-burner ocp cluster-density --iterations=2 --churn=false --uuid=${UUID} --network-policies=false
+echo "Running cluster-density-v2 wrapper"
+kube-burner ocp cluster-density-v2 --iterations=3 --churn-duration=2m ${COMMON_FLAGS}
 # Disable gc and avoid metric indexing
 echo "Running node-density-cni wrapper with gc=false"
 kube-burner ocp node-density-cni --pods-per-node=75 --gc=false --uuid=${UUID} --alerting=false

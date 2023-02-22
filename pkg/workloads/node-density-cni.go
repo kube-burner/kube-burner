@@ -26,18 +26,11 @@ import (
 // NewNodeDensity holds node-density-cni workload
 func NewNodeDensityCNI(wh *WorkloadHelper) *cobra.Command {
 	var podsPerNode int
-	var extract bool
 	cmd := &cobra.Command{
 		Use:          "node-density-cni",
 		Short:        "Runs node-density-cni workload",
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
-			if extract {
-				if err := wh.extractWorkload(cmd.Name(), "metrics.yml"); err != nil {
-					log.Fatal(err)
-				}
-				os.Exit(0)
-			}
 			wh.Metadata.Benchmark = cmd.Name()
 			workerNodeCount, err := wh.discoveryAgent.GetWorkerNodeCount()
 			if err != nil {
@@ -51,10 +44,9 @@ func NewNodeDensityCNI(wh *WorkloadHelper) *cobra.Command {
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint((totalPods-podCount)/2))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			wh.run(cmd.Name(), "metrics.yml")
+			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])
 		},
 	}
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
-	cmd.Flags().BoolVar(&extract, "extract", false, "Extract workload in the current directory")
 	return cmd
 }

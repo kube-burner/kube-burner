@@ -4,7 +4,6 @@ The kube-burner binary brings a very opinionated OpenShift wrapper designed to s
 This wrapper is hosted under the `kube-burner ocp` subcommand that currently looks like:
 
 ```console
-$ kube-burner ocp
 This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads
 
 Usage:
@@ -12,17 +11,22 @@ Usage:
 
 Available Commands:
   cluster-density    Runs cluster-density workload
+  cluster-density-v2 Runs cluster-density-v2 workload
   node-density       Runs node-density workload
-  node-density-heavy Runs node-density-heavy workload
   node-density-cni   Runs node-density-cni workload
+  node-density-heavy Runs node-density-heavy workload
 
 Flags:
+      --alerting           Enable alerting (default true)
       --burst int          Burst (default 20)
       --es-index string    Elastic Search index
       --es-server string   Elastic Search endpoint
+      --extract            Extract workload in the current directory
+      --gc                 Garbage collect created namespaces (default true)
   -h, --help               help for ocp
       --qps int            QPS (default 20)
-      --uuid string        Benchmark UUID (default "ff60bd1c-df27-4713-be3e-6b92acdd4d72")
+      --timeout duration   Benchmark timeout (default 3h0m0s)
+      --uuid string        Benchmark UUID (default "a535fd13-3e9d-435a-8d82-0592dc8671c8")
 
 Global Flags:
       --log-level string   Allowed values: trace, debug, info, warn, error, fatal (default "info")
