@@ -45,6 +45,7 @@ This option is meant to run Kube-burner benchmark, and it supports the these fla
 - skip-tls-verify: Skip TLS verification for prometheus. Default `true`
 - step: Prometheus step size. Default `30s`
 - timeout: Kube-burner benchmark global timeout. When timing out, return code is 2. Default `4h`
+- user-metadata: YAML file path containing custom user-metadata to be indexed.
 
 **Note**: Both basic authentication and Bearer authentication need credentials able to query the given Prometheus API.
 
