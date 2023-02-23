@@ -12,8 +12,8 @@ global:
     - name: podLatency
       esIndex: {{.ES_INDEX}}
 jobs:
-  - name: cluster-density
-    namespace: cluster-density
+  - name: cluster-density-v2
+    namespace: cluster-density-v2
     jobIterations: {{.JOB_ITERATIONS}}
     qps: {{.QPS}}
     burst: {{.BURST}}
@@ -39,19 +39,34 @@ jobs:
       - objectTemplate: build.yml
         replicas: 1
 
-      - objectTemplate: deployment.yml
-        replicas: 5
+      - objectTemplate: deployment-server.yml
+        replicas: 3
         inputVars:
           podReplicas: 2
+
+      - objectTemplate: deployment-client.yml
+        replicas: 2
+        inputVars:
+          podReplicas: 2
+          ingressDomain: {{.INGRESS_DOMAIN}}
 
       - objectTemplate: service.yml
         replicas: 5
         
       - objectTemplate: route.yml
-        replicas: 1
+        replicas: 2
 
       - objectTemplate: secret.yml
         replicas: 10
 
       - objectTemplate: configmap.yml
         replicas: 10
+
+      - objectTemplate: np-deny-all.yml
+        replicas: 1
+
+      - objectTemplate: np-allow-from-clients.yml
+        replicas: 1
+
+      - objectTemplate: np-allow-from-ingress.yml
+        replicas: 1
