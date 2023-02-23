@@ -61,8 +61,6 @@ func init() {
 // SetLogLevel sets log level
 func SetLogLevel(logLevel string) {
 	switch logLevel {
-	case "trace":
-		defaultLogger.Level = logrus.TraceLevel
 	case "debug":
 		defaultLogger.Level = logrus.DebugLevel
 	case "warn":

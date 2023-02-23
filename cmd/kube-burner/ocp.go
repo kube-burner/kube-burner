@@ -46,6 +46,7 @@ func openShiftCmd() *cobra.Command {
 	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
 	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
 	gc := ocpCmd.PersistentFlags().Bool("gc", true, "Garbage collect created namespaces")
+	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
@@ -59,7 +60,7 @@ func openShiftCmd() *cobra.Command {
 			"GC":        fmt.Sprintf("%v", *gc),
 		}
 		discoveryAgent := discovery.NewDiscoveryAgent()
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout, *userMetadata)
 		wh.Metadata.UUID = *uuid
 		if *esServer != "" {
 			err := wh.GatherMetadata()

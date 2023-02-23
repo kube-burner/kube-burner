@@ -47,13 +47,13 @@ func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url, token, username, password, uuid string, tlsVerify bool, step time.Duration) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url, token, username, password, uuid string, tlsVerify bool, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
 	p := Prometheus{
 		Step:       step,
 		uuid:       uuid,
 		configSpec: configSpec,
+		metadata:   metadata,
 	}
-
 	log.Info("👽 Initializing prometheus client")
 	cfg := api.Config{
 		Address: url,
@@ -185,7 +185,8 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 			if v.Timestamp.Time().Before(prometheusJob.End) {
 				jobName = prometheusJob.Name
 				jobConfig = prometheusJob.JobConfig
-				jobConfig.Objects = nil // no need to insert this into the metric.
+				jobConfig.NamespaceLabels = nil // no need to insert this into the metric
+				jobConfig.Objects = nil         // no need to insert this into the metric
 			}
 		}
 		m := metric{
@@ -195,6 +196,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 			MetricName: metricName,
 			JobName:    jobName,
 			JobConfig:  jobConfig,
+			Metadata:   p.metadata,
 		}
 		for k, v := range v.Metric {
 			if k == "__name__" {
@@ -226,7 +228,8 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 				if val.Timestamp.Time().Before(job.End) {
 					jobName = job.Name
 					jobConfig = job.JobConfig
-					jobConfig.Objects = nil // no need to insert this into the metric.
+					jobConfig.NamespaceLabels = nil // no need to insert this into the metric
+					jobConfig.Objects = nil         // no need to insert this into the metric.
 				}
 			}
 			m := metric{
@@ -237,6 +240,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 				JobName:    jobName,
 				JobConfig:  jobConfig,
 				Timestamp:  val.Timestamp.Time(),
+				Metadata:   p.metadata,
 			}
 			for k, v := range v.Metric {
 				if k == "__name__" {

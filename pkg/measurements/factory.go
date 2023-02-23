@@ -33,6 +33,7 @@ type measurementFactory struct {
 	createFuncs map[string]measurement
 	indexer     *indexers.Indexer
 	uuid        string
+	metadata    map[string]interface{}
 }
 
 type measurement interface {
@@ -46,7 +47,7 @@ var measurementMap = make(map[string]measurement)
 var kubeburnerCfg *config.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(configSpec config.Spec, uuid string, indexer *indexers.Indexer) {
+func NewMeasurementFactory(configSpec config.Spec, uuid string, indexer *indexers.Indexer, metadata map[string]interface{}) {
 	kubeburnerCfg = &configSpec.GlobalConfig
 	log.Info("📈 Creating measurement factory")
 	_, restConfig, err := config.GetClientSet(0, 0)
@@ -60,6 +61,7 @@ func NewMeasurementFactory(configSpec config.Spec, uuid string, indexer *indexer
 		createFuncs: make(map[string]measurement),
 		indexer:     indexer,
 		uuid:        uuid,
+		metadata:    metadata,
 	}
 	for _, measurement := range kubeburnerCfg.Measurements {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {

@@ -30,6 +30,7 @@ type Prometheus struct {
 	uuid          string
 	configSpec    config.Spec
 	JobList       []Job
+	metadata      map[string]interface{}
 }
 
 type Job struct {
@@ -64,4 +65,5 @@ type metric struct {
 	MetricName string            `json:"metricName,omitempty"`
 	JobName    string            `json:"jobName,omitempty"`
 	JobConfig  config.Job        `json:"jobConfig,omitempty"`
+	Metadata   interface{}       `json:"metadata,omitempty"`
 }
