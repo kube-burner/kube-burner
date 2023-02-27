@@ -69,7 +69,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) Metr
 			log.Fatal(err)
 		}
 		if metricsScraperConfig.ActionIndex {
-			if metricsEndpoint.Start == metricsEndpoint.End {
+			if metricsEndpoint.Start == 0 || metricsEndpoint.End == 0 || metricsEndpoint.Start == metricsEndpoint.End {
 				metricsEndpoint.Start = metricsScraperConfig.StartTime
 				metricsEndpoint.End = metricsScraperConfig.EndTime
 			}
