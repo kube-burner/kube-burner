@@ -221,7 +221,6 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.MarkFlagRequired("config")
-	cmd.MarkFlagsMutuallyExclusive("prometheus-url", "config")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
