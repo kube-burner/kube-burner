@@ -40,12 +40,14 @@ type MetricsScraperConfig struct {
 	EndTime         int64
 	JobName         string
 	ActionIndex     bool
+	UserMetaData    string
 }
 
 // MetricsScraperResponse holds parsed data realted to scraper and target indexer
 type MetricsScraper struct {
-	PrometheusClients []*prometheus.Prometheus
-	AlertMs           []*alerting.AlertManager
-	Indexer           *indexers.Indexer
-	ConfigSpec        config.Spec
+	PrometheusClients   []*prometheus.Prometheus
+	AlertMs             []*alerting.AlertManager
+	Indexer             *indexers.Indexer
+	ConfigSpec          config.Spec
+	UserMetadataContent map[string]interface{}
 }

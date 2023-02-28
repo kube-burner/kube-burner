@@ -88,7 +88,7 @@ func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed
 		discoveryAgent:  da,
 		timeout:         timeout,
 		indexing:        indexing,
-    userMetadata:   userMetadata,
+		userMetadata:    userMetadata,
 	}
 }
 
@@ -214,7 +214,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 			log.Fatal(err.Error())
 		}
 	}
-	configSpec.GlobalConfig.MetricsProfile = metricsProfile
+	configSpec.GlobalConfig.MetricsProfile = metrics
 	if wh.metricsEndpoint != "" {
 		commons.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
 	} else {

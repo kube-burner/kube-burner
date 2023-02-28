@@ -26,7 +26,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -95,7 +94,6 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			userMetadataContent := make(map[string]interface{})
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
 				if err != nil {
@@ -116,14 +114,9 @@ func initCmd() *cobra.Command {
 				Token:           token,
 				Username:        username,
 				UUID:            uuid,
+				UserMetaData:    userMetadata,
 			})
-			if userMetadata != "" {
-				userMetadataContent, err = util.ReadUserMetadata(userMetadata)
-				if err != nil {
-					log.Fatalf("Error reading provided user metadata: %v", err)
-				}
-			}
-			rc, err = burner.Run(metricsScraper.ConfigSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, userMetadataContent)
+			rc, err = burner.Run(metricsScraper.ConfigSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -209,6 +202,7 @@ func indexCmd() *cobra.Command {
 				EndTime:         end,
 				JobName:         jobName,
 				ActionIndex:     true,
+				UserMetaData:    userMetadata,
 			})
 		},
 	}

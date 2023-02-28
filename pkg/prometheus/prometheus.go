@@ -53,7 +53,7 @@ func NewPrometheusClient(configSpec config.Spec, url, token, username, password,
 		UUID:       uuid,
 		ConfigSpec: configSpec,
 		Endpoint:   url,
-    metadata:   metadata,
+		metadata:   metadata,
 	}
 
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)

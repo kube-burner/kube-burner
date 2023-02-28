@@ -22,6 +22,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 )
 
 // Processes common config and executes according to the caller
@@ -31,6 +32,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) Metr
 	var prometheusClients []*prometheus.Prometheus
 	var alertMs []*alerting.AlertManager
 	var alertM *alerting.AlertManager
+	userMetadataContent := make(map[string]interface{})
 	configSpec, err := config.Parse(metricsScraperConfig.ConfigFile, false)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -41,6 +43,13 @@ func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) Metr
 			log.Fatal(err.Error())
 		}
 	}
+	if metricsScraperConfig.UserMetaData != "" {
+		userMetadataContent, err = util.ReadUserMetadata(metricsScraperConfig.UserMetaData)
+		if err != nil {
+			log.Fatalf("Error reading provided user metadata: %v", err)
+		}
+	}
+
 	updateParamIfEmpty(&metricsScraperConfig.MetricsEndpoint, configSpec.GlobalConfig.MetricsEndpoint)
 	updateParamIfEmpty(&metricsScraperConfig.URL, configSpec.GlobalConfig.PrometheusURL)
 	validateMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, metricsScraperConfig.URL)
@@ -63,8 +72,11 @@ func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) Metr
 			configSpec.GlobalConfig.MetricsProfile = metricsScraperConfig.MetricsProfile
 			metricsEndpoint.Profile = metricsScraperConfig.MetricsProfile
 		}
-
-		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, metricsScraperConfig.Username, metricsScraperConfig.Password, metricsScraperConfig.UUID, metricsScraperConfig.SkipTLSVerify, metricsScraperConfig.PrometheusStep)
+		metadataContent := map[string]interface{}{}
+		if metricsScraperConfig.ActionIndex {
+			metadataContent = userMetadataContent
+		}
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, metricsScraperConfig.Username, metricsScraperConfig.Password, metricsScraperConfig.UUID, metricsScraperConfig.SkipTLSVerify, metricsScraperConfig.PrometheusStep, metadataContent)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -96,9 +108,10 @@ func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) Metr
 		}
 	}
 	return MetricsScraper{
-		PrometheusClients: prometheusClients,
-		AlertMs:           alertMs,
-		Indexer:           indexer,
-		ConfigSpec:        configSpec,
+		PrometheusClients:   prometheusClients,
+		AlertMs:             alertMs,
+		Indexer:             indexer,
+		ConfigSpec:          configSpec,
+		UserMetadataContent: userMetadataContent,
 	}
 }
