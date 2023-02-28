@@ -109,53 +109,53 @@ type Object struct {
 // Job defines a kube-burner job
 type Job struct {
 	// IterationCount how many times to execute the job
-	JobIterations int `yaml:"jobIterations" json:"jobIterations"`
+	JobIterations int `yaml:"jobIterations" json:"jobIterations,omitempty"`
 	// IterationDelay how much time to wait between each job iteration
-	JobIterationDelay time.Duration `yaml:"jobIterationDelay" json:"jobIterationDelay"`
+	JobIterationDelay time.Duration `yaml:"jobIterationDelay" json:"jobIterationDelay,omitempty"`
 	// JobPause how much time to pause after finishing the job
-	JobPause time.Duration `yaml:"jobPause" json:"jobPause"`
+	JobPause time.Duration `yaml:"jobPause" json:"jobPause,omitempty"`
 	// Name job name
-	Name string `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name,omitempty"`
 	// Objects list of objects
-	Objects []Object `yaml:"objects" json:"objects"`
+	Objects []Object `yaml:"objects" json:"objects,omitempty"`
 	// JobType type of job
-	JobType JobType `yaml:"jobType" json:"jobType"`
+	JobType JobType `yaml:"jobType" json:"jobType,omitempty"`
 	// Max number of queries per second
-	QPS float32 `yaml:"qps" json:"qps"`
+	QPS float32 `yaml:"qps" json:"qps,omitempty"`
 	// Maximum burst for throttle
-	Burst int `yaml:"burst" json:"burst"`
+	Burst int `yaml:"burst" json:"burst,omitempty"`
 	// Namespace namespace base name to use
-	Namespace string `yaml:"namespace" json:"namespace"`
+	Namespace string `yaml:"namespace" json:"namespace,omitempty"`
 	// WaitFor list of objects to wait for, if not specified wait for all
-	WaitFor []string `yaml:"waitFor" json:"waitFor"`
+	WaitFor []string `yaml:"waitFor" json:"waitFor,omitempty"`
 	// MaxWaitTimeout maximum wait period
-	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout" json:"maxWaitTimeout"`
+	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout" json:"maxWaitTimeout,omitempty"`
 	// WaitForDeletion wait for objects to be definitively deleted
-	WaitForDeletion bool `yaml:"waitForDeletion" json:"waitForDeletion"`
+	WaitForDeletion bool `yaml:"waitForDeletion" json:"waitForDeletion,omitempty"`
 	// PodWait wait for all pods to be running before moving forward to the next iteration
-	PodWait bool `yaml:"podWait" json:"podWait"`
+	PodWait bool `yaml:"podWait" json:"podWait,omitempty"`
 	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
-	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished"`
+	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
 	// Cleanup clean up old namespaces
-	Cleanup bool `yaml:"cleanup" json:"cleanup"`
+	Cleanup bool `yaml:"cleanup" json:"cleanup,omitempty"`
 	// NamespacedIterations create a namespace per job iteration
-	NamespacedIterations bool `yaml:"namespacedIterations" json:"namespacedIterations"`
+	NamespacedIterations bool `yaml:"namespacedIterations" json:"namespacedIterations,omitempty"`
 	// VerifyObjects verify object count after running the job
-	VerifyObjects bool `yaml:"verifyObjects" json:"verifyObjects"`
+	VerifyObjects bool `yaml:"verifyObjects" json:"verifyObjects,omitempty"`
 	// ErrorOnVerify exit when verification fails
-	ErrorOnVerify bool `yaml:"errorOnVerify" json:"errorOnVerify"`
+	ErrorOnVerify bool `yaml:"errorOnVerify" json:"errorOnVerify,omitempty"`
 	// PreLoadImages enables pulling all images before running the job
-	PreLoadImages bool `yaml:"preLoadImages" json:"preLoadImages"`
+	PreLoadImages bool `yaml:"preLoadImages" json:"preLoadImages,omitempty"`
 	// PreLoadPeriod determines the duration of the preload stage
-	PreLoadPeriod time.Duration `yaml:"preLoadPeriod" json:"preLoadPeriod"`
+	PreLoadPeriod time.Duration `yaml:"preLoadPeriod" json:"preLoadPeriod,omitempty"`
 	// NamespaceLabels add custom labels to namespaces created by kube-burner
 	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"namespaceLabels,omitempty"`
 	// Churn workload
-	Churn bool `yaml:"churn" json:"churn"`
+	Churn bool `yaml:"churn" json:"churn,omitempty"`
 	// Churn percentage
-	ChurnPercent int `yaml:"churnPercent" json:"churnPercent"`
+	ChurnPercent int `yaml:"churnPercent" json:"churnPercent,omitempty"`
 	// Churn duration
-	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration"`
+	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration,omitempty"`
 	// Churn delay between sets
-	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay"`
+	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
 }

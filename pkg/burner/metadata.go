@@ -26,25 +26,27 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 )
 
-type metadata struct {
-	Timestamp   time.Time  `json:"timestamp"`
-	UUID        string     `json:"uuid"`
-	MetricName  string     `json:"metricName"`
-	ElapsedTime float64    `json:"elapsedTime"`
-	JobConfig   config.Job `json:"jobConfig"`
+type jobSummary struct {
+	Timestamp   time.Time              `json:"timestamp"`
+	UUID        string                 `json:"uuid"`
+	MetricName  string                 `json:"metricName"`
+	ElapsedTime float64                `json:"elapsedTime"`
+	JobConfig   config.Job             `json:"jobConfig"`
+	Metadata    map[string]interface{} `json:"metadata"`
 }
 
-const jobSummary = "jobSummary"
+const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexMetadataInfo(configSpec config.Spec, indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time) error {
+func indexjobSummaryInfo(configSpec config.Spec, indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) error {
 	metadataInfo := []interface{}{
-		metadata{
+		jobSummary{
 			UUID:        uuid,
 			ElapsedTime: elapsedTime,
 			JobConfig:   jobConfig,
-			MetricName:  jobSummary,
+			MetricName:  jobSummaryMetric,
 			Timestamp:   timestamp,
+			Metadata:    metadata,
 		},
 	}
 	if configSpec.GlobalConfig.WriteToFile {

@@ -26,6 +26,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -80,7 +81,7 @@ To configure your bash shell to load completions for each session execute:
 func initCmd() *cobra.Command {
 	var err error
 	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
-	var username, password, uuid, token, configMap, namespace string
+	var username, password, uuid, token, configMap, namespace, userMetadata string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
 	var timeout time.Duration
@@ -94,6 +95,7 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			userMetadataContent := make(map[string]interface{})
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
 				if err != nil {
@@ -102,7 +104,6 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-
 			metricsScraper := commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
 				ConfigFile:      configFile,
 				Password:        password,
@@ -116,8 +117,13 @@ func initCmd() *cobra.Command {
 				Username:        username,
 				UUID:            uuid,
 			})
-
-			rc, err = burner.Run(metricsScraper.ConfigSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout)
+			if userMetadata != "" {
+				userMetadataContent, err = util.ReadUserMetadata(userMetadata)
+				if err != nil {
+					log.Fatalf("Error reading provided user metadata: %v", err)
+				}
+			}
+			rc, err = burner.Run(metricsScraper.ConfigSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, userMetadataContent)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -138,6 +144,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
+	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
@@ -176,7 +183,7 @@ func destroyCmd() *cobra.Command {
 func indexCmd() *cobra.Command {
 	var url, metricsEndpoint, metricsProfile, configFile, jobName string
 	var start, end int64
-	var username, password, uuid, token string
+	var username, password, uuid, token, userMetadata string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
 	cmd := &cobra.Command{
@@ -218,7 +225,9 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
+	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagsMutuallyExclusive("prometheus-url", "config")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
@@ -284,7 +293,7 @@ func alertCmd() *cobra.Command {
 			if token == "" {
 				token = configSpec.GlobalConfig.BearerToken
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep, map[string]interface{}{})
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -326,7 +335,7 @@ func main() {
 		importCmd(),
 		openShiftCmd(),
 	)
-	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: trace, debug, info, warn, error, fatal")
+	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		log.SetLogLevel(*logLevel)
 	}

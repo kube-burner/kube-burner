@@ -29,17 +29,18 @@ import (
 
 // LatencyQuantiles holds the latency measurement quantiles
 type LatencyQuantiles struct {
-	QuantileName string     `json:"quantileName"`
-	UUID         string     `json:"uuid"`
-	P99          int        `json:"P99"`
-	P95          int        `json:"P95"`
-	P50          int        `json:"P50"`
-	Max          int        `json:"max"`
-	Avg          int        `json:"avg"`
-	Timestamp    time.Time  `json:"timestamp"`
-	MetricName   string     `json:"metricName"`
-	JobName      string     `json:"jobName"`
-	JobConfig    config.Job `json:"jobConfig"`
+	QuantileName string      `json:"quantileName"`
+	UUID         string      `json:"uuid"`
+	P99          int         `json:"P99"`
+	P95          int         `json:"P95"`
+	P50          int         `json:"P50"`
+	Max          int         `json:"max"`
+	Avg          int         `json:"avg"`
+	Timestamp    time.Time   `json:"timestamp"`
+	MetricName   string      `json:"metricName"`
+	JobName      string      `json:"jobName"`
+	JobConfig    config.Job  `json:"jobConfig"`
+	Metadata     interface{} `json:"metadata,omitempty"`
 }
 
 // SetQuantile adds quantile value

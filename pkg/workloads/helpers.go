@@ -34,10 +34,10 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 )
 
 const (
-	metricsProfile     = "metrics.yml"
 	alertsProfile      = "alerts.yml"
 	metadataMetricName = "clusterMetadata"
 	ocpCfgDir          = "ocp-config"
@@ -54,30 +54,32 @@ type WorkloadHelper struct {
 	ocpConfig       embed.FS
 	discoveryAgent  discovery.Agent
 	indexing        bool
+	userMetadata    string
 }
 
 type clusterMetadata struct {
-	MetricName       string    `json:"metricName,omitempty"`
-	UUID             string    `json:"uuid"`
-	Platform         string    `json:"platform"`
-	OCPVersion       string    `json:"ocpVersion"`
-	K8SVersion       string    `json:"k8sVersion"`
-	MasterNodesType  string    `json:"masterNodesType"`
-	WorkerNodesType  string    `json:"workerNodesType"`
-	InfraNodesType   string    `json:"infraNodesType"`
-	WorkerNodesCount int       `json:"workerNodesCount"`
-	InfraNodesCount  int       `json:"infraNodesCount"`
-	TotalNodes       int       `json:"totalNodes"`
-	SDNType          string    `json:"sdnType"`
-	Benchmark        string    `json:"benchmark"`
-	Timestamp        time.Time `json:"timestamp"`
-	EndDate          time.Time `json:"endDate"`
-	ClusterName      string    `json:"clusterName"`
-	Passed           bool      `json:"passed"`
+	MetricName       string                 `json:"metricName,omitempty"`
+	UUID             string                 `json:"uuid"`
+	Platform         string                 `json:"platform"`
+	OCPVersion       string                 `json:"ocpVersion"`
+	K8SVersion       string                 `json:"k8sVersion"`
+	MasterNodesType  string                 `json:"masterNodesType"`
+	WorkerNodesType  string                 `json:"workerNodesType"`
+	InfraNodesType   string                 `json:"infraNodesType"`
+	WorkerNodesCount int                    `json:"workerNodesCount"`
+	InfraNodesCount  int                    `json:"infraNodesCount"`
+	TotalNodes       int                    `json:"totalNodes"`
+	SDNType          string                 `json:"sdnType"`
+	Benchmark        string                 `json:"benchmark"`
+	Timestamp        time.Time              `json:"timestamp"`
+	EndDate          time.Time              `json:"endDate"`
+	ClusterName      string                 `json:"clusterName"`
+	Passed           bool                   `json:"passed"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent, indexing bool, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent, indexing bool, timeout time.Duration, metricsEndpoint string, userMetadata string) WorkloadHelper {
 	return WorkloadHelper{
 		envVars:         envVars,
 		alerting:        alerting,
@@ -86,6 +88,7 @@ func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed
 		discoveryAgent:  da,
 		timeout:         timeout,
 		indexing:        indexing,
+    userMetadata:   userMetadata,
 	}
 }
 
@@ -169,6 +172,24 @@ func (wh *WorkloadHelper) indexMetadata() {
 }
 
 func (wh *WorkloadHelper) run(workload, metrics string) {
+	metadata := map[string]interface{}{
+		"platform":   wh.Metadata.Platform,
+		"ocpVersion": wh.Metadata.OCPVersion,
+		"k8sVersion": wh.Metadata.K8SVersion,
+		"totalNodes": wh.Metadata.TotalNodes,
+		"sdnType":    wh.Metadata.SDNType,
+	}
+	if wh.userMetadata != "" {
+		userMetadataContent, err := util.ReadUserMetadata(wh.userMetadata)
+		if err != nil {
+			log.Fatalf("Error reading provided user metadata: %v", err)
+		}
+		// Combine provided userMetadata with the regular OCP metadata
+		for k, v := range userMetadataContent {
+			metadata[k] = v
+		}
+		wh.Metadata.Metadata = userMetadataContent
+	}
 	var rc int
 	var err error
 	var indexer *indexers.Indexer
@@ -179,7 +200,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 	cfg := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(cfg); err != nil {
 		log.Debug("Workload not available in the current directory, extracting it")
-		if err := wh.extractWorkload(workload, metrics); err != nil {
+		if err := wh.ExtractWorkload(workload, metrics); err != nil {
 			log.Fatalf("Error extracting workload: %v", err)
 		}
 	}
@@ -206,7 +227,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 	for _, metricsEndpoint := range metricsEndpoints {
 		// Updating the prometheus endpoint actually being used in spec.
 		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
-		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, "", "", wh.Metadata.UUID, true, 30*time.Second)
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, "", "", wh.Metadata.UUID, true, 30*time.Second, metadata)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -219,7 +240,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 		prometheusClients = append(prometheusClients, p)
 		alertMs = append(alertMs, alertM)
 	}
-	rc, err = burner.Run(configSpec, wh.Metadata.UUID, prometheusClients, alertMs, indexer, wh.timeout)
+	rc, err = burner.Run(configSpec, wh.Metadata.UUID, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -229,7 +250,8 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 	os.Exit(rc)
 }
 
-func (wh *WorkloadHelper) extractWorkload(workload, metrics string) error {
+// ExtractWorkload extracts the given workload and metrics profile to the current diretory
+func (wh *WorkloadHelper) ExtractWorkload(workload, metrics string) error {
 	dirContent, err := wh.ocpConfig.ReadDir(path.Join(ocpCfgDir, workload))
 	if err != nil {
 		return err
@@ -250,7 +272,7 @@ func (wh *WorkloadHelper) extractWorkload(workload, metrics string) error {
 			return err
 		}
 	}
-	if err = createFile(path.Join(ocpCfgDir, metrics), metricsProfile); err != nil {
+	if err = createFile(path.Join(ocpCfgDir, metrics), metrics); err != nil {
 		return err
 	}
 	if err = createFile(path.Join(ocpCfgDir, alertsProfile), alertsProfile); err != nil {

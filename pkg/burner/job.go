@@ -78,7 +78,7 @@ var restConfig *rest.Config
 var waitRestConfig *rest.Config
 
 //nolint:gocyclo
-func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration) (int, error) {
+func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
 	var err error
 	var rc int
 	var measurementsWg sync.WaitGroup
@@ -87,7 +87,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
-		measurements.NewMeasurementFactory(configSpec, uuid, indexer)
+		measurements.NewMeasurementFactory(configSpec, uuid, indexer, metadata)
 		jobList := newExecutorList(configSpec, uuid)
 		// Iterate job list
 		for jobPosition, job := range jobList {
@@ -166,7 +166,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		if configSpec.GlobalConfig.IndexerConfig.Enabled {
 			for _, job := range jobList {
 				elapsedTime := job.End.Sub(job.Start).Seconds()
-				err := indexMetadataInfo(configSpec, indexer, uuid, elapsedTime, job.Config, job.Start)
+				err := indexjobSummaryInfo(configSpec, indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
 				if err != nil {
 					log.Errorf(err.Error())
 				}

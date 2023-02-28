@@ -18,6 +18,7 @@ import (
 	"embed"
 	_ "embed"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -43,10 +44,12 @@ func openShiftCmd() *cobra.Command {
 	metricsEndpoint := ocpCmd.PersistentFlags().String("metrics-endpoint", "", "YAML file with a list of metric endpoints")
 	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
-	timeout := ocpCmd.PersistentFlags().Duration("timeout", 2*time.Hour, "Benchmark timeout")
+	timeout := ocpCmd.PersistentFlags().Duration("timeout", 3*time.Hour, "Benchmark timeout")
 	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
 	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
 	gc := ocpCmd.PersistentFlags().Bool("gc", true, "Garbage collect created namespaces")
+	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
+	extract := ocpCmd.PersistentFlags().Bool("extract", false, "Extract workload in the current directory")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
@@ -60,8 +63,14 @@ func openShiftCmd() *cobra.Command {
 			"GC":        fmt.Sprintf("%v", *gc),
 		}
 		discoveryAgent := discovery.NewDiscoveryAgent()
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout, *metricsEndpoint)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout, *metricsEndpoint, *userMetadata)
 		wh.Metadata.UUID = *uuid
+		if *extract {
+			if err := wh.ExtractWorkload(cmd.Name(), workloads.MetricsProfileMap[cmd.Name()]); err != nil {
+				log.Fatal(err)
+			}
+			os.Exit(0)
+		}
 		if *esServer != "" {
 			err := wh.GatherMetadata()
 			if err != nil {
@@ -71,7 +80,8 @@ func openShiftCmd() *cobra.Command {
 		wh.SetKubeBurnerFlags()
 	}
 	ocpCmd.AddCommand(
-		workloads.NewClusterDensity(&wh),
+		workloads.NewClusterDensity(&wh, "cluster-density"),
+		workloads.NewClusterDensity(&wh, "cluster-density-v2"),
 		workloads.NewNodeDensity(&wh),
 		workloads.NewNodeDensityHeavy(&wh),
 		workloads.NewNodeDensityCNI(&wh),

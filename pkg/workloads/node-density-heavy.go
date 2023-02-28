@@ -28,18 +28,11 @@ import (
 func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 	var podsPerNode, probesPeriod int
 	var podReadyThreshold time.Duration
-	var extract bool
 	cmd := &cobra.Command{
 		Use:          "node-density-heavy",
 		Short:        "Runs node-density-heavy workload",
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
-			if extract {
-				if err := wh.extractWorkload(cmd.Name(), "metrics.yml"); err != nil {
-					log.Fatal(err)
-				}
-				os.Exit(0)
-			}
 			wh.Metadata.Benchmark = cmd.Name()
 			workerNodeCount, err := wh.discoveryAgent.GetWorkerNodeCount()
 			if err != nil {
@@ -56,12 +49,11 @@ func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 			os.Setenv("PROBES_PERIOD", fmt.Sprint(probesPeriod))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			wh.run(cmd.Name(), "metrics.yml")
+			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])
 		},
 	}
 	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 1*time.Hour, "Pod ready timeout threshold")
 	cmd.Flags().IntVar(&probesPeriod, "probes-period", 10, "Perf app readiness/livenes probes period in seconds")
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
-	cmd.Flags().BoolVar(&extract, "extract", false, "Extract workload in the current directory")
 	return cmd
 }
