@@ -24,8 +24,8 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
+	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -79,13 +79,10 @@ To configure your bash shell to load completions for each session execute:
 
 func initCmd() *cobra.Command {
 	var err error
-	var url, metricsProfile, alertProfile, configFile string
+	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
 	var username, password, uuid, token, configMap, namespace, userMetadata string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
-	var prometheusClient *prometheus.Prometheus
-	var alertM *alerting.AlertManager
-	var indexer *indexers.Indexer
 	var timeout time.Duration
 	var rc int
 	cmd := &cobra.Command{
@@ -97,7 +94,6 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			userMetadataContent := make(map[string]interface{})
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
 				if err != nil {
@@ -106,43 +102,21 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			configSpec, err := config.Parse(configFile, true)
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			if url == "" {
-				url = configSpec.GlobalConfig.PrometheusURL
-			}
-			if token == "" {
-				token = configSpec.GlobalConfig.BearerToken
-			}
-			if metricsProfile != "" {
-				configSpec.GlobalConfig.MetricsProfile = metricsProfile
-			}
-			if configSpec.GlobalConfig.IndexerConfig.Enabled {
-				indexer, err = indexers.NewIndexer(configSpec)
-				if err != nil {
-					log.Fatal(err.Error())
-				}
-			}
-			if url != "" {
-				prometheusClient, err = prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep, map[string]interface{}{})
-				if err != nil {
-					log.Fatal(err)
-				}
-				if alertProfile != "" {
-					if alertM, err = alerting.NewAlertManager(alertProfile, uuid, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, prometheusClient); err != nil {
-						log.Fatalf("Error creating alert manager: %s", err)
-					}
-				}
-			}
-			if userMetadata != "" {
-				userMetadataContent, err = util.ReadUserMetadata(userMetadata)
-				if err != nil {
-					log.Fatalf("Error reading provided user metadata: %v", err)
-				}
-			}
-			rc, err = burner.Run(configSpec, uuid, prometheusClient, alertM, indexer, timeout, userMetadataContent)
+			metricsScraper := commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
+				ConfigFile:      configFile,
+				Password:        password,
+				PrometheusStep:  prometheusStep,
+				MetricsEndpoint: metricsEndpoint,
+				MetricsProfile:  metricsProfile,
+				AlertProfile:    alertProfile,
+				SkipTLSVerify:   skipTLSVerify,
+				URL:             url,
+				Token:           token,
+				Username:        username,
+				UUID:            uuid,
+				UserMetaData:    userMetadata,
+			})
+			rc, err = burner.Run(metricsScraper.ConfigSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -154,6 +128,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "", "Metrics profile file or URL")
+	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
 	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
@@ -199,12 +174,11 @@ func destroyCmd() *cobra.Command {
 }
 
 func indexCmd() *cobra.Command {
-	var url, metricsProfile, configFile, jobName string
+	var url, metricsEndpoint, metricsProfile, configFile, jobName string
 	var start, end int64
 	var username, password, uuid, token, userMetadata string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
-	var indexer *indexers.Indexer
 	cmd := &cobra.Command{
 		Use:   "index",
 		Short: "Index kube-burner metrics",
@@ -213,54 +187,23 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			userMetadataContent := make(map[string]interface{})
-			configSpec, err := config.Parse(configFile, false)
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			if configSpec.GlobalConfig.IndexerConfig.Enabled {
-				indexer, err = indexers.NewIndexer(configSpec)
-				if err != nil {
-					log.Fatal(err.Error())
-				}
-			}
-			if url == "" {
-				url = configSpec.GlobalConfig.PrometheusURL
-			}
-			if token == "" {
-				token = configSpec.GlobalConfig.BearerToken
-			}
-			if metricsProfile != "" {
-				configSpec.GlobalConfig.MetricsProfile = metricsProfile
-			}
-			if userMetadata != "" {
-				userMetadataContent, err = util.ReadUserMetadata(userMetadata)
-				if err != nil {
-					log.Fatalf("Error reading provided user metadata: %v", err)
-				}
-			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep, userMetadataContent)
-			if err != nil {
-				log.Fatal(err)
-			}
-			startTime := time.Unix(start, 0)
-			endTime := time.Unix(end, 0)
-			log.Infof("Indexing metrics with UUID %s", uuid)
-			p.JobList = []prometheus.Job{{
-				Start: startTime,
-				End:   endTime,
-				Name:  jobName,
-			},
-			}
-			if err := p.ScrapeJobsMetrics(indexer); err != nil {
-				log.Error(err)
-			}
-			if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
-				err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
-				if err != nil {
-					log.Fatal(err.Error())
-				}
-			}
+			_ = commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
+				ConfigFile:      configFile,
+				Password:        password,
+				PrometheusStep:  prometheusStep,
+				MetricsEndpoint: metricsEndpoint,
+				MetricsProfile:  metricsProfile,
+				SkipTLSVerify:   skipTLSVerify,
+				URL:             url,
+				Token:           token,
+				Username:        username,
+				UUID:            uuid,
+				StartTime:       start,
+				EndTime:         end,
+				JobName:         jobName,
+				ActionIndex:     true,
+				UserMetaData:    userMetadata,
+			})
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
@@ -269,6 +212,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file")
+	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
@@ -276,9 +220,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
-	cmd.MarkFlagRequired("prometheus-url")
 	cmd.MarkFlagRequired("config")
-	cmd.MarkFlagsMutuallyExclusive("prometheus-url", "config")
 	cmd.Flags().SortFlags = false
 	return cmd
 }

@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
+	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
@@ -77,10 +78,11 @@ var restConfig *rest.Config
 var waitRestConfig *rest.Config
 
 //nolint:gocyclo
-func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
+func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
 	var err error
 	var rc int
 	var measurementsWg sync.WaitGroup
+	var prometheusJobList []prometheus.Job
 	res := make(chan int, 1)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
@@ -156,8 +158,8 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 			prometheusJob.JobConfig = job.Config
 			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Seconds()
 			// Don't append to Prometheus jobList when prometheus it's not initialized
-			if p != nil {
-				p.JobList = append(p.JobList, prometheusJob)
+			if len(prometheusClients) > 0 {
+				prometheusJobList = append(prometheusJobList, prometheusJob)
 			}
 			log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 		}
@@ -170,29 +172,25 @@ func Run(configSpec config.Spec, uuid string, p *prometheus.Prometheus, alertM *
 				}
 			}
 		}
-		if p != nil {
-			log.Infof("Waiting %v extra before scraping prometheus", p.Step)
-			time.Sleep(p.Step)
-			// Update end time of last job
-			jobList[len(jobList)-1].End = time.Now().UTC()
+		// Update end time of last job
+		jobList[len(jobList)-1].End = time.Now().UTC()
+		if len(prometheusClients) > 0 {
+			log.Infof("Waiting %v extra before starting to scraping prometheus endpoints", prometheusClients[0].Step)
+			time.Sleep(prometheusClients[0].Step)
+		}
+		for idx, prometheusClient := range prometheusClients {
 			// If alertManager is configured
-			if alertM != nil {
-				log.Infof("Evaluating alerts")
-				if alertM.Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
+			if alertMs[idx] != nil {
+				log.Infof("Evaluating alerts for prometheus - %v", prometheusClient.ConfigSpec.GlobalConfig.PrometheusURL)
+				if alertMs[idx].Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
 					innerRC = 1
 				}
 			}
+			prometheusClient.JobList = prometheusJobList
 			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 			if configSpec.GlobalConfig.IndexerConfig.Enabled || configSpec.GlobalConfig.WriteToFile {
-				if err := p.ScrapeJobsMetrics(indexer); err != nil {
-					log.Error(err.Error())
-				}
-				if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
-					err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
-					if err != nil {
-						log.Error(err.Error())
-					}
-				}
+				commons.ScrapeMetrics(prometheusClient, indexer)
+				commons.HandleTarball(configSpec)
 			}
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)

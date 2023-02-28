@@ -27,6 +27,7 @@ In this section is described global job configuration, it holds the following pa
 | prometheusURL    | Prometheus URL endpoint, flag has precedence                                                             | String       | <http://prometheus.endpoint.com:9000>      | ""         |
 | bearerToken      | Bearer token to access the Prometheus endpoint                                                           | String       | thisIsAValidToken       | ""         |
 | metricsProfile   | Path to the metrics profile configuration file                                                           | String       | metrics.yml       | ""         |
+| metricsEndpoint   | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String  | metrics-endpoint.yml       | "" |
 | GC               | Garbage collect created namespaces                                                                       | Boolean        | true            | false      |
 
 kube-burner connects to the k8s cluster using the following methods in this order:
