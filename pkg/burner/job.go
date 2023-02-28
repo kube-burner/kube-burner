@@ -22,12 +22,12 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
-	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 	"golang.org/x/time/rate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -189,8 +189,8 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 			prometheusClient.JobList = prometheusJobList
 			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 			if configSpec.GlobalConfig.IndexerConfig.Enabled || configSpec.GlobalConfig.WriteToFile {
-				commons.ScrapeMetrics(prometheusClient, indexer)
-				commons.HandleTarball(configSpec)
+				metrics.ScrapeMetrics(prometheusClient, indexer)
+				metrics.HandleTarball(configSpec)
 			}
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)

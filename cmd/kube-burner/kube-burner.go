@@ -24,8 +24,8 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
-	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -102,7 +102,7 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			metricsScraper := commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
+			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.MetricsScraperConfig{
 				ConfigFile:      configFile,
 				Password:        password,
 				PrometheusStep:  prometheusStep,
@@ -187,7 +187,7 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			_ = commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
+			_ = metrics.ProcessMetricsScraperConfig(metrics.MetricsScraperConfig{
 				ConfigFile:      configFile,
 				Password:        password,
 				PrometheusStep:  prometheusStep,
