@@ -24,6 +24,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 )
 
 type jobSummary struct {
@@ -33,6 +34,7 @@ type jobSummary struct {
 	ElapsedTime float64                `json:"elapsedTime"`
 	JobConfig   config.Job             `json:"jobConfig"`
 	Metadata    map[string]interface{} `json:"metadata"`
+	Version     string                 `json:"version"`
 }
 
 const jobSummaryMetric = "jobSummary"
@@ -47,6 +49,7 @@ func indexjobSummaryInfo(configSpec config.Spec, indexer *indexers.Indexer, uuid
 			MetricName:  jobSummaryMetric,
 			Timestamp:   timestamp,
 			Metadata:    metadata,
+			Version:     fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
 		},
 	}
 	if configSpec.GlobalConfig.WriteToFile {
