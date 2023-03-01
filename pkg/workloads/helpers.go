@@ -29,6 +29,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
+	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -46,6 +47,7 @@ type WorkloadHelper struct {
 	envVars         map[string]string
 	prometheusURL   string
 	prometheusToken string
+	metricsEndpoint string
 	timeout         time.Duration
 	Metadata        clusterMetadata
 	alerting        bool
@@ -77,30 +79,34 @@ type clusterMetadata struct {
 }
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent, indexing bool, timeout time.Duration, userMetadata string) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent, indexing bool, timeout time.Duration, metricsEndpoint string, userMetadata string) WorkloadHelper {
 	return WorkloadHelper{
-		envVars:        envVars,
-		alerting:       alerting,
-		ocpConfig:      ocpConfig,
-		discoveryAgent: da,
-		timeout:        timeout,
-		indexing:       indexing,
-		userMetadata:   userMetadata,
+		envVars:         envVars,
+		alerting:        alerting,
+		metricsEndpoint: metricsEndpoint,
+		ocpConfig:       ocpConfig,
+		discoveryAgent:  da,
+		timeout:         timeout,
+		indexing:        indexing,
+		userMetadata:    userMetadata,
 	}
 }
 
 // SetKubeBurnerFlags configures the required environment variables and flags for kube-burner
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
-	prometheusURL, prometheusToken, err := wh.discoveryAgent.GetPrometheus()
-	if err != nil {
-		log.Fatal("Error obtaining Prometheus information: ", err.Error())
+	var err error
+	if wh.metricsEndpoint == "" {
+		prometheusURL, prometheusToken, err := wh.discoveryAgent.GetPrometheus()
+		if err != nil {
+			log.Fatal("Error obtaining Prometheus information: ", err.Error())
+		}
+		wh.prometheusURL = prometheusURL
+		wh.prometheusToken = prometheusToken
 	}
 	wh.envVars["INGRESS_DOMAIN"], err = wh.discoveryAgent.GetDefaultIngressDomain()
 	if err != nil {
 		log.Fatal("Error obtaining default ingress domain: ", err.Error())
 	}
-	wh.prometheusURL = prometheusURL
-	wh.prometheusToken = prometheusToken
 	for k, v := range wh.envVars {
 		os.Setenv(k, v)
 	}
@@ -185,8 +191,12 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 		wh.Metadata.Metadata = userMetadataContent
 	}
 	var rc int
+	var err error
 	var indexer *indexers.Indexer
 	var alertM *alerting.AlertManager
+	var prometheusClients []*prometheus.Prometheus
+	var alertMs []*alerting.AlertManager
+	var metricsEndpoints []prometheus.MetricEndpoint
 	cfg := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(cfg); err != nil {
 		log.Debug("Workload not available in the current directory, extracting it")
@@ -205,17 +215,32 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 		}
 	}
 	configSpec.GlobalConfig.MetricsProfile = metrics
-	p, err := prometheus.NewPrometheusClient(configSpec, wh.prometheusURL, wh.prometheusToken, "", "", wh.Metadata.UUID, true, 30*time.Second, metadata)
-	if err != nil {
-		log.Fatal(err)
+	if wh.metricsEndpoint != "" {
+		commons.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
+	} else {
+		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
+			Endpoint: wh.prometheusURL,
+			Token:    wh.prometheusToken,
+		})
 	}
-	if wh.alerting {
-		alertM, err = alerting.NewAlertManager(alertsProfile, wh.Metadata.UUID, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p)
+
+	for _, metricsEndpoint := range metricsEndpoints {
+		// Updating the prometheus endpoint actually being used in spec.
+		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, "", "", wh.Metadata.UUID, true, 30*time.Second, metadata)
 		if err != nil {
 			log.Fatal(err)
 		}
+		if wh.alerting {
+			alertM, err = alerting.NewAlertManager(alertsProfile, wh.Metadata.UUID, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+		prometheusClients = append(prometheusClients, p)
+		alertMs = append(alertMs, alertM)
 	}
-	rc, err = burner.Run(configSpec, wh.Metadata.UUID, p, alertM, indexer, wh.timeout, metadata)
+	rc, err = burner.Run(configSpec, wh.Metadata.UUID, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
 		log.Fatal(err)
 	}

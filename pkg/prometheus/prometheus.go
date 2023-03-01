@@ -50,11 +50,13 @@ func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 func NewPrometheusClient(configSpec config.Spec, url, token, username, password, uuid string, tlsVerify bool, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
 	p := Prometheus{
 		Step:       step,
-		uuid:       uuid,
-		configSpec: configSpec,
+		UUID:       uuid,
+		ConfigSpec: configSpec,
+		Endpoint:   url,
 		metadata:   metadata,
 	}
-	log.Info("👽 Initializing prometheus client")
+
+	log.Infof("👽 Initializing prometheus client with URL: %s", url)
 	cfg := api.Config{
 		Address: url,
 		RoundTripper: authTransport{
@@ -140,14 +142,14 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 				continue
 			}
 		}
-		if p.configSpec.GlobalConfig.WriteToFile {
-			filename := fmt.Sprintf("%s-%s.json", md.MetricName, p.uuid)
-			if p.configSpec.GlobalConfig.MetricsDirectory != "" {
-				err = os.MkdirAll(p.configSpec.GlobalConfig.MetricsDirectory, 0744)
+		if p.ConfigSpec.GlobalConfig.WriteToFile {
+			filename := fmt.Sprintf("%s-%s.json", md.MetricName, p.UUID)
+			if p.ConfigSpec.GlobalConfig.MetricsDirectory != "" {
+				err = os.MkdirAll(p.ConfigSpec.GlobalConfig.MetricsDirectory, 0744)
 				if err != nil {
 					return fmt.Errorf("error creating metrics directory: %v: ", err)
 				}
-				filename = path.Join(p.configSpec.GlobalConfig.MetricsDirectory, filename)
+				filename = path.Join(p.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
 			}
 			log.Debugf("Writing to: %s", filename)
 			f, err := os.Create(filename)
@@ -162,8 +164,8 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 				log.Errorf("JSON encoding error: %s", err)
 			}
 		}
-		if p.configSpec.GlobalConfig.IndexerConfig.Enabled {
-			indexName := p.configSpec.GlobalConfig.IndexerConfig.DefaultIndex
+		if p.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
+			indexName := p.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex
 			if md.IndexName != "" {
 				indexName = strings.ToLower(md.IndexName)
 			}
@@ -191,7 +193,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 		}
 		m := metric{
 			Labels:     make(map[string]string),
-			UUID:       p.uuid,
+			UUID:       p.UUID,
 			Query:      query,
 			MetricName: metricName,
 			JobName:    jobName,
@@ -234,7 +236,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 			}
 			m := metric{
 				Labels:     make(map[string]string),
-				UUID:       p.uuid,
+				UUID:       p.UUID,
 				Query:      query,
 				MetricName: metricName,
 				JobName:    jobName,

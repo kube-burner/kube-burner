@@ -25,10 +25,11 @@ import (
 // Prometheus describes the prometheus connection
 type Prometheus struct {
 	api           apiv1.API
+	Endpoint      string
 	MetricProfile metricProfile
 	Step          time.Duration
-	uuid          string
-	configSpec    config.Spec
+	UUID          string
+	ConfigSpec    config.Spec
 	JobList       []Job
 	metadata      map[string]interface{}
 }
@@ -54,6 +55,16 @@ type metricProfile []struct {
 	MetricName string `yaml:"metricName"`
 	IndexName  string `yaml:"indexName"`
 	Instant    bool   `yaml:"instant"`
+}
+
+// MetricEndpoint describes prometheus endpoint to scrape
+type MetricEndpoint struct {
+	Endpoint     string `yaml:"endpoint"`
+	Token        string `yaml:"token"`
+	Profile      string `yaml:"profile"`
+	AlertProfile string `yaml:"alertProfile"`
+	Start        int64  `yaml:"start"`
+	End          int64  `yaml:"end"`
 }
 
 type metric struct {
