@@ -26,21 +26,19 @@ import (
 )
 
 // Processes common config and executes according to the caller
-func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) MetricsScraper {
+func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
+	var err error
+	configSpec := metricsScraperConfig.ConfigSpec
 	var indexer *indexers.Indexer
 	var metricsEndpoints []prometheus.MetricEndpoint
 	var prometheusClients []*prometheus.Prometheus
 	var alertMs []*alerting.AlertManager
 	var alertM *alerting.AlertManager
 	userMetadataContent := make(map[string]interface{})
-	configSpec, err := config.Parse(metricsScraperConfig.ConfigFile, false)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
 	if configSpec.GlobalConfig.IndexerConfig.Enabled {
 		indexer, err = indexers.NewIndexer(configSpec)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatalf("%v indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
 		}
 	}
 	if metricsScraperConfig.UserMetaData != "" {
@@ -93,7 +91,9 @@ func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) Metr
 			},
 			}
 			ScrapeMetrics(p, indexer)
-			HandleTarball(configSpec)
+			if configSpec.GlobalConfig.IndexerConfig.Type == config.LocalIndexer {
+				HandleTarball(configSpec)
+			}
 		} else {
 			updateParamIfEmpty(&metricsEndpoint.AlertProfile, metricsScraperConfig.AlertProfile)
 			updateParamIfEmpty(&metricsEndpoint.AlertProfile, configSpec.GlobalConfig.AlertProfile)
@@ -107,7 +107,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig MetricsScraperConfig) Metr
 			alertM = nil
 		}
 	}
-	return MetricsScraper{
+	return Scraper{
 		PrometheusClients:   prometheusClients,
 		AlertMs:             alertMs,
 		Indexer:             indexer,

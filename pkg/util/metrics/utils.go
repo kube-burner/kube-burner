@@ -67,8 +67,8 @@ func ScrapeMetrics(p *prometheus.Prometheus, indexer *indexers.Indexer) {
 
 // Handles tarball use case
 func HandleTarball(configSpec config.Spec) {
-	if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
-		if err := prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory); err != nil {
+	if configSpec.GlobalConfig.IndexerConfig.CreateTarball {
+		if err := createTarball(configSpec.GlobalConfig.IndexerConfig); err != nil {
 			log.Fatal(err.Error())
 		}
 	}

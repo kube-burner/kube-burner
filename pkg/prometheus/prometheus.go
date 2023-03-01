@@ -18,13 +18,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
-	"os"
-	"path"
-	"strings"
 	"text/template"
 	"time"
 
@@ -116,7 +112,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	var renderedQuery bytes.Buffer
 	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 	for _, md := range p.MetricProfile {
-		var metrics []interface{}
+		var datapoints []interface{}
 		t, _ := template.New("").Parse(md.Query)
 		t.Execute(&renderedQuery, map[string]string{"elapsed": fmt.Sprintf("%dm", elapsed)})
 		query := renderedQuery.String()
@@ -127,7 +123,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 				log.Warnf("Error found with query %s: %s", query, err)
 				continue
 			}
-			if err := p.parseVector(md.MetricName, query, v, &metrics); err != nil {
+			if err := p.parseVector(md.MetricName, query, v, &datapoints); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", query, err)
 			}
 		} else {
@@ -137,39 +133,13 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 				log.Warnf("Error found with query %s: %s", query, err)
 				continue
 			}
-			if err := p.parseMatrix(md.MetricName, query, v, &metrics); err != nil {
+			if err := p.parseMatrix(md.MetricName, query, v, &datapoints); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", query, err)
 				continue
 			}
 		}
-		if p.ConfigSpec.GlobalConfig.WriteToFile {
-			filename := fmt.Sprintf("%s-%s.json", md.MetricName, p.UUID)
-			if p.ConfigSpec.GlobalConfig.MetricsDirectory != "" {
-				err = os.MkdirAll(p.ConfigSpec.GlobalConfig.MetricsDirectory, 0744)
-				if err != nil {
-					return fmt.Errorf("error creating metrics directory: %v: ", err)
-				}
-				filename = path.Join(p.ConfigSpec.GlobalConfig.MetricsDirectory, filename)
-			}
-			log.Debugf("Writing to: %s", filename)
-			f, err := os.Create(filename)
-			if err != nil {
-				log.Errorf("Error creating metrics file %s: %s", filename, err)
-				continue
-			}
-			defer f.Close()
-			jsonEnc := json.NewEncoder(f)
-			err = jsonEnc.Encode(metrics)
-			if err != nil {
-				log.Errorf("JSON encoding error: %s", err)
-			}
-		}
 		if p.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-			indexName := p.ConfigSpec.GlobalConfig.IndexerConfig.DefaultIndex
-			if md.IndexName != "" {
-				indexName = strings.ToLower(md.IndexName)
-			}
-			(*indexer).Index(indexName, metrics)
+			(*indexer).Index(datapoints, indexers.IndexingOpts{MetricName: md.MetricName})
 		}
 	}
 	return nil

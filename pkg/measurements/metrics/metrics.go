@@ -15,10 +15,7 @@
 package metrics
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path"
 	"reflect"
 	"time"
 
@@ -53,35 +50,6 @@ func (plq *LatencyQuantiles) SetQuantile(quantile float64, qValue int) {
 	case 0.99:
 		plq.P99 = qValue
 	}
-}
-
-// WriteToFile writes both the latency and quantile results to a file
-func WriteToFile(lat []interface{}, quant []interface{}, metricName string, jobName string, directory string) error {
-	filesMetrics := map[string]interface{}{
-		fmt.Sprintf("%s-%s.json", jobName, metricName):         lat,
-		fmt.Sprintf("%s-%s-summary.json", jobName, metricName): quant,
-	}
-	for filename, data := range filesMetrics {
-		if directory != "" {
-			err := os.MkdirAll(directory, 0744)
-			if err != nil {
-				return fmt.Errorf("error creating metrics directory: %s", err)
-			}
-			filename = path.Join(directory, filename)
-		}
-		f, err := os.Create(filename)
-		if err != nil {
-			return fmt.Errorf("error creating latency metrics file %s: %s", filename, err)
-		}
-		defer f.Close()
-		jsonEnc := json.NewEncoder(f)
-		jsonEnc.SetIndent("", "  ")
-		log.Infof("Writing latency metrics in %s", filename)
-		if err := jsonEnc.Encode(data); err != nil {
-			return fmt.Errorf("JSON encoding error: %s", err)
-		}
-	}
-	return nil
 }
 
 func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}) int {

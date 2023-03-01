@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,6 +40,7 @@ const elastic = "elastic"
 // Elastic ElasticSearch instance
 type Elastic struct {
 	client *elasticsearch.Client
+	index  string
 }
 
 func init() {
@@ -47,34 +49,48 @@ func init() {
 
 func (esIndexer *Elastic) new(configSpec config.Spec) error {
 	esConfig := configSpec.GlobalConfig.IndexerConfig
+	if esConfig.DefaultIndex == "" {
+		return fmt.Errorf("index name not specified")
+	}
+	esIndex := strings.ToLower(esConfig.DefaultIndex)
 	cfg := elasticsearch.Config{
 		Addresses: esConfig.ESServers,
 		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: esConfig.InsecureSkipVerify}},
 	}
 	ESClient, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		return fmt.Errorf("Error creating the ES client: %s", err)
+		return fmt.Errorf("error creating the ES client: %s", err)
 	}
 	r, err := ESClient.Cluster.Health()
 	if err != nil {
 		return fmt.Errorf("ES health check failed: %s", err)
 	}
 	if r.StatusCode != 200 {
-		return fmt.Errorf("Unexpected ES status code: %d", r.StatusCode)
+		return fmt.Errorf("unexpected ES status code: %d", r.StatusCode)
 	}
 	esIndexer.client = ESClient
+	esIndexer.index = esIndex
+	r, _ = esIndexer.client.Indices.Exists([]string{esIndex})
+	if r.IsError() {
+		log.Infof("Creating index %s", esIndex)
+		r, _ = esIndexer.client.Indices.Create(esIndex)
+		if r.IsError() {
+			return fmt.Errorf("error creating index %s on ES: %s", esIndex, r.String())
+		}
+	}
 	return nil
 }
 
 // Index uses bulkIndexer to index the documents in the given index
-func (esIndexer *Elastic) Index(index string, documents []interface{}) {
+func (esIndexer *Elastic) Index(documents []interface{}, opts IndexingOpts) {
 	var statString string
 	var indexerStatsLock sync.Mutex
+	log.Infof("Indexing metric %s", opts.MetricName)
 	indexerStats := make(map[string]int)
 	hasher := sha256.New()
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Client:     esIndexer.client,
-		Index:      index,
+		Index:      esIndexer.index,
 		FlushBytes: 5e+6,
 		NumWorkers: runtime.NumCPU(),
 		Timeout:    10 * time.Minute, // TODO: hardcoded
@@ -82,16 +98,8 @@ func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 	if err != nil {
 		log.Errorf("Error creating the indexer: %s", err)
 	}
-	r, _ := esIndexer.client.Indices.Exists([]string{index})
-	if r.IsError() {
-		log.Infof("Creating index %s", index)
-		r, _ = esIndexer.client.Indices.Create(index)
-		if r.IsError() {
-			log.Warnf("Error creating index %s on ES: %s", index, r.String())
-		}
-	}
 	start := time.Now().UTC()
-	log.Debugf("Indexing [%d] documents in %s", len(documents), index)
+	log.Debugf("Indexing [%d] documents in %s", len(documents), esIndexer.index)
 	for _, document := range documents {
 		j, err := json.Marshal(document)
 		if err != nil {
@@ -119,7 +127,6 @@ func (esIndexer *Elastic) Index(index string, documents []interface{}) {
 	if err := bi.Close(context.Background()); err != nil {
 		log.Fatalf("Unexpected ES error: %s", err)
 	}
-
 	dur := time.Since(start)
 	for stat, val := range indexerStats {
 		statString += fmt.Sprintf(" %s=%d", stat, val)

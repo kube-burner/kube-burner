@@ -166,10 +166,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		if configSpec.GlobalConfig.IndexerConfig.Enabled {
 			for _, job := range jobList {
 				elapsedTime := job.End.Sub(job.Start).Seconds()
-				err := indexjobSummaryInfo(configSpec, indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
-				if err != nil {
-					log.Errorf(err.Error())
-				}
+				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
 			}
 		}
 		// Update end time of last job
@@ -181,14 +178,13 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		for idx, prometheusClient := range prometheusClients {
 			// If alertManager is configured
 			if alertMs[idx] != nil {
-				log.Infof("Evaluating alerts for prometheus - %v", prometheusClient.ConfigSpec.GlobalConfig.PrometheusURL)
 				if alertMs[idx].Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
 					innerRC = 1
 				}
 			}
 			prometheusClient.JobList = prometheusJobList
 			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-			if configSpec.GlobalConfig.IndexerConfig.Enabled || configSpec.GlobalConfig.WriteToFile {
+			if configSpec.GlobalConfig.IndexerConfig.Enabled {
 				metrics.ScrapeMetrics(prometheusClient, indexer)
 				metrics.HandleTarball(configSpec)
 			}

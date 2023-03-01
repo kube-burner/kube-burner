@@ -1,8 +1,5 @@
 
 global:
-  writeToFile: true
-  createTarball: true
-  metricsDirectory: collected-metrics
   indexerConfig:
     enabled: false
     esServers: [http://elastic-elk.apps.rsevilla-ocp45-ovn.perf-testing.devcluster.openshift.com]
@@ -11,7 +8,6 @@ global:
     type: elastic
   measurements:
     - name: podLatency
-      esIndex: kube-burner
 
 jobs:
   - name: cluster-density

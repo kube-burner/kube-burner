@@ -24,6 +24,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	v1 "k8s.io/api/core/v1"
@@ -160,11 +161,6 @@ func (p *podLatency) stop() (int, error) {
 	if len(p.config.LatencyThresholds) > 0 {
 		rc = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
 	}
-	if kubeburnerCfg.WriteToFile {
-		if err := metrics.WriteToFile(p.normLatencies, p.latencyQuantiles, "podLatency", factory.jobConfig.Name, kubeburnerCfg.MetricsDirectory); err != nil {
-			log.Errorf("Error writing measurement podLatency: %s", err)
-		}
-	}
 	if kubeburnerCfg.IndexerConfig.Enabled {
 		log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
 		p.index()
@@ -180,8 +176,8 @@ func (p *podLatency) stop() (int, error) {
 
 // index sends metrics to the configured indexer
 func (p *podLatency) index() {
-	(*factory.indexer).Index(p.config.ESIndex, p.normLatencies)
-	(*factory.indexer).Index(p.config.ESIndex, p.latencyQuantiles)
+	(*factory.indexer).Index(p.normLatencies, indexers.IndexingOpts{MetricName: podLatencyMeasurement, JobName: factory.jobConfig.Name})
+	(*factory.indexer).Index(p.latencyQuantiles, indexers.IndexingOpts{MetricName: podLatencyQuantilesMeasurement, JobName: factory.jobConfig.Name})
 }
 
 func (p *podLatency) normalizeMetrics() {

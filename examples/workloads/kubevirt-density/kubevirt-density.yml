@@ -1,11 +1,7 @@
 global:
   # collect metrics from Prometheus and dump to files
-  writeToFile: true
-  createTarball: true
-  metricsDirectory: collected-metrics
   measurements:
   - name: vmiLatency
-    esIndex: kube-burner
 
   # save metrics to database (e.g., elasticsearch)
   indexerConfig:

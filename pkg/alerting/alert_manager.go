@@ -110,6 +110,7 @@ func (a *AlertManager) readProfile(alertProfileCfg string) error {
 
 // Evaluate evaluates expressions
 func (a *AlertManager) Evaluate(start, end time.Time) int {
+	log.Infof("Evaluating alerts for prometheus: %v", a.prometheus.Endpoint)
 	var alertList []interface{}
 	elapsed := int(end.Sub(start).Minutes())
 	var renderedQuery bytes.Buffer
@@ -201,6 +202,6 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 }
 
 func (a *AlertManager) index(alertSet []interface{}) {
-	log.Info("Indexing alerts in ", a.indexName)
-	(*a.indexer).Index(a.indexName, alertSet)
+	log.Info("Indexing alerts")
+	(*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
 }
