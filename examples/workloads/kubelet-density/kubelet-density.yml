@@ -1,8 +1,5 @@
 ---
 global:
-  writeToFile: true
-  metricsDirectory: collected-metrics
-  createTarball: true
   indexerConfig:
     enabled: false
     esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
@@ -11,7 +8,6 @@ global:
     type: elastic
   measurements:
     - name: podLatency
-      esIndex: kube-burner
       thresholds:
       - conditionType: Ready
         metric: Avg

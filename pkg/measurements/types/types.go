@@ -22,9 +22,6 @@ import (
 type Measurement struct {
 	// Name is the name the measurement
 	Name string `yaml:"name"`
-	// ESIndex contains the ElasticSearch index used to
-	// index the metrics
-	ESIndex string `yaml:"esIndex"`
 	// LatencyThresholds config
 	LatencyThresholds []LatencyThreshold `yaml:"thresholds"`
 	// PPRofTargets targets config

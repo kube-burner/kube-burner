@@ -24,8 +24,8 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
-	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -102,8 +102,12 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			metricsScraper := commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
-				ConfigFile:      configFile,
+			configSpec, err := config.Parse(configFile, false)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+				ConfigSpec:      configSpec,
 				Password:        password,
 				PrometheusStep:  prometheusStep,
 				MetricsEndpoint: metricsEndpoint,
@@ -116,7 +120,7 @@ func initCmd() *cobra.Command {
 				UUID:            uuid,
 				UserMetaData:    userMetadata,
 			})
-			rc, err = burner.Run(metricsScraper.ConfigSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
+			rc, err = burner.Run(configSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -187,8 +191,12 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			_ = commons.ProcessMetricsScraperConfig(commons.MetricsScraperConfig{
-				ConfigFile:      configFile,
+			configSpec, err := config.Parse(configFile, false)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+			_ = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+				ConfigSpec:      configSpec,
 				Password:        password,
 				PrometheusStep:  prometheusStep,
 				MetricsEndpoint: metricsEndpoint,
@@ -239,7 +247,7 @@ func importCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			err = prometheus.ImportTarball(tarball, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer)
+			err = metrics.ImportTarball(tarball, indexer)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -247,7 +255,8 @@ func importCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVar(&tarball, "tarball", "", "Metrics tarball file")
-	cmd.MarkFlagsRequiredTogether("config", "tarball")
+	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagRequired("tarball")
 	return cmd
 }
 

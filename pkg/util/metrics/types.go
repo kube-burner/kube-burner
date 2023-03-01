@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package commons
+package metrics
 
 import (
 	"time"
@@ -23,9 +23,9 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 )
 
-// MetricScraperConfig holds data related to scraper and target indexer
-type MetricsScraperConfig struct {
-	ConfigFile      string
+// ScraperConfig holds data related to scraper and target indexer
+type ScraperConfig struct {
+	ConfigSpec      config.Spec
 	Password        string
 	PrometheusStep  time.Duration
 	MetricsEndpoint string
@@ -43,8 +43,8 @@ type MetricsScraperConfig struct {
 	UserMetaData    string
 }
 
-// MetricsScraperResponse holds parsed data realted to scraper and target indexer
-type MetricsScraper struct {
+// ScraperResponse holds parsed data realted to scraper and target indexer
+type Scraper struct {
 	PrometheusClients   []*prometheus.Prometheus
 	AlertMs             []*alerting.AlertManager
 	Indexer             *indexers.Indexer

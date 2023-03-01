@@ -32,6 +32,16 @@ const (
 	PatchJob JobType = "patch"
 )
 
+// IndexerType type of indexer
+type IndexerType string
+
+const (
+	// Elastic indexer that send metrics to the configures ES instance
+	ElasticIndexer IndexerType = "elastic"
+	// Local indexer that writes metrics to local directory
+	LocalIndexer IndexerType = "local"
+)
+
 // Spec configuration root
 type Spec struct {
 	// GlobalConfig defines global configuration parameters
@@ -43,7 +53,7 @@ type Spec struct {
 // IndexerConfig holds the indexer configuration
 type IndexerConfig struct {
 	// Type type of indexer
-	Type string `yaml:"type"`
+	Type IndexerType `yaml:"type"`
 	// ESServers List of ElasticSearch instances
 	ESServers []string `yaml:"esServers"`
 	// DefaultIndex default index to send prometheus metrics
@@ -54,18 +64,18 @@ type IndexerConfig struct {
 	InsecureSkipVerify bool `yaml:"insecureSkipVerify"`
 	// Enabled enable indexer
 	Enabled bool `yaml:"enabled"`
+	// Directory to save metrics files in
+	MetricsDirectory string `yaml:"metricsDirectory"`
+	// Create tarball
+	CreateTarball bool `yaml:"createTarball"`
+	// TarBall name
+	TarballName string `yaml:"tarballName"`
 }
 
 // GlobalConfig holds the global configuration
 type GlobalConfig struct {
 	// IndexerConfig contains a IndexerConfig definition
 	IndexerConfig IndexerConfig `yaml:"indexerConfig"`
-	// Write prometheus metrics to a file
-	WriteToFile bool `yaml:"writeToFile"`
-	// Create tarball
-	CreateTarball bool `yaml:"createTarball"`
-	// Directory to save metrics files in
-	MetricsDirectory string `yaml:"metricsDirectory"`
 	// Measurements describes a list of measurements kube-burner
 	// will take along with job
 	Measurements []mtypes.Measurement `yaml:"measurements"`

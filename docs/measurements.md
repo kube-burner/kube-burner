@@ -5,7 +5,7 @@ Apart from prometheus metrics collection, Kube-burner allows to get further metr
 Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
 'kube-burner' supports the following measurements so far:
 
-Note: podLatency is only captured when a benchmark is triggered. It does not work with the "index" mode of kube-burner
+**Note:** podLatency measurement is only captured when a benchmark is triggered. It does not work with the "index" mode of kube-burner
 
 ## Pod latency
 
@@ -14,10 +14,9 @@ Collects latencies from the different pod startup phases, these **latency metric
 ```yaml
   measurements:
   - name: podLatency
-    esIndex: kube-burner-podlatency
 ```
 
-This measurement sends its metrics to the index configured by *esIndex*. The metrics collected are pod latency histograms and pod latency quantiles P99, P95 and P50.
+This measurement sends its metrics to configured indexer. The metrics collected are pod latency histograms and pod latency quantiles P99, P95 and P50.
 
 Pod latency sample:
 
@@ -86,8 +85,6 @@ And the metrics are:
 
 More information about the pod conditions can be found in the [kubernetes docs site](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions).
 
-**Note**: The __esIndex__ option can be used to configure the ES index where metrics will be indexed.
-
 ### Pod latency thresholds
 
 It's possible to stablish pod latency thresholds in the different pod conditions and metrics through the option `thresholds` from the podLatency measurement:
@@ -97,7 +94,6 @@ For example, the example below establish a threshold of 2000ms in the P99 metric
 ```yaml
   measurements:
   - name: podLatency
-    esIndex: kube-burner-podlatency
     thresholds:
     - conditionType: Ready
       metric: P99

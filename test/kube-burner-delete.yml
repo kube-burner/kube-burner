@@ -1,16 +1,16 @@
 ---
  
 global:
-  writeToFile: true
-  metricsDirectory: collected-metrics
   prometheusURL: http://localhost:9090
   metricsProfile: metrics-profile.yaml
   measurements:
   - name: podLatency
-    esIndex: kube-burner
 
   indexerConfig:
-    enabled: false
+    enabled: true
+    type: elastic
+    esServers: ["https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443"]
+    defaultIndex: "kube-burner-ocp"
 
 jobs:
   - name: not-namespaced

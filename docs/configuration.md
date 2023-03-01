@@ -18,9 +18,6 @@ In this section is described global job configuration, it holds the following pa
 
 | Option           | Description                                                                                              | Type           | Example        | Default     |
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|----------------|-------------|
-| writeToFile      | Whether to dump collected metrics to files                                                               | Boolean        | true           | false       |
-| createTarball    | Create metrics tarball, it has no effect if `writeToFile` is not enabled                                 | Boolean        | true           | false       |
-| metricsDirectory | Directory where collected metrics will be dumped into. It will be created if it doesn't exist previously | String         | ./metrics      | ./collected-metrics |
 | measurements     | List of measurements. Detailed in the [measurements section]                                             | List           | -              | []          |
 | indexerConfig    | Holds the indexer configuration. Detailed in the [indexers section]                                      | Object         | -              | -           |
 | requestTimeout   | Client-go request timeout                                                                                | Duration       | 5s             | 15s         |

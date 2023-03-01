@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prometheus
+package metrics
 
 import (
 	"archive/tar"
@@ -24,16 +24,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 )
 
-const tarballName = "kube-burner-metrics"
-
-func CreateTarball(metricsDirectory string) error {
-	tarball, err := os.Create(fmt.Sprintf("%v-%d.tgz", tarballName, time.Now().Unix()))
+func createTarball(indexerConfig config.IndexerConfig) error {
+	tarball, err := os.Create(fmt.Sprintf(indexerConfig.TarballName))
 	if err != nil {
 		return fmt.Errorf("Could not create tarball file: %v", err)
 	}
@@ -43,7 +41,7 @@ func CreateTarball(metricsDirectory string) error {
 	defer tarball.Close()
 	defer gzipWriter.Close()
 	defer tarWriter.Close()
-	err = filepath.Walk(metricsDirectory, func(path string, info fs.FileInfo, err error) error {
+	err = filepath.Walk(indexerConfig.MetricsDirectory, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -70,7 +68,7 @@ func CreateTarball(metricsDirectory string) error {
 	return nil
 }
 
-func ImportTarball(tarball, indexName string, indexer *indexers.Indexer) error {
+func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 	log.Infof("Importing tarball %v", tarball)
 	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)
@@ -97,7 +95,7 @@ func ImportTarball(tarball, indexName string, indexer *indexers.Indexer) error {
 			return fmt.Errorf("Tarball read error: %v", err)
 		}
 		log.Infof("Importing metrics from %s", hdr.Name)
-		(*indexer).Index(indexName, metrics)
+		(*indexer).Index(metrics, indexers.IndexingOpts{})
 	}
 	return nil
 }

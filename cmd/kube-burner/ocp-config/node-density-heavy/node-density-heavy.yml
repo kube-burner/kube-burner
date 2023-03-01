@@ -1,6 +1,5 @@
 ---
 global:
-  writeToFile: false
   gc: {{.GC}}
   indexerConfig:
     enabled: {{.INDEXING}}
@@ -10,7 +9,6 @@ global:
     type: elastic
   measurements:
     - name: podLatency
-      esIndex: {{.ES_INDEX}}
       thresholds:
         - conditionType: Ready
           metric: P99

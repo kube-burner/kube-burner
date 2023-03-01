@@ -1,5 +1,4 @@
 global:
-  writeToFile: false
   metricsEndpoint: metrics-endpoints.yaml
   alertProfile: alert-profile.yml
   indexerConfig:

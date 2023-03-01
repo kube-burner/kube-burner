@@ -23,11 +23,16 @@ import (
 
 // Indexer indexer interface
 type Indexer interface {
-	Index(string, []interface{})
+	Index([]interface{}, IndexingOpts)
 	new(config.Spec) error
 }
 
-var indexerMap = make(map[string]Indexer)
+type IndexingOpts struct {
+	MetricName string
+	JobName    string
+}
+
+var indexerMap = make(map[config.IndexerType]Indexer)
 
 // NewIndexer creates a new Indexer with the specified IndexerConfig
 func NewIndexer(configSpec config.Spec) (*Indexer, error) {

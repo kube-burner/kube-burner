@@ -40,14 +40,14 @@ import (
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
-		MetricsDirectory: "collected-metrics",
-		GC:               false,
-		RequestTimeout:   15 * time.Second,
-		WriteToFile:      false,
-		Measurements:     []mtypes.Measurement{},
+		GC:             false,
+		RequestTimeout: 15 * time.Second,
+		Measurements:   []mtypes.Measurement{},
 		IndexerConfig: IndexerConfig{
 			Enabled:            false,
 			InsecureSkipVerify: false,
+			MetricsDirectory:   "collected-metrics",
+			TarballName:        "kube-burner-metrics.tgz",
 		},
 	},
 }

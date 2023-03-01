@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package commons
+package metrics
 
 import (
 	"time"
@@ -43,7 +43,7 @@ func validateMetricsEndpoint(metricsEndpoint string, prometheusURL string) {
 func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheus.MetricEndpoint) {
 	f, err := util.ReadConfig(metricsEndpoint)
 	if err != nil {
-		log.Fatalf("Error reading metrics endpoint %s: %s", metricsEndpoint, err)
+		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpoint, err)
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
@@ -67,10 +67,8 @@ func ScrapeMetrics(p *prometheus.Prometheus, indexer *indexers.Indexer) {
 
 // Handles tarball use case
 func HandleTarball(configSpec config.Spec) {
-	var err error
-	if configSpec.GlobalConfig.WriteToFile && configSpec.GlobalConfig.CreateTarball {
-		err = prometheus.CreateTarball(configSpec.GlobalConfig.MetricsDirectory)
-		if err != nil {
+	if configSpec.GlobalConfig.IndexerConfig.CreateTarball {
+		if err := createTarball(configSpec.GlobalConfig.IndexerConfig); err != nil {
 			log.Fatal(err.Error())
 		}
 	}

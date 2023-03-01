@@ -29,12 +29,12 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
-	"github.com/cloud-bulldozer/kube-burner/pkg/commons"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 )
 
 const (
@@ -171,7 +171,7 @@ func (wh *WorkloadHelper) indexMetadata() {
 	}
 }
 
-func (wh *WorkloadHelper) run(workload, metrics string) {
+func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	metadata := map[string]interface{}{
 		"platform":   wh.Metadata.Platform,
 		"ocpVersion": wh.Metadata.OCPVersion,
@@ -200,7 +200,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 	cfg := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(cfg); err != nil {
 		log.Debug("Workload not available in the current directory, extracting it")
-		if err := wh.ExtractWorkload(workload, metrics); err != nil {
+		if err := wh.ExtractWorkload(workload, metricsProfile); err != nil {
 			log.Fatalf("Error extracting workload: %v", err)
 		}
 	}
@@ -211,12 +211,12 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 	if wh.indexing {
 		indexer, err = indexers.NewIndexer(configSpec)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Fatal("%v Indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
 		}
 	}
-	configSpec.GlobalConfig.MetricsProfile = metrics
+	configSpec.GlobalConfig.MetricsProfile = metricsProfile
 	if wh.metricsEndpoint != "" {
-		commons.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
+		metrics.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
 	} else {
 		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
 			Endpoint: wh.prometheusURL,
@@ -251,7 +251,7 @@ func (wh *WorkloadHelper) run(workload, metrics string) {
 }
 
 // ExtractWorkload extracts the given workload and metrics profile to the current diretory
-func (wh *WorkloadHelper) ExtractWorkload(workload, metrics string) error {
+func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error {
 	dirContent, err := wh.ocpConfig.ReadDir(path.Join(ocpCfgDir, workload))
 	if err != nil {
 		return err
@@ -272,7 +272,7 @@ func (wh *WorkloadHelper) ExtractWorkload(workload, metrics string) error {
 			return err
 		}
 	}
-	if err = createFile(path.Join(ocpCfgDir, metrics), metrics); err != nil {
+	if err = createFile(path.Join(ocpCfgDir, metricsProfile), metricsProfile); err != nil {
 		return err
 	}
 	if err = createFile(path.Join(ocpCfgDir, alertsProfile), alertsProfile); err != nil {
