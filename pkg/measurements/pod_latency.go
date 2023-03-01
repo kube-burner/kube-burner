@@ -71,8 +71,8 @@ func init() {
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	now := time.Now().UTC()
 	pod := obj.(*v1.Pod)
-	jobConfig := factory.jobConfig
-	jobConfig.NamespaceLabels = nil //  metric doesn't need this data
+	jobConfig := *factory.jobConfig
+	jobConfig.NamespaceLabels = nil // metric doesn't need this data
 	jobConfig.Objects = nil         // metric doesn't need this data
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
 		if strings.Contains(pod.Namespace, factory.jobConfig.Namespace) {
@@ -82,7 +82,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 				Name:       pod.Name,
 				MetricName: podLatencyMeasurement,
 				UUID:       factory.uuid,
-				JobConfig:  *jobConfig,
+				JobConfig:  jobConfig,
 				JobName:    factory.jobConfig.Name,
 				Metadata:   factory.metadata,
 			}
