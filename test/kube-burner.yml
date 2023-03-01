@@ -1,17 +1,12 @@
 ---
  
 global:
-  writeToFile: true
-  metricsDirectory: collected-metrics
   measurements:
   - name: podLatency
-    esIndex: kube-burner
 
   indexerConfig:
-    type: elastic
+    type: local
     enabled: true
-    esServers: ["https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443"]
-    defaultIndex: "kube-burner-ocp"
 
 jobs:
   - name: namespaced

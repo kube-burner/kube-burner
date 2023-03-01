@@ -15,6 +15,7 @@
 package burner
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"

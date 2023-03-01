@@ -1,5 +1,4 @@
 global:
-  writeToFile: false
   prometheusURL: http://localhost:9090
   metricsProfile: metrics.yaml
   indexerConfig:
