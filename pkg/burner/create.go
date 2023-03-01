@@ -108,7 +108,6 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	}
 	if ex.nsObjects && !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
-		nsLabels["name"] = ns
 		if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
 			log.Fatal(err.Error())
 		}
@@ -118,7 +117,6 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsObjects && ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
-			nsLabels["name"] = ns
 			if err = createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), nsLabels); err != nil {
 				log.Error(err.Error())
 				continue
