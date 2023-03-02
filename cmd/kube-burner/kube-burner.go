@@ -85,6 +85,7 @@ func initCmd() *cobra.Command {
 	var prometheusStep time.Duration
 	var timeout time.Duration
 	var rc int
+	var metricsScraper metrics.Scraper
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -106,20 +107,22 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-				ConfigSpec:      configSpec,
-				Password:        password,
-				PrometheusStep:  prometheusStep,
-				MetricsEndpoint: metricsEndpoint,
-				MetricsProfile:  metricsProfile,
-				AlertProfile:    alertProfile,
-				SkipTLSVerify:   skipTLSVerify,
-				URL:             url,
-				Token:           token,
-				Username:        username,
-				UUID:            uuid,
-				UserMetaData:    userMetadata,
-			})
+			if configSpec.GlobalConfig.IndexerConfig.Enabled || alertProfile != "" {
+				metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+					ConfigSpec:      configSpec,
+					Password:        password,
+					PrometheusStep:  prometheusStep,
+					MetricsEndpoint: metricsEndpoint,
+					MetricsProfile:  metricsProfile,
+					AlertProfile:    alertProfile,
+					SkipTLSVerify:   skipTLSVerify,
+					URL:             url,
+					Token:           token,
+					Username:        username,
+					UUID:            uuid,
+					UserMetaData:    userMetadata,
+				})
+			}
 			rc, err = burner.Run(configSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
 			if err != nil {
 				log.Fatalf(err.Error())
