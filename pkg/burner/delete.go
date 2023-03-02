@@ -96,7 +96,8 @@ func (ex *Executor) RunDeleteJob() {
 			wait.PollImmediateInfinite(2*time.Second, func() (bool, error) {
 				itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 				if err != nil {
-					return false, err
+					log.Error(err.Error())
+					return false, nil
 				}
 				if len(itemList.Items) > 0 {
 					log.Debugf("Waiting for %d %s labeled with %s to be deleted", len(itemList.Items), obj.gvr.Resource, labelSelector)
