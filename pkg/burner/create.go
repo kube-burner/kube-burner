@@ -85,7 +85,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		}
 		// If any of the objects is namespaced, we configure the job to create namepaces
 		if o.Namespaced {
-			ex.nsObjects = true
+			ex.Config.NamespacedIterations = true
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
@@ -106,7 +106,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	for label, value := range ex.Config.NamespaceLabels {
 		nsLabels[label] = value
 	}
-	if ex.nsObjects && !ex.Config.NamespacedIterations {
+	if !ex.Config.NamespacedIterations {
 		ns = ex.Config.Namespace
 		if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
 			log.Fatal(err.Error())
@@ -115,7 +115,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	start := time.Now().Round(time.Second)
 	for i := iterationStart; i <= iterationEnd; i++ {
 		log.Debugf("Creating object replicas from iteration %d", i)
-		if ex.nsObjects && ex.Config.NamespacedIterations {
+		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			if err = createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), nsLabels); err != nil {
 				log.Error(err.Error())
