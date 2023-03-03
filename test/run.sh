@@ -51,7 +51,9 @@ check_files() {
 }
 
 test_init_checks() {
-  check_files
+  if [[ ${INDEXING} == "true" ]]; then
+    check_files
+  fi
   check_ns kube-burner-job=namespaced,kube-burner-uuid=${uuid} 10
   check_running_pods kube-burner-job=namespaced,kube-burner-uuid=${uuid} 10
   timeout 500 kube-burner init -c kube-burner-delete.yml --uuid ${uuid} --log-level=debug
@@ -64,6 +66,11 @@ test_init_checks() {
 }
 
 log "Running kube-burner init"
+export INDEXING=false
+timeout 500 kube-burner init -c kube-burner.yml --uuid ${uuid} --log-level=debug 
+test_init_checks
+export INDEXING=true
+log "Running kube-burner init with metrics and alert indexing"
 timeout 500 kube-burner init -c kube-burner.yml --uuid ${uuid} --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
 test_init_checks
 log "Running kube-burner init for multiple endpoints case"
