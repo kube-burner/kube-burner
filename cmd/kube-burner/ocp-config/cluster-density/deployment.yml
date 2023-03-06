@@ -19,7 +19,7 @@ spec:
       - args:
         - sleep
         - infinity
-        image: k8s.gcr.io/pause:3.1
+        image: registry.k8s.io/pause:3.1
         resources:
           requests:
             memory: "10Mi"
