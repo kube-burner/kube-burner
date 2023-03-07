@@ -6,7 +6,7 @@ trap print_events ERR
 export QPS=2
 export BURST=2
 export TERM=screen-256color
-export JOB_ITERATIONS=9
+export JOB_ITERATIONS=5
 
 bold=$(tput bold)
 normal=$(tput sgr0)

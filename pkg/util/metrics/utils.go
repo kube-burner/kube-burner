@@ -48,7 +48,7 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
 	if err := yamlDec.Decode(&metricsEndpoints); err != nil {
-		log.Fatalf("Error decoding metrics endpoint %s: %s", metricsEndpoint, err)
+		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpoint, err)
 	}
 }
 

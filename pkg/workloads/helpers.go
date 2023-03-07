@@ -223,7 +223,6 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			Token:    wh.prometheusToken,
 		})
 	}
-
 	for _, metricsEndpoint := range metricsEndpoints {
 		// Updating the prometheus endpoint actually being used in spec.
 		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
