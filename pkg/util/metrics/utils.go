@@ -15,6 +15,8 @@
 package metrics
 
 import (
+	"bytes"
+	"io"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -45,7 +47,15 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 	if err != nil {
 		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpoint, err)
 	}
-	yamlDec := yaml.NewDecoder(f)
+	cfg, err := io.ReadAll(f)
+	if err != nil {
+		log.Fatalf("Error reading configuration file %s: %s", metricsEndpoint, err)
+	}
+	renderedME, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
+	if err != nil {
+		log.Fatalf("Template error in %s: %s", metricsEndpoint, err)
+	}
+	yamlDec := yaml.NewDecoder(bytes.NewReader(renderedME))
 	yamlDec.KnownFields(true)
 	if err := yamlDec.Decode(&metricsEndpoints); err != nil {
 		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpoint, err)

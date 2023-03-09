@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -50,23 +49,6 @@ var configSpec = Spec{
 			TarballName:        "kube-burner-metrics.tgz",
 		},
 	},
-}
-
-func envToMap() map[string]interface{} {
-	envMap := make(map[string]interface{})
-	for _, v := range os.Environ() {
-		envVar := strings.SplitN(v, "=", 2)
-		envMap[envVar[0]] = envVar[1]
-	}
-	return envMap
-}
-
-func renderConfig(cfg []byte) ([]byte, error) {
-	rendered, err := util.RenderTemplate(cfg, envToMap(), util.MissingKeyError)
-	if err != nil {
-		return rendered, fmt.Errorf("Error rendering configuration template: %s", err)
-	}
-	return rendered, nil
 }
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
@@ -123,7 +105,10 @@ func Parse(c string, jobsRequired bool) (Spec, error) {
 	if err != nil {
 		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
 	}
-	renderedCfg, err := renderConfig(cfg)
+	renderedCfg, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
+	if err != nil {
+		return configSpec, fmt.Errorf("Error rendering configuration template: %s", err)
+	}
 	if err != nil {
 		return configSpec, err
 	}

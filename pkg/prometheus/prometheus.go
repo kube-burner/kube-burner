@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"text/template"
@@ -73,7 +74,7 @@ func NewPrometheusClient(configSpec config.Spec, url, token, username, password,
 	}
 	if configSpec.GlobalConfig.MetricsProfile != "" {
 		if err := p.readProfile(configSpec.GlobalConfig.MetricsProfile); err != nil {
-			log.Fatal(err)
+			log.Fatalf("Metrics-profile error: %v", err.Error())
 		}
 	}
 	return &p, nil
@@ -92,9 +93,17 @@ func (p *Prometheus) verifyConnection() error {
 func (p *Prometheus) readProfile(metricsProfile string) error {
 	f, err := util.ReadConfig(metricsProfile)
 	if err != nil {
-		log.Fatalf("Error reading metrics profile %s: %s", metricsProfile, err)
+		return fmt.Errorf("error reading metrics profile %s: %s", metricsProfile, err)
 	}
-	yamlDec := yaml.NewDecoder(f)
+	cfg, err := io.ReadAll(f)
+	if err != nil {
+		return fmt.Errorf("error reading configuration file %s: %s", metricsProfile, err)
+	}
+	renderedMP, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
+	if err != nil {
+		return fmt.Errorf("template error in %s: %s", metricsProfile, err)
+	}
+	yamlDec := yaml.NewDecoder(bytes.NewReader(renderedMP))
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&p.MetricProfile); err != nil {
 		return fmt.Errorf("error decoding metrics profile %s: %s", metricsProfile, err)

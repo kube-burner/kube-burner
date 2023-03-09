@@ -18,6 +18,8 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"os"
+	"strings"
 	"text/template"
 	"time"
 
@@ -82,4 +84,14 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 	}
 	log.Tracef("Rendered template: %s", rendered.String())
 	return rendered.Bytes(), nil
+}
+
+// EnvToMap returns the host environment variables as a map
+func EnvToMap() map[string]interface{} {
+	envMap := make(map[string]interface{})
+	for _, v := range os.Environ() {
+		envVar := strings.SplitN(v, "=", 2)
+		envMap[envVar[0]] = envVar[1]
+	}
+	return envMap
 }
