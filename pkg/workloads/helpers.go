@@ -241,6 +241,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		}
 		prometheusClients = append(prometheusClients, p)
 		alertMs = append(alertMs, alertM)
+		alertM = nil
 	}
 	rc, err = burner.Run(configSpec, wh.Metadata.UUID, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {

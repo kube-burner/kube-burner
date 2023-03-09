@@ -64,7 +64,7 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 
 // Scrapes prometheus metrics
 func ScrapeMetrics(p *prometheus.Prometheus, indexer *indexers.Indexer) {
-	log.Infof("Scraping for the prometheus entry with params - {Endpoint:%v, Profile:%v, Start:%v, End:%v}",
+	log.Infof("Scraping for the prometheus entry with params - Endpoint: %v, Profile: %v, Start: %v, End: %v",
 		p.Endpoint,
 		p.ConfigSpec.GlobalConfig.MetricsProfile,
 		p.JobList[0].Start.Format(time.RFC3339),

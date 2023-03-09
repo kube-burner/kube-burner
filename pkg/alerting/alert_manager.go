@@ -115,9 +115,11 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 	elapsed := int(end.Sub(start).Minutes())
 	var renderedQuery bytes.Buffer
 	result := Passed
+	vars := util.EnvToMap()
+	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
 	for _, alert := range a.alertProfile {
 		t, _ := template.New("").Parse(alert.Expr)
-		t.Execute(&renderedQuery, map[string]string{"elapsed": fmt.Sprintf("%dm", elapsed)})
+		t.Execute(&renderedQuery, vars)
 		expr := renderedQuery.String()
 		renderedQuery.Reset()
 		log.Infof("Evaluating expression: '%s'", expr)

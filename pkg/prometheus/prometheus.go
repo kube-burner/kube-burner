@@ -19,7 +19,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"text/template"
@@ -95,15 +94,7 @@ func (p *Prometheus) readProfile(metricsProfile string) error {
 	if err != nil {
 		return fmt.Errorf("error reading metrics profile %s: %s", metricsProfile, err)
 	}
-	cfg, err := io.ReadAll(f)
-	if err != nil {
-		return fmt.Errorf("error reading configuration file %s: %s", metricsProfile, err)
-	}
-	renderedMP, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
-	if err != nil {
-		return fmt.Errorf("template error in %s: %s", metricsProfile, err)
-	}
-	yamlDec := yaml.NewDecoder(bytes.NewReader(renderedMP))
+	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&p.MetricProfile); err != nil {
 		return fmt.Errorf("error decoding metrics profile %s: %s", metricsProfile, err)
@@ -119,11 +110,13 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	var err error
 	var v model.Value
 	var renderedQuery bytes.Buffer
+	vars := util.EnvToMap()
+	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
 	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 	for _, md := range p.MetricProfile {
 		var datapoints []interface{}
 		t, _ := template.New("").Parse(md.Query)
-		t.Execute(&renderedQuery, map[string]string{"elapsed": fmt.Sprintf("%dm", elapsed)})
+		t.Execute(&renderedQuery, vars)
 		query := renderedQuery.String()
 		renderedQuery.Reset()
 		if md.Instant {
