@@ -171,7 +171,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		// Update end time of last job
 		jobList[len(jobList)-1].End = time.Now().UTC()
 		if len(prometheusClients) > 0 {
-			log.Infof("Waiting %v extra before starting to scraping prometheus endpoints", prometheusClients[0].Step)
+			log.Infof("Waiting %v extra before scraping prometheus endpoints", prometheusClients[0].Step)
 			time.Sleep(prometheusClients[0].Step)
 		}
 		for idx, prometheusClient := range prometheusClients {

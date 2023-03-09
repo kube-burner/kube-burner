@@ -219,19 +219,22 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		metrics.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
 	} else {
 		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
-			Endpoint: wh.prometheusURL,
-			Token:    wh.prometheusToken,
+			Endpoint:     wh.prometheusURL,
+			AlertProfile: alertsProfile,
+			Token:        wh.prometheusToken,
 		})
 	}
 	for _, metricsEndpoint := range metricsEndpoints {
 		// Updating the prometheus endpoint actually being used in spec.
 		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
+		configSpec.GlobalConfig.MetricsProfile = metricsEndpoint.Profile
+		configSpec.GlobalConfig.AlertProfile = metricsEndpoint.AlertProfile
 		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, "", "", wh.Metadata.UUID, true, 30*time.Second, metadata)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if wh.alerting {
-			alertM, err = alerting.NewAlertManager(alertsProfile, wh.Metadata.UUID, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p)
+		if wh.alerting && configSpec.GlobalConfig.AlertProfile != "" {
+			alertM, err = alerting.NewAlertManager(configSpec.GlobalConfig.AlertProfile, wh.Metadata.UUID, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p)
 			if err != nil {
 				log.Fatal(err)
 			}
