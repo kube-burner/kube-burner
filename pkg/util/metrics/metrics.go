@@ -47,23 +47,22 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			log.Fatalf("Error reading provided user metadata: %v", err)
 		}
 	}
-
-	updateParamIfEmpty(&metricsScraperConfig.MetricsEndpoint, configSpec.GlobalConfig.MetricsEndpoint)
-	updateParamIfEmpty(&metricsScraperConfig.URL, configSpec.GlobalConfig.PrometheusURL)
-	validateMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, metricsScraperConfig.URL)
-
-	if metricsScraperConfig.MetricsEndpoint != "" {
-		DecodeMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, &metricsEndpoints)
-	} else {
-		updateParamIfEmpty(&metricsScraperConfig.Token, configSpec.GlobalConfig.BearerToken)
-		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
-			Endpoint: metricsScraperConfig.URL,
-			Token:    metricsScraperConfig.Token,
-		})
+	// When a metric profile or a alert profile is passed we set up metricsEndpoints
+	if metricsScraperConfig.MetricsEndpoint != "" || metricsScraperConfig.MetricsProfile != "" || metricsScraperConfig.AlertProfile != "" {
+		updateParamIfEmpty(&metricsScraperConfig.MetricsEndpoint, configSpec.GlobalConfig.MetricsEndpoint)
+		updateParamIfEmpty(&metricsScraperConfig.URL, configSpec.GlobalConfig.PrometheusURL)
+		validateMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, metricsScraperConfig.URL)
+		if metricsScraperConfig.MetricsEndpoint != "" {
+			DecodeMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, &metricsEndpoints)
+		} else {
+			updateParamIfEmpty(&metricsScraperConfig.Token, configSpec.GlobalConfig.BearerToken)
+			metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
+				Endpoint: metricsScraperConfig.URL,
+				Token:    metricsScraperConfig.Token,
+			})
+		}
 	}
-
 	for _, metricsEndpoint := range metricsEndpoints {
-
 		if metricsEndpoint.Profile != "" {
 			configSpec.GlobalConfig.MetricsProfile = metricsEndpoint.Profile
 		} else if metricsScraperConfig.MetricsProfile != "" {
