@@ -73,7 +73,7 @@ func NewPrometheusClient(configSpec config.Spec, url, token, username, password,
 	}
 	if configSpec.GlobalConfig.MetricsProfile != "" {
 		if err := p.readProfile(configSpec.GlobalConfig.MetricsProfile); err != nil {
-			log.Fatal(err)
+			log.Fatalf("Metrics-profile error: %v", err.Error())
 		}
 	}
 	return &p, nil
@@ -92,7 +92,7 @@ func (p *Prometheus) verifyConnection() error {
 func (p *Prometheus) readProfile(metricsProfile string) error {
 	f, err := util.ReadConfig(metricsProfile)
 	if err != nil {
-		log.Fatalf("Error reading metrics profile %s: %s", metricsProfile, err)
+		return fmt.Errorf("error reading metrics profile %s: %s", metricsProfile, err)
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
@@ -110,11 +110,13 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	var err error
 	var v model.Value
 	var renderedQuery bytes.Buffer
+	vars := util.EnvToMap()
+	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
 	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 	for _, md := range p.MetricProfile {
 		var datapoints []interface{}
 		t, _ := template.New("").Parse(md.Query)
-		t.Execute(&renderedQuery, map[string]string{"elapsed": fmt.Sprintf("%dm", elapsed)})
+		t.Execute(&renderedQuery, vars)
 		query := renderedQuery.String()
 		renderedQuery.Reset()
 		if md.Instant {
