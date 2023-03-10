@@ -16,7 +16,7 @@ jobs:
     burst: {{ .BURST }}
     namespacedIterations: true
     preLoadImages: true
-    preLoadPeriod: 30s
+    preLoadPeriod: 5s
     cleanup: true
     namespace: namespaced
     podWait: false
