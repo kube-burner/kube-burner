@@ -220,6 +220,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
 			Endpoint:     wh.prometheusURL,
 			AlertProfile: alertsProfile,
+			Profile:      metricsProfile,
 			Token:        wh.prometheusToken,
 		})
 	}
