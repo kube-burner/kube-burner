@@ -41,6 +41,7 @@ func openShiftCmd() *cobra.Command {
 	var wh workloads.WorkloadHelper
 	esServer := ocpCmd.PersistentFlags().String("es-server", "", "Elastic Search endpoint")
 	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
+	indexing := ocpCmd.PersistentFlags().Bool("indexing", true, "Enable indexing")
 	metricsEndpoint := ocpCmd.PersistentFlags().String("metrics-endpoint", "", "YAML file with a list of metric endpoints")
 	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
@@ -53,17 +54,16 @@ func openShiftCmd() *cobra.Command {
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
-		indexing := *esServer != ""
 		envVars := map[string]string{
 			"ES_SERVER": strings.TrimSuffix(*esServer, "/"),
 			"ES_INDEX":  *esIndex,
 			"QPS":       fmt.Sprintf("%d", *qps),
 			"BURST":     fmt.Sprintf("%d", *burst),
-			"INDEXING":  fmt.Sprintf("%v", indexing),
+			"INDEXING":  fmt.Sprintf("%v", *indexing),
 			"GC":        fmt.Sprintf("%v", *gc),
 		}
 		discoveryAgent := discovery.NewDiscoveryAgent()
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout, *metricsEndpoint, *userMetadata)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, *indexing, *timeout, *metricsEndpoint, *userMetadata)
 		wh.Metadata.UUID = *uuid
 		if *extract {
 			if err := wh.ExtractWorkload(cmd.Name(), workloads.MetricsProfileMap[cmd.Name()]); err != nil {
