@@ -211,7 +211,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	if wh.indexing {
 		indexer, err = indexers.NewIndexer(configSpec)
 		if err != nil {
-			log.Fatal("%v Indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
+			log.Fatalf("%v Indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
 		}
 	}
 	configSpec.GlobalConfig.MetricsProfile = metricsProfile

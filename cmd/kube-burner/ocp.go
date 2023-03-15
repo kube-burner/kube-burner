@@ -41,7 +41,7 @@ func openShiftCmd() *cobra.Command {
 	var wh workloads.WorkloadHelper
 	esServer := ocpCmd.PersistentFlags().String("es-server", "", "Elastic Search endpoint")
 	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
-	indexing := ocpCmd.PersistentFlags().Bool("indexing", true, "Enable indexing")
+	indexing := ocpCmd.PersistentFlags().Bool("indexing", false, "Enable indexing")
 	metricsEndpoint := ocpCmd.PersistentFlags().String("metrics-endpoint", "", "YAML file with a list of metric endpoints")
 	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
