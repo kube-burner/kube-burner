@@ -214,7 +214,6 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			log.Fatal("%v Indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
 		}
 	}
-	configSpec.GlobalConfig.MetricsProfile = metricsProfile
 	if wh.metricsEndpoint != "" {
 		metrics.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
 	} else {
