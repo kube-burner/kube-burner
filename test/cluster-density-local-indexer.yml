@@ -1,0 +1,55 @@
+---
+global:
+  gc: {{.GC}}
+  indexerConfig:
+    enabled: {{.INDEXING}}
+    metricsDirectory: collected-metrics
+    createTarball: true
+    tarballName: collected-metrics.tar.gz
+    type: local
+  measurements:
+    - name: podLatency
+jobs:
+  - name: cluster-density
+    namespace: cluster-density
+    jobIterations: {{.JOB_ITERATIONS}}
+    qps: {{.QPS}}
+    burst: {{.BURST}}
+    namespacedIterations: true
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: true
+    preLoadPeriod: 30s
+    churn: {{.CHURN}}
+    churnDuration: {{.CHURN_DURATION}}
+    churnPercent: {{.CHURN_PERCENT}}
+    churnDelay: {{.CHURN_DELAY}}
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+
+      - objectTemplate: imagestream.yml
+        replicas: 1
+
+      - objectTemplate: build.yml
+        replicas: 1
+
+      - objectTemplate: deployment.yml
+        replicas: 5
+        inputVars:
+          podReplicas: 2
+
+      - objectTemplate: service.yml
+        replicas: 5
+
+      - objectTemplate: route.yml
+        replicas: 1
+
+      - objectTemplate: secret.yml
+        replicas: 10
+
+      - objectTemplate: configmap.yml
+        replicas: 10

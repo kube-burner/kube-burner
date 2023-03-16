@@ -34,9 +34,16 @@ kube-burner ocp cluster-density-v2 --iterations=2 --churn-duration=2m ${COMMON_F
 echo "Running node-density-cni wrapper with gc=false"
 kube-burner ocp node-density-cni --pods-per-node=75 --gc=false --uuid=${UUID} --alerting=false
 oc delete ns -l kube-burner-uuid=${UUID}
-trap - ERR
 echo "Running cluster-density timeout case"
+trap - ERR
 kube-burner ocp cluster-density --iterations=1 --churn-duration=5m ${COMMON_FLAGS} --timeout=1s
 if [ ${?} != 2 ]; then
   die "Kube-burner timed out but its exit code was ${rc} != 2"
 fi
+trap 'die' ERR
+
+# Run OCP test for local indexer - this will overwrite existing cluster-density.yml file
+echo "Running cluster-density wrapper with local indexer"
+mv cluster-density-local-indexer.yml cluster-density.yml
+kube-burner ocp cluster-density --iterations=2 --churn=false --indexing=true
+[[ ! -f "collected-metrics.tar.gz" ]] && die "Local indexer did not create collected-metrics.tar.gz file"
