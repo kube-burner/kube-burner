@@ -44,6 +44,9 @@ trap 'die' ERR
 
 # Run OCP test for local indexer - this will overwrite existing cluster-density.yml file
 echo "Running cluster-density wrapper with local indexer"
-mv cluster-density-local-indexer.yml cluster-density.yml
+cp cluster-density-local-indexer.yml cluster-density.yml
 kube-burner ocp cluster-density --iterations=2 --churn=false --indexing=true
-[[ ! -f "collected-metrics.tar.gz" ]] && die "Local indexer did not create collected-metrics.tar.gz file"
+if [[ ! -f "collected-metrics.tar.gz" ]]
+then
+  die "Local indexer did not create collected-metrics.tar.gz file"
+fi
