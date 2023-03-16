@@ -50,7 +50,7 @@ $ kube-burner ocp node-density --pods-per-node=100
 Running cluster-density with multiple endpoints support
 
 ```console
-$ kube-burner ocp cluster-density --iterations=1 --churn-duration=2m0s --indexing=true --es-index kube-burner --es-server https://www.esurl.com:443 --metrics-endpoint metrics-endpoints.yaml
+$ kube-burner ocp cluster-density --iterations=1 --churn-duration=2m0s --es-index kube-burner --es-server https://www.esurl.com:443 --metrics-endpoint metrics-endpoints.yaml
 ```
 
 
