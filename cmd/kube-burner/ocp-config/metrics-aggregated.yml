@@ -135,3 +135,11 @@
 
 - query: sum(kube_node_status_condition{status="true"}) by (condition)
   metricName: nodeStatus
+
+# Prometheus metrics
+
+- query: openshift:prometheus_tsdb_head_series:sum{job="prometheus-k8s"}
+  metricName: prometheus-timeseriestotal
+
+- query: openshift:prometheus_tsdb_head_samples_appended_total:sum{job="prometheus-k8s"}
+  metricName: prometheus-ingestionrate
