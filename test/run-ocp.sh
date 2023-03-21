@@ -20,6 +20,10 @@ COMMON_FLAGS="--es-server=${ES_SERVER} --es-index=${ES_INDEX} --alerting=true --
 
 echo "Running node-density wrapper"
 kube-burner ocp node-density --pods-per-node=75 --pod-ready-threshold=10s --container-image=gcr.io/google_containers/pause:3.0 ${COMMON_FLAGS}
+hits=$(curl "${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:etcdVersion" | jq .hits.total.value)
+if [[ ${hits} == 0 ]]; then
+  die "Couldn't find the metric etcdVersion indexed in ES"
+fi
 echo "Running node-density-heavy wrapper"
 kube-burner ocp node-density-heavy --pods-per-node=75 ${COMMON_FLAGS} --qps=5 --burst=5
 echo "Running cluster-density wrapper and user metadata"
