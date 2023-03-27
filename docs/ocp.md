@@ -23,10 +23,12 @@ Flags:
       --es-server string          Elastic Search endpoint
       --extract                   Extract workload in the current directory
       --gc                        Garbage collect created namespaces (default true)
+      --local-indexing            Local indexing
   -h, --help                      help for ocp
       --metrics-endpoint string   YAML file with a list of metric endpoints
       --qps int                   QPS (default 20)
       --timeout duration          Benchmark timeout (default 2h0m0s)
+      --user-metadata string      User provided metadata file, in YAML format
       --uuid string               Benchmark UUID (default "ff60bd1c-df27-4713-be3e-6b92acdd4d72")
 
 Global Flags:
