@@ -197,7 +197,10 @@ func (da *Agent) GetNodesInfo() (NodeInfo, error) {
 				nodeInfoData.MasterType = node.Labels["node.kubernetes.io/instance-type"]
 			case "node-role.kubernetes.io/worker":
 				nodeInfoData.WorkerCount++
-				nodeInfoData.WorkerType = node.Labels["node.kubernetes.io/instance-type"]
+				// Discard nodes with infra label
+				if _, ok := node.Labels["node-role.kubernetes.io/infra"]; !ok {
+					nodeInfoData.WorkerType = node.Labels["node.kubernetes.io/instance-type"]
+				}
 			case "node-role.kubernetes.io/infra":
 				nodeInfoData.InfraCount++
 				nodeInfoData.InfraType = node.Labels["node.kubernetes.io/instance-type"]
