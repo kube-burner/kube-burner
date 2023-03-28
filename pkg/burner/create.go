@@ -220,7 +220,7 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 			uns, err = dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
 		}
 		if err != nil {
-			if kerrors.IsForbidden(err) {
+			if kerrors.IsUnauthorized(err) {
 				log.Fatalf("Authorization error creating %s/%s: %s", obj.GetKind(), obj.GetName(), err)
 				return true, err
 			} else if kerrors.IsAlreadyExists(err) {
