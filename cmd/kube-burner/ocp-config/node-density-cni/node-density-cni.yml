@@ -6,7 +6,7 @@ global:
     esServers: ["{{.ES_SERVER}}"]
     insecureSkipVerify: true
     defaultIndex: {{.ES_INDEX}}
-    type: elastic
+    type: {{.INDEXING_TYPE}}
   measurements:
     - name: podLatency
 jobs:

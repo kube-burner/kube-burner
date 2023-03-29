@@ -23,6 +23,7 @@ import (
 	"time"
 
 	log "github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
@@ -39,7 +40,10 @@ func openShiftCmd() *cobra.Command {
 		Long:  `This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads`,
 	}
 	var wh workloads.WorkloadHelper
+	var indexingType config.IndexerType
+	var indexing bool
 	esServer := ocpCmd.PersistentFlags().String("es-server", "", "Elastic Search endpoint")
+	localIndexing := ocpCmd.PersistentFlags().Bool("local-indexing", false, "Enable local indexing")
 	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
 	metricsEndpoint := ocpCmd.PersistentFlags().String("metrics-endpoint", "", "YAML file with a list of metric endpoints")
 	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
@@ -51,16 +55,25 @@ func openShiftCmd() *cobra.Command {
 	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
 	extract := ocpCmd.PersistentFlags().Bool("extract", false, "Extract workload in the current directory")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
+	ocpCmd.MarkFlagsMutuallyExclusive("es-server", "local-indexing")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
-		indexing := *esServer != ""
+		if *esServer != "" || *localIndexing {
+			indexing = true
+			if *esServer != "" {
+				indexingType = config.ElasticIndexer
+			} else {
+				indexingType = config.LocalIndexer
+			}
+		}
 		envVars := map[string]string{
-			"ES_SERVER": strings.TrimSuffix(*esServer, "/"),
-			"ES_INDEX":  *esIndex,
-			"QPS":       fmt.Sprintf("%d", *qps),
-			"BURST":     fmt.Sprintf("%d", *burst),
-			"INDEXING":  fmt.Sprintf("%v", indexing),
-			"GC":        fmt.Sprintf("%v", *gc),
+			"ES_SERVER":     strings.TrimSuffix(*esServer, "/"),
+			"ES_INDEX":      *esIndex,
+			"QPS":           fmt.Sprintf("%d", *qps),
+			"BURST":         fmt.Sprintf("%d", *burst),
+			"GC":            fmt.Sprintf("%v", *gc),
+			"INDEXING":      fmt.Sprintf("%v", indexing),
+			"INDEXING_TYPE": string(indexingType),
 		}
 		discoveryAgent := discovery.NewDiscoveryAgent()
 		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout, *metricsEndpoint, *userMetadata)
