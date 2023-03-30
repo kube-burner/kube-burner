@@ -199,10 +199,12 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	var metricsEndpoints []prometheus.MetricEndpoint
 	cfg := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(cfg); err != nil {
-		log.Debug("Workload not available in the current directory, extracting it")
+		log.Debugf("File %v not available in the current directory, extracting it", cfg)
 		if err := wh.ExtractWorkload(workload, metricsProfile); err != nil {
 			log.Fatalf("Error extracting workload: %v", err)
 		}
+	} else {
+		log.Infof("File %v available in the current directory, using it", cfg)
 	}
 	configSpec, err := config.Parse(cfg, true)
 	if err != nil {
