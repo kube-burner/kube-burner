@@ -113,11 +113,18 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		}
 	}
 	start := time.Now().Round(time.Second)
+	// We have to sum 1 since the iterations start from 1
+	iterationProgress := (iterationEnd - iterationStart + 1) / 10
+	percent := 1
 	for i := iterationStart; i <= iterationEnd; i++ {
+		if i == iterationStart+iterationProgress*percent {
+			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart+1)
+			percent++
+		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
-			if err = createNamespace(ClientSet, fmt.Sprintf("%s-%d", ex.Config.Namespace, i), nsLabels); err != nil {
+			if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
 				log.Error(err.Error())
 				continue
 			}
@@ -126,8 +133,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
 		if ex.Config.PodWait {
-			log.Infof("Waiting up to %s all job actions to be completed", ex.Config.MaxWaitTimeout)
-			log.Debugf("Waiting for actions in namespace %v to be completed", ns)
+			log.Infof("Waiting up to %s for actions to be completed in namespace", ex.Config.MaxWaitTimeout, ns)
 			ex.waitForObjects(ns)
 		}
 		if ex.Config.JobIterationDelay > 0 {
@@ -269,11 +275,11 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		}
 		// delete numToChurn namespaces starting at randStart
 		for i := randStart; i < numToChurn+randStart; i++ {
-			nsName := fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+			ns := fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
 			// Label namespaces to be deleted
-			_, err = ClientSet.CoreV1().Namespaces().Patch(context.TODO(), nsName, types.JSONPatchType, delPatch, metav1.PatchOptions{})
+			_, err = ClientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
 			if err != nil {
-				log.Errorf("Error patching namespace %s. Error: %v", nsName, err)
+				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
 			}
 		}
 		// 1 hour timeout to delete namespaces
