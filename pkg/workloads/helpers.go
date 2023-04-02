@@ -31,7 +31,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/vishnuchalla/perfscale-go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
@@ -211,7 +211,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		log.Fatal(err)
 	}
 	if wh.indexing {
-		indexer, err = indexers.NewIndexer(configSpec)
+		indexer, err = indexers.NewIndexer(configSpec.GlobalConfig.IndexerConfig)
 		if err != nil {
 			log.Fatalf("%v indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
 		}

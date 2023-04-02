@@ -20,7 +20,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/vishnuchalla/perfscale-go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"

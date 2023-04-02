@@ -26,11 +26,10 @@ import (
 	"path/filepath"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/vishnuchalla/perfscale-go-commons/indexers"
 )
 
-func createTarball(indexerConfig config.IndexerConfig) error {
+func createTarball(indexerConfig indexers.IndexerConfig) error {
 	tarball, err := os.Create(fmt.Sprintf(indexerConfig.TarballName))
 	if err != nil {
 		return fmt.Errorf("Could not create tarball file: %v", err)

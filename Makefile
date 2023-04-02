@@ -22,7 +22,7 @@ CONTAINER_NAME = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)
 CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)-$(ARCH)
 MANIFEST_ARCHS ?= amd64 arm64 ppc64le s390x
 
-all: lint build images push
+all: build images push
 
 help:
 	@echo "Commands for $(BIN_PATH):"

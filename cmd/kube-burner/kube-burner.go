@@ -28,7 +28,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/vishnuchalla/perfscale-go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 
 	uid "github.com/satori/go.uuid"
@@ -246,7 +246,7 @@ func importCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			indexer, err := indexers.NewIndexer(configSpec)
+			indexer, err := indexers.NewIndexer(configSpec.GlobalConfig.IndexerConfig)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -287,7 +287,7 @@ func alertCmd() *cobra.Command {
 				}
 			}
 			if configSpec.GlobalConfig.IndexerConfig.Enabled {
-				indexer, err = indexers.NewIndexer(configSpec)
+				indexer, err = indexers.NewIndexer(configSpec.GlobalConfig.IndexerConfig)
 				if err != nil {
 					log.Fatal(err.Error())
 				}

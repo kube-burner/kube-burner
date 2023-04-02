@@ -19,7 +19,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/vishnuchalla/perfscale-go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 )
 

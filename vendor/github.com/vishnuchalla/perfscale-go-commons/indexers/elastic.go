@@ -28,8 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/vishnuchalla/perfscale-go-commons/logger"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esutil"
@@ -47,8 +46,8 @@ func init() {
 	indexerMap[elastic] = &Elastic{}
 }
 
-func (esIndexer *Elastic) new(configSpec config.Spec) error {
-	esConfig := configSpec.GlobalConfig.IndexerConfig
+func (esIndexer *Elastic) new(indexerConfig IndexerConfig) error {
+	esConfig := indexerConfig
 	if esConfig.DefaultIndex == "" {
 		return fmt.Errorf("index name not specified")
 	}
@@ -72,7 +71,7 @@ func (esIndexer *Elastic) new(configSpec config.Spec) error {
 	esIndexer.index = esIndex
 	r, _ = esIndexer.client.Indices.Exists([]string{esIndex})
 	if r.IsError() {
-		log.Infof("Creating index %s", esIndex)
+		logger.Infof("Creating index %s", esIndex)
 		r, _ = esIndexer.client.Indices.Create(esIndex)
 		if r.IsError() {
 			return fmt.Errorf("error creating index %s on ES: %s", esIndex, r.String())
@@ -85,7 +84,7 @@ func (esIndexer *Elastic) new(configSpec config.Spec) error {
 func (esIndexer *Elastic) Index(documents []interface{}, opts IndexingOpts) {
 	var statString string
 	var indexerStatsLock sync.Mutex
-	log.Infof("Indexing metric %s", opts.MetricName)
+	logger.Infof("Indexing metric %s", opts.MetricName)
 	indexerStats := make(map[string]int)
 	hasher := sha256.New()
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
@@ -96,14 +95,14 @@ func (esIndexer *Elastic) Index(documents []interface{}, opts IndexingOpts) {
 		Timeout:    10 * time.Minute, // TODO: hardcoded
 	})
 	if err != nil {
-		log.Errorf("Error creating the indexer: %s", err)
+		logger.Errorf("Error creating the indexer: %s", err)
 	}
 	start := time.Now().UTC()
-	log.Debugf("Indexing [%d] documents in %s", len(documents), esIndexer.index)
+	logger.Debugf("Indexing [%d] documents in %s", len(documents), esIndexer.index)
 	for _, document := range documents {
 		j, err := json.Marshal(document)
 		if err != nil {
-			log.Errorf("Cannot encode document %s: %s", document, err)
+			logger.Errorf("Cannot encode document %s: %s", document, err)
 		}
 		hasher.Write(j)
 		err = bi.Add(
@@ -120,16 +119,16 @@ func (esIndexer *Elastic) Index(documents []interface{}, opts IndexingOpts) {
 			},
 		)
 		if err != nil {
-			log.Errorf("Unexpected ES indexing error: %s", err)
+			logger.Errorf("Unexpected ES indexing error: %s", err)
 		}
 		hasher.Reset()
 	}
 	if err := bi.Close(context.Background()); err != nil {
-		log.Fatalf("Unexpected ES error: %s", err)
+		logger.Fatalf("Unexpected ES error: %s", err)
 	}
 	dur := time.Since(start)
 	for stat, val := range indexerStats {
 		statString += fmt.Sprintf(" %s=%d", stat, val)
 	}
-	log.Debugf("Indexing finished in %v:%v", dur.Truncate(time.Millisecond), statString)
+	logger.Debugf("Indexing finished in %v:%v", dur.Truncate(time.Millisecond), statString)
 }

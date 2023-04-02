@@ -19,8 +19,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/vishnuchalla/perfscale-go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 )
@@ -36,7 +35,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 	var alertM *alerting.AlertManager
 	userMetadataContent := make(map[string]interface{})
 	if configSpec.GlobalConfig.IndexerConfig.Enabled {
-		indexer, err = indexers.NewIndexer(configSpec)
+		indexer, err = indexers.NewIndexer(configSpec.GlobalConfig.IndexerConfig)
 		if err != nil {
 			log.Fatalf("%v indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
 		}
@@ -90,7 +89,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			},
 			}
 			ScrapeMetrics(p, indexer)
-			if configSpec.GlobalConfig.IndexerConfig.Type == config.LocalIndexer {
+			if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer {
 				HandleTarball(configSpec)
 			}
 		} else {

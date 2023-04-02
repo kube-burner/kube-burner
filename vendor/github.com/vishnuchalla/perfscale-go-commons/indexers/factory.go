@@ -17,31 +17,19 @@ package indexers
 import (
 	"fmt"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/vishnuchalla/perfscale-go-commons/logger"
 )
 
-// Indexer indexer interface
-type Indexer interface {
-	Index([]interface{}, IndexingOpts)
-	new(config.Spec) error
-}
-
-type IndexingOpts struct {
-	MetricName string
-	JobName    string
-}
-
-var indexerMap = make(map[config.IndexerType]Indexer)
+var indexerMap = make(map[IndexerType]Indexer)
 
 // NewIndexer creates a new Indexer with the specified IndexerConfig
-func NewIndexer(configSpec config.Spec) (*Indexer, error) {
+func NewIndexer(indexerConfig IndexerConfig) (*Indexer, error) {
 	var indexer Indexer
 	var exists bool
-	cfg := configSpec.GlobalConfig.IndexerConfig
+	cfg := indexerConfig
 	if indexer, exists = indexerMap[cfg.Type]; exists {
-		log.Infof("📁 Creating indexer: %s", cfg.Type)
-		err := indexer.new(configSpec)
+		logger.Infof("📁 Creating indexer: %s", cfg.Type)
+		err := indexer.new(indexerConfig)
 		if err != nil {
 			return &indexer, err
 		}

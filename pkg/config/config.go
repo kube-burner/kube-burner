@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/vishnuchalla/perfscale-go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 
 	"gopkg.in/yaml.v3"
@@ -42,7 +43,7 @@ var configSpec = Spec{
 		GC:             false,
 		RequestTimeout: 15 * time.Second,
 		Measurements:   []mtypes.Measurement{},
-		IndexerConfig: IndexerConfig{
+		IndexerConfig:  indexers.IndexerConfig{
 			Enabled:            false,
 			InsecureSkipVerify: false,
 			MetricsDirectory:   "collected-metrics",
