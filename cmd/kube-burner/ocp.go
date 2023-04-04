@@ -24,7 +24,7 @@ import (
 
 	log "github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/vishnuchalla/perfscale-go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
+	"github.com/vishnuchalla/perfscale-go-commons/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"

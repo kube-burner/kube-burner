@@ -35,7 +35,17 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 	var alertM *alerting.AlertManager
 	userMetadataContent := make(map[string]interface{})
 	if configSpec.GlobalConfig.IndexerConfig.Enabled {
-		indexer, err = indexers.NewIndexer(configSpec.GlobalConfig.IndexerConfig)
+		config := indexers.IndexerConfig{
+			Type: "elastic",
+			ESServers: []string{"https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443"},
+			DefaultIndex: "ripsaw-kube-burner",
+			Port: 0,
+			InsecureSkipVerify: true,
+			Enabled: true,
+			MetricsDirectory: "collected-metrics",
+			TarballName: "k8s-netperf-metrics.tgz",
+		}
+		indexer, err = indexers.NewIndexer(config)
 		if err != nil {
 			log.Fatalf("%v indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
 		}

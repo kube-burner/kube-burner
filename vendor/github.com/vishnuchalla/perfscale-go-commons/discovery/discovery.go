@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
+	"github.com/vishnuchalla/perfscale-go-commons/logger"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +52,7 @@ func NewDiscoveryAgent() Agent {
 	}
 	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	discoveryAgent = Agent{
 		clientSet:     kubernetes.NewForConfigOrDie(restConfig),
@@ -92,7 +92,7 @@ func getPrometheusURL(dynamicClient dynamic.Interface) (string, error) {
 		return "", err
 	}
 	endpoint := "https://" + prometheusHost
-	log.Debug("Prometheus endpoint: ", endpoint)
+	logger.Debug("Prometheus endpoint: ", endpoint)
 	return endpoint, nil
 }
 
@@ -107,14 +107,14 @@ func getBearerToken(clientset *kubernetes.Clientset) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Debug("Bearer token: ", response.Status.Token)
+	logger.Debug("Bearer token: ", response.Status.Token)
 	return response.Status.Token, nil
 }
 
 // GetWorkerNodeCount returns the number of worker nodes
 func (da *Agent) GetWorkerNodeCount() (int, error) {
 	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: workerNodeSelector})
-	log.Infof("Listed nodes after using selector %s: %d", workerNodeSelector, len(nodeList.Items))
+	logger.Infof("Listed nodes after using selector %s: %d", workerNodeSelector, len(nodeList.Items))
 	return len(nodeList.Items), err
 }
 
@@ -132,7 +132,7 @@ func (da *Agent) GetCurrentPodCount() (int, error) {
 		}
 		podCount += len(podList.Items)
 	}
-	log.Debug("Current running pod count: ", podCount)
+	logger.Debug("Current running pod count: ", podCount)
 	return podCount, nil
 }
 

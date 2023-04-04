@@ -166,8 +166,9 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
-# github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230402135434-e9103e59439b
+# github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230404173523-087c08ac6563
 ## explicit; go 1.19
+github.com/vishnuchalla/perfscale-go-commons/discovery
 github.com/vishnuchalla/perfscale-go-commons/indexers
 github.com/vishnuchalla/perfscale-go-commons/logger
 # golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd

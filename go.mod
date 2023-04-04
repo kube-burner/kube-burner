@@ -62,7 +62,7 @@ require (
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230402135434-e9103e59439b // indirect
+	github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230404173523-087c08ac6563 // indirect
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect

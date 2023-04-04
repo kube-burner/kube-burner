@@ -528,8 +528,10 @@ github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PK
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
-github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230402135434-e9103e59439b h1:f2GH8I5QnRM1fs/SL4b7g7zDFTvNWPouGmImx4qO5wA=
-github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230402135434-e9103e59439b/go.mod h1:JczDuZOdhtq/v3s7nK/JdPERtsbLlJJDzKCIKganKOE=
+github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230404171748-17e197f3fbbe h1:fpGZyKfWMmEPwyuf5P2b0q5i3lZwmxl/Z1mVWz6jKsM=
+github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230404171748-17e197f3fbbe/go.mod h1:JczDuZOdhtq/v3s7nK/JdPERtsbLlJJDzKCIKganKOE=
+github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230404173523-087c08ac6563 h1:g7Pg6Q8wtFeEgsOkz7z7/ZK6ZQUzCbPOU4bF/gKEyAM=
+github.com/vishnuchalla/perfscale-go-commons v0.0.0-20230404173523-087c08ac6563/go.mod h1:JczDuZOdhtq/v3s7nK/JdPERtsbLlJJDzKCIKganKOE=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
