@@ -12,6 +12,7 @@ Usage:
 Available Commands:
   cluster-density    Runs cluster-density workload
   cluster-density-v2 Runs cluster-density-v2 workload
+  cluster-density-ms Runs cluster-density-ms workload
   node-density       Runs node-density workload
   node-density-cni   Runs node-density-cni workload
   node-density-heavy Runs node-density-heavy workload
