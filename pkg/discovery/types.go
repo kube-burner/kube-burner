@@ -18,6 +18,17 @@ type InfraObj struct {
 	Status struct {
 		InfrastructureName string `json:"infrastructureName"`
 		Platform           string `json:"platform"`
+		Type               string `json:"type"`
+		PlatformStatus     struct {
+			Aws struct {
+				Region       string `json:"region"`
+				ResourceTags []struct {
+					Key   string `json:"key"`
+					Value string `json:"value"`
+				} `json:"resourceTags"`
+			} `json:"aws"`
+			Type string `json:"type"`
+		} `yaml:"platformStatus"`
 	} `json:"status"`
 }
 
