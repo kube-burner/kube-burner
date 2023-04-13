@@ -123,7 +123,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.Config.NamespacedIterations {
-			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i/ex.Config.IterationsPerNamespace)
 			if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
 				log.Error(err.Error())
 				continue
@@ -149,7 +149,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
 		for i := iterationStart; i <= iterationEnd; i++ {
 			if ex.Config.NamespacedIterations {
-				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i/ex.Config.IterationsPerNamespace)
 			}
 			sem <- 1
 			wg.Add(1)
