@@ -29,6 +29,9 @@ jobs:
         fetch-depth: 0
         ref: ${{ github.event.pull_request.head.sha }}
 
+    - name: Vendor
+      run: make vendor
+      
     - name: Build
       run: make build
 
