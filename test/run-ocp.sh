@@ -30,8 +30,8 @@ echo "Running cluster-density wrapper and user metadata"
 kube-burner ocp cluster-density --iterations=2 --churn-duration=2m ${COMMON_FLAGS} --user-metadata=user-metadata.yml
 echo "Running cluster-density wrapper"
 kube-burner ocp cluster-density --iterations=2 --churn=false --uuid=${UUID}
-echo "Running cluster-density wrapper for multiple endpoints case"
-kube-burner ocp cluster-density --iterations=1 --churn-duration=2m --metrics-endpoint metrics-endpoints.yaml ${COMMON_FLAGS}
+echo "Running cluster-density-ms wrapper for multiple endpoints case"
+kube-burner ocp cluster-density-ms --iterations=1 --churn-duration=2m --metrics-endpoint metrics-endpoints.yaml ${COMMON_FLAGS}
 echo "Running cluster-density-v2 wrapper"
 kube-burner ocp cluster-density-v2 --iterations=2 --churn-duration=2m ${COMMON_FLAGS}
 # Disable gc and avoid metric indexing

@@ -92,11 +92,13 @@ func SetJobConfig(jobConfig *config.Job) {
 }
 
 // Start starts registered measurements
-func Start(wg *sync.WaitGroup) {
+func Start() {
+	var wg sync.WaitGroup
 	for _, measurement := range factory.createFuncs {
 		wg.Add(1)
-		go measurement.start(wg)
+		go measurement.start(&wg)
 	}
+	wg.Wait()
 }
 
 // Stop stops registered measurements

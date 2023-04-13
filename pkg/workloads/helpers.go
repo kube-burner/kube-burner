@@ -131,6 +131,11 @@ func (wh *WorkloadHelper) GatherMetadata() error {
 	}
 	wh.Metadata.MetricName = metadataMetricName
 	wh.Metadata.Platform = infra.Status.Platform
+	for _, v := range infra.Status.PlatformStatus.Aws.ResourceTags {
+		if v.Key == "red-hat-clustertype" {
+			wh.Metadata.Platform = v.Value
+		}
+	}
 	wh.Metadata.ClusterName = infra.Status.InfrastructureName
 	wh.Metadata.K8SVersion = version.K8sVersion
 	wh.Metadata.OCPVersion = version.OcpVersion

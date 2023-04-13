@@ -17,7 +17,6 @@ package burner
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/log"
@@ -80,7 +79,6 @@ var waitRestConfig *rest.Config
 func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
 	var err error
 	var rc int
-	var measurementsWg sync.WaitGroup
 	var prometheusJobList []prometheus.Job
 	res := make(chan int, 1)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
@@ -117,8 +115,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 					defer cancel()
 					CleanupNamespaces(ctx, job.selector.ListOptions)
 				}
-				measurements.Start(&measurementsWg)
-				measurementsWg.Wait()
+				measurements.Start()
 				if job.Config.Churn {
 					log.Info("Churning enabled")
 					log.Infof("Churn duration: %v", job.Config.ChurnDuration)
