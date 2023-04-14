@@ -15,7 +15,10 @@
 package log
 
 import (
+	"fmt"
 	"os"
+	"path"
+	"runtime"
 
 	"github.com/sirupsen/logrus"
 )
@@ -82,6 +85,9 @@ func newLogrusLogger() *logrus.Logger {
 	customFormatter := new(logrus.TextFormatter)
 	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
 	customFormatter.FullTimestamp = true
+	customFormatter.CallerPrettyfier = func(f *runtime.Frame) (function string, file string) {
+		return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+	}
 	l.SetFormatter(customFormatter)
 	return l
 }
