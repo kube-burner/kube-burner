@@ -26,19 +26,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var (
-	namespaces = make(map[string]bool)
-)
-
 func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLabels map[string]string) error {
 	ns := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
 	}
 
 	return RetryWithExponentialBackOff(func() (done bool, err error) {
-		if namespaces[namespaceName] {
-			return true, nil
-		}
 		_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
 		if errors.IsForbidden(err) {
 			log.Fatalf("authorization error creating namespace %s: %s", ns.Name, err)
@@ -58,7 +51,6 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 			return false, nil
 		}
 		log.Debugf("Created namespace: %s", ns.Name)
-		namespaces[namespaceName] = true
 		return true, err
 	}, 5*time.Second, 3, 0, 8)
 }

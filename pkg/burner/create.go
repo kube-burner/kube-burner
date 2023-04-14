@@ -38,6 +38,11 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+var (
+	namespacesCreated = make(map[string]bool)
+	namespacesWaited  = make(map[string]bool)
+)
+
 func setupCreateJob(jobConfig config.Job) Executor {
 	var f io.Reader
 	var err error
@@ -124,17 +129,24 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.Config.NamespacedIterations {
 			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i/ex.Config.IterationsPerNamespace)
-			if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
-				log.Error(err.Error())
-				continue
+			if !namespacesCreated[ns] {
+				if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
+					log.Error(err.Error())
+					continue
+				}
+				namespacesCreated[ns] = true
 			}
 		}
 		for objectIndex, obj := range ex.objects {
 			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
 		if ex.Config.PodWait {
+			// TODO Only need one waiter per namespace, not one per namespace per iterations.
 			log.Infof("Waiting up to %s for actions to be completed in namespace", ex.Config.MaxWaitTimeout, ns)
-			ex.waitForObjects(ns)
+			if !namespacesWaited[ns] {
+				ex.waitForObjects(ns)
+				namespacesWaited[ns] = true
+			}
 		}
 		if ex.Config.JobIterationDelay > 0 {
 			log.Infof("Sleeping for %v", ex.Config.JobIterationDelay)
