@@ -26,7 +26,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
@@ -35,6 +34,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
+	log "github.com/sirupsen/logrus"
 )
 
 const (

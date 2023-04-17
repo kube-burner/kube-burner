@@ -3,7 +3,7 @@ package util
 import (
 	"os"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
