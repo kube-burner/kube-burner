@@ -26,6 +26,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/vishnuchalla/go-commons/indexers"
 
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +43,7 @@ var configSpec = Spec{
 		GC:             false,
 		RequestTimeout: 15 * time.Second,
 		Measurements:   []mtypes.Measurement{},
-		IndexerConfig: IndexerConfig{
+		IndexerConfig: indexers.IndexerConfig{
 			Enabled:            false,
 			InsecureSkipVerify: false,
 			MetricsDirectory:   "collected-metrics",

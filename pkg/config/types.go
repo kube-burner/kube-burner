@@ -18,6 +18,7 @@ import (
 	"time"
 
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/vishnuchalla/go-commons/indexers"
 )
 
 // JobType type of job
@@ -32,16 +33,6 @@ const (
 	PatchJob JobType = "patch"
 )
 
-// IndexerType type of indexer
-type IndexerType string
-
-const (
-	// Elastic indexer that send metrics to the configures ES instance
-	ElasticIndexer IndexerType = "elastic"
-	// Local indexer that writes metrics to local directory
-	LocalIndexer IndexerType = "local"
-)
-
 // Spec configuration root
 type Spec struct {
 	// GlobalConfig defines global configuration parameters
@@ -50,32 +41,10 @@ type Spec struct {
 	Jobs []Job `yaml:"jobs"`
 }
 
-// IndexerConfig holds the indexer configuration
-type IndexerConfig struct {
-	// Type type of indexer
-	Type IndexerType `yaml:"type"`
-	// ESServers List of ElasticSearch instances
-	ESServers []string `yaml:"esServers"`
-	// DefaultIndex default index to send prometheus metrics
-	DefaultIndex string `yaml:"defaultIndex"`
-	// Port indexer port
-	Port int `yaml:"port"`
-	// InsecureSkipVerify disable TLS ceriticate verification
-	InsecureSkipVerify bool `yaml:"insecureSkipVerify"`
-	// Enabled enable indexer
-	Enabled bool `yaml:"enabled"`
-	// Directory to save metrics files in
-	MetricsDirectory string `yaml:"metricsDirectory"`
-	// Create tarball
-	CreateTarball bool `yaml:"createTarball"`
-	// TarBall name
-	TarballName string `yaml:"tarballName"`
-}
-
 // GlobalConfig holds the global configuration
 type GlobalConfig struct {
 	// IndexerConfig contains a IndexerConfig definition
-	IndexerConfig IndexerConfig `yaml:"indexerConfig"`
+	IndexerConfig indexers.IndexerConfig `yaml:"indexerConfig"`
 	// Measurements describes a list of measurements kube-burner
 	// will take along with job
 	Measurements []mtypes.Measurement `yaml:"measurements"`

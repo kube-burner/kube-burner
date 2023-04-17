@@ -25,9 +25,9 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/prometheus/common/model"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/vishnuchalla/go-commons/indexers"
 	"gopkg.in/yaml.v3"
 )
 

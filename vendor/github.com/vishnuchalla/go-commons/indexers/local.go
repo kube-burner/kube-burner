@@ -1,15 +1,3 @@
-package indexers
-
-import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path"
-
-	"github.com/cloud-bulldozer/kube-burner/log"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-)
-
 // Copyright 2023 The Kube-burner Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +12,17 @@ import (
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+package indexers
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path"
+
+	logger "github.com/sirupsen/logrus"
+)
+
 const local = "local"
 
 type Local struct {
@@ -34,11 +33,11 @@ func init() {
 	indexerMap[local] = &Local{}
 }
 
-func (l *Local) new(configSpec config.Spec) error {
-	if configSpec.GlobalConfig.IndexerConfig.MetricsDirectory == "" {
+func (l *Local) new(indexerConfig IndexerConfig) error {
+	if indexerConfig.MetricsDirectory == "" {
 		return fmt.Errorf("directory name not specified")
 	}
-	l.metricsDirectory = configSpec.GlobalConfig.IndexerConfig.MetricsDirectory
+	l.metricsDirectory = indexerConfig.MetricsDirectory
 	err := os.MkdirAll(l.metricsDirectory, 0744)
 	return err
 }
@@ -52,14 +51,14 @@ func (l *Local) Index(documents []interface{}, opts IndexingOpts) {
 		metricName = fmt.Sprintf("%s.json", opts.MetricName)
 	}
 	filename := path.Join(l.metricsDirectory, metricName)
-	log.Infof("Writing metric to: %s", filename)
+	logger.Infof("Writing metric to: %s", filename)
 	f, err := os.Create(filename)
 	if err != nil {
-		log.Errorf("Error creating metrics file %s: %s", filename, err)
+		logger.Errorf("Error creating metrics file %s: %s", filename, err)
 	}
 	defer f.Close()
 	jsonEnc := json.NewEncoder(f)
 	if jsonEnc.Encode(documents); err != nil {
-		log.Errorf("JSON encoding error: %s", err)
+		logger.Errorf("JSON encoding error: %s", err)
 	}
 }

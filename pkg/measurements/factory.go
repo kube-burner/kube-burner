@@ -20,8 +20,8 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/vishnuchalla/go-commons/indexers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )

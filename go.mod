@@ -1,16 +1,16 @@
 module github.com/cloud-bulldozer/kube-burner
 
-go 1.19
+go 1.18
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/elastic/go-elasticsearch/v7 v7.13.1
 	github.com/prometheus/client_golang v1.15.0
 	github.com/prometheus/common v0.42.0
 	github.com/satori/go.uuid v1.2.0
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cast v1.3.1
 	github.com/spf13/cobra v1.6.1
+	github.com/vishnuchalla/go-commons v1.0.2
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.25.4
@@ -34,6 +34,7 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/elastic/go-elasticsearch/v7 v7.13.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
