@@ -24,13 +24,13 @@ import (
 	"text/template"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	api "github.com/prometheus/client_golang/api"
 	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 

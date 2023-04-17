@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )

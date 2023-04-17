@@ -19,9 +19,9 @@ import (
 	"reflect"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	log "github.com/sirupsen/logrus"
 )
 
 // LatencyQuantiles holds the latency measurement quantiles

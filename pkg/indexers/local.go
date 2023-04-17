@@ -6,8 +6,8 @@ import (
 	"os"
 	"path"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	log "github.com/sirupsen/logrus"
 )
 
 // Copyright 2023 The Kube-burner Authors.

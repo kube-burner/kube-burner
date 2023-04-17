@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
@@ -28,6 +27,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
