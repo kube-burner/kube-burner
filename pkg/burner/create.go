@@ -143,9 +143,13 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		if ex.Config.PodWait {
 			// TODO Only need one waiter per namespace, not one per namespace per iterations.
 			log.Infof("Waiting up to %s for actions to be completed in namespace", ex.Config.MaxWaitTimeout, ns)
-			if !namespacesWaited[ns] {
+			if ex.Config.NamespacedIterations {
+				if !namespacesWaited[ns] {
+					ex.waitForObjects(ns)
+					namespacesWaited[ns] = true
+				}
+			} else {
 				ex.waitForObjects(ns)
-				namespacesWaited[ns] = true
 			}
 		}
 		if ex.Config.JobIterationDelay > 0 {
@@ -162,6 +166,11 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		for i := iterationStart; i <= iterationEnd; i++ {
 			if ex.Config.NamespacedIterations {
 				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i/ex.Config.IterationsPerNamespace)
+				if namespacesWaited[ns] {
+					continue
+				} else {
+					namespacesWaited[ns] = true
+				}
 			}
 			sem <- 1
 			wg.Add(1)
