@@ -18,10 +18,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
 	"time"
 
-	_ "github.com/cloud-bulldozer/kube-burner/pkg/log"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
@@ -344,7 +346,17 @@ func main() {
 	)
 	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		lvl, err := log.ParseLevel(*logLevel)
+		logrus.SetReportCaller(true)
+		formatter := &logrus.TextFormatter{
+			TimestampFormat: "2006-01-02 15:04:05",
+			FullTimestamp:   true,
+			DisableColors:   true,
+			CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
+				return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+			},
+		}
+		logrus.SetFormatter(formatter)
+		lvl, err := logrus.ParseLevel(*logLevel)
 		if err != nil {
 			log.Fatalf("Unknown log level %s", *logLevel)
 		}
