@@ -56,7 +56,7 @@ func preLoadImages(job Executor) error {
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: "kube-burner-preload=true"})
+	CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: "kube-burner-preload=true"}, true)
 	return nil
 }
 

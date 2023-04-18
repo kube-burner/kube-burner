@@ -286,7 +286,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
 		// Delete namespaces based on the label we added
-		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"})
+		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"}, true)
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart-1)

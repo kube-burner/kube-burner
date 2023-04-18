@@ -175,7 +175,7 @@ func destroyCmd() *cobra.Command {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			burner.CleanupNamespaces(ctx, listOptions)
+			burner.CleanupNamespaces(ctx, listOptions, true)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")

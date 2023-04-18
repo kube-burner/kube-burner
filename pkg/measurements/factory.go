@@ -79,7 +79,7 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
 		if err := measurementFunc.setConfig(measurement); err != nil {
-			return fmt.Errorf("Config validataion error: %s", err)
+			return fmt.Errorf("Config validation error: %s", err)
 		}
 		mf.createFuncs[measurement.Name] = measurementFunc
 		log.Infof("Registered measurement: %s", measurement.Name)
