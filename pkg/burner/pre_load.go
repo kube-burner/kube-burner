@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +56,7 @@ func preLoadImages(job Executor) error {
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: "kube-burner-preload=true"})
+	CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: "kube-burner-preload=true"}, true)
 	return nil
 }
 

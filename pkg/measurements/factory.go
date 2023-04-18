@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/vishnuchalla/go-commons/indexers"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -79,7 +79,7 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
 		if err := measurementFunc.setConfig(measurement); err != nil {
-			return fmt.Errorf("Config validataion error: %s", err)
+			return fmt.Errorf("Config validation error: %s", err)
 		}
 		mf.createFuncs[measurement.Name] = measurementFunc
 		log.Infof("Registered measurement: %s", measurement.Name)

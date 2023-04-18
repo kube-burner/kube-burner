@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
 )

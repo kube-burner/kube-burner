@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
@@ -28,6 +27,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 	"github.com/vishnuchalla/go-commons/indexers"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -113,7 +113,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 				if job.Config.Cleanup {
 					ctx, cancel := context.WithTimeout(context.Background(), timeout)
 					defer cancel()
-					CleanupNamespaces(ctx, job.selector.ListOptions)
+					CleanupNamespaces(ctx, job.selector.ListOptions, true)
 				}
 				measurements.Start()
 				if job.Config.Churn {
@@ -165,11 +165,9 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
 			}
 		}
-		// Update end time of last job
-		jobList[len(jobList)-1].End = time.Now().UTC()
-		if len(prometheusClients) > 0 {
-			log.Infof("Waiting %v extra before scraping prometheus endpoints", prometheusClients[0].Step)
-			time.Sleep(prometheusClients[0].Step)
+		// We initialize cleanup as soon as the benchmark finishes
+		if configSpec.GlobalConfig.GC {
+			go CleanupNamespaces(context.TODO(), v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
 		}
 		for idx, prometheusClient := range prometheusClients {
 			// If alertManager is configured
@@ -198,8 +196,8 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		// Use timeout/4 to garbage collect namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), timeout/4)
 		defer cancel()
-		log.Info("Garbage collecting created namespaces")
-		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)})
+		log.Info("Garbage collecting remaining namespaces")
+		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
 	}
 	return rc, nil
 }

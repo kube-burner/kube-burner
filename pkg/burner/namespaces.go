@@ -18,7 +18,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,37 +55,27 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 }
 
 // CleanupNamespaces deletes namespaces with the given selector
-func CleanupNamespaces(ctx context.Context, l metav1.ListOptions) {
+func CleanupNamespaces(ctx context.Context, l metav1.ListOptions, cleanupWait bool) {
 	ns, _ := ClientSet.CoreV1().Namespaces().List(ctx, l)
 	if len(ns.Items) > 0 {
 		log.Infof("Deleting namespaces with label %s", l.LabelSelector)
 		for _, ns := range ns.Items {
 			err := ClientSet.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 			if errors.IsNotFound(err) {
-				log.Warnf("Namespace %s not found", ns.Name)
+				log.Debugf("Namespace %s not found", ns.Name)
 				continue
-			}
-			if ctx.Err() == context.DeadlineExceeded {
-				log.Fatalf("Timeout cleaning up namespaces: %v", err)
 			}
 			if err != nil {
 				log.Errorf("Error cleaning up namespaces: %v", err)
 			}
 		}
-	}
-	if len(ns.Items) > 0 {
-		if err := waitForDeleteNamespaces(ctx, l); err != nil {
-			if ctx.Err() == context.DeadlineExceeded {
-				log.Fatalf("Timeout cleaning up namespaces: %v", err)
-			}
-			if err != nil {
-				log.Errorf("Error cleaning up namespaces: %v", err)
-			}
+		if cleanupWait {
+			waitForDeleteNamespaces(ctx, l)
 		}
 	}
 }
 
-func waitForDeleteNamespaces(ctx context.Context, l metav1.ListOptions) error {
+func waitForDeleteNamespaces(ctx context.Context, l metav1.ListOptions) {
 	log.Info("Waiting for namespaces to be definitely deleted")
 	err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
 		ns, err := ClientSet.CoreV1().Namespaces().List(ctx, l)
@@ -98,5 +88,11 @@ func waitForDeleteNamespaces(ctx context.Context, l metav1.ListOptions) error {
 		log.Debugf("Waiting for %d namespaces labeled with %s to be deleted", len(ns.Items), l.LabelSelector)
 		return false, nil
 	})
-	return err
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Fatalf("Timeout cleaning up namespaces: %v", err)
+		} else {
+			log.Errorf("Error cleaning up namespaces: %v", err)
+		}
+	}
 }

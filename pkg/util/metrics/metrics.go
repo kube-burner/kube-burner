@@ -17,11 +17,11 @@ package metrics
 import (
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/vishnuchalla/go-commons/indexers"
+	log "github.com/sirupsen/logrus"
 )
 
 // Processes common config and executes according to the caller

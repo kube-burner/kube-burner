@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // ReadConfig reads configuration from the given path or URL
