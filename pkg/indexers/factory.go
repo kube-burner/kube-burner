@@ -17,8 +17,8 @@ package indexers
 import (
 	"fmt"
 
-	"github.com/cloud-bulldozer/kube-burner/log"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	log "github.com/sirupsen/logrus"
 )
 
 // Indexer indexer interface
