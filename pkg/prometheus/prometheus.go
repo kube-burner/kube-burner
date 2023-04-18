@@ -29,8 +29,8 @@ import (
 	api "github.com/prometheus/client_golang/api"
 	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
-	"github.com/vishnuchalla/go-commons/indexers"
 	log "github.com/sirupsen/logrus"
+	"github.com/vishnuchalla/go-commons/indexers"
 	"gopkg.in/yaml.v3"
 )
 

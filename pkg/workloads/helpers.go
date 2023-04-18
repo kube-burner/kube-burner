@@ -33,8 +33,8 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
-	"github.com/vishnuchalla/go-commons/indexers"
 	log "github.com/sirupsen/logrus"
+	"github.com/vishnuchalla/go-commons/indexers"
 )
 
 const (
