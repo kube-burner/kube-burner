@@ -23,7 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -56,7 +56,7 @@ func preLoadImages(job Executor) error {
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: "kube-burner-preload=true"}, true)
+	CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "kube-burner-preload=true"}, true)
 	return nil
 }
 
@@ -107,19 +107,19 @@ func createDSs(imageList []string, namespaceLabels map[string]string) error {
 			Image:           image,
 		}
 		ds := appsv1.DaemonSet{
-			TypeMeta: v1.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "DaemonSet",
 				APIVersion: "apps/v1",
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: dsName,
 			},
 			Spec: appsv1.DaemonSetSpec{
-				Selector: &v1.LabelSelector{
+				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": dsName},
 				},
 				Template: corev1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"app": dsName},
 					},
 					Spec: corev1.PodSpec{
@@ -136,7 +136,7 @@ func createDSs(imageList []string, namespaceLabels map[string]string) error {
 			},
 		}
 		log.Infof("Pre-load: Creating DaemonSet using image %s in namespace %s", image, preLoadNs)
-		_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, v1.CreateOptions{})
+		_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}

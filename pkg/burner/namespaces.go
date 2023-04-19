@@ -19,7 +19,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -27,7 +27,7 @@ import (
 )
 
 func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLabels map[string]string) error {
-	ns := v1.Namespace{
+	ns := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
 	}
 
@@ -40,8 +40,8 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 		if errors.IsAlreadyExists(err) {
 			log.Infof("Namespace %s already exists", ns.Name)
 			nsSpec, _ := clientset.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
-			if nsSpec.Status.Phase == v1.NamespaceTerminating {
-				log.Warnf("Namespace %s is in %v state, retrying", namespaceName, v1.NamespaceTerminating)
+			if nsSpec.Status.Phase == corev1.NamespaceTerminating {
+				log.Warnf("Namespace %s is in %v state, retrying", namespaceName, corev1.NamespaceTerminating)
 				return false, nil
 			}
 			return true, nil
