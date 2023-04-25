@@ -41,20 +41,13 @@ build: $(BIN_PATH)
 $(BIN_PATH): $(SOURCES)
 	@echo -e "\033[2mBuilding $(BIN_PATH)\033[0m"
 	@echo "GOPATH=$(GOPATH)"
-	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner
+	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner
 
 lint:
 	golangci-lint run
 
 clean:
 	test ! -e $(BIN_DIR) || rm -Rf $(BIN_PATH)
-
-vendor:
-	go mod vendor
-
-deps-update:
-	go mod tidy
-	go mod vendor
 
 install:
 	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
