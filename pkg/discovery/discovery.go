@@ -25,7 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -80,7 +80,7 @@ func getPrometheusURL(dynamicClient dynamic.Interface) (string, error) {
 		Group:    routeGroup,
 		Version:  routeVersion,
 		Resource: routeResource,
-	}).Namespace("openshift-monitoring").Get(context.TODO(), "prometheus-k8s", v1.GetOptions{})
+	}).Namespace("openshift-monitoring").Get(context.TODO(), "prometheus-k8s", metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -103,7 +103,7 @@ func getBearerToken(clientset *kubernetes.Clientset) (string, error) {
 			ExpirationSeconds: pointer.Int64Ptr(int64(tokenExpiration.Seconds())),
 		},
 	}
-	response, err := clientset.CoreV1().ServiceAccounts("openshift-monitoring").CreateToken(context.TODO(), "prometheus-k8s", &request, v1.CreateOptions{})
+	response, err := clientset.CoreV1().ServiceAccounts("openshift-monitoring").CreateToken(context.TODO(), "prometheus-k8s", &request, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -113,7 +113,7 @@ func getBearerToken(clientset *kubernetes.Clientset) (string, error) {
 
 // GetWorkerNodeCount returns the number of worker nodes
 func (da *Agent) GetWorkerNodeCount() (int, error) {
-	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: workerNodeSelector})
+	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: workerNodeSelector})
 	log.Infof("Listed nodes after using selector %s: %d", workerNodeSelector, len(nodeList.Items))
 	return len(nodeList.Items), err
 }
@@ -121,12 +121,12 @@ func (da *Agent) GetWorkerNodeCount() (int, error) {
 // GetCurrentPodCount returns the number of current running pods across all worker nodes
 func (da *Agent) GetCurrentPodCount() (int, error) {
 	var podCount int
-	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{LabelSelector: workerNodeSelector})
+	nodeList, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: workerNodeSelector})
 	if err != nil {
 		return podCount, err
 	}
 	for _, node := range nodeList.Items {
-		podList, err := da.clientSet.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), v1.ListOptions{FieldSelector: "status.phase=Running,spec.nodeName=" + node.Name})
+		podList, err := da.clientSet.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase=Running,spec.nodeName=" + node.Name})
 		if err != nil {
 			return podCount, err
 		}
@@ -143,7 +143,7 @@ func (da *Agent) GetInfraDetails() (InfraObj, error) {
 		Group:    "config.openshift.io",
 		Version:  "v1",
 		Resource: "infrastructures",
-	}).Get(context.TODO(), "cluster", v1.GetOptions{})
+	}).Get(context.TODO(), "cluster", metav1.GetOptions{})
 	if err != nil {
 		return infraJSON, err
 	}
@@ -166,7 +166,7 @@ func (da *Agent) GetVersionInfo() (VersionObj, error) {
 			Group:    "config.openshift.io",
 			Version:  "v1",
 			Resource: "clusterversions",
-		}).Get(context.TODO(), "version", v1.GetOptions{})
+		}).Get(context.TODO(), "version", metav1.GetOptions{})
 	if err != nil {
 		return versionInfo, err
 	}
@@ -185,7 +185,7 @@ func (da *Agent) GetVersionInfo() (VersionObj, error) {
 // GetNodesInfo returns node information
 func (da *Agent) GetNodesInfo() (NodeInfo, error) {
 	var nodeInfoData NodeInfo
-	nodes, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), v1.ListOptions{})
+	nodes, err := da.clientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nodeInfoData, err
 	}
@@ -216,7 +216,7 @@ func (da *Agent) GetSDNInfo() (string, error) {
 		Group:    "config.openshift.io",
 		Version:  "v1",
 		Resource: "networks",
-	}).Get(context.TODO(), "cluster", v1.GetOptions{})
+	}).Get(context.TODO(), "cluster", metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -233,7 +233,7 @@ func (da *Agent) GetDefaultIngressDomain() (string, error) {
 		Group:    "operator.openshift.io",
 		Version:  "v1",
 		Resource: "ingresscontrollers",
-	}).Namespace("openshift-ingress-operator").Get(context.TODO(), "default", v1.GetOptions{})
+	}).Namespace("openshift-ingress-operator").Get(context.TODO(), "default", metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
