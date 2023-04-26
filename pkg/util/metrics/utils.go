@@ -19,11 +19,11 @@ import (
 	"io"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
-	"github.com/vishnuchalla/go-commons/indexers"
 	"gopkg.in/yaml.v3"
 )
 
@@ -59,6 +59,34 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 	yamlDec.KnownFields(true)
 	if err := yamlDec.Decode(&metricsEndpoints); err != nil {
 		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpoint, err)
+	}
+}
+
+// Index sends measurement metrics to the indexer
+func Index(argsMap map[string]interface{}) {
+	podLatencyMeasurement := argsMap["podLatencyMeasurement"].(string)
+	podLatencyQuantilesMeasurement := argsMap["podLatencyQuantilesMeasurement"].(string)
+	normLatencies := argsMap["normLatencies"].([]interface{})
+	latencyQuantiles := argsMap["latencyQuantiles"].([]interface{})
+	indexer := argsMap["indexer"].(*indexers.Indexer)
+	index := argsMap["indexer"].(string)
+	jobName := argsMap["jobName"].(string)
+
+	log.Infof("Indexing metric %s", podLatencyMeasurement)
+	log.Debugf("Indexing [%d] documents in %s", len(normLatencies), index)
+	resp, err := (*indexer).Index(normLatencies, indexers.IndexingOpts{MetricName: podLatencyMeasurement, JobName: jobName})
+	if err != nil {
+		log.Fatal(err.Error())
+	} else {
+		log.Debug(resp)
+	}
+	log.Infof("Indexing metric %s", podLatencyQuantilesMeasurement)
+	log.Debugf("Indexing [%d] documents in %s", len(latencyQuantiles), index)
+	resp, err = (*indexer).Index(latencyQuantiles, indexers.IndexingOpts{MetricName: podLatencyQuantilesMeasurement, JobName: jobName})
+	if err != nil {
+		log.Fatal(err.Error())
+	} else {
+		log.Debug(resp)
 	}
 }
 

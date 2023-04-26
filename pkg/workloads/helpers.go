@@ -26,6 +26,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
@@ -34,7 +35,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
-	"github.com/vishnuchalla/go-commons/indexers"
 )
 
 const (
@@ -216,9 +216,11 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		log.Fatal(err)
 	}
 	if wh.indexing {
-		indexer, err = indexers.NewIndexer(configSpec.GlobalConfig.IndexerConfig)
+		indexerConfig := configSpec.GlobalConfig.IndexerConfig
+		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
+		indexer, err = indexers.NewIndexer(indexerConfig)
 		if err != nil {
-			log.Fatalf("%v indexer: %v", configSpec.GlobalConfig.IndexerConfig.Type, err.Error())
+			log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
 		}
 	}
 	if wh.metricsEndpoint != "" {
@@ -241,7 +243,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			log.Fatal(err)
 		}
 		if wh.alerting && configSpec.GlobalConfig.AlertProfile != "" {
-			alertM, err = alerting.NewAlertManager(configSpec.GlobalConfig.AlertProfile, wh.Metadata.UUID, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p)
+			alertM, err = alerting.NewAlertManager(configSpec.GlobalConfig.AlertProfile, wh.Metadata.UUID, configSpec.GlobalConfig.IndexerConfig.Index, indexer, p)
 			if err != nil {
 				log.Fatal(err)
 			}

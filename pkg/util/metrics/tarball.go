@@ -25,8 +25,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	log "github.com/sirupsen/logrus"
-	"github.com/vishnuchalla/go-commons/indexers"
 )
 
 func createTarball(indexerConfig indexers.IndexerConfig) error {
@@ -67,7 +67,7 @@ func createTarball(indexerConfig indexers.IndexerConfig) error {
 	return nil
 }
 
-func ImportTarball(tarball string, indexer *indexers.Indexer) error {
+func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string) error {
 	log.Infof("Importing tarball %v", tarball)
 	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)
@@ -94,7 +94,11 @@ func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 			return fmt.Errorf("Tarball read error: %v", err)
 		}
 		log.Infof("Importing metrics from %s", hdr.Name)
-		(*indexer).Index(metrics, indexers.IndexingOpts{})
+		log.Infof("Writing metric to: %s", metricsDir)
+		_, err = (*indexer).Index(metrics, indexers.IndexingOpts{})
+		if err != nil {
+			log.Fatal(err.Error())
+		}
 	}
 	return nil
 }

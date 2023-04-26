@@ -18,9 +18,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
-	"github.com/vishnuchalla/go-commons/indexers"
+	log "github.com/sirupsen/logrus"
 )
 
 type jobSummary struct {
@@ -36,7 +37,7 @@ type jobSummary struct {
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
+func indexjobSummaryInfo(indexer *indexers.Indexer, uuid, indexName string, elapsedTime float64, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
 			UUID:        uuid,
@@ -48,5 +49,12 @@ func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime flo
 			Version:     fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
 		},
 	}
-	(*indexer).Index(metadataInfo, indexers.IndexingOpts{MetricName: jobSummaryMetric, JobName: jobConfig.Name})
+	log.Infof("Indexing metric %s", jobSummaryMetric)
+	log.Debugf("Indexing [%d] documents in %s", len(metadataInfo), indexName)
+	resp, err := (*indexer).Index(metadataInfo, indexers.IndexingOpts{MetricName: jobSummaryMetric, JobName: jobConfig.Name})
+	if err != nil {
+		log.Fatal(err.Error())
+	} else {
+		log.Debug(resp)
+	}
 }

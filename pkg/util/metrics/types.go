@@ -17,10 +17,10 @@ package metrics
 import (
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
-	"github.com/vishnuchalla/go-commons/indexers"
 )
 
 // ScraperConfig holds data related to scraper and target indexer
