@@ -69,7 +69,7 @@ func Index(argsMap map[string]interface{}) {
 	normLatencies := argsMap["normLatencies"].([]interface{})
 	latencyQuantiles := argsMap["latencyQuantiles"].([]interface{})
 	indexer := argsMap["indexer"].(*indexers.Indexer)
-	index := argsMap["indexer"].(string)
+	index := argsMap["index"].(string)
 	jobName := argsMap["jobName"].(string)
 
 	log.Infof("Indexing metric %s", podLatencyMeasurement)
