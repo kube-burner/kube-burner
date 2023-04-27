@@ -18,7 +18,6 @@ jobs:
     namespace: api-intensive
     podWait: false
     cleanup: true
-    waitFor: []
     waitWhenFinished: true
     objects:
       - objectTemplate: templates/deployment.yaml

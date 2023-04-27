@@ -114,6 +114,8 @@ type Object struct {
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// Namespaced this object is namespaced
 	Namespaced bool `yaml:"namespaced" json:"namespaced"`
+	// Wait for resource to be ready, it doesn't apply to all resources
+	Wait bool `yaml:"wait" json:"wait"`
 }
 
 // Job defines a kube-burner job
@@ -136,8 +138,6 @@ type Job struct {
 	Burst int `yaml:"burst" json:"burst,omitempty"`
 	// Namespace namespace base name to use
 	Namespace string `yaml:"namespace" json:"namespace,omitempty"`
-	// WaitFor list of objects to wait for, if not specified wait for all
-	WaitFor []string `yaml:"waitFor" json:"waitFor,omitempty"`
 	// MaxWaitTimeout maximum wait period
 	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout" json:"maxWaitTimeout,omitempty"`
 	// WaitForDeletion wait for objects to be definitively deleted

@@ -47,6 +47,7 @@ type object struct {
 	patchType      string
 	namespaced     bool
 	kind           string
+	wait           bool
 }
 
 // Executor contains the information required to execute a job

@@ -30,19 +30,9 @@ import (
 )
 
 func (ex *Executor) waitForObjects(ns string) {
-	waitFor := true
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
-		if len(ex.Config.WaitFor) > 0 {
-			waitFor = false
-			for _, kind := range ex.Config.WaitFor {
-				if obj.kind == kind {
-					waitFor = true
-					break
-				}
-			}
-		}
-		if waitFor {
+		if obj.wait {
 			wg.Add(1)
 			switch obj.kind {
 			case "Deployment":
