@@ -17,15 +17,12 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"os"
 	"strings"
 	"text/template"
-	"time"
 
 	sprig "github.com/Masterminds/sprig/v3"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cast"
 )
 
 type templateOption string
@@ -35,46 +32,10 @@ const (
 	MissingKeyZero  templateOption = "missingkey=zero"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
-// RenderTemplate renders a go-template and adds several custom functions
+// RenderTemplate renders a go-template
 func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
 	var rendered bytes.Buffer
-	funcMap := sprig.GenericFuncMap()
-	extraFuncs := map[string]interface{}{
-		"multiply": func(a interface{}, b ...interface{}) int {
-			res := cast.ToInt(a)
-			for _, v := range b {
-				res = res * cast.ToInt(v)
-			}
-			return res
-		},
-		"rand": func(length interface{}) string {
-			var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-			b := make([]rune, cast.ToInt(length))
-			for i := range b {
-				b[i] = letterRunes[rand.Intn(len(letterRunes))]
-			}
-			return string(b)
-		},
-		"sequence": func(start, end interface{}) []int {
-			var sequence = []int{}
-			for i := cast.ToInt(start); i <= cast.ToInt(end); i++ {
-				sequence = append(sequence, i)
-			}
-			return sequence
-		},
-		"randInteger": func(a, b interface{}) int {
-			return rand.Intn(cast.ToInt(b)) + cast.ToInt(a)
-		},
-	}
-	for k, v := range extraFuncs {
-		funcMap[k] = v
-	}
-	sprig.GenericFuncMap()
-	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
+	t, err := template.New("").Option(string(options)).Funcs(sprig.GenericFuncMap()).Parse(string(original))
 	if err != nil {
 		return nil, fmt.Errorf("parsing error: %s", err)
 	}

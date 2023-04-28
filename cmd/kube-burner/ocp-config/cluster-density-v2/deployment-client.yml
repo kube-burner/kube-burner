@@ -66,17 +66,17 @@ spec:
           mountPath: /etc/podlabels
         env:
         - name: ENVVAR1
-          value: "{{rand 250}}"
+          value: "{{randAlphaNum 250}}"
         - name: ENVVAR2
-          value: "{{rand 250}}"
+          value: "{{randAlphaNum 250}}"
         - name: ENVVAR3
-          value: "{{rand 250}}"
+          value: "{{randAlphaNum 250}}"
         - name: ENVVAR4
-          value: "{{rand 250}}"
+          value: "{{randAlphaNum 250}}"
         - name: ROUTE_ENDPOINT
           value: "https://cluster-density-{{.Replica}}-cluster-density-v2-{{.Iteration}}.{{ .ingressDomain }}/256.html"
         - name: SERVICE_ENDPOINT
-          value: "http://cluster-density-{{randInteger 1 5}}/256.html"
+          value: "http://cluster-density-{{randInt 1 6}}/256.html"
       volumes:
       - name: secret-1
         secret:

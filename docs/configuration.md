@@ -245,57 +245,6 @@ spec:
 ## Template functions
 
 Apart from the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner is compiled with the library [sprig](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.
-In addition, kube-burner ships some several extra functions:
-
-- multiply: Multiply two integers
-
-```yaml
-apiVersion: v1
-data:
-  eight: {{multiply 2 4}}
-  anotherInt: {{multiply .inputIntVariable 5}}
-kind: ConfigMap
-metadata:
-  name: configmap-{{.Replica}}
-```
-
-- randInteger: Generates a positive random integer between two numbers.
-
-```yaml
-apiVersion: v1
-data:
-  number: {{randInteger 0 100}}
-kind: ConfigMap
-metadata:
-  name: configmap-{{.Replica}}
-```
-
-- rand: This function can be used to generate a random string with the given length. i.e
-
-```yaml
-apiVersion: v1
-data:
-  myfile: {{rand 512}}
-  myOtherFile: {{rand .inputIntVariable}}
-kind: ConfigMap
-metadata:
-  name: configmap-{{.Replica}}
-```
-
-- sequence: This function can be used to generate an array with elements to loop over
-
-```yaml
-apiVersion: v1
-data:
-  blah: "This has many labels"
-kind: ConfigMap
-metadata:
-  name: configmap-{{.Replica}}
-  labels:
-    {{ range $index, $element := sequence 1 10 }}
-    label-{{ $element }}: "true"
-    {{ end }}
-```
 
 [measurements section]: ../measurements/
 [indexers section]: ../indexers/
