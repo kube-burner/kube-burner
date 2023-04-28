@@ -59,13 +59,13 @@ spec:
         name: cluster-density
         env:
         - name: ENVVAR1
-          value: "{{rand 250}}"
+          value: "{{randAlphaNum 250}}"
         - name: ENVVAR2
-          value: "{{rand 250}}"
+          value: "{{randAlphaNum 250}}"
         - name: ENVVAR3
-          value: "{{rand 250}}"
+          value: "{{randAlphaNum 250}}"
         - name: ENVVAR4
-          value: "{{rand 250}}"
+          value: "{{randAlphaNum 250}}"
       volumes:
       - name: secret-1
         secret:
