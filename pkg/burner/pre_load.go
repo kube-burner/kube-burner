@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 )
 
 const preLoadNs = "preload-kube-burner"
@@ -123,7 +124,8 @@ func createDSs(imageList []string, namespaceLabels map[string]string) error {
 						Labels: map[string]string{"app": dsName},
 					},
 					Spec: corev1.PodSpec{
-						InitContainers: []corev1.Container{container},
+						TerminationGracePeriodSeconds: pointer.Int64(0),
+						InitContainers:                []corev1.Container{container},
 						// Only Always restart policy is supported
 						Containers: []corev1.Container{
 							{
