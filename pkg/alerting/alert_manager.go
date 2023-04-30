@@ -140,7 +140,7 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 		}
 	}
 	if len(alertList) > 0 && a.indexer != nil {
-		a.index(alertList, a.indexName)
+		a.index(alertList)
 	}
 	return result
 }
@@ -202,14 +202,14 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 	return result, alertSet, nil
 }
 
-func (a *AlertManager) index(alertSet []interface{}, indexName string) {
+func (a *AlertManager) index(alertSet []interface{}) {
 	log.Info("Indexing alerts")
 	log.Infof("Indexing metric %s", alertMetricName)
-	log.Debugf("Indexing [%d] documents in %s", len(alertSet), indexName)
+	log.Debugf("Indexing [%d] documents", len(alertSet))
 	resp, err := (*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Error(err)
 	} else {
-		log.Debug(resp)
+		log.Info(resp)
 	}
 }

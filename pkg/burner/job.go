@@ -163,7 +163,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		if globalConfig.IndexerConfig.Enabled {
 			for _, job := range jobList {
 				elapsedTime := job.End.Sub(job.Start).Seconds()
-				indexjobSummaryInfo(indexer, uuid, globalConfig.IndexerConfig.Index, elapsedTime, job.Config, job.Start, metadata)
+				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
 			}
 		}
 		// We initialize cleanup as soon as the benchmark finishes

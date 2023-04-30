@@ -143,12 +143,12 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 		indexerConfig := p.ConfigSpec.GlobalConfig.IndexerConfig
 		if indexerConfig.Enabled {
 			log.Infof("Indexing metric %s", md.MetricName)
-			log.Debugf("Indexing [%d] documents in %s", len(datapoints), indexerConfig.Index)
+			log.Debugf("Indexing [%d] documents", len(datapoints))
 			resp, err := (*indexer).Index(datapoints, indexers.IndexingOpts{MetricName: md.MetricName})
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
 			} else {
-				log.Debug(resp)
+				log.Info(resp)
 			}
 		}
 	}

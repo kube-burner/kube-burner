@@ -62,34 +62,6 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 	}
 }
 
-// Index sends measurement metrics to the indexer
-func Index(argsMap map[string]interface{}) {
-	podLatencyMeasurement := argsMap["podLatencyMeasurement"].(string)
-	podLatencyQuantilesMeasurement := argsMap["podLatencyQuantilesMeasurement"].(string)
-	normLatencies := argsMap["normLatencies"].([]interface{})
-	latencyQuantiles := argsMap["latencyQuantiles"].([]interface{})
-	indexer := argsMap["indexer"].(*indexers.Indexer)
-	index := argsMap["index"].(string)
-	jobName := argsMap["jobName"].(string)
-
-	log.Infof("Indexing metric %s", podLatencyMeasurement)
-	log.Debugf("Indexing [%d] documents in %s", len(normLatencies), index)
-	resp, err := (*indexer).Index(normLatencies, indexers.IndexingOpts{MetricName: podLatencyMeasurement, JobName: jobName})
-	if err != nil {
-		log.Fatal(err.Error())
-	} else {
-		log.Debug(resp)
-	}
-	log.Infof("Indexing metric %s", podLatencyQuantilesMeasurement)
-	log.Debugf("Indexing [%d] documents in %s", len(latencyQuantiles), index)
-	resp, err = (*indexer).Index(latencyQuantiles, indexers.IndexingOpts{MetricName: podLatencyQuantilesMeasurement, JobName: jobName})
-	if err != nil {
-		log.Fatal(err.Error())
-	} else {
-		log.Debug(resp)
-	}
-}
-
 // Scrapes prometheus metrics
 func ScrapeMetrics(p *prometheus.Prometheus, indexer *indexers.Indexer) {
 	log.Infof("Scraping for the prometheus entry with params - Endpoint: %v, Profile: %v, Start: %v, End: %v",

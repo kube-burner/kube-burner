@@ -97,7 +97,7 @@ func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string)
 		log.Infof("Writing metric to: %s", metricsDir)
 		_, err = (*indexer).Index(metrics, indexers.IndexingOpts{})
 		if err != nil {
-			log.Fatal(err.Error())
+			return err
 		}
 	}
 	return nil

@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
-	metricsUtil "github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -379,16 +379,23 @@ func (p *vmiLatency) stop() (int, error) {
 
 // index sends metrics to the configured indexer
 func (p *vmiLatency) index() {
-	argsMap := map[string]interface{}{
-		"normLatencies":                  p.normLatencies,
-		"latencyQuantiles":               p.latencyQuantiles,
-		"indexer":                        factory.indexer,
-		"index":                          kubeburnerCfg.IndexerConfig.Index,
-		"podLatencyMeasurement":          podLatencyMeasurement,
-		"podLatencyQuantilesMeasurement": podLatencyQuantilesMeasurement,
-		"jobName":                        factory.jobConfig.Name,
+	indexingOpts := indexers.IndexingOpts{
+		JobName: factory.jobConfig.Name,
 	}
-	metricsUtil.Index(argsMap)
+	metricMap := map[string][]interface{}{
+		podLatencyMeasurement:          p.normLatencies,
+		podLatencyQuantilesMeasurement: p.latencyQuantiles,
+	}
+	for metricName, data := range metricMap {
+		indexingOpts.MetricName = metricName
+		log.Debugf("Indexing [%d] documents", len(data)) 
+		resp, err := (*factory.indexer).Index(data, indexingOpts)
+		if err != nil {
+			log.Error(err)
+		} else {
+			log.Info(resp)
+		}
+	}
 }
 
 func (p *vmiLatency) normalizeMetrics() {

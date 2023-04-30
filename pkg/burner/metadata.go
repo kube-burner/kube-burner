@@ -37,7 +37,7 @@ type jobSummary struct {
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexjobSummaryInfo(indexer *indexers.Indexer, uuid, indexName string, elapsedTime float64, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
+func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
 			UUID:        uuid,
@@ -50,11 +50,11 @@ func indexjobSummaryInfo(indexer *indexers.Indexer, uuid, indexName string, elap
 		},
 	}
 	log.Infof("Indexing metric %s", jobSummaryMetric)
-	log.Debugf("Indexing [%d] documents in %s", len(metadataInfo), indexName)
+	log.Debugf("Indexing [%d] documents", len(metadataInfo))
 	resp, err := (*indexer).Index(metadataInfo, indexers.IndexingOpts{MetricName: jobSummaryMetric, JobName: jobConfig.Name})
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Error(err)
 	} else {
-		log.Debug(resp)
+		log.Info(resp)
 	}
 }
