@@ -388,7 +388,7 @@ func (p *vmiLatency) index() {
 	}
 	for metricName, data := range metricMap {
 		indexingOpts.MetricName = metricName
-		log.Debugf("Indexing [%d] documents", len(data)) 
+		log.Debugf("Indexing [%d] documents", len(data))
 		resp, err := (*factory.indexer).Index(data, indexingOpts)
 		if err != nil {
 			log.Error(err)
