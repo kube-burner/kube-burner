@@ -38,7 +38,6 @@ func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLa
 			return false, err
 		}
 		if errors.IsAlreadyExists(err) {
-			// Getting unnecessary logs here. Would need to implement a GET first so we aren't issuing creates. Should just use an in-memory cache for creation.
 			log.Infof("Namespace %s already exists", ns.Name)
 			nsSpec, _ := clientset.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
 			if nsSpec.Status.Phase == corev1.NamespaceTerminating {
