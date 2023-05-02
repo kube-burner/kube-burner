@@ -188,7 +188,7 @@ func (p *podLatency) index() {
 		log.Debugf("Indexing [%d] documents", len(data))
 		resp, err := (*factory.indexer).Index(data, indexingOpts)
 		if err != nil {
-			log.Error(err)
+			log.Error(err.Error())
 		} else {
 			log.Info(resp)
 		}
