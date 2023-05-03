@@ -32,7 +32,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 
 	uid "github.com/satori/go.uuid"
@@ -250,11 +250,13 @@ func importCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			indexer, err := indexers.NewIndexer(configSpec)
+			indexerConfig := configSpec.GlobalConfig.IndexerConfig
+			log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
+			indexer, err := indexers.NewIndexer(indexerConfig)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			err = metrics.ImportTarball(tarball, indexer)
+			err = metrics.ImportTarball(tarball, indexer, indexerConfig.MetricsDirectory)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -291,7 +293,9 @@ func alertCmd() *cobra.Command {
 				}
 			}
 			if configSpec.GlobalConfig.IndexerConfig.Enabled {
-				indexer, err = indexers.NewIndexer(configSpec)
+				indexerConfig := configSpec.GlobalConfig.IndexerConfig
+				log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
+				indexer, err = indexers.NewIndexer(indexerConfig)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -308,7 +312,7 @@ func alertCmd() *cobra.Command {
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, configSpec.GlobalConfig.IndexerConfig.DefaultIndex, indexer, p); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, configSpec.GlobalConfig.IndexerConfig.Index, indexer, p); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			rc := alertM.Evaluate(startTime, endTime)

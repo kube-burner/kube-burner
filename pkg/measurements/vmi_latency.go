@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
@@ -379,8 +379,23 @@ func (p *vmiLatency) stop() (int, error) {
 
 // index sends metrics to the configured indexer
 func (p *vmiLatency) index() {
-	(*factory.indexer).Index(p.normLatencies, indexers.IndexingOpts{MetricName: podLatencyMeasurement, JobName: factory.jobConfig.Name})
-	(*factory.indexer).Index(p.latencyQuantiles, indexers.IndexingOpts{MetricName: podLatencyQuantilesMeasurement, JobName: factory.jobConfig.Name})
+	indexingOpts := indexers.IndexingOpts{
+		JobName: factory.jobConfig.Name,
+	}
+	metricMap := map[string][]interface{}{
+		podLatencyMeasurement:          p.normLatencies,
+		podLatencyQuantilesMeasurement: p.latencyQuantiles,
+	}
+	for metricName, data := range metricMap {
+		indexingOpts.MetricName = metricName
+		log.Debugf("Indexing [%d] documents", len(data))
+		resp, err := (*factory.indexer).Index(data, indexingOpts)
+		if err != nil {
+			log.Error(err.Error())
+		} else {
+			log.Info(resp)
+		}
+	}
 }
 
 func (p *vmiLatency) normalizeMetrics() {

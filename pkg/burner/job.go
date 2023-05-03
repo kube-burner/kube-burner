@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
@@ -81,6 +81,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 	var rc int
 	var prometheusJobList []prometheus.Job
 	res := make(chan int, 1)
+	globalConfig := configSpec.GlobalConfig
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
@@ -159,14 +160,14 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 			}
 			log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
 		}
-		if configSpec.GlobalConfig.IndexerConfig.Enabled {
+		if globalConfig.IndexerConfig.Enabled {
 			for _, job := range jobList {
 				elapsedTime := job.End.Sub(job.Start).Seconds()
 				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
 			}
 		}
 		// We initialize cleanup as soon as the benchmark finishes
-		if configSpec.GlobalConfig.GC {
+		if globalConfig.GC {
 			go CleanupNamespaces(context.TODO(), v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
 		}
 		for idx, prometheusClient := range prometheusClients {
@@ -178,7 +179,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 			}
 			prometheusClient.JobList = prometheusJobList
 			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-			if configSpec.GlobalConfig.IndexerConfig.Enabled {
+			if globalConfig.IndexerConfig.Enabled {
 				metrics.ScrapeMetrics(prometheusClient, indexer)
 				metrics.HandleTarball(configSpec)
 			}
@@ -192,7 +193,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		log.Errorf("%v timeout reached", timeout)
 		rc = rcTimeout
 	}
-	if configSpec.GlobalConfig.GC {
+	if globalConfig.GC {
 		// Use timeout/4 to garbage collect namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), timeout/4)
 		defer cancel()

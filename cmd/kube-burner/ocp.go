@@ -22,12 +22,11 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +40,7 @@ func openShiftCmd() *cobra.Command {
 		Long:  `This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads`,
 	}
 	var wh workloads.WorkloadHelper
-	var indexingType config.IndexerType
+	var indexingType indexers.IndexerType
 	var indexing bool
 	esServer := ocpCmd.PersistentFlags().String("es-server", "", "Elastic Search endpoint")
 	localIndexing := ocpCmd.PersistentFlags().Bool("local-indexing", false, "Enable local indexing")
@@ -62,9 +61,9 @@ func openShiftCmd() *cobra.Command {
 		if *esServer != "" || *localIndexing {
 			indexing = true
 			if *esServer != "" {
-				indexingType = config.ElasticIndexer
+				indexingType = indexers.ElasticIndexer
 			} else {
-				indexingType = config.LocalIndexer
+				indexingType = indexers.LocalIndexer
 			}
 		}
 		envVars := map[string]string{
