@@ -22,12 +22,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/prometheus/common/model"
-	log "github.com/sirupsen/logrus"
-
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/prometheus/common/model"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -205,5 +204,12 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 
 func (a *AlertManager) index(alertSet []interface{}) {
 	log.Info("Indexing alerts")
-	(*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
+	log.Infof("Indexing metric %s", alertMetricName)
+	log.Debugf("Indexing [%d] documents", len(alertSet))
+	resp, err := (*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
+	if err != nil {
+		log.Error(err)
+	} else {
+		log.Info(resp)
+	}
 }

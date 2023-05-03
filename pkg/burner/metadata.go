@@ -18,9 +18,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
+	log "github.com/sirupsen/logrus"
 )
 
 type jobSummary struct {
@@ -48,5 +49,12 @@ func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime flo
 			Version:     fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
 		},
 	}
-	(*indexer).Index(metadataInfo, indexers.IndexingOpts{MetricName: jobSummaryMetric, JobName: jobConfig.Name})
+	log.Infof("Indexing metric %s", jobSummaryMetric)
+	log.Debugf("Indexing [%d] documents", len(metadataInfo))
+	resp, err := (*indexer).Index(metadataInfo, indexers.IndexingOpts{MetricName: jobSummaryMetric, JobName: jobConfig.Name})
+	if err != nil {
+		log.Error(err)
+	} else {
+		log.Info(resp)
+	}
 }
