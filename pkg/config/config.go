@@ -85,7 +85,10 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnDuration:        1 * time.Hour,
 		ChurnDelay:           5 * time.Minute,
 		Objects: []Object{
-			{Namespaced: true},
+			{
+				Namespaced: true,
+				Wait:       true,
+			},
 		},
 	}
 	if err := unmarshal(&raw); err != nil {

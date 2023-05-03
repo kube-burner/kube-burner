@@ -51,7 +51,6 @@ jobs:
     # interval between jobs execution
     jobIterationDelay: 1s
     # wait all VMI be in the Ready Condition
-    waitFor: ["VirtualMachine"]
     waitWhenFinished: true
     # does not need to wait all pods be running since we wait for all VMIs be running
     podWait: false
