@@ -92,8 +92,7 @@ func (ex *Executor) RunDeleteJob() {
 			}(item)
 		}
 		if ex.Config.WaitForDeletion {
-			wg.Wait()
-			wait.PollImmediateInfinite(2*time.Second, func() (bool, error) {
+			wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
 				itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 				if err != nil {
 					log.Error(err.Error())

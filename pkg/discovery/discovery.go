@@ -100,7 +100,7 @@ func getPrometheusURL(dynamicClient dynamic.Interface) (string, error) {
 func getBearerToken(clientset *kubernetes.Clientset) (string, error) {
 	request := authenticationv1.TokenRequest{
 		Spec: authenticationv1.TokenRequestSpec{
-			ExpirationSeconds: pointer.Int64Ptr(int64(tokenExpiration.Seconds())),
+			ExpirationSeconds: pointer.Int64(int64(tokenExpiration.Seconds())),
 		},
 	}
 	response, err := clientset.CoreV1().ServiceAccounts("openshift-monitoring").CreateToken(context.TODO(), "prometheus-k8s", &request, metav1.CreateOptions{})

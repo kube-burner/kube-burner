@@ -216,7 +216,9 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		log.Fatal(err)
 	}
 	wh.Metadata.Passed = rc == 0
-	wh.indexMetadata()
+	if wh.indexing {
+		wh.indexMetadata()
+	}
 	log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
 	os.Exit(rc)
 }
