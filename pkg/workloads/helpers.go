@@ -15,33 +15,40 @@
 package workloads
 
 import (
-	"bytes"
-	"crypto/tls"
 	"embed"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	ocpMeta "github.com/cloud-bulldozer/go-commons/ocp-metadata"
+	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
-	alertsProfile      = "alerts.yml"
-	metadataMetricName = "clusterMetadata"
-	ocpCfgDir          = "ocp-config"
+	alertsProfile = "alerts.yml"
+	ocpCfgDir     = "ocp-config"
 )
+
+type BenchmarkMetadata struct {
+	ocpMeta.ClusterMetadata
+	UUID         string
+	Benchmark    string                 `json:"benchmark"`
+	Timestamp    time.Time              `json:"timestamp"`
+	EndDate      time.Time              `json:"endDate"`
+	Passed       bool                   `json:"passed"`
+	UserMetadata map[string]interface{} `json:"metadata,omitempty"`
+}
 
 type WorkloadHelper struct {
 	envVars         map[string]string
@@ -49,61 +56,54 @@ type WorkloadHelper struct {
 	prometheusToken string
 	metricsEndpoint string
 	timeout         time.Duration
-	Metadata        clusterMetadata
+	Metadata        BenchmarkMetadata
 	alerting        bool
 	ocpConfig       embed.FS
-	discoveryAgent  discovery.Agent
+	ocpMetaAgent    ocpMeta.Metadata
 	indexing        bool
-	userMetadata    string
-}
-
-type clusterMetadata struct {
-	MetricName       string                 `json:"metricName,omitempty"`
-	UUID             string                 `json:"uuid"`
-	Platform         string                 `json:"platform"`
-	OCPVersion       string                 `json:"ocpVersion"`
-	K8SVersion       string                 `json:"k8sVersion"`
-	MasterNodesType  string                 `json:"masterNodesType"`
-	WorkerNodesType  string                 `json:"workerNodesType"`
-	InfraNodesType   string                 `json:"infraNodesType"`
-	WorkerNodesCount int                    `json:"workerNodesCount"`
-	InfraNodesCount  int                    `json:"infraNodesCount"`
-	TotalNodes       int                    `json:"totalNodes"`
-	SDNType          string                 `json:"sdnType"`
-	Benchmark        string                 `json:"benchmark"`
-	Timestamp        time.Time              `json:"timestamp"`
-	EndDate          time.Time              `json:"endDate"`
-	ClusterName      string                 `json:"clusterName"`
-	Passed           bool                   `json:"passed"`
-	Metadata         map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, da discovery.Agent, indexing bool, timeout time.Duration, metricsEndpoint string, userMetadata string) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, indexing bool, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
+	var kubeconfig string
+	if os.Getenv("KUBECONFIG") != "" {
+		kubeconfig = os.Getenv("KUBECONFIG")
+	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
+	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ocpMetadata, err := ocpmetadata.NewMetadata(restConfig)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 	return WorkloadHelper{
 		envVars:         envVars,
 		alerting:        alerting,
 		metricsEndpoint: metricsEndpoint,
 		ocpConfig:       ocpConfig,
-		discoveryAgent:  da,
+		ocpMetaAgent:    ocpMetadata,
 		timeout:         timeout,
 		indexing:        indexing,
-		userMetadata:    userMetadata,
 	}
 }
+
+var indexer *indexers.Indexer
 
 // SetKubeBurnerFlags configures the required environment variables and flags for kube-burner
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	var err error
 	if wh.metricsEndpoint == "" {
-		prometheusURL, prometheusToken, err := wh.discoveryAgent.GetPrometheus()
+		prometheusURL, prometheusToken, err := wh.ocpMetaAgent.GetPrometheus()
 		if err != nil {
 			log.Fatal("Error obtaining Prometheus information: ", err.Error())
 		}
 		wh.prometheusURL = prometheusURL
 		wh.prometheusToken = prometheusToken
 	}
-	wh.envVars["INGRESS_DOMAIN"], err = wh.discoveryAgent.GetDefaultIngressDomain()
+	wh.envVars["INGRESS_DOMAIN"], err = wh.ocpMetaAgent.GetDefaultIngressDomain()
 	if err != nil {
 		log.Fatal("Error obtaining default ingress domain: ", err.Error())
 	}
@@ -112,67 +112,34 @@ func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	}
 }
 
-func (wh *WorkloadHelper) GatherMetadata() error {
-	infra, err := wh.discoveryAgent.GetInfraDetails()
+func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
+	var err error
+	wh.Metadata.ClusterMetadata, err = wh.ocpMetaAgent.GetClusterMetadata()
 	if err != nil {
 		return err
 	}
-	version, err := wh.discoveryAgent.GetVersionInfo()
-	if err != nil {
-		return err
-	}
-	nodeInfo, err := wh.discoveryAgent.GetNodesInfo()
-	if err != nil {
-		return err
-	}
-	sdnType, err := wh.discoveryAgent.GetSDNInfo()
-	if err != nil {
-		return err
-	}
-	wh.Metadata.MetricName = metadataMetricName
-	wh.Metadata.Platform = infra.Status.Platform
-	for _, v := range infra.Status.PlatformStatus.Aws.ResourceTags {
-		if v.Key == "red-hat-clustertype" {
-			wh.Metadata.Platform = v.Value
+	if userMetadata != "" {
+		userMetadataContent, err := util.ReadUserMetadata(userMetadata)
+		if err != nil {
+			log.Fatalf("Error reading provided user metadata: %v", err)
 		}
+		wh.Metadata.UserMetadata = userMetadataContent
 	}
-	wh.Metadata.ClusterName = infra.Status.InfrastructureName
-	wh.Metadata.K8SVersion = version.K8sVersion
-	wh.Metadata.OCPVersion = version.OcpVersion
-	wh.Metadata.TotalNodes = nodeInfo.TotalNodes
-	wh.Metadata.WorkerNodesCount = nodeInfo.WorkerCount
-	wh.Metadata.InfraNodesCount = nodeInfo.InfraCount
-	wh.Metadata.MasterNodesType = nodeInfo.MasterType
-	wh.Metadata.WorkerNodesType = nodeInfo.WorkerType
-	wh.Metadata.InfraNodesType = nodeInfo.InfraType
-	wh.Metadata.SDNType = sdnType
 	wh.Metadata.Timestamp = time.Now().UTC()
 	return nil
 }
 
 func (wh *WorkloadHelper) indexMetadata() {
+	log.Info("Indexing cluster metadata document")
 	wh.Metadata.EndDate = time.Now().UTC()
-	if wh.envVars["ES_SERVER"] == "" {
-		log.Info("No metadata will be indexed")
-		return
-	}
-	esEndpoint := fmt.Sprintf("%v/%v/_doc", wh.envVars["ES_SERVER"], wh.envVars["ES_INDEX"])
-	body, _ := json.Marshal(wh.Metadata)
-	client := http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	resp, err := client.Post(esEndpoint, "application/json", bytes.NewBuffer(body))
+	msg, err := (*indexer).Index([]interface{}{wh.Metadata}, indexers.IndexingOpts{
+		MetricName: wh.Metadata.MetricName,
+		JobName:    wh.Metadata.Benchmark,
+	})
 	if err != nil {
-		log.Error("Error indexing metadata: ", err)
-		return
-	}
-	if resp.StatusCode == http.StatusCreated {
-		log.Info("Cluster metadata indexed correctly")
+		log.Error(err.Error())
 	} else {
-		b, _ := io.ReadAll(resp.Body)
-		log.Errorf("Error indexing metadata, code: %v body: %s", resp.StatusCode, b)
+		log.Info(msg)
 	}
 }
 
@@ -184,20 +151,12 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		"totalNodes": wh.Metadata.TotalNodes,
 		"sdnType":    wh.Metadata.SDNType,
 	}
-	if wh.userMetadata != "" {
-		userMetadataContent, err := util.ReadUserMetadata(wh.userMetadata)
-		if err != nil {
-			log.Fatalf("Error reading provided user metadata: %v", err)
-		}
-		// Combine provided userMetadata with the regular OCP metadata
-		for k, v := range userMetadataContent {
-			metadata[k] = v
-		}
-		wh.Metadata.Metadata = userMetadataContent
+	// Combine provided userMetadata with the regular OCP metadata
+	for k, v := range wh.Metadata.UserMetadata {
+		metadata[k] = v
 	}
 	var rc int
 	var err error
-	var indexer *indexers.Indexer
 	var alertM *alerting.AlertManager
 	var prometheusClients []*prometheus.Prometheus
 	var alertMs []*alerting.AlertManager
