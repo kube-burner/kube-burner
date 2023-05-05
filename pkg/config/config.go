@@ -57,6 +57,7 @@ func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type rawObject Object
 	object := rawObject{
 		Namespaced: true,
+		Wait:       true,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err
@@ -84,12 +85,6 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnPercent:         10,
 		ChurnDuration:        1 * time.Hour,
 		ChurnDelay:           5 * time.Minute,
-		Objects: []Object{
-			{
-				Namespaced: true,
-				Wait:       true,
-			},
-		},
 	}
 	if err := unmarshal(&raw); err != nil {
 		return err
