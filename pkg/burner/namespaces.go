@@ -77,7 +77,7 @@ func CleanupNamespaces(ctx context.Context, l metav1.ListOptions, cleanupWait bo
 
 func waitForDeleteNamespaces(ctx context.Context, l metav1.ListOptions) {
 	log.Info("Waiting for namespaces to be definitely deleted")
-	err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		ns, err := ClientSet.CoreV1().Namespaces().List(ctx, l)
 		if err != nil {
 			return false, err
