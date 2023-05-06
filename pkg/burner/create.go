@@ -83,6 +83,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			inputVars:      o.InputVars,
 			namespaced:     o.Namespaced,
 			wait:           o.Wait,
+			waitOptions:    o.WaitOptions,
 		}
 		// If any of the objects is namespaced, we configure the job to create namepaces
 		if o.Namespaced {

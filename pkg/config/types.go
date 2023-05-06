@@ -85,6 +85,8 @@ type Object struct {
 	Namespaced bool `yaml:"namespaced" json:"namespaced"`
 	// Wait for resource to be ready, it doesn't apply to all resources
 	Wait bool `yaml:"wait" json:"wait"`
+	// WaitOptions define custom behaviors when waiting for objects creation
+	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -137,4 +139,9 @@ type Job struct {
 	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration,omitempty"`
 	// Churn delay between sets
 	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
+}
+
+type WaitOptions struct {
+	// ForCondition wait for this condition to become true
+	ForCondition string `yaml:"forCondition" json:"forCondition,omitempty"`
 }

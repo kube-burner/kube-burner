@@ -77,8 +77,18 @@ Each object element supports the following parameters:
 | inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -                                                   | -       |
 | namespaced           | Whether to create a namespaced object or not                      | Boolean | false                                               | true    |
 | wait                 | Wait for object to be ready[^1]                                   | Boolean | false                                               | true    |
+| waitOptions          | Customize how to wait for object to be ready                      | Object  | -                                                   | -       |
 
-[^1]: Kube-burner is only able to wait for a subset of resources. These resources are available in the `pkg/burner/waiters.go` file
+[^1]: Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
+These resources are available in the `pkg/burner/waiters.go` file
+
+### Wait Options
+
+If you want to override the default waiter behaviors, you can specify wait options for your objects.
+
+| Option       | Description                                             | Type    | Example     | Default |
+|--------------|---------------------------------------------------------|---------|-------------|---------|
+| forCondition | Wait for the object condition with this name to be true | String  | myCondition | -       |
 
 ### Default labels
 

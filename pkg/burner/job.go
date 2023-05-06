@@ -48,6 +48,7 @@ type object struct {
 	namespaced     bool
 	kind           string
 	wait           bool
+	waitOptions    config.WaitOptions
 }
 
 // Executor contains the information required to execute a job
