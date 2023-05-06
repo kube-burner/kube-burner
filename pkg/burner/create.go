@@ -101,7 +101,6 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		"kube-burner-job":  ex.Config.Name,
 		"kube-burner-uuid": ex.uuid,
 	}
-	var wg sync.WaitGroup
 	var ns string
 	var err error
 	log.Infof("Running job %s", ex.Config.Name)
@@ -131,9 +130,12 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 				continue
 			}
 		}
+		var wg sync.WaitGroup
 		for objectIndex, obj := range ex.objects {
 			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
+		// Wait for all the iteration replicas to be created
+		wg.Wait()
 		if ex.Config.PodWait {
 			log.Infof("Waiting up to %s for actions to be completed in namespace", ex.Config.MaxWaitTimeout, ns)
 			ex.waitForObjects(ns)
@@ -144,7 +146,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		}
 	}
 	// Wait for all replicas to be created
-	wg.Wait()
+	var wg sync.WaitGroup
 	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {
 		log.Infof("Waiting up to %s for actions to be completed", ex.Config.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
