@@ -56,6 +56,6 @@
   severity: warning
 
 # Prometheus alerts
-- expr: ALERTS{severity="critical"} > 0
+- expr: ALERTS{severity="critical", alertstate="firing"} > 0
   description: Critical prometheus alert. {{$labels.alertname}}
   severity: warning
