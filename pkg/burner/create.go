@@ -117,6 +117,8 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart + 1) / 10
 	percent := 1
+	var namespacesCreated = make(map[string]bool)
+	var namespacesWaited = make(map[string]bool)
 	for i := iterationStart; i <= iterationEnd; i++ {
 		if i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart+1)
@@ -124,18 +126,24 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.Config.NamespacedIterations {
-			ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
-			if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
-				log.Error(err.Error())
-				continue
+			ns = ex.generateNamespace(i)
+			if !namespacesCreated[ns] {
+				if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
+					log.Error(err.Error())
+					continue
+				}
+				namespacesCreated[ns] = true
 			}
 		}
 		for objectIndex, obj := range ex.objects {
 			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
 		if ex.Config.PodWait {
-			log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.Config.MaxWaitTimeout, ns)
-			ex.waitForObjects(ns)
+			if !ex.Config.NamespacedIterations || !namespacesWaited[ns] {
+				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.Config.MaxWaitTimeout, ns)
+				ex.waitForObjects(ns)
+				namespacesWaited[ns] = true
+			}
 		}
 		if ex.Config.JobIterationDelay > 0 {
 			log.Infof("Sleeping for %v", ex.Config.JobIterationDelay)
@@ -150,7 +158,12 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
 		for i := iterationStart; i <= iterationEnd; i++ {
 			if ex.Config.NamespacedIterations {
-				ns = fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+				ns = ex.generateNamespace(i)
+				if namespacesWaited[ns] {
+					continue
+				} else {
+					namespacesWaited[ns] = true
+				}
 			}
 			sem <- 1
 			wg.Add(1)
@@ -167,6 +180,14 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		wg.Wait()
 	}
 	log.Infof("Finished the create job in %v", time.Since(start).Round(time.Second))
+}
+
+// Simple integer division on the iteration allows us to batch iterations into
+// namespaces. Division means namespaces are populated to their desired number
+// of iterations before the next namespace is created.
+func (ex *Executor) generateNamespace(iteration int) string {
+	nsIndex := iteration / ex.Config.IterationsPerNamespace
+	return fmt.Sprintf("%s-%d", ex.Config.Namespace, nsIndex)
 }
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
@@ -274,14 +295,19 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		} else {
 			numToChurn = ex.Config.JobIterations
 		}
+		var namespacesPatched = make(map[string]bool)
 		// delete numToChurn namespaces starting at randStart
 		for i := randStart; i < numToChurn+randStart; i++ {
-			ns := fmt.Sprintf("%s-%d", ex.Config.Namespace, i)
+			ns := ex.generateNamespace(i)
+			if namespacesPatched[ns] {
+				continue
+			}
 			// Label namespaces to be deleted
 			_, err = ClientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
 			if err != nil {
 				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
 			}
+			namespacesPatched[ns] = true
 		}
 		// 1 hour timeout to delete namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
