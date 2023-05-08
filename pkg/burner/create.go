@@ -82,6 +82,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			kind:           gvk.Kind,
 			inputVars:      o.InputVars,
 			namespaced:     o.Namespaced,
+			wait:           o.Wait,
 		}
 		// If any of the objects is namespaced, we configure the job to create namepaces
 		if o.Namespaced {

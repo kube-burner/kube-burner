@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -42,7 +43,7 @@ var configSpec = Spec{
 		GC:             false,
 		RequestTimeout: 15 * time.Second,
 		Measurements:   []mtypes.Measurement{},
-		IndexerConfig: IndexerConfig{
+		IndexerConfig: indexers.IndexerConfig{
 			Enabled:            false,
 			InsecureSkipVerify: false,
 			MetricsDirectory:   "collected-metrics",
@@ -85,7 +86,10 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
 		Objects: []Object{
-			{Namespaced: true},
+			{
+				Namespaced: true,
+				Wait:       true,
+			},
 		},
 	}
 	if err := unmarshal(&raw); err != nil {

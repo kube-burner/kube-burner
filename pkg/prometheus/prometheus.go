@@ -24,8 +24,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	api "github.com/prometheus/client_golang/api"
 	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -140,8 +140,16 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 				continue
 			}
 		}
-		if p.ConfigSpec.GlobalConfig.IndexerConfig.Enabled {
-			(*indexer).Index(datapoints, indexers.IndexingOpts{MetricName: md.MetricName})
+		indexerConfig := p.ConfigSpec.GlobalConfig.IndexerConfig
+		if indexerConfig.Enabled {
+			log.Infof("Indexing metric %s", md.MetricName)
+			log.Debugf("Indexing [%d] documents", len(datapoints))
+			resp, err := (*indexer).Index(datapoints, indexers.IndexingOpts{MetricName: md.MetricName})
+			if err != nil {
+				log.Error(err.Error())
+			} else {
+				log.Info(resp)
+			}
 		}
 	}
 	return nil

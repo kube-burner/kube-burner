@@ -48,7 +48,6 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | podWait              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | true     | false   |
 | waitWhenFinished     | Wait for all pods to be running when all iterations are completed                | Boolean | true     | true    |
 | maxWaitTimeout       | Maximum wait timeout in seconds. (If podWait is enabled this timeout will be reseted with each iteration) | Integer | 1h     | 12h |
-| waitFor              | List containing the objects Kind wait for. Wait for all if empty                 | List    | ["Deployment", "Build", "DaemonSet"]| []      |
 | jobIterationDelay    | How long to wait between each job iteration                                      | Duration| 2s       | 0s      |
 | jobPause             | How long to pause after finishing the job                                        | Duration| 10s      | 0s      |
 | qps                  | Limit object creation queries per second                                         | Integer | 25       | 0       |
@@ -77,6 +76,9 @@ Each object element supports the following parameters:
 | replicas             | How replicas of this object to create per job iteration           | Integer | 10                                                  | -       |
 | inputVars            | Map of arbitrary input variables to inject to the object template | Object  | -                                                   | -       |
 | namespaced           | Whether to create a namespaced object or not                      | Boolean | false                                               | true    |
+| wait                 | Wait for object to be ready[^1]                                   | Boolean | false                                               | true    |
+
+[^1]: Kube-burner is only able to wait for a subset of resources. These resources are available in the `pkg/burner/waiters.go` file
 
 ### Default labels
 
