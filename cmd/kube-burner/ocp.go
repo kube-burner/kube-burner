@@ -82,11 +82,9 @@ func openShiftCmd() *cobra.Command {
 			}
 			os.Exit(0)
 		}
-		if indexing {
-			err := wh.GatherMetadata(*userMetadata)
-			if err != nil {
-				log.Fatal(err.Error())
-			}
+		err := wh.GatherMetadata(*userMetadata)
+		if err != nil {
+			log.Fatal(err.Error())
 		}
 		wh.SetKubeBurnerFlags()
 	}
