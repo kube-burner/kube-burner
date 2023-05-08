@@ -134,7 +134,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
 		if ex.Config.PodWait {
-			log.Infof("Waiting up to %s for actions to be completed in namespace", ex.Config.MaxWaitTimeout, ns)
+			log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.Config.MaxWaitTimeout, ns)
 			ex.waitForObjects(ns)
 		}
 		if ex.Config.JobIterationDelay > 0 {
@@ -203,7 +203,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			newObject.SetLabels(labels)
 			json.Marshal(newObject.Object)
 			// replicaWg is necessary because we want to wait for all replicas
-			// to be crated before running any other action such as verify objects,
+			// to be created before running any other action such as verify objects,
 			// wait for ready, etc. Without this wait group, running for example,
 			// verify objects can lead into a race condition when some objects
 			// hasn't been created yet
