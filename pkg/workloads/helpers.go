@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	ocpMeta "github.com/cloud-bulldozer/go-commons/ocp-metadata"
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
@@ -41,7 +40,7 @@ const (
 )
 
 type BenchmarkMetadata struct {
-	ocpMeta.ClusterMetadata
+	ocpmetadata.ClusterMetadata
 	UUID         string
 	Benchmark    string                 `json:"benchmark"`
 	Timestamp    time.Time              `json:"timestamp"`
@@ -59,7 +58,7 @@ type WorkloadHelper struct {
 	Metadata        BenchmarkMetadata
 	alerting        bool
 	ocpConfig       embed.FS
-	ocpMetaAgent    ocpMeta.Metadata
+	ocpMetaAgent    ocpmetadata.Metadata
 	indexing        bool
 }
 
