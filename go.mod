@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/cloud-bulldozer/go-commons v1.0.0
+	github.com/cloud-bulldozer/go-commons v1.0.1
 	github.com/prometheus/client_golang v1.15.0
 	github.com/prometheus/common v0.42.0
 	github.com/satori/go.uuid v1.2.0
@@ -73,5 +73,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-replace github.com/cloud-bulldozer/go-commons => github.com/rsevilla87/go-commons v0.0.0-20230504090236-e88f6f97037c

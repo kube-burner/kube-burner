@@ -38,7 +38,7 @@ func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
 			totalPods := wh.Metadata.WorkerNodesCount * podsPerNode
 			podCount, err := wh.ocpMetaAgent.GetCurrentPodCount()
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal(err.Error())
 			}
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(totalPods-podCount))
 			os.Setenv("POD_READY_THRESHOLD", fmt.Sprintf("%v", podReadyThreshold))
