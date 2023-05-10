@@ -29,6 +29,12 @@ jobs:
         fetch-depth: 0
         ref: ${{ github.event.pull_request.head.sha }}
 
+    - name: Build-macos
+      env:
+        GOOS: darwin
+        ARCH: arm64
+      run: make build
+
     - name: Build
       run: make build
 
@@ -44,9 +50,6 @@ jobs:
       with:
         name: kube-burner
         path: /usr/bin/kube-burner
-
-    - name: Build-macos
-      run: GOOS=darwin ARCH=arm64 make build
 
     - uses: actions/upload-artifact@v3
       with:
