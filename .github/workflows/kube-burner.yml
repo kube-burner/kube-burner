@@ -45,6 +45,14 @@ jobs:
         name: kube-burner
         path: /usr/bin/kube-burner
 
+    - name: Build-macos
+      run: GOOS=darwin ARCH=arm64 make build
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: kube-burner-darwin-arm64
+        path: bin/arm64/kube-burner
+
   k8s-tests:
     needs: build
     runs-on: ubuntu-latest
