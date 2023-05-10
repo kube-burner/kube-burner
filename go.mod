@@ -97,4 +97,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/cloud-bulldozer/go-commons v1.0.0 => ../go-commons/
+replace github.com/cloud-bulldozer/go-commons v1.0.0 => github.com/davdhacs/kube-burner-go-commons v0.0.0-20230510160744-56ea58f2ec16
