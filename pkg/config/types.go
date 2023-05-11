@@ -121,6 +121,8 @@ type Job struct {
 	Cleanup bool `yaml:"cleanup" json:"cleanup,omitempty"`
 	// NamespacedIterations create a namespace per job iteration
 	NamespacedIterations bool `yaml:"namespacedIterations" json:"namespacedIterations,omitempty"`
+	// IterationsPerNamespace is the modulus to apply to job iterations to calculate . Default 1
+	IterationsPerNamespace int `yaml:"iterationsPerNamespace" json:"iterationsPerNamespace,omitempty"`
 	// VerifyObjects verify object count after running the job
 	VerifyObjects bool `yaml:"verifyObjects" json:"verifyObjects,omitempty"`
 	// ErrorOnVerify exit when verification fails
