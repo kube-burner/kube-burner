@@ -142,7 +142,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		if ex.Config.PodWait {
 			if !ex.Config.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.Config.MaxWaitTimeout, ns)
-                                wg.Wait()
+				wg.Wait()
 				ex.waitForObjects(ns)
 				namespacesWaited[ns] = true
 			}
