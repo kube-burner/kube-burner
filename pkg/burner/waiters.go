@@ -71,7 +71,7 @@ func (ex *Executor) waitForObjects(ns string) {
 func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
 	// TODO handle errors such as timeouts
-	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		deps, err := waitClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -88,7 +88,7 @@ func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGr
 
 func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		rss, err := waitClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -105,7 +105,7 @@ func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 
 func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		stss, err := waitClientSet.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -122,7 +122,7 @@ func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGr
 
 func waitForPVC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		pvc, err := waitClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Bound"})
 		if err != nil {
 			return false, err
@@ -133,7 +133,7 @@ func waitForPVC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 
 func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		rcs, err := waitClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -150,7 +150,7 @@ func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 
 func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		dss, err := waitClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -167,7 +167,7 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 
 func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		pods, err := waitClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
 		if err != nil {
 			return false, err
@@ -185,7 +185,7 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *syn
 		Version:  types.OpenShiftBuildAPIVersion,
 		Resource: types.OpenShiftBuildResource,
 	}
-	wait.PollImmediate(1*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		builds, err := waitDynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -223,7 +223,7 @@ func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 
 func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration) {
 	var uObj types.UnstructuredContent
-	wait.PollImmediate(10*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		objs, err := waitDynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -278,7 +278,7 @@ func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Version:  types.KubevirtAPIVersion,
 		Resource: types.VirtualMachineInstanceReplicaSetResource,
 	}
-	wait.PollImmediate(10*time.Second, maxWaitTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		objs, err := waitDynamicClient.Resource(vmiGVRRS).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Debugf("replicaSets error %v", err)

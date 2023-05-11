@@ -34,12 +34,8 @@ func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			wh.Metadata.Benchmark = cmd.Name()
-			workerNodeCount, err := wh.discoveryAgent.GetWorkerNodeCount()
-			if err != nil {
-				log.Fatal("Error obtaining worker node count:", err)
-			}
-			totalPods := workerNodeCount * podsPerNode
-			podCount, err := wh.discoveryAgent.GetCurrentPodCount()
+			totalPods := wh.Metadata.WorkerNodesCount * podsPerNode
+			podCount, err := wh.ocpMetaAgent.GetCurrentPodCount()
 			if err != nil {
 				log.Fatal(err)
 			}

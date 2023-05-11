@@ -169,7 +169,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
 				}
-				err = exec.Stream(remotecommand.StreamOptions{
+				err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 					Stdin:  nil,
 					Stdout: f,
 					Stderr: &stderr,
@@ -237,7 +237,7 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 		if err != nil {
 			return fmt.Errorf("Failed to establish SPDYExecutor on %s: %s", pod.Name, err)
 		}
-		err = exec.Stream(remotecommand.StreamOptions{
+		err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 			Stdin:  f,
 			Stdout: nil,
 			Stderr: &stderr,

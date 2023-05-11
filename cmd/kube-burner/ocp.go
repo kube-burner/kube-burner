@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/discovery"
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -75,8 +74,7 @@ func openShiftCmd() *cobra.Command {
 			"INDEXING":      fmt.Sprintf("%v", indexing),
 			"INDEXING_TYPE": string(indexingType),
 		}
-		discoveryAgent := discovery.NewDiscoveryAgent()
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, discoveryAgent, indexing, *timeout, *metricsEndpoint, *userMetadata)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, indexing, *timeout, *metricsEndpoint)
 		wh.Metadata.UUID = *uuid
 		if *extract {
 			if err := wh.ExtractWorkload(cmd.Name(), workloads.MetricsProfileMap[cmd.Name()]); err != nil {
@@ -84,11 +82,9 @@ func openShiftCmd() *cobra.Command {
 			}
 			os.Exit(0)
 		}
-		if *esServer != "" {
-			err := wh.GatherMetadata()
-			if err != nil {
-				log.Fatal(err.Error())
-			}
+		err := wh.GatherMetadata(*userMetadata)
+		if err != nil {
+			log.Fatal(err.Error())
 		}
 		wh.SetKubeBurnerFlags()
 	}
