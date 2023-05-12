@@ -34,33 +34,37 @@ func (ex *Executor) waitForObjects(ns string) {
 	for _, obj := range ex.objects {
 		if obj.wait {
 			wg.Add(1)
-			switch obj.kind {
-			case "Deployment":
-				go waitForDeployments(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "ReplicaSet":
-				go waitForRS(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "ReplicationController":
-				go waitForRC(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "StatefulSet":
-				go waitForStatefulSet(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "DaemonSet":
-				go waitForDS(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "Pod":
-				go waitForPod(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "Build", "BuildConfig":
-				go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
-			case "VirtualMachine":
-				go waitForVM(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "VirtualMachineInstance":
-				go waitForVMI(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "VirtualMachineInstanceReplicaSet":
-				go waitForVMIRS(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "Job":
-				go waitForJob(ns, ex.Config.MaxWaitTimeout, &wg)
-			case "PersistentVolumeClaim":
-				go waitForPVC(ns, ex.Config.MaxWaitTimeout, &wg)
-			default:
-				wg.Done()
+			if obj.waitOptions.ForCondition != "" {
+				go waitForCondition(obj.gvr, ns, obj.waitOptions.ForCondition, ex.Config.MaxWaitTimeout, &wg)
+			} else {
+				switch obj.kind {
+				case "Deployment":
+					go waitForDeployments(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "ReplicaSet":
+					go waitForRS(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "ReplicationController":
+					go waitForRC(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "StatefulSet":
+					go waitForStatefulSet(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "DaemonSet":
+					go waitForDS(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "Pod":
+					go waitForPod(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "Build", "BuildConfig":
+					go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
+				case "VirtualMachine":
+					go waitForVM(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "VirtualMachineInstance":
+					go waitForVMI(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "VirtualMachineInstanceReplicaSet":
+					go waitForVMIRS(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "Job":
+					go waitForJob(ns, ex.Config.MaxWaitTimeout, &wg)
+				case "PersistentVolumeClaim":
+					go waitForPVC(ns, ex.Config.MaxWaitTimeout, &wg)
+				default:
+					wg.Done()
+				}
 			}
 		}
 	}
@@ -219,6 +223,12 @@ func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Resource: "jobs",
 	}
 	verifyCondition(gvr, ns, "Complete", maxWaitTimeout)
+}
+
+func waitForCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration,
+	wg *sync.WaitGroup) {
+	defer wg.Done()
+	verifyCondition(gvr, ns, condition, maxWaitTimeout)
 }
 
 func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration) {
