@@ -155,16 +155,16 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 			jobList[jobPosition].End = time.Now().UTC()
 			prometheusJob.End = jobList[jobPosition].End
 			prometheusJob.JobConfig = job.Config
-			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Seconds()
+			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Round(time.Second)
 			// Don't append to Prometheus jobList when prometheus it's not initialized
 			if len(prometheusClients) > 0 {
 				prometheusJobList = append(prometheusJobList, prometheusJob)
 			}
-			log.Infof("Job %s took %.2f seconds", job.Config.Name, elapsedTime)
+			log.Infof("Job %s took %v", job.Config.Name, elapsedTime)
 		}
 		if globalConfig.IndexerConfig.Enabled {
 			for _, job := range jobList {
-				elapsedTime := job.End.Sub(job.Start).Seconds()
+				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
 				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
 			}
 		}
