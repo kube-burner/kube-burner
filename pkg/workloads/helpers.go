@@ -41,7 +41,7 @@ const (
 
 type BenchmarkMetadata struct {
 	ocpmetadata.ClusterMetadata
-	UUID         string
+	UUID         string                 `json:"uuid"`
 	Benchmark    string                 `json:"benchmark"`
 	Timestamp    time.Time              `json:"timestamp"`
 	EndDate      time.Time              `json:"endDate"`
