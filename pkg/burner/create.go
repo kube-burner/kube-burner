@@ -114,7 +114,6 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 			log.Fatal(err.Error())
 		}
 	}
-	start := time.Now().Round(time.Second)
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart + 1) / 10
 	percent := 1
@@ -181,7 +180,6 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		}
 		wg.Wait()
 	}
-	log.Infof("Finished the create job in %v", time.Since(start).Round(time.Second))
 }
 
 // Simple integer division on the iteration allows us to batch iterations into
