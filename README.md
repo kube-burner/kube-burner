@@ -23,7 +23,7 @@ But it also provides other features like
 
 ## Documentation
 
-Documentation is available at https://kube-burner.readthedocs.io/
+Documentation is available at https://cloud-bulldozer.github.io/kube-burner/
 
 ## Downloading Kube-burner
 
