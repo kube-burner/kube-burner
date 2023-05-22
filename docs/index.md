@@ -2,7 +2,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cloud-bulldozer/kube-burner)](https://goreportcard.com/report/github.com/cloud-bulldozer/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# What's this?
+# What's this
 
 Kube-burner is a tool aimed at stressing kubernetes clusters. The main functionallity it provides can be summarized in these three steps:
 
