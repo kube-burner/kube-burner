@@ -28,7 +28,7 @@ type jobSummary struct {
 	Timestamp   time.Time              `json:"timestamp"`
 	UUID        string                 `json:"uuid"`
 	MetricName  string                 `json:"metricName"`
-	ElapsedTime float64                `json:"elapsedTime"`
+	ElapsedTime time.Duration          `json:"elapsedTime"`
 	JobConfig   config.Job             `json:"jobConfig"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	Version     string                 `json:"version"`
@@ -37,7 +37,7 @@ type jobSummary struct {
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
+func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime time.Duration, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
 			UUID:        uuid,

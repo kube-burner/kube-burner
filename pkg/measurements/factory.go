@@ -102,17 +102,22 @@ func Start() {
 }
 
 // Stop stops registered measurements
-func Stop() int {
+// if a measurement fails, returns a list of the failed measurements or nil
+func Stop() error {
 	var err error
-	var r, rc int
+	var r int
+	failedMeasurements := []string{}
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Stopping measurement: %s", name)
 		if r, err = measurement.stop(); err != nil {
 			log.Errorf("Error stopping measurement %s: %s", name, err)
 		}
 		if r != 0 {
-			rc = r
+			failedMeasurements = append(failedMeasurements, name)
 		}
 	}
-	return rc
+	if len(failedMeasurements) > 0 {
+		return fmt.Errorf("%v", failedMeasurements)
+	}
+	return nil
 }
