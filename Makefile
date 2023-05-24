@@ -1,5 +1,5 @@
 
-.PHONY: build clean test help images push manifest manifest-build
+.PHONY: build lint clean test help images push manifest manifest-build all
 
 
 ARCH ?= amd64
@@ -28,6 +28,7 @@ help:
 	@echo "Commands for $(BIN_PATH):"
 	@echo
 	@echo 'Usage:'
+	@echo '    make lint                     Install and execute pre-commit'
 	@echo '    make clean                    Clean the compiled binaries'
 	@echo '    [ARCH=arch] make build        Compile the project for arch, default amd64'
 	@echo '    [ARCH=arch] make install      Installs kube-burner binary in the system, default amd64'
@@ -44,7 +45,11 @@ $(BIN_PATH): $(SOURCES)
 	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner
 
 lint:
-	golangci-lint run
+	@echo -e "\n\033[2mUpdating pre-commit hooks..\033[0m"
+	pre-commit autoupdate
+	@echo "Executing pre-commit for all files"
+	pre-commit run --all-files
+	@echo "pre-commit executed."
 
 clean:
 	test ! -e $(BIN_DIR) || rm -Rf $(BIN_PATH)
@@ -70,4 +75,3 @@ manifest-build:
 	for arch in $(MANIFEST_ARCHS); do \
 		$(ENGINE) manifest add $(CONTAINER_NAME) $(CONTAINER_NAME)-$${arch}; \
 	done
-
