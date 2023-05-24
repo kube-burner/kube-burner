@@ -162,7 +162,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 			log.Infof("Job %s took %v", job.Config.Name, elapsedTime)
 			// We stop and index measurements per job
 			if err = measurements.Stop(); err != nil {
-				log.Error("Failed measurements: %v", err.Error())
+				log.Errorf("Failed measurements: %v", err.Error())
 				innerRC = 1
 			}
 		}
