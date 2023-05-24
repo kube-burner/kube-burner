@@ -1,6 +1,6 @@
 # CLI
 
-kube-burner is tool written in golang that can be used to stress kubernetes clusters by creating, deleting and patching resources at a 
+kube-burner is tool written in golang that can be used to stress kubernetes clusters by creating, deleting and patching resources at a
 given rate. The actions taken by this tool are highly custimizable, and their available subcommands are detailed below:
 
 ```console
@@ -54,25 +54,25 @@ This is the main subcommand, it triggers a new kube-burner benchmark and it supp
 With the above, triggering kube-burner would be as simple as:
 
 ```console
-$ kube-burner init -c cfg.yml -u https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+kube-burner init -c cfg.yml -u https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
 Kube-burner also supports remote configuration files served by a web server, to use it, rather than a path pass a URL like below:
 
 ```console
-$ kube-burner init -c http://web.domain.com:8080/cfg.yml -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+kube-burner init -c http://web.domain.com:8080/cfg.yml -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
 If you have no interest in collecting prometheus metrics, kube-burner can also be launched w/o any prometheus reference to disable metrics collection.
 
 ```console
-$ kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
 To scrape metrics from multiple endpoints init command can be triggered as below.
 
 ```console
-$ kube-burner init -c cluster-density.yml -e metrics-endpoints.yaml
+kube-burner init -c cluster-density.yml -e metrics-endpoints.yaml
 ```
 
 And a metrics-endpoints.yaml file with valid keys for the `init` command would look something like this.
