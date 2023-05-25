@@ -25,7 +25,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/vishnuchalla/go-commons/indexers"
 	log "github.com/sirupsen/logrus"
 )
 

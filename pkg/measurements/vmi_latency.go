@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/vishnuchalla/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"

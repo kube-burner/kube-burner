@@ -22,7 +22,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/vishnuchalla/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/prometheus/common/model"
@@ -122,7 +122,7 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 		expr := renderedQuery.String()
 		renderedQuery.Reset()
 		log.Infof("Evaluating expression: '%s'", expr)
-		v, err := a.prometheus.QueryRange(expr, start, end)
+		v, err := a.prometheus.Client.QueryRange(expr, start, end, a.prometheus.Step)
 		if err != nil {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue

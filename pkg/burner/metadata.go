@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/vishnuchalla/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 	log "github.com/sirupsen/logrus"

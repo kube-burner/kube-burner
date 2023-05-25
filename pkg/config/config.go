@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/vishnuchalla/go-commons/indexers"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"

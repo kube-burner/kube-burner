@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
+	"github.com/vishnuchalla/go-commons/indexers"
+	ocpmetadata "github.com/vishnuchalla/go-commons/ocp-metadata"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
@@ -40,7 +40,7 @@ const (
 )
 
 type BenchmarkMetadata struct {
-	ocpmetadata.ClusterMetadata
+	ClusterMetadata	ocpmetadata.ClusterMetadata
 	UUID         string                 `json:"uuid"`
 	Benchmark    string                 `json:"benchmark"`
 	Timestamp    time.Time              `json:"timestamp"`
@@ -132,7 +132,7 @@ func (wh *WorkloadHelper) indexMetadata() {
 	log.Info("Indexing cluster metadata document")
 	wh.Metadata.EndDate = time.Now().UTC()
 	msg, err := (*indexer).Index([]interface{}{wh.Metadata}, indexers.IndexingOpts{
-		MetricName: wh.Metadata.MetricName,
+		MetricName: wh.Metadata.ClusterMetadata.MetricName,
 		JobName:    wh.Metadata.Benchmark,
 	})
 	if err != nil {
@@ -144,11 +144,11 @@ func (wh *WorkloadHelper) indexMetadata() {
 
 func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	metadata := map[string]interface{}{
-		"platform":   wh.Metadata.Platform,
-		"ocpVersion": wh.Metadata.OCPVersion,
-		"k8sVersion": wh.Metadata.K8SVersion,
-		"totalNodes": wh.Metadata.TotalNodes,
-		"sdnType":    wh.Metadata.SDNType,
+		"platform":   wh.Metadata.ClusterMetadata.Platform,
+		"ocpVersion": wh.Metadata.ClusterMetadata.OCPVersion,
+		"k8sVersion": wh.Metadata.ClusterMetadata.K8SVersion,
+		"totalNodes": wh.Metadata.ClusterMetadata.TotalNodes,
+		"sdnType":    wh.Metadata.ClusterMetadata.SDNType,
 	}
 	// Combine provided userMetadata with the regular OCP metadata
 	for k, v := range wh.Metadata.UserMetadata {

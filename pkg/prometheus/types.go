@@ -19,12 +19,12 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/vishnuchalla/go-commons/prometheus"
 )
 
 // Prometheus describes the prometheus connection
 type Prometheus struct {
-	api           apiv1.API
+	Client        *prometheus.Prometheus
 	Endpoint      string
 	MetricProfile metricProfile
 	Step          time.Duration
