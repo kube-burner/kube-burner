@@ -25,13 +25,13 @@ import (
 )
 
 type jobSummary struct {
-	Timestamp     time.Time              `json:"timestamp"`
-	UUID          string                 `json:"uuid"`
-	MetricName    string                 `json:"metricName"`
-	ElapsedTimeNs time.Duration          `json:"elapsedTimeNs"`
-	JobConfig     config.Job             `json:"jobConfig"`
-	Metadata      map[string]interface{} `json:"metadata"`
-	Version       string                 `json:"version"`
+	Timestamp   time.Time              `json:"timestamp"`
+	UUID        string                 `json:"uuid"`
+	MetricName  string                 `json:"metricName"`
+	ElapsedTime time.Duration          `json:"elapsedTime"`
+	JobConfig   config.Job             `json:"jobConfig"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	Version     string                 `json:"version"`
 }
 
 const jobSummaryMetric = "jobSummary"
@@ -40,13 +40,13 @@ const jobSummaryMetric = "jobSummary"
 func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime time.Duration, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
-			UUID:          uuid,
-			ElapsedTimeNs: elapsedTime,
-			JobConfig:     jobConfig,
-			MetricName:    jobSummaryMetric,
-			Timestamp:     timestamp,
-			Metadata:      metadata,
-			Version:       fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
+			UUID:        uuid,
+			ElapsedTime: elapsedTime,
+			JobConfig:   jobConfig,
+			MetricName:  jobSummaryMetric,
+			Timestamp:   timestamp,
+			Metadata:    metadata,
+			Version:     fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
 		},
 	}
 	log.Infof("Indexing metric %s", jobSummaryMetric)
