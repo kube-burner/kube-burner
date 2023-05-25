@@ -279,7 +279,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 	// Create timer for the churn duration
 	timer := time.After(ex.Config.ChurnDuration)
 	// Patch to label namespaces for deletion
-	delPatch := []byte(`[{"op":"add","path":"/metadata/labels","value":{"churndelete":"delete"}}]`)
+	delPatch := []byte(`[{"op":"add","path":"/metadata/labels/churndelete","value": "delete"}]`)
 	for {
 		select {
 		case <-timer:
