@@ -15,7 +15,6 @@
 package prometheus
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
@@ -39,14 +38,6 @@ type Job struct {
 	End       time.Time
 	Name      string
 	JobConfig config.Job
-}
-
-// This object implements RoundTripper
-type authTransport struct {
-	Transport http.RoundTripper
-	token     string
-	username  string
-	password  string
 }
 
 // metricProfile describes what metrics kube-burner collects

@@ -22,8 +22,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/vishnuchalla/go-commons/indexers"
-	ocpmetadata "github.com/vishnuchalla/go-commons/ocp-metadata"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
@@ -31,6 +29,8 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
+	"github.com/vishnuchalla/go-commons/indexers"
+	ocpmetadata "github.com/vishnuchalla/go-commons/ocp-metadata"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -40,13 +40,13 @@ const (
 )
 
 type BenchmarkMetadata struct {
-	ClusterMetadata	ocpmetadata.ClusterMetadata
-	UUID         string                 `json:"uuid"`
-	Benchmark    string                 `json:"benchmark"`
-	Timestamp    time.Time              `json:"timestamp"`
-	EndDate      time.Time              `json:"endDate"`
-	Passed       bool                   `json:"passed"`
-	UserMetadata map[string]interface{} `json:"metadata,omitempty"`
+	ClusterMetadata ocpmetadata.ClusterMetadata
+	UUID            string                 `json:"uuid"`
+	Benchmark       string                 `json:"benchmark"`
+	Timestamp       time.Time              `json:"timestamp"`
+	EndDate         time.Time              `json:"endDate"`
+	Passed          bool                   `json:"passed"`
+	UserMetadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type WorkloadHelper struct {

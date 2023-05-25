@@ -32,8 +32,8 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
-	"github.com/vishnuchalla/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
+	"github.com/vishnuchalla/go-commons/indexers"
 
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
