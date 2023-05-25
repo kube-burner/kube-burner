@@ -169,7 +169,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		if globalConfig.IndexerConfig.Enabled {
 			for _, job := range jobList {
 				// elapsedTime is recalculated for every job of the list
-				elapsedTime := job.End.Sub(job.Start).Round(time.Second)
+				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
 				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
 			}
 		}
