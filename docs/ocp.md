@@ -109,10 +109,10 @@ Each iteration of **cluster-density-v2** creates the following objects in each o
 - 2 edge route pointing to the to first and second service respectively
 - 10 secrets containing 2048 character random string
 - 10 configMaps containing a 2048 character random string
-- 3 network policies
-  - 1 deny-all traffic
-  - 1 allow traffic from client/nginx pods to server/nginx pods
-  - 1 allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
+- 3 network policies:
+   - 1 deny-all traffic
+   - 1 allow traffic from client/nginx pods to server/nginx pods
+   - 1 allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
 
 ---
 
