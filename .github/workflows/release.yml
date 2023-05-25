@@ -6,7 +6,9 @@ on:
       - "*" # triggers only if push new tag version
 
 jobs:
-  build:
+
+jobs:
+  release-build:
     name: GoReleaser build
     runs-on: ubuntu-latest
 
@@ -29,3 +31,8 @@ jobs:
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  image-upload:
+    needs: release-build
+    uses: ./.github/workflows/image-upload.yml

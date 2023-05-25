@@ -1,0 +1,17 @@
+# pullrequest.yml
+name: Pull Request Workflow
+
+on:
+  pull_request_target:
+    branches:
+      - master
+
+jobs:
+  linter:
+    uses: ./.github/workflows/linters.yml
+  build:
+    needs: linter
+    uses: ./.github/workflows/builders.yml
+  test-k8s:
+    needs: build
+    uses: ./.github/workflows/test-k8s.yml

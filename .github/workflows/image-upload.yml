@@ -1,12 +1,6 @@
-name: Containers 
-
+# image-upload.yml
 on:
-  push:
-    branches:
-      - master
-    tags:
-      - "*" # triggers only if push new tag version
-
+  workflow_call:
 jobs:
   containers:
     name: Build container images
@@ -14,10 +8,10 @@ jobs:
     strategy:
       matrix:
         arch:
-         - arm64
-         - amd64
-         - ppc64le
-         - s390x
+        - arm64
+        - amd64
+        - ppc64le
+        - s390x
 
     steps:
 
@@ -31,7 +25,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
-        id: go
+          id: go
 
       - name: Login in quay
         run: podman login quay.io -u ${QUAY_USER} -p ${QUAY_TOKEN}
