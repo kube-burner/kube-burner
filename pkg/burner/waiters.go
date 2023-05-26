@@ -32,10 +32,10 @@ import (
 func (ex *Executor) waitForObjects(ns string) {
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
-		if obj.wait {
+		if obj.Wait {
 			wg.Add(1)
-			if obj.waitOptions.ForCondition != "" {
-				go waitForCondition(obj.gvr, ns, obj.waitOptions.ForCondition, ex.Config.MaxWaitTimeout, &wg)
+			if obj.WaitOptions.ForCondition != "" {
+				go waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.Config.MaxWaitTimeout, &wg)
 			} else {
 				switch obj.kind {
 				case "Deployment":
@@ -51,7 +51,7 @@ func (ex *Executor) waitForObjects(ns string) {
 				case "Pod":
 					go waitForPod(ns, ex.Config.MaxWaitTimeout, &wg)
 				case "Build", "BuildConfig":
-					go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.replicas, &wg)
+					go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.Replicas, &wg)
 				case "VirtualMachine":
 					go waitForVM(ns, ex.Config.MaxWaitTimeout, &wg)
 				case "VirtualMachineInstance":

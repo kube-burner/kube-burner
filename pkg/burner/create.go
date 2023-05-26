@@ -75,21 +75,16 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		_, gvk := yamlToUnstructured(cleanTemplate, uns)
 		gvr, _ := meta.UnsafeGuessKindToResource(*gvk)
 		obj := object{
-			gvr:            gvr,
-			objectSpec:     t,
-			objectTemplate: o.ObjectTemplate,
-			replicas:       o.Replicas,
-			kind:           gvk.Kind,
-			inputVars:      o.InputVars,
-			namespaced:     o.Namespaced,
-			wait:           o.Wait,
-			waitOptions:    o.WaitOptions,
+			gvr:        gvr,
+			objectSpec: t,
+			kind:       gvk.Kind,
+			Object:     o,
 		}
 		// If any of the objects is namespaced, we configure the job to create namepaces
 		if o.Namespaced {
 			ex.Config.NamespacedIterations = true
 		}
-		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.replicas, gvk.Kind)
+		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
 	return ex
@@ -192,7 +187,7 @@ func (ex *Executor) generateNamespace(iteration int) string {
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
-	for r := 1; r <= obj.replicas; r++ {
+	for r := 1; r <= obj.Replicas; r++ {
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
@@ -208,13 +203,13 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				jobUUID:      ex.uuid,
 				replica:      r,
 			}
-			for k, v := range obj.inputVars {
+			for k, v := range obj.InputVars {
 				templateData[k] = v
 			}
 			ex.limiter.Wait(context.TODO())
 			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
 			if err != nil {
-				log.Fatalf("Template error in %s: %s", obj.objectTemplate, err)
+				log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 			}
 			// Re-decode rendered object
 			yamlToUnstructured(renderedObj, newObject)
@@ -230,7 +225,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			// hasn't been created yet
 			replicaWg.Add(1)
 			go func() {
-				createRequest(obj.gvr, ns, newObject, obj.namespaced)
+				createRequest(obj.gvr, ns, newObject, obj.Namespaced)
 				replicaWg.Done()
 			}()
 		}(r)
