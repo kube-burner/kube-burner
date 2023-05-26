@@ -103,14 +103,14 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 			}
 			dynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			if job.Config.PreLoadImages {
-				preLoadImages(job)
+				if err = preLoadImages(job); err != nil {
+					log.Fatal(err.Error())
+				}
 			}
 			jobList[jobPosition].Start = time.Now().UTC()
-			prometheusJob := prometheus.Job{
-				Start: jobList[jobPosition].Start,
-			}
-			log.Infof("Triggering job: %s", job.Config.Name)
 			measurements.SetJobConfig(&job.Config)
+			log.Infof("Triggering job: %s", job.Config.Name)
+			measurements.Start()
 			switch job.Config.JobType {
 			case config.CreationJob:
 				if job.Config.Cleanup {
@@ -118,7 +118,6 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 					defer cancel()
 					CleanupNamespaces(ctx, job.selector.ListOptions, true)
 				}
-				measurements.Start()
 				if job.Config.Churn {
 					log.Info("Churning enabled")
 					log.Infof("Churn duration: %v", job.Config.ChurnDuration)
@@ -139,10 +138,6 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 				if job.Config.Churn {
 					job.RunCreateJobWithChurn()
 				}
-				// We stop and index measurements per job
-				if measurements.Stop() == 1 {
-					innerRC = 1
-				}
 			case config.DeletionJob:
 				job.RunDeleteJob()
 			case config.PatchJob:
@@ -152,18 +147,28 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 				log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
 				time.Sleep(job.Config.JobPause)
 			}
+
 			jobList[jobPosition].End = time.Now().UTC()
-			prometheusJob.End = jobList[jobPosition].End
-			prometheusJob.JobConfig = job.Config
+			prometheusJob := prometheus.Job{
+				Start:     jobList[jobPosition].Start,
+				End:       jobList[jobPosition].End,
+				JobConfig: job.Config,
+			}
 			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Round(time.Second)
 			// Don't append to Prometheus jobList when prometheus it's not initialized
 			if len(prometheusClients) > 0 {
 				prometheusJobList = append(prometheusJobList, prometheusJob)
 			}
 			log.Infof("Job %s took %v", job.Config.Name, elapsedTime)
+			// We stop and index measurements per job
+			if err = measurements.Stop(); err != nil {
+				log.Errorf("Failed measurements: %v", err.Error())
+				innerRC = 1
+			}
 		}
 		if globalConfig.IndexerConfig.Enabled {
 			for _, job := range jobList {
+				// elapsedTime is recalculated for every job of the list
 				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
 				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
 			}
