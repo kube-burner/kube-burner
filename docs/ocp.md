@@ -4,7 +4,7 @@ The kube-burner binary brings a very opinionated OpenShift wrapper designed to s
 This wrapper is hosted under the `kube-burner ocp` subcommand that currently looks like:
 
 ```console
-$ kube-burner ocp -h
+$ kube-burner ocp help
 This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads
 
 Usage:
@@ -64,122 +64,74 @@ This wrapper provides the following benefits among others:
 - Prevents modifying configuration files to tweak some of the parameters of the workloads
 - Discovers the Prometheus URL and authentication token, so the user does not have to perform those operations before using them.
 
-## Available workloads
+## Cluster density workloads
 
-### cluster-density, cluster-density-v2 and cluster-density-ms
+This workload family is a control-plane density focused workload that that creates different objects across the cluster. There're 3 different variants [cluster-density](#cluster-density), [cluster-density-v2](#cluster-density-v2) and [cluster-density-ms](#cluster-density-ms).
 
-Control-plane density focused test that creates deployments, builds, secrets, services and more across in the cluster. Each iteration of these workloads create a new namespace, they support the following flags.
+Each iteration of these create a new namespace, the three support similar configuration flags. Check them out from the subcommand help
 
-```shell
-$ kube-burner ocp cluster-density -h
-Runs cluster-density workload
+!!! Info
+    Workload churning of 1h is enabled by default in the `cluster-density` workloads, you can disable it by passing `--churn=false` to the workload subcommand
 
-Usage:
-  kube-burner ocp cluster-density [flags]
+### cluster-density
 
-Flags:
-      --churn                     Enable churning (default true)
-      --churn-delay duration      Time to wait between each churn (default 2m0s)
-      --churn-duration duration   Churn duration (default 1h0m0s)
-      --churn-percent int         Percentage of job iterations that kube-burner will churn each round (default 10)
-      --iterations int            cluster-density iterations
-```
+Each iteration of **cluster-density** creates the following objects in each of the dreated namespaces:
 
----
+- 1 Imagestream
+- 1 Build. The OCP internal container registry must be set-up previously since the resulting container image will be pushed there.
+- 5 Deployments with two pod replicas (pause) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
+- 5 Services, each one pointing to the TCP/8080 and TCP/8443 ports of one of the previous deployments
+- 1 edge Route pointing to the to first service
+- 10 Secrets containing 2048 character random string
+- 10 ConfigMaps containing a 2048 character random string
 
-Each iteration of **cluster-density** creates the following objects in each of the namespaces/iterations:
+### cluster-density-v2
 
-- 1 imagestream
-- 1 build. The OCP internal container registry must be set-up previously since the resulting container image will be pushed there.
-- 5 deployments with two pod replicas (pause) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
-- 5 services, each one pointing to the TCP/8080 and TCP/8443 ports of one of the previous deployments
-- 1 edge route pointing to the to first service
-- 10 secrets containing 2048 character random string
-- 10 configMaps containing a 2048 character random string
+Very similar to [cluster-denstiy](#cluster-density), but with some key differences provided by NetworkPolicies and improved readinesProbes, that leads to a heavier load in the cluster's CNI plugin. Each iteration creates the following objects in each of the created namespaces:
 
----
+- 1 ImagesStream
+- 1 Build. The OCP internal container registry must be set-up previously since the resulting container image will be pushed there.
+- 3 Deployments with two pod 2 replicas (nginx) mounting 4 Secrets, 4 configmaps and 1 downwardAPI volume each
+- 2 Deployments with two pod 2 replicas (curl) mounting 4 Secrets, 4 configmaps and 1 downwardAPI volume each. These pods have configured a readinessProbe that makes a request to one of the Services and one of the routes created by this workload every 10 seconds.
+- 5 Services, each one pointing to the TCP/8080 port of one of the nginx Deployments.
+- 2 edge Routes pointing to the to first and second Services respectively
+- 10 Secrets containing 2048 character random string
+- 10 ConfigMaps containing a 2048 character random string
+- 3 NetworkPolicies:
+    - 1 deny-all traffic
+    - 1 allow traffic from client/nginx pods to server/nginx pods
+    - 1 allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
 
-Each iteration of **cluster-density-v2** creates the following objects in each of the namespaces/iterations:
+### cluster-density-ms
 
-- 1 imagestream
-- 1 build. The OCP internal container registry must be set-up previously since the resulting container image will be pushed there.
-- 3 deployments with two pod 2 replicas (nginx) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
-- 2 deployments with two pod 2 replicas (curl) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each. These pods have configured a readinessProbe that makes a request to one of the services and one of the routes created by this workload every 10 seconds.
-- 5 services, each one pointing to the TCP/8080 port of one of the nginx deployments.
-- 2 edge route pointing to the to first and second service respectively
-- 10 secrets containing 2048 character random string
-- 10 configMaps containing a 2048 character random string
-- 3 network policies:
-   - 1 deny-all traffic
-   - 1 allow traffic from client/nginx pods to server/nginx pods
-   - 1 allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
+Lightest version of this workload family,each iteration the following objects in each of the created namespaces:
 
----
+- 1 ImageStream
+- 4 Deployments with two pod replicas (pause) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
+- 2 Services, each one pointing to the TCP/8080 and TCP/8443 ports of the first and second deployment respectively.
+- 1 edge Route pointing to the to first service
+- 20 Secrets containing 2048 character random string
+- 10 ConfigMaps containing a 2048 character random string
 
-Each iteration of **cluster-density-ms** creates the following objects in each of the namespaces/iterations:
+## Node density workloads
 
-- 1 imagestream
-- 4 deployments with two pod replicas (pause) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
-- 2 services, each one pointing to the TCP/8080 and TCP/8443 ports of the first and second deployment respectively.
-- 1 edge route pointing to the to first service
-- 20 secrets containing 2048 character random string
-- 10 configMaps containing a 2048 character random string
+The workloads of this family create a single namespace with a set of Pods, Deployments Services, depending onf the workload.
 
-## node-density, node-density-cni & node-density-heavy
+### node-density
 
-The **node-density** workload is meant to fill with pause pods all the worker nodes from the cluster. It can be customized with the following flags.
+This workload is meant to fill with pause pods all the worker nodes from the cluster. It can be customized with the following flags. This workload is usually used to measure the Pod's ready latency KPI.
 
-```shell
-$ kube-burner ocp node-density -h
-Runs node-density workload
+### node-density-cni
 
-Usage:
-  kube-burner ocp node-density [flags]
+It creates two Deployments, a client/curl and a server/nxing, and 1 Service backed by the previous server Pods. The client application has configured an startupProbe that makes requests to the previous Service every second with a timeout of 600s.
 
-Flags:
-      --container-image string         Container image (default "gcr.io/google_containers/pause:3.1")
-  -h, --help                           help for node-density
-      --pod-ready-threshold duration   Pod ready timeout threshold (default 5s)
-      --pods-per-node int              Pods per node (default 245)
-```
+### node-density-heav
 
----
-
-The **node-density-cni** workload does something similar with the difference that it creates two deployments client/curl and server/nxing, and 1 service backed by the previous server deployment. The client application has configured an startupProbe that makes requests to the service every second with a timeout of 600s.
-
-$ kube-burner ocp node-density-cni -h
-Runs node-density-cni workload
-
-```shell
-Usage:
-  kube-burner ocp node-density-cni [flags]
-
-Flags:
-  -h, --help                help for node-density-cni
-      --pods-per-node int   Pods per node (default 245)
-```
-
----
-
-The **node-density-heavy** workload creates a single namespace with two deployments, a postgresql database and a simple client that performs periodic queries on the previous database and a service that is used by the client to reach the database.
-
-```shell
-$ kube-burner ocp node-density-heavy -h
-Runs node-density-heavy workload
-
-Usage:
-  kube-burner ocp node-density-heavy [flags]
-
-Flags:
-  -h, --help                           help for node-density-heavy
-      --pod-ready-threshold duration   Pod ready timeout threshold (default 1h0m0s)
-      --pods-per-node int              Pods per node (default 245)
-      --probes-period int              Perf app readiness/livenes probes period in seconds (default 10)
-```
+Creates two Deployments, a postgresql database and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a Service that is used by the client to reach the database.
 
 ## Customizing workloads
 
-It's possible to customize the workload configuration before running the workload by extracting, updating and finally running it:
+It's possible to customize the workload configuration by extracting, updating and finally running it:
 
 ```console
 $ kube-burner ocp node-density --extract
@@ -189,30 +141,30 @@ $ vi node-density.yml                               # Perform modifications acco
 $ kube-burner ocp node-density --pods-per-node=100  # Run workload
 ```
 
-### Cluster metadata
+## Cluster metadata
 
-As soon as a benchmark finishes, kube-burner will index the cluster metadata in the configured indexer. At the time of writing this document is based on the following golang struct:
+When benchmark finishes, kube-burner will index the cluster metadata in the configured indexer. At the time of writing this document is based on the following golang struct:
 
 ```golang
 type clusterMetadata struct {
- MetricName       string                 `json:"metricName,omitempty"`
- UUID             string                 `json:"uuid"`
- Platform         string                 `json:"platform"`
- OCPVersion       string                 `json:"ocpVersion"`
- K8SVersion       string                 `json:"k8sVersion"`
- MasterNodesType  string                 `json:"masterNodesType"`
- WorkerNodesType  string                 `json:"workerNodesType"`
- InfraNodesType   string                 `json:"infraNodesType"`
- WorkerNodesCount int                    `json:"workerNodesCount"`
- InfraNodesCount  int                    `json:"infraNodesCount"`
- TotalNodes       int                    `json:"totalNodes"`
- SDNType          string                 `json:"sdnType"`
- Benchmark        string                 `json:"benchmark"`
- Timestamp        time.Time              `json:"timestamp"`
- EndDate          time.Time              `json:"endDate"`
- ClusterName      string                 `json:"clusterName"`
- Passed           bool                   `json:"passed"`
- Metadata         map[string]interface{} `json:"metadata,omitempty"`
+    MetricName       string                 `json:"metricName,omitempty"`
+    UUID             string                 `json:"uuid"`
+    Platform         string                 `json:"platform"`
+    OCPVersion       string                 `json:"ocpVersion"`
+    K8SVersion       string                 `json:"k8sVersion"`
+    MasterNodesType  string                 `json:"masterNodesType"`
+    WorkerNodesType  string                 `json:"workerNodesType"`
+    InfraNodesType   string                 `json:"infraNodesType"`
+    WorkerNodesCount int                    `json:"workerNodesCount"`
+    InfraNodesCount  int                    `json:"infraNodesCount"`
+    TotalNodes       int                    `json:"totalNodes"`
+    SDNType          string                 `json:"sdnType"`
+    Benchmark        string                 `json:"benchmark"`
+    Timestamp        time.Time              `json:"timestamp"`
+    EndDate          time.Time              `json:"endDate"`
+    ClusterName      string                 `json:"clusterName"`
+    Passed           bool                   `json:"passed"`
+    Metadata         map[string]interface{} `json:"metadata,omitempty"`
 }
 ```
 

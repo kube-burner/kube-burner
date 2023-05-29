@@ -2,15 +2,18 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cloud-bulldozer/kube-burner)](https://goreportcard.com/report/github.com/cloud-bulldozer/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# What's this
+# What is Kube-burner
 
-Kube-burner is a tool aimed at stressing kubernetes clusters. The main functionallity it provides can be summarized in these three steps:
+Kube-burner is a Kubernetes performance toolset. It provides multiple functionalities where the most hightliged can be summarized in:
 
-- Create/delete the objects declared in the jobs.
-- Collect desired on-cluster prometheus metrics.
-- Write and/or index them to the configured TSDB.
+- Create, delete and patch Kubernetes at scale.
+- Prometheus metric collection and indexing.
+- Measurements.
+- Alerting.
 
-[![asciicast](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp.svg)](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp)
+Kube-burner is a binary application written in golang that makes an intensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
+
+![Demo](media/demo.gif)
 
 # Quick starting with Kube-burner
 

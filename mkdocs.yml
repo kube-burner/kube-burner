@@ -2,39 +2,53 @@ docs_dir: docs/
 repo_url: https://github.com/cloud-bulldozer/kube-burner
 nav:
 - Home: index.md
-- CLI: cli.md
-- Reference: configuration.md
+- Command line: cli.md
+- Reference: reference/configuration.md
 - Measurements: measurements.md
-- Metrics: metrics.md
-- Indexers: indexers.md
-- Alerting: alerting.md
+- Observability & alerting: 
+  - observability/index.md
+  - Overview: observability/index.md
+  - Collecting metrics: observability/metrics.md
+  - Indexing: observability/indexing.md
+  - Alerting: observability/alerting.md
 - OpenShift Wrapper: ocp.md
 - Development:
-  - Contributing: contributing.md
+  - development/index.md
+  - Development: development/index.md
+  - Linters: development/linters.md
 site_name: Kube-burner
 plugins:
   - search
+extra_css:
+  - css/extra.css
 theme:
   name: material
+  font:
+    text: Noto Sans
+    code: Noto Sans Mono
   palette:
     # Palette toggle for light mode
     - scheme: default
+      media: "(prefers-color-scheme: light)"
+      primary: indigo
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-night
         name: Switch to dark mode
     # Palette toggle for dark mode
     - scheme: slate
+      media: "(prefers-color-scheme: dark)"
+      primary: indigo
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-sunny
 
   logo: media/logo/kube-burner-logo-mini.png
   favicon: media/logo/kube-burner-logo-mini.png
   features:
     - navigation.instant
     - navigation.tracking
-    - navigation.tabs
-    - navigation.tabs.sticky
     - navigation.indexes
+    - navigation.top
+    - navigation.footer
     - toc.integrate
     - search.suggest
     - search.highlight
@@ -68,7 +82,11 @@ markdown_extensions:
   - pymdownx.keys
   - pymdownx.mark
   - pymdownx.smartsymbols
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:

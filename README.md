@@ -6,20 +6,16 @@
 
 # What is Kube-burner
 
-Kube-burner is a tool aimed at stressing kubernetes clusters. The main functionallity it provides can be summarized in these three steps:
+Kube-burner is a Kubernetes performance toolset. It provides multiple functionalities where the most hightliged can be summarized in:
 
-- Create/delete the objects declared in the jobs.
-- Collect desired on-cluster prometheus metrics.
-- Write and/or index them to the configured TSDB.
+- Create, delete and patch Kubernetes at scale.
+- Prometheus metric collection and indexing.
+- Measurements.
+- Alerting.
 
-But it also provides other features like
+Kube-burner is a binary application written in golang that makes an intensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
 
-- Standalone metrics collection
-- Alerting
-- PProf collection
-- Pod startup latency measurements
-
-[![asciicast](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp.svg)](https://asciinema.org/a/KksoK5voK3al1FuOza89t1JAp)
+![Demo](docs/media/demo.gif)
 
 ## Documentation
 
@@ -35,6 +31,6 @@ In case you want to start tinkering with Kube-burner now:
 
 ## Contributing Guidelines, CI, and Code Style
 
-Please read the [Contribution Guidelines](docs/ci.md) before contributing to this project. It provides information on how to contribute, guidelines for setting an environment a CI checks to be done before commiting code.
+Please read the [Development section](https://cloud-bulldozer.github.io/kube-burner/development/) before contributing to this project. It provides information on how to contribute, guidelines for setting an environment a CI checks to be done before commiting code.
 
 This project utilizes a Continuous Integration (CI) pipeline to ensure code quality and maintain project standards. The CI process automatically builds, tests, and verifies the project on each commit and pull request.
