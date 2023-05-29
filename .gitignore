@@ -7,3 +7,4 @@
 *.out
 bin
 dist
+site/
