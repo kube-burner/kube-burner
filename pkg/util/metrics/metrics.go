@@ -79,14 +79,9 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			log.Fatal(err)
 		}
 		if metricsScraperConfig.ActionIndex {
-			if metricsEndpoint.Start == 0 || metricsEndpoint.End == 0 || metricsEndpoint.Start == metricsEndpoint.End {
-				metricsEndpoint.Start = metricsScraperConfig.StartTime
-				metricsEndpoint.End = metricsScraperConfig.EndTime
-			}
-
 			p.JobList = []prometheus.Job{{
-				Start: time.Unix(metricsEndpoint.Start, 0),
-				End:   time.Unix(metricsEndpoint.End, 0),
+				Start: time.Unix(metricsScraperConfig.StartTime, 0),
+				End:   time.Unix(metricsScraperConfig.EndTime, 0),
 				Name:  metricsScraperConfig.JobName,
 			},
 			}
@@ -98,7 +93,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			updateParamIfEmpty(&metricsEndpoint.AlertProfile, metricsScraperConfig.AlertProfile)
 			updateParamIfEmpty(&metricsEndpoint.AlertProfile, configSpec.GlobalConfig.AlertProfile)
 			if metricsEndpoint.AlertProfile != "" {
-				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.UUID, configSpec.GlobalConfig.IndexerConfig.Index, indexer, p); err != nil {
+				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.UUID, indexer, p); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
 				}
 			}

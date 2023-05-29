@@ -53,7 +53,6 @@ type authTransport struct {
 type metricProfile []struct {
 	Query      string `yaml:"query"`
 	MetricName string `yaml:"metricName"`
-	IndexName  string `yaml:"indexName"`
 	Instant    bool   `yaml:"instant"`
 }
 
@@ -63,8 +62,6 @@ type MetricEndpoint struct {
 	Token        string `yaml:"token"`
 	Profile      string `yaml:"profile"`
 	AlertProfile string `yaml:"alertProfile"`
-	Start        int64  `yaml:"start"`
-	End          int64  `yaml:"end"`
 }
 
 type metric struct {
