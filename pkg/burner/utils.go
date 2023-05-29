@@ -89,7 +89,7 @@ func (ex *Executor) Verify() bool {
 			success = false
 			continue
 		}
-		objectsExpected := ex.Config.JobIterations * obj.replicas
+		objectsExpected := ex.Config.JobIterations * obj.Replicas
 		if replicas != objectsExpected {
 			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 			success = false

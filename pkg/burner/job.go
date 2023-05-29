@@ -38,17 +38,12 @@ import (
 )
 
 type object struct {
-	gvr            schema.GroupVersionResource
-	objectTemplate string
-	objectSpec     []byte
-	replicas       int
-	inputVars      map[string]interface{}
-	labelSelector  map[string]string
-	patchType      string
-	namespaced     bool
-	kind           string
-	wait           bool
-	waitOptions    config.WaitOptions
+	gvr           schema.GroupVersionResource
+	objectSpec    []byte
+	labelSelector map[string]string
+	patchType     string
+	kind          string
+	config.Object
 }
 
 // Executor contains the information required to execute a job

@@ -64,12 +64,11 @@ func setupPatchJob(jobConfig config.Job) Executor {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
 		obj := object{
-			gvr:            gvr,
-			objectSpec:     t,
-			objectTemplate: o.ObjectTemplate,
-			inputVars:      o.InputVars,
-			labelSelector:  o.LabelSelector,
-			patchType:      o.PatchType,
+			gvr:           gvr,
+			objectSpec:    t,
+			Object:        o,
+			labelSelector: o.LabelSelector,
+			patchType:     o.PatchType,
 		}
 		log.Infof("Job %s: Patch %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
@@ -122,7 +121,7 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 	var data []byte
 	patchOptions := metav1.PatchOptions{}
 
-	if strings.HasSuffix(obj.objectTemplate, "json") {
+	if strings.HasSuffix(obj.ObjectTemplate, "json") {
 		if obj.patchType == string(types.ApplyPatchType) {
 			log.Fatalf("Apply patch type requires YAML")
 		}
@@ -134,12 +133,12 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 			jobIteration: iteration,
 			jobUUID:      ex.uuid,
 		}
-		for k, v := range obj.inputVars {
+		for k, v := range obj.InputVars {
 			templateData[k] = v
 		}
 		renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
 		if err != nil {
-			log.Fatalf("Template error in %s: %s", obj.objectTemplate, err)
+			log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 		}
 
 		// Converting to JSON if patch type is not Apply
