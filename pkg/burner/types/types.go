@@ -14,15 +14,6 @@
 
 package types
 
-import (
-	"time"
-
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
-	"golang.org/x/time/rate"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-)
-
 const (
 	// OpenShift Build CRD
 	OpenShiftBuildGroup      = "build.openshift.io"
@@ -36,30 +27,6 @@ const (
 	VirtualMachineInstanceResource           = "virtualmachineinstances"
 	VirtualMachineInstanceReplicaSetResource = "virtualmachineinstancereplicasets"
 )
-
-type Object struct {
-	Gvr            schema.GroupVersionResource
-	ObjectTemplate string
-	ObjectSpec     []byte
-	Replicas       int
-	InputVars      map[string]interface{}
-	LabelSelector  map[string]string
-	PatchType      string
-	Namespaced     bool
-	Kind           string
-}
-
-// Executor contains the information required to execute a job
-type Executor struct {
-	Objects   []Object
-	Start     time.Time
-	End       time.Time
-	Config    config.Job
-	Selector  *util.Selector
-	UUID      string
-	Limiter   *rate.Limiter
-	NsObjects bool
-}
 
 // Condition contains details for the current condition of this pod.
 type Condition struct {

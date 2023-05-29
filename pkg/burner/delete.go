@@ -21,28 +21,36 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/restmapper"
 )
 
 func setupDeleteJob(jobConfig *config.Job) Executor {
-	log.Debugf("Preparing delete job: %s", jobConfig.Name)
 	var ex Executor
+	log.Debugf("Preparing delete job: %s", jobConfig.Name)
+	apiGroupResouces, err := restmapper.GetAPIGroupResources(discoveryClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mapper := restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
 	for _, o := range jobConfig.Objects {
 		if o.APIVersion == "" {
 			o.APIVersion = "v1"
 		}
 		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
-		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+		mapping, err := mapper.RESTMapping(gvk.GroupKind())
+		if err != nil {
+			log.Fatal(err)
+		}
 		if len(o.LabelSelector) == 0 {
 			log.Fatalf("Empty labelSelectors not allowed with: %s", o.Kind)
 		}
 		obj := object{
-			gvr:           gvr,
+			gvr:           mapping.Resource,
 			labelSelector: o.LabelSelector,
 		}
 		log.Debugf("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
@@ -91,7 +99,7 @@ func (ex *Executor) RunDeleteJob() {
 				}
 			}(item)
 		}
-		if ex.Config.WaitForDeletion {
+		if ex.Job.WaitForDeletion {
 			wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
 				itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 				if err != nil {

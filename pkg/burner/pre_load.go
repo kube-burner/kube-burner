@@ -42,17 +42,17 @@ type NestedPod struct {
 }
 
 func preLoadImages(job Executor) error {
-	log.Info("Pre-load: images from job ", job.Config.Name)
+	log.Info("Pre-load: images from job ", job.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
-	err = createDSs(imageList, job.Config.NamespaceLabels)
+	err = createDSs(imageList, job.NamespaceLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
-	log.Infof("Pre-load: Sleeping for %v", job.Config.PreLoadPeriod)
-	time.Sleep(job.Config.PreLoadPeriod)
+	log.Infof("Pre-load: Sleeping for %v", job.PreLoadPeriod)
+	time.Sleep(job.PreLoadPeriod)
 	log.Infof("Pre-load: Deleting namespace %s", preLoadNs)
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)

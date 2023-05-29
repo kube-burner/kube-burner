@@ -24,7 +24,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 	log "github.com/sirupsen/logrus"
@@ -32,6 +31,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -48,13 +48,12 @@ type object struct {
 
 // Executor contains the information required to execute a job
 type Executor struct {
-	objects  []object
-	Start    time.Time
-	End      time.Time
-	Config   config.Job
-	selector *util.Selector
-	uuid     string
-	limiter  *rate.Limiter
+	objects []object
+	Start   time.Time
+	End     time.Time
+	config.Job
+	uuid    string
+	limiter *rate.Limiter
 }
 
 const (
@@ -69,6 +68,7 @@ var ClientSet *kubernetes.Clientset
 var waitClientSet *kubernetes.Clientset
 var dynamicClient dynamic.Interface
 var waitDynamicClient dynamic.Interface
+var discoveryClient *discovery.DiscoveryClient
 var restConfig *rest.Config
 var waitRestConfig *rest.Config
 
@@ -86,51 +86,52 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 		jobList := newExecutorList(configSpec, uuid)
 		// Iterate job list
 		for jobPosition, job := range jobList {
-			if job.Config.QPS == 0 || job.Config.Burst == 0 {
+			if job.QPS == 0 || job.Burst == 0 {
 				log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
 			} else {
-				log.Infof("QPS: %v", job.Config.QPS)
-				log.Infof("Burst: %v", job.Config.Burst)
+				log.Infof("QPS: %v", job.QPS)
+				log.Infof("Burst: %v", job.Burst)
 			}
-			ClientSet, restConfig, err = config.GetClientSet(job.Config.QPS, job.Config.Burst)
+			ClientSet, restConfig, err = config.GetClientSet(job.QPS, job.Burst)
+			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
 			dynamicClient = dynamic.NewForConfigOrDie(restConfig)
-			if job.Config.PreLoadImages {
+			if job.PreLoadImages {
 				if err = preLoadImages(job); err != nil {
 					log.Fatal(err.Error())
 				}
 			}
 			jobList[jobPosition].Start = time.Now().UTC()
-			measurements.SetJobConfig(&job.Config)
-			log.Infof("Triggering job: %s", job.Config.Name)
+			measurements.SetJobConfig(&job.Job)
+			log.Infof("Triggering job: %s", job.Name)
 			measurements.Start()
-			switch job.Config.JobType {
+			switch job.JobType {
 			case config.CreationJob:
-				if job.Config.Cleanup {
+				if job.Cleanup {
 					ctx, cancel := context.WithTimeout(context.Background(), timeout)
 					defer cancel()
-					CleanupNamespaces(ctx, job.selector.ListOptions, true)
+					CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
 				}
-				if job.Config.Churn {
+				if job.Churn {
 					log.Info("Churning enabled")
-					log.Infof("Churn duration: %v", job.Config.ChurnDuration)
-					log.Infof("Churn percent: %v", job.Config.ChurnPercent)
-					log.Infof("Churn delay: %v", job.Config.ChurnDelay)
+					log.Infof("Churn duration: %v", job.ChurnDuration)
+					log.Infof("Churn percent: %v", job.ChurnPercent)
+					log.Infof("Churn delay: %v", job.ChurnDelay)
 				}
-				job.RunCreateJob(1, job.Config.JobIterations)
+				job.RunCreateJob(1, job.JobIterations)
 				// If object verification is enabled
-				if job.Config.VerifyObjects && !job.Verify() {
+				if job.VerifyObjects && !job.Verify() {
 					errMsg := "Object verification failed"
 					// If errorOnVerify is enabled. Set RC to 1
-					if job.Config.ErrorOnVerify {
+					if job.ErrorOnVerify {
 						errMsg += ". Setting return code to 1"
 						innerRC = 1
 					}
 					log.Error(errMsg)
 				}
-				if job.Config.Churn {
+				if job.Churn {
 					job.RunCreateJobWithChurn()
 				}
 			case config.DeletionJob:
@@ -138,23 +139,23 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 			case config.PatchJob:
 				job.RunPatchJob()
 			}
-			if job.Config.JobPause > 0 {
-				log.Infof("Pausing for %v before finishing job", job.Config.JobPause)
-				time.Sleep(job.Config.JobPause)
+			if job.JobPause > 0 {
+				log.Infof("Pausing for %v before finishing job", job.JobPause)
+				time.Sleep(job.JobPause)
 			}
 
 			jobList[jobPosition].End = time.Now().UTC()
 			prometheusJob := prometheus.Job{
 				Start:     jobList[jobPosition].Start,
 				End:       jobList[jobPosition].End,
-				JobConfig: job.Config,
+				JobConfig: job.Job,
 			}
 			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Round(time.Second)
 			// Don't append to Prometheus jobList when prometheus it's not initialized
 			if len(prometheusClients) > 0 {
 				prometheusJobList = append(prometheusJobList, prometheusJob)
 			}
-			log.Infof("Job %s took %v", job.Config.Name, elapsedTime)
+			log.Infof("Job %s took %v", job.Name, elapsedTime)
 			// We stop and index measurements per job
 			if err = measurements.Stop(); err != nil {
 				log.Errorf("Failed measurements: %v", err.Error())
@@ -165,7 +166,7 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 			for _, job := range jobList {
 				// elapsedTime is recalculated for every job of the list
 				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
-				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Config, job.Start, metadata)
+				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Job, job.Start, metadata)
 			}
 		}
 		// We initialize cleanup as soon as the benchmark finishes
@@ -209,6 +210,11 @@ func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Pr
 func newExecutorList(configSpec config.Spec, uuid string) []Executor {
 	var ex Executor
 	var executorList []Executor
+	_, restConfig, err := config.GetClientSet(100, 100) // Hardcoded QPS/Burst
+	if err != nil {
+		log.Fatalf("Error creating clientSet: %s", err)
+	}
+	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
 		if job.JobType == config.CreationJob {
 			ex = setupCreateJob(job)
@@ -220,13 +226,13 @@ func newExecutorList(configSpec config.Spec, uuid string) []Executor {
 			log.Fatalf("Unknown jobType: %s", job.JobType)
 		}
 		for _, j := range executorList {
-			if job.Name == j.Config.Name {
+			if job.Name == j.Job.Name {
 				log.Fatalf("Job names must be unique: %s", job.Name)
 			}
 		}
 		// Limits the number of workers to QPS and Burst
 		ex.limiter = rate.NewLimiter(rate.Limit(job.QPS), job.Burst)
-		ex.Config = job
+		ex.Job = job
 		ex.uuid = uuid
 		executorList = append(executorList, ex)
 	}
