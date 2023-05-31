@@ -1,0 +1,119 @@
+# test-k8s.yml
+name: Execute tests on k8s and OCP
+on:
+  workflow_call:
+    secrets:
+      OPENSHIFT_SERVER:
+        required: true
+      OPENSHIFT_USER:
+        required: true
+      OPENSHIFT_PASSWORD:
+        required: true
+jobs:
+  test-k8s:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        k8s-version:
+        - v1.24.0
+        - v1.25.0
+        - v1.26.0
+        - v1.27.0
+    steps:
+
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Download kube-burner binary
+      uses: actions/download-artifact@v3
+      with:
+        name: kube-burner
+        path: /tmp/
+
+    - name: Install bats
+      uses: mig4/setup-bats@v1
+      with:
+        bats-version: 1.9.0
+
+    - name: Install oc
+      uses: redhat-actions/oc-installer@v1
+
+    - name: Execute Tests
+      working-directory: test
+      run: |
+        export PATH=${PATH}:/tmp/
+        chmod +x /tmp/kube-burner
+        bats -F pretty -T --report-formatter junit --print-output-on-failure test-k8s.bats
+        cp report.xml test-k8s-${{matrix.k8s-version}}-results.xml
+      env:
+        TERM: linux
+        KIND_VERSION: v0.19.0
+        K8S_VERSION: ${{matrix.k8s-version}}
+
+    - name: Upload test results artifact
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-k8s-results
+        path: test/test-k8s-${{matrix.k8s-version}}-results.xml
+
+    - name: Publish Test Report
+      uses: mikepenz/action-junit-report@v3
+      if: always()
+      with:
+        report_paths: test/report.xml
+
+  ocp-wrapper:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ocp-e2e-ci
+    steps:
+
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Download kube-burner binary
+      uses: actions/download-artifact@v3
+      with:
+        name: kube-burner
+        path: /tmp/
+
+    - name: Install bats
+      uses: mig4/setup-bats@v1
+      with:
+        bats-version: 1.9.0
+
+    - name: Install oc
+      uses: redhat-actions/oc-installer@v1
+
+    - name: Execute Tests
+      working-directory: test
+      run: |
+        export PATH=${PATH}:/tmp/
+        chmod +x /tmp/kube-burner
+        bats -F pretty -T --report-formatter junit --print-output-on-failure test-ocp.bats
+        cp report.xml test-ocp-results.xml
+      env:
+        TERM: linux
+        OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+        OPENSHIFT_USER: ${{ secrets.OPENSHIFT_USER }}
+        OPENSHIFT_PASSWORD: ${{ secrets.OPENSHIFT_PASSWORD }}
+
+    - name: Upload test results artifact
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-ocp-results
+        path: test/test-ocp-results.xml
+
+    - name: Publish Test Report
+      uses: mikepenz/action-junit-report@v3
+      if: always()
+      with:
+        report_paths: test/report.xml

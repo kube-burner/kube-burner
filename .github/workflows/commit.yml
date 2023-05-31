@@ -1,0 +1,11 @@
+# commit.yml
+name: Commit Workflow
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  linter:
+    uses: ./.github/workflows/linters.yml

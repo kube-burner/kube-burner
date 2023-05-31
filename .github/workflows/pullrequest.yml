@@ -1,0 +1,46 @@
+# pullrequest.yml
+name: Pull Request Workflow
+
+on:
+  pull_request_target:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    uses: ./.github/workflows/builders.yml
+  tests:
+    needs: build
+    uses: ./.github/workflows/test-k8s.yml
+    secrets: inherit
+  report_results:
+    needs: tests
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Download k8s test results
+        uses: actions/download-artifact@v3
+        if: always()
+        with:
+          name: test-k8s-results
+
+      - name: Download ocp test results
+        uses: actions/download-artifact@v3
+        if: always()
+        with:
+          name: test-ocp-results
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            test-*-results.xml

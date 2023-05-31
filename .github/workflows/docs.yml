@@ -1,9 +1,7 @@
-name: docs
+# docs.yml
+name: Generate and Deploy docs
 on:
-  push:
-    branches:
-      - master
-      - main
+  workflow_call:
 permissions:
   contents: write
 jobs:

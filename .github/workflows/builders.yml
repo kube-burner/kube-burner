@@ -1,0 +1,34 @@
+# builders.yml
+name: Build Binary and Images
+on:
+  workflow_call:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Set up Go 1.19
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19
+
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Build code
+      run: make build
+
+    - name: Build container images
+      run: make images
+      env:
+        VERSION: snapshot
+
+    - name: Install
+      run: sudo make install
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: kube-burner
+        path: /usr/bin/kube-burner
