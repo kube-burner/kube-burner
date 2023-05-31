@@ -107,16 +107,14 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 }
 
 // Find Job fills up job attributes if any
-func (p *Prometheus) findJob(timestamp time.Time) (string, config.Job) {
-	var jobName string
+func (p *Prometheus) findJob(timestamp time.Time) config.Job {
 	var jobConfig config.Job
 	for _, prometheusJob := range p.JobList {
 		if timestamp.Before(prometheusJob.End) {
-			jobName = prometheusJob.Name
 			jobConfig = prometheusJob.JobConfig
 		}
 	}
-	return jobName, jobConfig
+	return jobConfig
 }
 
 // Parse vector parses results for an instant query
@@ -126,7 +124,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, vector := range data {
-		_, jobConfig := p.findJob(vector.Timestamp.Time())
+		jobConfig := p.findJob(vector.Timestamp.Time())
 
 		m := createMetric(p.UUID, query, metricName, jobConfig, p.metadata, vector.Metric, vector.Value, vector.Timestamp.Time())
 		*metrics = append(*metrics, m)
@@ -142,7 +140,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 	}
 	for _, matrix := range data {
 		for _, val := range matrix.Values {
-			_, jobConfig := p.findJob(val.Timestamp.Time())
+			jobConfig := p.findJob(val.Timestamp.Time())
 
 			m := createMetric(p.UUID, query, metricName, jobConfig, p.metadata, matrix.Metric, val.Value, val.Timestamp.Time())
 			*metrics = append(*metrics, m)
