@@ -21,12 +21,12 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/cloud-bulldozer/go-commons/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
-	"github.com/vishnuchalla/go-commons/indexers"
-	"github.com/vishnuchalla/go-commons/prometheus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -126,9 +126,9 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, vector := range data {
-		jobName, jobConfig := p.findJob(vector.Timestamp.Time())
+		_, jobConfig := p.findJob(vector.Timestamp.Time())
 
-		m := createMetric(p.UUID, query, metricName, jobName, jobConfig, p.metadata, vector.Metric, vector.Value, vector.Timestamp.Time())
+		m := createMetric(p.UUID, query, metricName, jobConfig, p.metadata, vector.Metric, vector.Value, vector.Timestamp.Time())
 		*metrics = append(*metrics, m)
 	}
 	return nil
@@ -142,9 +142,9 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 	}
 	for _, matrix := range data {
 		for _, val := range matrix.Values {
-			jobName, jobConfig := p.findJob(val.Timestamp.Time())
+			_, jobConfig := p.findJob(val.Timestamp.Time())
 
-			m := createMetric(p.UUID, query, metricName, jobName, jobConfig, p.metadata, matrix.Metric, val.Value, val.Timestamp.Time())
+			m := createMetric(p.UUID, query, metricName, jobConfig, p.metadata, matrix.Metric, val.Value, val.Timestamp.Time())
 			*metrics = append(*metrics, m)
 		}
 	}
@@ -166,13 +166,13 @@ func (p *Prometheus) readProfile(metricsProfile string) error {
 }
 
 // Create metric creates metric to be indexed
-func createMetric(uuid, query, metricName, jobName string, jobConfig config.Job, metadata map[string]interface{}, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
+func createMetric(uuid, query, metricName string, jobConfig config.Job, metadata map[string]interface{}, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
 	m := metric{
 		Labels:     make(map[string]string),
 		UUID:       uuid,
 		Query:      query,
 		MetricName: metricName,
-		JobName:    jobName,
+		JobName:    jobConfig.Name,
 		JobConfig:  jobConfig,
 		Timestamp:  timestamp,
 		Metadata:   metadata,

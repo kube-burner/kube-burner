@@ -23,10 +23,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
-	"github.com/vishnuchalla/go-commons/indexers"
 
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

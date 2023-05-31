@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/vishnuchalla/go-commons/indexers"
 )
 
 //go:embed ocp-config/*

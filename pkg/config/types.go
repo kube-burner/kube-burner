@@ -17,8 +17,8 @@ package config
 import (
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
-	"github.com/vishnuchalla/go-commons/indexers"
 )
 
 // JobType type of job

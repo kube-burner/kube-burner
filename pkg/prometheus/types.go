@@ -17,8 +17,8 @@ package prometheus
 import (
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/vishnuchalla/go-commons/prometheus"
 )
 
 // Prometheus describes the prometheus connection

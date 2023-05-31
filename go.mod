@@ -4,11 +4,11 @@ go 1.19
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/cloud-bulldozer/go-commons v1.0.4
 	github.com/prometheus/common v0.44.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
-	github.com/vishnuchalla/go-commons v1.0.13
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.27.1

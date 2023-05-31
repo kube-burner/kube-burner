@@ -25,8 +25,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	log "github.com/sirupsen/logrus"
-	"github.com/vishnuchalla/go-commons/indexers"
 )
 
 func createTarball(indexerConfig indexers.IndexerConfig) error {
