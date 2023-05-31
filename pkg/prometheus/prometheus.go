@@ -126,7 +126,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 	for _, vector := range data {
 		jobConfig := p.findJob(vector.Timestamp.Time())
 
-		m := createMetric(p.UUID, query, metricName, jobConfig, p.metadata, vector.Metric, vector.Value, vector.Timestamp.Time())
+		m := p.createMetric(query, metricName, jobConfig, vector.Metric, vector.Value, vector.Timestamp.Time())
 		*metrics = append(*metrics, m)
 	}
 	return nil
@@ -142,7 +142,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 		for _, val := range matrix.Values {
 			jobConfig := p.findJob(val.Timestamp.Time())
 
-			m := createMetric(p.UUID, query, metricName, jobConfig, p.metadata, matrix.Metric, val.Value, val.Timestamp.Time())
+			m := p.createMetric(query, metricName, jobConfig, matrix.Metric, val.Value, val.Timestamp.Time())
 			*metrics = append(*metrics, m)
 		}
 	}
@@ -164,16 +164,16 @@ func (p *Prometheus) readProfile(metricsProfile string) error {
 }
 
 // Create metric creates metric to be indexed
-func createMetric(uuid, query, metricName string, jobConfig config.Job, metadata map[string]interface{}, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
+func (p *Prometheus) createMetric(query, metricName string, jobConfig config.Job, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
 	m := metric{
 		Labels:     make(map[string]string),
-		UUID:       uuid,
+		UUID:       p.UUID,
 		Query:      query,
 		MetricName: metricName,
 		JobName:    jobConfig.Name,
 		JobConfig:  jobConfig,
 		Timestamp:  timestamp,
-		Metadata:   metadata,
+		Metadata:   p.metadata,
 	}
 	for k, v := range labels {
 		if k != "__name__" {
