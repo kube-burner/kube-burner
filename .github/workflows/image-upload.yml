@@ -1,12 +1,12 @@
-name: Containers 
-
+# image-upload.yml
+name: Upload containers to Quay
 on:
-  push:
-    branches:
-      - master
-    tags:
-      - "*" # triggers only if push new tag version
-
+  workflow_call:
+    secrets:
+      QUAY_USER:
+        required: true
+      QUAY_TOKEN:
+        required: true
 jobs:
   containers:
     name: Build container images
@@ -14,27 +14,28 @@ jobs:
     strategy:
       matrix:
         arch:
-         - arm64
-         - amd64
-         - ppc64le
-         - s390x
+        - arm64
+        - amd64
+        - ppc64le
+        - s390x
 
     steps:
-
       - name: Install dependencies required for multi-arch builds
         run: sudo apt-get update && sudo apt-get install qemu-user-static podman fuse-overlayfs
 
-      - name: Check out code into the Go module directory
+      - name: Check out code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Go 1.19
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
-        id: go
 
       - name: Login in quay
-        run: podman login quay.io -u ${QUAY_USER} -p ${QUAY_TOKEN}
+        run: podman login quay.io -u="${QUAY_USER}" -p="${QUAY_TOKEN}"
         env:
           QUAY_USER: ${{ secrets.QUAY_USER }}
           QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
@@ -48,11 +49,13 @@ jobs:
         run: make images
         env:
           ARCH: ${{ matrix.arch }}
+          ORG: ${GITHUB_REPOSITORY_OWNER}
 
       - name: Push container image
         run: make push
         env:
           ARCH: ${{ matrix.arch }}
+          ORG: ${GITHUB_REPOSITORY_OWNER}
 
   manifest:
     name: Build container manifest
@@ -60,14 +63,19 @@ jobs:
     needs: containers
     steps:
 
-      - name: Check out code into the Go module directory
+      - name: Check out code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Login in quay
-        run: podman login quay.io -u ${QUAY_USER} -p ${QUAY_TOKEN}
+        run: podman login quay.io -u="${QUAY_USER}" -p="${QUAY_TOKEN}"
         env:
           QUAY_USER: ${{ secrets.QUAY_USER }}
           QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
 
       - name: Create and push manifest
         run: make manifest
+        env:
+          ORG: ${GITHUB_REPOSITORY_OWNER}

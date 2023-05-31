@@ -15,13 +15,20 @@ nav:
 - Development:
   - development/index.md
   - Development: development/index.md
-  - Linters: development/linters.md
+  - CI:
+    - CI: development/ci.md
+    - Tests: development/ci/tests.md
 site_name: Kube-burner
 plugins:
   - search
+  - include-markdown
+extra:
+  version:
+    provider: mike
 extra_css:
   - css/extra.css
 theme:
+  version: latest
   name: material
   font:
     text: Noto Sans

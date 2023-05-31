@@ -118,7 +118,6 @@ A valid file provided to the `--metrics-endpoint` would look like this.
   profile: metrics.yaml
 ```
 
-!!! Note
+!!!note
     The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file.
-    
-    The `profile` and `alertProfile` parameters are optionsl. If not provided they will be taken from the CLI flags.
+    The `profile` and `alertProfile` parameters are optional. If not provided they will be taken from the CLI flags.

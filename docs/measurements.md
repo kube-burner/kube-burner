@@ -119,10 +119,10 @@ As some components require authentication to get profiling information, `kube-bu
 
 - **Bearer token authentication**: This modality is configured by the variable `bearerToken`, which holds a valid Bearer token that will be used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components
 - **Certificate Authentication**: Usually valid for etcd, this method can be configured using a combination of cert/privKey files or directly using the cert/privkey content, it can be tweaked with the following variables:
-    - `cert`: Base64 encoded certificate.
-    - `key`: Base64 encoded private key.
-    - `certFile`: Path to a certificate file.
-    - `keyFile`: Path to a private key file.
+    1. `cert`: Base64 encoded certificate.
+    1. `key`: Base64 encoded private key.
+    1. `certFile`: Path to a certificate file.
+    1. `keyFile`: Path to a private key file.
 
 !!!note
     The decoded content of the certificate and private key is written to the files /tmp/pprof.crt and /tmp/pprof.key of the remote pods respectively
