@@ -312,7 +312,7 @@ func alertCmd() *cobra.Command {
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, configSpec.GlobalConfig.IndexerConfig.Index, indexer, p); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			rc := alertM.Evaluate(startTime, endTime)

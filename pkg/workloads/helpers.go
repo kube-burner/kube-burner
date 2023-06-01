@@ -201,7 +201,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			log.Fatal(err)
 		}
 		if wh.alerting && configSpec.GlobalConfig.AlertProfile != "" {
-			alertM, err = alerting.NewAlertManager(configSpec.GlobalConfig.AlertProfile, wh.Metadata.UUID, configSpec.GlobalConfig.IndexerConfig.Index, indexer, p)
+			alertM, err = alerting.NewAlertManager(configSpec.GlobalConfig.AlertProfile, wh.Metadata.UUID, indexer, p)
 			if err != nil {
 				log.Fatal(err)
 			}
