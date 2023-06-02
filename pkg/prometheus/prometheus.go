@@ -16,34 +16,23 @@ package prometheus
 
 import (
 	"bytes"
-	"context"
-	"crypto/tls"
 	"fmt"
 	"math"
-	"net/http"
 	"text/template"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/cloud-bulldozer/go-commons/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
-	api "github.com/prometheus/client_golang/api"
-	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
-func (bat authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if bat.username != "" {
-		req.SetBasicAuth(bat.username, bat.password)
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", bat.token))
-	return bat.Transport.RoundTrip(req)
-}
-
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
 func NewPrometheusClient(configSpec config.Spec, url, token, username, password, uuid string, tlsVerify bool, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
+	var err error
 	p := Prometheus{
 		Step:       step,
 		UUID:       uuid,
@@ -51,24 +40,9 @@ func NewPrometheusClient(configSpec config.Spec, url, token, username, password,
 		Endpoint:   url,
 		metadata:   metadata,
 	}
-
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
-	cfg := api.Config{
-		Address: url,
-		RoundTripper: authTransport{
-			Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: &tls.Config{InsecureSkipVerify: tlsVerify}},
-			token:     token,
-			username:  username,
-			password:  password,
-		},
-	}
-	c, err := api.NewClient(cfg)
+	p.Client, err = prometheus.NewClient(url, token, username, password, tlsVerify)
 	if err != nil {
-		return &p, err
-	}
-	p.api = apiv1.NewAPI(c)
-	// Verify Prometheus connection prior returning
-	if err := p.verifyConnection(); err != nil {
 		return &p, err
 	}
 	if configSpec.GlobalConfig.MetricsProfile != "" {
@@ -77,29 +51,6 @@ func NewPrometheusClient(configSpec config.Spec, url, token, username, password,
 		}
 	}
 	return &p, nil
-}
-
-func (p *Prometheus) verifyConnection() error {
-	_, err := p.api.Runtimeinfo(context.TODO())
-	if err != nil {
-		return err
-	}
-	log.Debug("Prometheus endpoint verified")
-	return nil
-}
-
-// ReadProfile reads and parses metric profile configuration
-func (p *Prometheus) readProfile(metricsProfile string) error {
-	f, err := util.ReadConfig(metricsProfile)
-	if err != nil {
-		return fmt.Errorf("error reading metrics profile %s: %s", metricsProfile, err)
-	}
-	yamlDec := yaml.NewDecoder(f)
-	yamlDec.KnownFields(true)
-	if err = yamlDec.Decode(&p.MetricProfile); err != nil {
-		return fmt.Errorf("error decoding metrics profile %s: %s", metricsProfile, err)
-	}
-	return nil
 }
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
@@ -121,7 +72,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 		renderedQuery.Reset()
 		if md.Instant {
 			log.Debugf("Instant query: %s", query)
-			if v, err = p.Query(query, end); err != nil {
+			if v, err = p.Client.Query(query, end); err != nil {
 				log.Warnf("Error found with query %s: %s", query, err)
 				continue
 			}
@@ -130,7 +81,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 			}
 		} else {
 			log.Debugf("Range query: %s", query)
-			v, err = p.QueryRange(query, start, end)
+			v, err = p.Client.QueryRange(query, start, end, p.Step)
 			if err != nil {
 				log.Warnf("Error found with query %s: %s", query, err)
 				continue
@@ -155,109 +106,86 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	return nil
 }
 
-func (p *Prometheus) parseVector(metricName, query string, value model.Value, metrics *[]interface{}) error {
-	var jobName string
+// Find Job fills up job attributes if any
+func (p *Prometheus) findJob(timestamp time.Time) config.Job {
 	var jobConfig config.Job
+	for _, prometheusJob := range p.JobList {
+		if timestamp.Before(prometheusJob.End) {
+			jobConfig = prometheusJob.JobConfig
+			jobConfig.NamespaceLabels = nil // no need to insert this into the metric
+			jobConfig.Objects = nil         // no need to insert this into the metric
+		}
+	}
+	return jobConfig
+}
+
+// Parse vector parses results for an instant query
+func (p *Prometheus) parseVector(metricName, query string, value model.Value, metrics *[]interface{}) error {
 	data, ok := value.(model.Vector)
 	if !ok {
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
-	for _, v := range data {
-		for _, prometheusJob := range p.JobList {
-			if v.Timestamp.Time().Before(prometheusJob.End) {
-				jobName = prometheusJob.Name
-				jobConfig = prometheusJob.JobConfig
-				jobConfig.NamespaceLabels = nil // no need to insert this into the metric
-				jobConfig.Objects = nil         // no need to insert this into the metric
-			}
-		}
-		m := metric{
-			Labels:     make(map[string]string),
-			UUID:       p.UUID,
-			Query:      query,
-			MetricName: metricName,
-			JobName:    jobName,
-			JobConfig:  jobConfig,
-			Metadata:   p.metadata,
-		}
-		for k, v := range v.Metric {
-			if k == "__name__" {
-				continue
-			}
-			m.Labels[string(k)] = string(v)
-		}
-		if math.IsNaN(float64(v.Value)) {
-			m.Value = 0
-		} else {
-			m.Value = float64(v.Value)
-		}
-		m.Timestamp = v.Timestamp.Time()
+	for _, vector := range data {
+		jobConfig := p.findJob(vector.Timestamp.Time())
+
+		m := p.createMetric(query, metricName, jobConfig, vector.Metric, vector.Value, vector.Timestamp.Time())
 		*metrics = append(*metrics, m)
 	}
 	return nil
 }
 
+// Parse matrix parses results for an non-instant query
 func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, metrics *[]interface{}) error {
-	var jobName string
-	var jobConfig config.Job
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
-	for _, v := range data {
-		for _, val := range v.Values {
-			for _, job := range p.JobList {
-				if val.Timestamp.Time().Before(job.End) {
-					jobName = job.Name
-					jobConfig = job.JobConfig
-					jobConfig.NamespaceLabels = nil // no need to insert this into the metric
-					jobConfig.Objects = nil         // no need to insert this into the metric.
-				}
-			}
-			m := metric{
-				Labels:     make(map[string]string),
-				UUID:       p.UUID,
-				Query:      query,
-				MetricName: metricName,
-				JobName:    jobName,
-				JobConfig:  jobConfig,
-				Timestamp:  val.Timestamp.Time(),
-				Metadata:   p.metadata,
-			}
-			for k, v := range v.Metric {
-				if k == "__name__" {
-					continue
-				}
-				m.Labels[string(k)] = string(v)
-			}
-			if math.IsNaN(float64(val.Value)) {
-				m.Value = 0
-			} else {
-				m.Value = float64(val.Value)
-			}
+	for _, matrix := range data {
+		for _, val := range matrix.Values {
+			jobConfig := p.findJob(val.Timestamp.Time())
+
+			m := p.createMetric(query, metricName, jobConfig, matrix.Metric, val.Value, val.Timestamp.Time())
 			*metrics = append(*metrics, m)
 		}
 	}
 	return nil
 }
 
-// Query prometheus query wrapper
-func (p *Prometheus) Query(query string, time time.Time) (model.Value, error) {
-	var v model.Value
-	v, _, err := p.api.Query(context.TODO(), query, time)
+// ReadProfile reads and parses metric profile configuration
+func (p *Prometheus) readProfile(metricsProfile string) error {
+	f, err := util.ReadConfig(metricsProfile)
 	if err != nil {
-		return v, err
+		return fmt.Errorf("error reading metrics profile %s: %s", metricsProfile, err)
 	}
-	return v, nil
+	yamlDec := yaml.NewDecoder(f)
+	yamlDec.KnownFields(true)
+	if err = yamlDec.Decode(&p.MetricProfile); err != nil {
+		return fmt.Errorf("error decoding metrics profile %s: %s", metricsProfile, err)
+	}
+	return nil
 }
 
-// QueryRange prometheus queryRange wrapper
-func (p *Prometheus) QueryRange(query string, start, end time.Time) (model.Value, error) {
-	var v model.Value
-	r := apiv1.Range{Start: start, End: end, Step: p.Step}
-	v, _, err := p.api.QueryRange(context.TODO(), query, r)
-	if err != nil {
-		return v, err
+// Create metric creates metric to be indexed
+func (p *Prometheus) createMetric(query, metricName string, jobConfig config.Job, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
+	m := metric{
+		Labels:     make(map[string]string),
+		UUID:       p.UUID,
+		Query:      query,
+		MetricName: metricName,
+		JobName:    jobConfig.Name,
+		JobConfig:  jobConfig,
+		Timestamp:  timestamp,
+		Metadata:   p.metadata,
 	}
-	return v, nil
+	for k, v := range labels {
+		if k != "__name__" {
+			m.Labels[string(k)] = string(v)
+		}
+	}
+	if math.IsNaN(float64(value)) {
+		m.Value = 0
+	} else {
+		m.Value = float64(value)
+	}
+	return m
 }

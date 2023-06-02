@@ -15,16 +15,15 @@
 package prometheus
 
 import (
-	"net/http"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
 // Prometheus describes the prometheus connection
 type Prometheus struct {
-	api           apiv1.API
+	Client        *prometheus.Prometheus
 	Endpoint      string
 	MetricProfile metricProfile
 	Step          time.Duration
@@ -39,14 +38,6 @@ type Job struct {
 	End       time.Time
 	Name      string
 	JobConfig config.Job
-}
-
-// This object implements RoundTripper
-type authTransport struct {
-	Transport http.RoundTripper
-	token     string
-	username  string
-	password  string
 }
 
 // metricProfile describes what metrics kube-burner collects
