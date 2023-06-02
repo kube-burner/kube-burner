@@ -41,12 +41,12 @@ const (
 
 type BenchmarkMetadata struct {
 	ocpmetadata.ClusterMetadata
-	UUID            string                 `json:"uuid"`
-	Benchmark       string                 `json:"benchmark"`
-	Timestamp       time.Time              `json:"timestamp"`
-	EndDate         time.Time              `json:"endDate"`
-	Passed          bool                   `json:"passed"`
-	UserMetadata    map[string]interface{} `json:"metadata,omitempty"`
+	UUID         string                 `json:"uuid"`
+	Benchmark    string                 `json:"benchmark"`
+	Timestamp    time.Time              `json:"timestamp"`
+	EndDate      time.Time              `json:"endDate"`
+	Passed       bool                   `json:"passed"`
+	UserMetadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type WorkloadHelper struct {
