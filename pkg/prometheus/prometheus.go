@@ -112,6 +112,8 @@ func (p *Prometheus) findJob(timestamp time.Time) config.Job {
 	for _, prometheusJob := range p.JobList {
 		if timestamp.Before(prometheusJob.End) {
 			jobConfig = prometheusJob.JobConfig
+			jobConfig.NamespaceLabels = nil // no need to insert this into the metric
+			jobConfig.Objects = nil         // no need to insert this into the metric
 		}
 	}
 	return jobConfig
