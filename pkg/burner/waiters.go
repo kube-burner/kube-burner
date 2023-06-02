@@ -35,33 +35,33 @@ func (ex *Executor) waitForObjects(ns string) {
 		if obj.Wait {
 			wg.Add(1)
 			if obj.WaitOptions.ForCondition != "" {
-				go waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.Config.MaxWaitTimeout, &wg)
+				go waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, &wg)
 			} else {
 				switch obj.kind {
 				case "Deployment":
-					go waitForDeployments(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForDeployments(ns, ex.MaxWaitTimeout, &wg)
 				case "ReplicaSet":
-					go waitForRS(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForRS(ns, ex.MaxWaitTimeout, &wg)
 				case "ReplicationController":
-					go waitForRC(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForRC(ns, ex.MaxWaitTimeout, &wg)
 				case "StatefulSet":
-					go waitForStatefulSet(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForStatefulSet(ns, ex.MaxWaitTimeout, &wg)
 				case "DaemonSet":
-					go waitForDS(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForDS(ns, ex.MaxWaitTimeout, &wg)
 				case "Pod":
-					go waitForPod(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForPod(ns, ex.MaxWaitTimeout, &wg)
 				case "Build", "BuildConfig":
-					go waitForBuild(ns, ex.Config.MaxWaitTimeout, obj.Replicas, &wg)
+					go waitForBuild(ns, ex.MaxWaitTimeout, obj.Replicas, &wg)
 				case "VirtualMachine":
-					go waitForVM(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForVM(ns, ex.MaxWaitTimeout, &wg)
 				case "VirtualMachineInstance":
-					go waitForVMI(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForVMI(ns, ex.MaxWaitTimeout, &wg)
 				case "VirtualMachineInstanceReplicaSet":
-					go waitForVMIRS(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForVMIRS(ns, ex.MaxWaitTimeout, &wg)
 				case "Job":
-					go waitForJob(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForJob(ns, ex.MaxWaitTimeout, &wg)
 				case "PersistentVolumeClaim":
-					go waitForPVC(ns, ex.Config.MaxWaitTimeout, &wg)
+					go waitForPVC(ns, ex.MaxWaitTimeout, &wg)
 				default:
 					wg.Done()
 				}

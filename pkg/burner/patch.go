@@ -79,7 +79,7 @@ func setupPatchJob(jobConfig config.Job) Executor {
 // RunPatchJob executes a patch job
 func (ex *Executor) RunPatchJob() {
 	var itemList *unstructured.UnstructuredList
-	log.Infof("Running patch job %s", ex.Config.Name)
+	log.Infof("Running patch job %s", ex.Name)
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
 
@@ -101,7 +101,7 @@ func (ex *Executor) RunPatchJob() {
 			continue
 		}
 		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
-		for i := 1; i <= ex.Config.JobIterations; i++ {
+		for i := 1; i <= ex.JobIterations; i++ {
 			for _, item := range itemList.Items {
 				wg.Add(1)
 				go ex.patchHandler(obj, item, i, &wg)
@@ -129,7 +129,7 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 	} else {
 		// Processing template
 		templateData := map[string]interface{}{
-			jobName:      ex.Config.Name,
+			jobName:      ex.Name,
 			jobIteration: iteration,
 			jobUUID:      ex.uuid,
 		}

@@ -30,35 +30,34 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/restmapper"
 )
 
 func setupCreateJob(jobConfig config.Job) Executor {
-	var f io.Reader
-	var err error
+	apiGroupResouces, err := restmapper.GetAPIGroupResources(discoveryClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mapper := restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
 	waitClientSet, waitRestConfig, err = config.GetClientSet(jobConfig.QPS*2, jobConfig.Burst*2)
 	if err != nil {
 		log.Fatalf("Error creating wait clientSet: %s", err.Error())
 	}
 	waitDynamicClient = dynamic.NewForConfigOrDie(waitRestConfig)
 	log.Debugf("Preparing create job: %s", jobConfig.Name)
-	selector := util.NewSelector()
-	selector.Configure("", fmt.Sprintf("kube-burner-job=%s", jobConfig.Name), "")
-	ex := Executor{
-		selector: selector,
-	}
+	ex := Executor{}
 	for _, o := range jobConfig.Objects {
 		if o.Replicas < 1 {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		f, err = util.ReadConfig(o.ObjectTemplate)
+		f, err := util.ReadConfig(o.ObjectTemplate)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
@@ -73,16 +72,19 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
 		}
 		_, gvk := yamlToUnstructured(cleanTemplate, uns)
-		gvr, _ := meta.UnsafeGuessKindToResource(*gvk)
+		mapping, err := mapper.RESTMapping(gvk.GroupKind())
+		if err != nil {
+			log.Fatal(err)
+		}
 		obj := object{
-			gvr:        gvr,
+			gvr:        mapping.Resource,
 			objectSpec: t,
 			kind:       gvk.Kind,
 			Object:     o,
 		}
 		// If any of the objects is namespaced, we configure the job to create namepaces
 		if o.Namespaced {
-			ex.Config.NamespacedIterations = true
+			ex.NamespacedIterations = true
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
@@ -93,18 +95,18 @@ func setupCreateJob(jobConfig config.Job) Executor {
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	nsLabels := map[string]string{
-		"kube-burner-job":  ex.Config.Name,
+		"kube-burner-job":  ex.Name,
 		"kube-burner-uuid": ex.uuid,
 	}
 	var wg sync.WaitGroup
 	var ns string
 	var err error
-	log.Infof("Running job %s", ex.Config.Name)
-	for label, value := range ex.Config.NamespaceLabels {
+	log.Infof("Running job %s", ex.Name)
+	for label, value := range ex.NamespaceLabels {
 		nsLabels[label] = value
 	}
-	if !ex.Config.NamespacedIterations {
-		ns = ex.Config.Namespace
+	if !ex.NamespacedIterations {
+		ns = ex.Namespace
 		if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
 			log.Fatal(err.Error())
 		}
@@ -120,7 +122,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 			percent++
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
-		if ex.Config.NamespacedIterations {
+		if ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
 				if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
@@ -133,27 +135,27 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		for objectIndex, obj := range ex.objects {
 			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
-		if ex.Config.PodWait {
-			if !ex.Config.NamespacedIterations || !namespacesWaited[ns] {
-				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.Config.MaxWaitTimeout, ns)
+		if ex.PodWait {
+			if !ex.NamespacedIterations || !namespacesWaited[ns] {
+				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
 				ex.waitForObjects(ns)
 				namespacesWaited[ns] = true
 			}
 		}
-		if ex.Config.JobIterationDelay > 0 {
-			log.Infof("Sleeping for %v", ex.Config.JobIterationDelay)
-			time.Sleep(ex.Config.JobIterationDelay)
+		if ex.JobIterationDelay > 0 {
+			log.Infof("Sleeping for %v", ex.JobIterationDelay)
+			time.Sleep(ex.JobIterationDelay)
 		}
 	}
 	// Wait for all replicas to be created
 	wg.Wait()
-	if ex.Config.WaitWhenFinished && !ex.Config.PodWait {
-		log.Infof("Waiting up to %s for actions to be completed", ex.Config.MaxWaitTimeout)
+	if ex.WaitWhenFinished && !ex.PodWait {
+		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
 		for i := iterationStart; i <= iterationEnd; i++ {
-			if ex.Config.NamespacedIterations {
+			if ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
 				if namespacesWaited[ns] {
 					continue
@@ -169,7 +171,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 				wg.Done()
 			}(ns)
 			// Wait for all namespaces to be ready
-			if !ex.Config.NamespacedIterations {
+			if !ex.NamespacedIterations {
 				break
 			}
 		}
@@ -181,8 +183,8 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 // namespaces. Division means namespaces are populated to their desired number
 // of iterations before the next namespace is created.
 func (ex *Executor) generateNamespace(iteration int) string {
-	nsIndex := iteration / ex.Config.IterationsPerNamespace
-	return fmt.Sprintf("%s-%d", ex.Config.Namespace, nsIndex)
+	nsIndex := iteration / ex.IterationsPerNamespace
+	return fmt.Sprintf("%s-%d", ex.Namespace, nsIndex)
 }
 
 func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
@@ -194,11 +196,11 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			var newObject = new(unstructured.Unstructured)
 			labels := map[string]string{
 				"kube-burner-uuid":  ex.uuid,
-				"kube-burner-job":   ex.Config.Name,
+				"kube-burner-job":   ex.Name,
 				"kube-burner-index": strconv.Itoa(objectIndex),
 			}
 			templateData := map[string]interface{}{
-				jobName:      ex.Config.Name,
+				jobName:      ex.Name,
 				jobIteration: iteration,
 				jobUUID:      ex.uuid,
 				replica:      r,
@@ -268,11 +270,11 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 func (ex *Executor) RunCreateJobWithChurn() {
 	var err error
 	// Determine the number of job iterations to churn (min 1)
-	numToChurn := int(math.Max(float64(ex.Config.ChurnPercent*ex.Config.JobIterations/100), 1))
+	numToChurn := int(math.Max(float64(ex.ChurnPercent*ex.JobIterations/100), 1))
 	now := time.Now().UTC()
 	rand.Seed(now.UnixNano())
 	// Create timer for the churn duration
-	timer := time.After(ex.Config.ChurnDuration)
+	timer := time.After(ex.ChurnDuration)
 	// Patch to label namespaces for deletion
 	delPatch := []byte(`[{"op":"add","path":"/metadata/labels/churndelete","value": "delete"}]`)
 	for {
@@ -285,10 +287,10 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		}
 		// Max amount of churn is 100% of namespaces
 		randStart := 1
-		if ex.Config.JobIterations-numToChurn+1 > 0 {
-			randStart = rand.Intn(ex.Config.JobIterations-numToChurn+1) + 1
+		if ex.JobIterations-numToChurn+1 > 0 {
+			randStart = rand.Intn(ex.JobIterations-numToChurn+1) + 1
 		} else {
-			numToChurn = ex.Config.JobIterations
+			numToChurn = ex.JobIterations
 		}
 		var namespacesPatched = make(map[string]bool)
 		// delete numToChurn namespaces starting at randStart
@@ -312,7 +314,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart-1)
-		log.Infof("Sleeping for %v", ex.Config.ChurnDelay)
-		time.Sleep(ex.Config.ChurnDelay)
+		log.Infof("Sleeping for %v", ex.ChurnDelay)
+		time.Sleep(ex.ChurnDelay)
 	}
 }
