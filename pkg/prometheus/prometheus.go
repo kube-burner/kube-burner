@@ -31,11 +31,11 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url, token, username, password, uuid string, tlsVerify bool, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url, token, username, password string, tlsVerify bool, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:       step,
-		UUID:       uuid,
+		UUID:       configSpec.GlobalConfig.UUID,
 		ConfigSpec: configSpec,
 		Endpoint:   url,
 		metadata:   metadata,
@@ -112,8 +112,6 @@ func (p *Prometheus) findJob(timestamp time.Time) config.Job {
 	for _, prometheusJob := range p.JobList {
 		if timestamp.Before(prometheusJob.End) {
 			jobConfig = prometheusJob.JobConfig
-			jobConfig.NamespaceLabels = nil // no need to insert this into the metric
-			jobConfig.Objects = nil         // no need to insert this into the metric
 		}
 	}
 	return jobConfig
@@ -127,7 +125,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 	}
 	for _, vector := range data {
 		jobConfig := p.findJob(vector.Timestamp.Time())
-
+		fmt.Println(jobConfig)
 		m := p.createMetric(query, metricName, jobConfig, vector.Metric, vector.Value, vector.Timestamp.Time())
 		*metrics = append(*metrics, m)
 	}

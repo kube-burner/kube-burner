@@ -23,7 +23,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
@@ -107,7 +106,7 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			configSpec, err := config.Parse(configFile, false)
+			configSpec, err := config.Parse(uuid, configFile, false)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -123,11 +122,10 @@ func initCmd() *cobra.Command {
 					URL:             url,
 					Token:           token,
 					Username:        username,
-					UUID:            uuid,
 					UserMetaData:    userMetadata,
 				})
 			}
-			rc, err = burner.Run(configSpec, uuid, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
+			rc, err = burner.Run(configSpec, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
@@ -163,7 +161,7 @@ func destroyCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if configFile != "" {
-				_, err := config.Parse(configFile, false)
+				_, err := config.Parse(uuid, configFile, false)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -198,7 +196,7 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			configSpec, err := config.Parse(configFile, false)
+			configSpec, err := config.Parse(uuid, configFile, false)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -212,7 +210,6 @@ func indexCmd() *cobra.Command {
 				URL:             url,
 				Token:           token,
 				Username:        username,
-				UUID:            uuid,
 				StartTime:       start,
 				EndTime:         end,
 				JobName:         jobName,
@@ -246,7 +243,7 @@ func importCmd() *cobra.Command {
 		Use:   "import",
 		Short: "Import metrics tarball",
 		Run: func(cmd *cobra.Command, args []string) {
-			configSpec, err := config.Parse(configFile, false)
+			configSpec, err := config.Parse("", configFile, false)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -287,7 +284,7 @@ func alertCmd() *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if configFile != "" {
-				configSpec, err = config.Parse(configFile, false)
+				configSpec, err = config.Parse(uuid, configFile, false)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -306,7 +303,7 @@ func alertCmd() *cobra.Command {
 			if token == "" {
 				token = configSpec.GlobalConfig.BearerToken
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, uuid, skipTLSVerify, prometheusStep, map[string]interface{}{})
+			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, skipTLSVerify, prometheusStep, map[string]interface{}{})
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -350,8 +347,8 @@ func main() {
 	)
 	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		logrus.SetReportCaller(true)
-		formatter := &logrus.TextFormatter{
+		log.SetReportCaller(true)
+		formatter := &log.TextFormatter{
 			TimestampFormat: "2006-01-02 15:04:05",
 			FullTimestamp:   true,
 			DisableColors:   true,
@@ -359,8 +356,8 @@ func main() {
 				return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
 			},
 		}
-		logrus.SetFormatter(formatter)
-		lvl, err := logrus.ParseLevel(*logLevel)
+		log.SetFormatter(formatter)
+		lvl, err := log.ParseLevel(*logLevel)
 		if err != nil {
 			log.Fatalf("Unknown log level %s", *logLevel)
 		}

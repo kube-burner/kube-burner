@@ -105,7 +105,7 @@ func (p *vmiLatency) handleCreateVM(obj interface{}) {
 				Namespace:  vm.Namespace,
 				Name:       vm.Name,
 				MetricName: vmiLatencyMeasurement,
-				UUID:       factory.uuid,
+				UUID:       globalCfg.UUID,
 				JobName:    factory.jobConfig.Name,
 			}
 		}
@@ -148,7 +148,7 @@ func (p *vmiLatency) handleCreateVMI(obj interface{}) {
 				Namespace:  vmi.Namespace,
 				Name:       vmi.Name,
 				MetricName: vmiLatencyMeasurement,
-				UUID:       factory.uuid,
+				UUID:       globalCfg.UUID,
 				JobName:    factory.jobConfig.Name,
 			}
 		}
@@ -368,7 +368,7 @@ func (p *vmiLatency) stop() (int, error) {
 	p.normalizeMetrics()
 	p.calcQuantiles()
 	rc := metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
-	if kubeburnerCfg.IndexerConfig.Enabled {
+	if globalCfg.IndexerConfig.Enabled {
 		p.index()
 	}
 	// Reset latency slices, required in multi-job benchmarks
@@ -446,7 +446,7 @@ func (p *vmiLatency) calcQuantiles() {
 	for quantileName, v := range quantileMap {
 		quantile := metrics.LatencyQuantiles{
 			QuantileName: quantileName,
-			UUID:         factory.uuid,
+			UUID:         globalCfg.UUID,
 			Timestamp:    time.Now().UTC(),
 			JobName:      factory.jobConfig.Name,
 			MetricName:   vmiLatencyQuantilesMeasurement,

@@ -43,6 +43,8 @@ type Spec struct {
 
 // GlobalConfig holds the global configuration
 type GlobalConfig struct {
+	// Benchmark UUID
+	UUID string
 	// IndexerConfig contains a IndexerConfig definition
 	IndexerConfig indexers.IndexerConfig `yaml:"indexerConfig"`
 	// Measurements describes a list of measurements kube-burner
@@ -100,7 +102,7 @@ type Job struct {
 	// Name job name
 	Name string `yaml:"name" json:"name,omitempty"`
 	// Objects list of objects
-	Objects []Object `yaml:"objects" json:"objects,omitempty"`
+	Objects []Object `yaml:"objects" json:"-"`
 	// JobType type of job
 	JobType JobType `yaml:"jobType" json:"jobType,omitempty"`
 	// Max number of queries per second
@@ -132,7 +134,7 @@ type Job struct {
 	// PreLoadPeriod determines the duration of the preload stage
 	PreLoadPeriod time.Duration `yaml:"preLoadPeriod" json:"preLoadPeriod,omitempty"`
 	// NamespaceLabels add custom labels to namespaces created by kube-burner
-	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"namespaceLabels,omitempty"`
+	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"-"`
 	// Churn workload
 	Churn bool `yaml:"churn" json:"churn,omitempty"`
 	// Churn percentage

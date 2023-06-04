@@ -255,10 +255,8 @@ func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxW
 			}
 			_ = json.Unmarshal(jsonBuild, &uObj)
 			for _, c := range uObj.Status.Conditions {
-				if c.Status == "True" {
-					if c.Type == condition {
-						continue VERIFY
-					}
+				if c.Status == "True" && c.Type == condition {
+					continue VERIFY
 				}
 			}
 			log.Debugf("Waiting for %s in ns %s to be ready", gvr.Resource, ns)
@@ -299,18 +297,18 @@ func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		objs, err := waitDynamicClient.Resource(vmiGVRRS).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			log.Debugf("replicaSets error %v", err)
+			log.Debugf("VMIRS error %v", err)
 			return false, err
 		}
 		for _, obj := range objs.Items {
 			jsonBuild, err := obj.MarshalJSON()
 			if err != nil {
-				log.Errorf("Error decoding Build object: %s", err)
+				log.Errorf("Error decoding VMIRS object: %s", err)
 				return false, err
 			}
 			_ = json.Unmarshal(jsonBuild, &rs)
 			if rs.Spec.Replicas != rs.Status.ReadyReplicas {
-				log.Debugf("Waiting for replicas from replicaSets in ns %s to be running", ns)
+				log.Debugf("Waiting for replicas from VMIRS in ns %s to be running", ns)
 				return false, nil
 			}
 		}

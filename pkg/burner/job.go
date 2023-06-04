@@ -73,16 +73,17 @@ var restConfig *rest.Config
 var waitRestConfig *rest.Config
 
 //nolint:gocyclo
-func Run(configSpec config.Spec, uuid string, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
+func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
 	var err error
 	var rc int
 	var prometheusJobList []prometheus.Job
 	res := make(chan int, 1)
+	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
-		measurements.NewMeasurementFactory(configSpec, uuid, indexer, metadata)
+		measurements.NewMeasurementFactory(configSpec, indexer, metadata)
 		jobList := newExecutorList(configSpec, uuid)
 		// Iterate job list
 		for jobPosition, job := range jobList {
