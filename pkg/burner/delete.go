@@ -53,6 +53,9 @@ func setupDeleteJob(jobConfig *config.Job) Executor {
 			gvr:           mapping.Resource,
 			labelSelector: o.LabelSelector,
 		}
+		if !isNamespaced(&gvk) {
+			obj.Namespaced = false
+		}
 		log.Debugf("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
 	}
@@ -86,13 +89,17 @@ func (ex *Executor) RunDeleteJob() {
 			go func(item unstructured.Unstructured) {
 				defer wg.Done()
 				ex.limiter.Wait(context.TODO())
-				err := dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+				var err error
+				if obj.Namespaced {
+					err = dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+				} else {
+					err = dynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+				}
 				if err != nil {
 					log.Errorf("Error found removing %s %s: %s", item.GetKind(), item.GetName(), err)
 				} else {
-					ns := item.GetNamespace()
-					if ns != "" {
-						log.Debugf("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), ns)
+					if obj.Namespaced {
+						log.Debugf("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
 					} else {
 						log.Debugf("Removing %s/%s", item.GetKind(), item.GetName())
 					}

@@ -22,17 +22,23 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
 const (
 	objectLimit = 500
 )
+
+// gvksCache is a cache to store GroupVersionKind objects
+var gvksCache = make(map[schema.GroupVersionKind]bool)
 
 func prepareTemplate(original []byte) ([]byte, error) {
 	// Removing all placeholders from template.
@@ -113,4 +119,24 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 
 func isEmpty(raw []byte) bool {
 	return strings.TrimSpace(string(raw)) == ""
+}
+
+// isNamespaced returns true if the resource is namespaced and false if is cluster-scoped
+func isNamespaced(gvr *schema.GroupVersionKind) bool {
+	if gvr == nil {
+		return false
+	}
+	if val, ok := gvksCache[*gvr]; ok {
+		log.Debugf("Found cached value for gvr: %v", gvr)
+		return val
+	}
+
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(waitClientSet.Discovery()))
+	rm, err := restMapper.RESTMapping(gvr.GroupKind(), gvr.Version)
+	if err != nil {
+		log.Errorf("Error getting RESTMapping: %v", err)
+		return false
+	}
+	log.Debugf("%s has %v scope", gvr.Group, rm.Scope.Name())
+	return rm.Scope.Name() == meta.RESTScopeNameNamespace
 }

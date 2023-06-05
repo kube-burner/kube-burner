@@ -36,7 +36,10 @@ func (ex *Executor) waitForObjects(ns string) {
 		if obj.Wait {
 			wg.Add(1)
 			if obj.WaitOptions.ForCondition != "" {
-				go waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, obj.Namespaced, &wg)
+				if !obj.Namespaced {
+					ns = ""
+				}
+				go waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, &wg)
 			} else {
 				switch obj.kind {
 				case "Deployment":
@@ -223,21 +226,20 @@ func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Version:  "v1",
 		Resource: "jobs",
 	}
-	verifyCondition(gvr, ns, "Complete", maxWaitTimeout, true)
+	verifyCondition(gvr, ns, "Complete", maxWaitTimeout)
 }
 
 func waitForCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration,
-	namespaced bool, wg *sync.WaitGroup) {
+	wg *sync.WaitGroup) {
 	defer wg.Done()
-	verifyCondition(gvr, ns, condition, maxWaitTimeout, namespaced)
+	verifyCondition(gvr, ns, condition, maxWaitTimeout)
 }
 
-func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration, namespaced bool) {
+func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration) {
 	var uObj types.UnstructuredContent
 	wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-
 		var objs *unstructured.UnstructuredList
-		if namespaced {
+		if ns != "" {
 			objs, err = waitDynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		} else {
 			objs, err = waitDynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
@@ -245,7 +247,6 @@ func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxW
 		if err != nil {
 			return false, err
 		}
-
 	VERIFY:
 		for _, obj := range objs.Items {
 			jsonBuild, err := obj.MarshalJSON()
@@ -259,7 +260,11 @@ func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxW
 					continue VERIFY
 				}
 			}
-			log.Debugf("Waiting for %s in ns %s to be ready", gvr.Resource, ns)
+			if ns != "" {
+				log.Debugf("Waiting for %s in ns %s to be ready", gvr.Resource, ns)
+			} else {
+				log.Debugf("Waiting for %s to be ready", gvr.Resource)
+			}
 			return false, err
 		}
 		return true, nil
@@ -273,7 +278,7 @@ func waitForVM(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Version:  types.KubevirtAPIVersion,
 		Resource: types.VirtualMachineResource,
 	}
-	verifyCondition(vmGVR, ns, "Ready", maxWaitTimeout, true)
+	verifyCondition(vmGVR, ns, "Ready", maxWaitTimeout)
 }
 
 func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
@@ -283,7 +288,7 @@ func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Version:  types.KubevirtAPIVersion,
 		Resource: types.VirtualMachineInstanceResource,
 	}
-	verifyCondition(vmiGVR, ns, "Ready", maxWaitTimeout, true)
+	verifyCondition(vmiGVR, ns, "Ready", maxWaitTimeout)
 }
 
 func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
