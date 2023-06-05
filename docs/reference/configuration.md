@@ -76,7 +76,6 @@ Each object element supports the following parameters:
 | `objectTemplate`       | Object template file path or URL                                | String  | ""      |
 | `replicas`             | How replicas of this object to create per job iteration           | Integer | -       |
 | `inputVars`            | Map of arbitrary input variables to inject to the object template | Object  | -       |
-| `namespaced`           | Whether to create a namespaced object or not                      | Boolean | true    |
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize [how to wait](#wait-options) for object to be ready     | Object  | {}       |
 
