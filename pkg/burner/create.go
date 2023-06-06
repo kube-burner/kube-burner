@@ -21,6 +21,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -56,20 +57,21 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
 		}
-		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		f, err := util.ReadConfig(o.ObjectTemplate)
+		templatePath := path.Join(config.CfgDir, o.ObjectTemplate)
+		log.Debugf("Rendering template: %s", templatePath)
+		f, err := util.ReadConfig(templatePath)
 		if err != nil {
-			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
+			log.Fatalf("Error reading template %s: %s", templatePath, err)
 		}
 		t, err := io.ReadAll(f)
 		if err != nil {
-			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
+			log.Fatalf("Error reading template %s: %s", templatePath, err)
 		}
 		// Deserialize YAML
 		uns := &unstructured.Unstructured{}
 		cleanTemplate, err := prepareTemplate(t)
 		if err != nil {
-			log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
+			log.Fatalf("Error preparing template %s: %s", templatePath, err)
 		}
 		_, gvk := yamlToUnstructured(cleanTemplate, uns)
 		mapping, err := mapper.RESTMapping(gvk.GroupKind())

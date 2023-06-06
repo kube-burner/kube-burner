@@ -24,6 +24,9 @@ import (
 // JobType type of job
 type JobType string
 
+// Config file directory
+var CfgDir string
+
 const (
 	// CreationJob used to create objects
 	CreationJob JobType = "create"

@@ -97,6 +97,11 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // Parse parses a configuration file
 func Parse(c string, jobsRequired bool) (Spec, error) {
+	cfgAbs, err := filepath.Abs(c)
+	if err != nil {
+		return configSpec, err
+	}
+	CfgDir = filepath.Dir(cfgAbs)
 	f, err := util.ReadConfig(c)
 	if err != nil {
 		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)

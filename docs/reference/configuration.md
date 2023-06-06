@@ -80,6 +80,9 @@ Each object element supports the following parameters:
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize how to wait for object to be ready                      | Object  | {}       |
 
+!!! info
+    The `objectTemplate` is a relative path to the main configuration file and not to the users's cwd
+
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
 
