@@ -1,20 +1,20 @@
 #!/usr/bin/env bats
 # vi: ft=bash
 
+load helpers.bash
+
 setup_file() {
   export BATS_TEST_TIMEOUT=600
   export TEMP_FOLDER; TEMP_FOLDER=$(mktemp -d)
   export JOB_ITERATIONS=5
   export QPS=2
   export BURST=2
-  load helpers.bash
   setup-kind
   setup-prometheus
 }
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  load helpers.bash
 }
 
 teardown() {
