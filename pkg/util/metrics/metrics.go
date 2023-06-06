@@ -31,6 +31,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 	var indexer *indexers.Indexer
 	var metricsEndpoints []prometheus.MetricEndpoint
 	var prometheusClients []*prometheus.Prometheus
+	var alertM *alerting.AlertManager
 	var alertMs []*alerting.AlertManager
 	indexerConfig := configSpec.GlobalConfig.IndexerConfig
 	userMetadataContent := make(map[string]interface{})
@@ -73,7 +74,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 		if metricsScraperConfig.ActionIndex {
 			metadataContent = userMetadataContent
 		}
-		auth := prometheus.PrometheusAuth{
+		auth := prometheus.Auth{
 			Username:      metricsScraperConfig.Username,
 			Password:      metricsScraperConfig.Password,
 			Token:         metricsScraperConfig.Token,
@@ -98,13 +99,13 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			updateParamIfEmpty(&metricsEndpoint.AlertProfile, metricsScraperConfig.AlertProfile)
 			updateParamIfEmpty(&metricsEndpoint.AlertProfile, configSpec.GlobalConfig.AlertProfile)
 			if metricsEndpoint.AlertProfile != "" {
-				if alertM, err := alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.UUID, indexer, p); err != nil {
+				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, configSpec.GlobalConfig.UUID, indexer, p); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
-				} else {
-					alertMs = append(alertMs, alertM)
 				}
 			}
 			prometheusClients = append(prometheusClients, p)
+			alertMs = append(alertMs, alertM)
+			alertM = nil
 		}
 	}
 	return Scraper{

@@ -303,7 +303,7 @@ func alertCmd() *cobra.Command {
 			if token == "" {
 				token = configSpec.GlobalConfig.BearerToken
 			}
-			auth := prometheus.PrometheusAuth{
+			auth := prometheus.Auth{
 				Username:      username,
 				Password:      password,
 				Token:         token,

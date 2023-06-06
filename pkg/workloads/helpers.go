@@ -197,7 +197,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
 		configSpec.GlobalConfig.MetricsProfile = metricsEndpoint.Profile
 		configSpec.GlobalConfig.AlertProfile = metricsEndpoint.AlertProfile
-		auth := prometheus.PrometheusAuth{
+		auth := prometheus.Auth{
 			Token:         metricsEndpoint.Token,
 			SkipTLSVerify: true,
 		}

@@ -21,7 +21,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 )
 
-type PrometheusAuth struct {
+type Auth struct {
 	Username      string
 	Password      string
 	Token         string

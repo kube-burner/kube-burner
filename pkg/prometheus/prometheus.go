@@ -31,7 +31,7 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth PrometheusAuth, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:       step,
