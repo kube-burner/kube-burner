@@ -1,59 +1,75 @@
 #!/usr/bin/env bats
 # vi: ft=bash
+# shellcheck disable=SC2086,SC2030,SC2031
+
+load helpers.bash
 
 setup_file() {
   export BATS_TEST_TIMEOUT=600
-  export TEMP_FOLDER; TEMP_FOLDER=$(mktemp -d)
   export JOB_ITERATIONS=5
   export QPS=2
   export BURST=2
-  load helpers.bash
   setup-kind
   setup-prometheus
 }
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  load helpers.bash
+  export TEMP_FOLDER; TEMP_FOLDER=$(mktemp -d)
 }
 
 teardown() {
+  echo "Last bats run command: ${BATS_RUN_COMMAND}"
   kubectl delete ns -l kube-burner-uuid="${UUID}" --ignore-not-found
 }
 
 teardown_file() {
-  load helpers.bash
   destroy-kind
   podman rm -f prometheus
 }
 
 @test "kube-burner: no indexing" {
-  INDEXING=false kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  export INDEXING=false
+  run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  [ "$status" -eq 0 ]
 }
 
-@test "kube-burner: indexing on. pod latency metrics" {
-  INDEXING=true LATENCY_ONLY=true kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+@test "kube-burner: indexing only pod latency metrics" {
+  export INDEXING=true
+  export LATENCY=true
+  run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  [ "$status" -eq 0 ]
   run test_init_checks
   [ "$status" -eq 0 ]
 }
 
 @test "kube-burner init: indexing, pod latency metrics and alerting" {
-  INDEXING=true kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
+  export INDEXING=true
+  run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
+  [ "$status" -eq 0 ]
+  export LATENCY=true
+  export ALERTING=true
   run test_init_checks
   [ "$status" -eq 0 ]
 }
 
-@test "kube-burner init: indexing and metrics-endopoints" {
-  INDEXING=true kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -e metrics-endpoints.yaml
+@test "kube-burner init: indexing and metrics-endpoint" {
+  export INDEXING=true
+  export ALERTING=true
+  run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -e metrics-endpoints.yaml
+  [ "$status" -eq 0 ]
   run test_init_checks
   [ "$status" -eq 0 ]
 }
 
 @test "kube-burner index: metrics-endpoint with single prometheus endpoint" {
-  INDEXING=true kube-burner index -c kube-burner-index-single-endpoint.yml -u http://localhost:9090 -m metrics-profile.yaml
+  export INDEXING=true
+  run kube-burner index -c kube-burner-index-single-endpoint.yml --uuid="${UUID}"  -u http://localhost:9090 -m metrics-profile.yaml
+  [ "$status" -eq 0 ]
 }
 
-@test "kube-burner index: test with metrics endpoints yaml" {
-  INDEXING=true kube-burner index -c kube-burner.yml -e metrics-endpoints.yaml
-  INDEXING=true kube-burner index -c kube-burner-index-multiple-endpoint.yml
+@test "kube-burner index: metrics-endpoint" {
+  export INDEXING=true
+  run kube-burner index -c kube-burner.yml --uuid="${UUID}" -e metrics-endpoints.yaml
+  [ "$status" -eq 0 ]
 }
