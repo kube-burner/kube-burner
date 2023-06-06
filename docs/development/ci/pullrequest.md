@@ -92,7 +92,7 @@ The "build" job uses the file `builders.yml` file to build binaries and images, 
 
 ### Report Results
 
-The "report_results" performs the following steps:
+The "report_results" job performs the following steps:
 
 1. Checks out the code.
 1. Downloads the Kubernetes and OpenShift test results artifacts.

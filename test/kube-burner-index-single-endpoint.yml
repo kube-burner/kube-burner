@@ -1,6 +1,4 @@
 global:
-  prometheusURL: http://localhost:9090
-  metricsProfile: metrics.yaml
   indexerConfig:
     enabled: true
     esServers: [https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443] 
