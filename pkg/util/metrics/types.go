@@ -42,11 +42,10 @@ type ScraperConfig struct {
 	UserMetaData    string
 }
 
-// ScraperResponse holds parsed data realted to scraper and target indexer
+// ScraperResponse holds parsed data related to scraper and target indexer
 type Scraper struct {
 	PrometheusClients   []*prometheus.Prometheus
 	AlertMs             []*alerting.AlertManager
 	Indexer             *indexers.Indexer
-	ConfigSpec          config.Spec
 	UserMetadataContent map[string]interface{}
 }

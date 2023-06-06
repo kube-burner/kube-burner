@@ -303,7 +303,13 @@ func alertCmd() *cobra.Command {
 			if token == "" {
 				token = configSpec.GlobalConfig.BearerToken
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, token, username, password, skipTLSVerify, prometheusStep, map[string]interface{}{})
+			auth := prometheus.PrometheusAuth{
+				Username:      username,
+				Password:      password,
+				Token:         token,
+				SkipTLSVerify: skipTLSVerify,
+			}
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, map[string]interface{}{})
 			if err != nil {
 				log.Fatal(err)
 			}

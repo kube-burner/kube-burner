@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -72,14 +71,5 @@ func ScrapeMetrics(p *prometheus.Prometheus, indexer *indexers.Indexer) {
 	log.Infof("Indexing metrics with UUID %s", p.UUID)
 	if err := p.ScrapeJobsMetrics(indexer); err != nil {
 		log.Error(err)
-	}
-}
-
-// Handles tarball use case
-func HandleTarball(configSpec config.Spec) {
-	if configSpec.GlobalConfig.IndexerConfig.CreateTarball {
-		if err := createTarball(configSpec.GlobalConfig.IndexerConfig); err != nil {
-			log.Fatal(err.Error())
-		}
 	}
 }

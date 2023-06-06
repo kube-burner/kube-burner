@@ -31,7 +31,7 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url, token, username, password string, tlsVerify bool, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth PrometheusAuth, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:       step,
@@ -41,7 +41,7 @@ func NewPrometheusClient(configSpec config.Spec, url, token, username, password 
 		metadata:   metadata,
 	}
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
-	p.Client, err = prometheus.NewClient(url, token, username, password, tlsVerify)
+	p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
 	if err != nil {
 		return &p, err
 	}
