@@ -105,18 +105,20 @@ print_events() {
   kubectl get events --sort-by='.lastTimestamp' -A
 }
 
+# shellcheck disable=SC2086
 check_metric_value() {
-  endpoint="${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${1}"
-  RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error')
-  RETURN_CODE=$?
-  echo "Command: ${BATS_RUN_COMMAND}"
-  if [ "${RETURN_CODE}" -ne 0 ]; then
-    echo "Return code: ${RETURN_CODE}"
-    return 1
-  elif [ "${RESULT}" == 0 ]; then
-    echo "$1 not found in ${endpoint}"
-    return 1
-  else
-    return 0
-  fi
+  for metric in "${@}"; do
+    endpoint="${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${metric}"
+    RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error')
+    RETURN_CODE=$?
+    if [ "${RETURN_CODE}" -ne 0 ]; then
+      echo "Return code: ${RETURN_CODE}"
+      return 1
+    elif [ "${RESULT}" == 0 ]; then
+      echo "$1 not found in ${endpoint}"
+      return 1
+    else
+      return 0
+    fi
+  done
 }
