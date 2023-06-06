@@ -45,8 +45,6 @@ $(BIN_PATH): $(SOURCES)
 	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner
 
 lint:
-	@echo -e "\n\033[2mUpdating pre-commit hooks..\033[0m"
-	pre-commit autoupdate
 	@echo "Executing pre-commit for all files"
 	pre-commit run --all-files
 	@echo "pre-commit executed."
