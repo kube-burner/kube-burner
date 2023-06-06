@@ -37,7 +37,6 @@ import (
 )
 
 type pprof struct {
-	directory   string
 	config      types.Measurement
 	stopChannel chan bool
 }
@@ -47,10 +46,6 @@ func init() {
 }
 
 func (p *pprof) setConfig(cfg types.Measurement) error {
-	p.directory = "pprof"
-	if cfg.PProfDirectory != "" {
-		p.directory = cfg.PProfDirectory
-	}
 	p.config = cfg
 	if err := p.validateConfig(); err != nil {
 		return err
@@ -61,7 +56,7 @@ func (p *pprof) setConfig(cfg types.Measurement) error {
 func (p *pprof) start(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var wg sync.WaitGroup
-	err := os.MkdirAll(p.directory, 0744)
+	err := os.MkdirAll(p.config.PProfDirectory, 0744)
 	if err != nil {
 		log.Fatalf("Error creating pprof directory: %s", err)
 	}
@@ -129,7 +124,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 			go func(target types.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
 				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Name, time.Now().Unix())
-				f, err := os.Create(path.Join(p.directory, pprofFile))
+				f, err := os.Create(path.Join(p.config.PProfDirectory, pprofFile))
 				var stderr bytes.Buffer
 				if err != nil {
 					log.Errorf("Error creating pprof file %s: %s", pprofFile, err)

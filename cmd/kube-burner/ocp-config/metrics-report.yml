@@ -1,0 +1,160 @@
+---
+# Kubelet & CRI-O
+
+# Average of the CPU usage from all worker's kubelet
+- query: irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m]) and on (node) kube_node_role{role="worker"}
+  metricName: cpu-kubelet
+  aggregations: [avg]
+
+# Average of the memory usage from all worker's kubelet
+- query: process_resident_memory_bytes{service="kubelet",job="kubelet"} and on (node) kube_node_role{role="worker"}
+  metricName: memory-kubelet
+  aggregations: [avg]
+
+# Average of the CPU usage from all worker's CRI-O
+- query: irate(process_cpu_seconds_total{service="kubelet",job="crio"}[2m]) and on (node) kube_node_role{role="worker"}
+  metricName: cpu-crio
+  aggregations: [avg]
+
+# Average of the memory usage from all worker's CRI-O
+- query: process_resident_memory_bytes{service="kubelet",job="crio"} and on (node) kube_node_role{role="worker"}
+  metricName: memory-crio
+  aggregations: [avg]
+
+# Etcd
+
+- query: histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket[2m]))
+  metricName: 99thEtcdDiskBackendCommit
+  aggregations: [avg]
+
+- query: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))
+  metricName: 99thEtcdDiskWalFsync
+  aggregations: [avg]
+
+- query: histogram_quantile(0.99, irate(etcd_network_peer_round_trip_time_seconds_bucket[2m]))
+  metricName: 99thEtcdRoundTripTime
+  aggregations: [avg]
+
+# Control-plane
+
+- query: topk(1, sum(rate(container_cpu_usage_seconds_total{namespace="openshift-kube-controller-manager"}[2m])) by (pod))
+  metricName: cpu-kube-controller-manager
+  aggregations: [avg]
+
+- query: topk(1, sum(container_memory_rss{namespace="openshift-kube-controller-manager"}) by (pod))
+  metricName: memory-kube-controller-manager
+  aggregations: [avg, max]
+
+- query: topk(3, sum(irate(container_cpu_system_seconds_total{namespace="openshift-kube-apiserver"}[2m])) by (pod))
+  metricName: cpu-kube-apiserver
+  aggregations: [avg]
+
+- query: topk(3, sum(container_memory_rss{namespace="openshift-kube-apiserver"}) by (pod))
+  metricName: memory-kube-apiserver
+  aggregations: [avg, max]
+
+- query: topk(3, sum(irate(container_cpu_system_seconds_total{namespace="openshift-etcd"}[2m])) by (pod))
+  metricName: cpu-etcd
+  aggregations: [avg]
+
+- query: topk(3,sum(container_memory_rss{namespace="openshift-etcd", name!=""}) by (pod))
+  metricName: memory-etcd
+  aggregations: [avg, max]
+
+# OVNKubernetes
+
+- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="sbdb"}[2m])
+  metricName: cpu-ovnkube-master-sbdb
+  aggregations: [avg]
+
+- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="sbdb"}
+  metricName: memory-ovnkube-master-sbdb
+  aggregations: [avg, max]
+
+- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="nbdb"}[2m])
+  metricName: cpu-ovnkube-master-nbdb
+  aggregations: [avg]
+
+- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="nbdb"}
+  metricName: memory-ovnkube-master-nbdb
+  aggregations: [avg, max]
+
+- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="northd"}[2m])
+  metricName: cpu-ovnkube-master-northd
+  aggregations: [avg]
+
+- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="northd"}
+  metricName: memory-ovnkube-master-northd
+  aggregations: [avg, max]
+
+- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="ovnkube-master"}[2m])
+  metricName: cpu-ovnkube-master-ovnkube-master
+  aggregations: [avg]
+
+- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="ovnkube-master"}
+  metricName: memory-ovnkube-master-ovnkube-master
+  aggregations: [avg, max]
+
+- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="ovn-dbchecker"}[2m])
+  metricName: cpu-ovnkube-master-ovn-dbchecker
+  aggregations: [avg]
+
+- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="ovn-dbchecker"}
+  metricName: memory-ovnkube-master-ovn-dbchecker
+  aggregations: [avg, max]
+
+- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovnkube-node"}[2m])
+  metricName: cpu-ovnkube-node-ovnkube-node
+  aggregations: [avg]
+
+- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovnkube-node"}
+  metricName: memory-ovnkube-node-ovnkube-node
+  aggregations: [avg, max]
+
+- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovn-controller"}[2m])
+  metricName: cpu-ovnkube-node-ovn-controller
+  aggregations: [avg]
+
+- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovo-controller"}
+  metricName: memory-ovnkube-node-ovn-controller
+  aggregations: [avg, max]
+
+# Nodes
+
+- query: sum(irate(node_cpu_seconds_total{mode!="idle", mode!="steal"}[2m]) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")) by (instance)
+  metricName: cpu-masters
+  aggregations: [avg]
+
+- query: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")
+  metricName: memory-masters
+  aggregations: [avg, max]
+
+- query: sum(irate(node_cpu_seconds_total{mode!="idle", mode!="steal"}[2m]) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")) by (instance)
+  metricName: cpu-masters
+  aggregations: [avg]
+
+- query: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="worker"}, "instance", "$1", "node", "(.+)")
+  metricName: memory-workers
+  aggregations: [avg, max]
+
+- query: sum(irate(node_cpu_seconds_total{mode!="idle", mode!="steal"}[2m]) and on (instance) label_replace(kube_node_role{role="worker"}, "instance", "$1", "node", "(.+)")) by (instance)
+  metricName: cpu-workers
+  aggregations: [avg]
+
+- query: sum(irate(node_cpu_seconds_total{mode!="idle", mode!="steal"}[2m]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) by (instance)
+  metricName: cpu-infra
+  aggregations: [avg]
+
+- query: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")
+  metricName: memory-infra
+  aggregations: [avg, max]
+
+# Cluster
+
+- query: cluster:memory_usage:ratio
+  metricName: memory-cluster-usage-ratio
+  aggregations: [max, avg]
+
+- query: cluster:node_cpu:ratio
+  metricName: cpu-cluster-usage-ratio
+  aggregations: [max, avg]

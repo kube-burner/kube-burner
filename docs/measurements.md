@@ -5,21 +5,21 @@ Kube-burner allows to get further metrics using other mechanisms or data sources
 Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
 'kube-burner' supports the following measurements so far:
 
-!!!Warning
+!!! Warning
     `podLatency`, as any other measurement, is only captured during a benchmark runtime. It does not work with the `index` subcommand of kube-burner
 
 ## Pod latency
 
-Collects latencies from the different pod startup phases, these **latency metrics are in ms**. Can be enabled with:
+Collects latencies from the different pod startup phases, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
   measurements:
   - name: podLatency
 ```
 
-This measurement sends its metrics to configured indexer. The metrics collected are pod latency histograms and pod latency quantiles P99, P95 and P50.
+This measurement sends its metrics to configured indexer. The metrics collected are pod latency histograms (`podLatencyMeasurement`) and a four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`). It's possible to skip indexing the `podLatencyMeasurement` metric by configuring the field `podLatencyMetrics` of this measurement to `quantiles`.
 
-Pod latency sample:
+Pod latency sample, one document like the below is indexed per each pod created by the workload that enters in Running condition during the workload:
 
 ```json
 {
@@ -94,12 +94,12 @@ It's possible to establish pod latency thresholds to the different pod condition
 Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
 
 ```yaml
-      measurements:
-      - name: podLatency
-        thresholds:
-        - conditionType: Ready
-          metric: P99
-          threshold: 2000ms
+  measurements:
+  - name: podLatency
+    thresholds:
+    - conditionType: Ready
+      metric: P99
+      thrshold: 2000ms
 ```
 
 Latency thresholds are evaluated at the end of each job, showing an informative message like the following:
@@ -124,29 +124,29 @@ As some components require authentication to get profiling information, `kube-bu
     1. `certFile`: Path to a certificate file.
     1. `keyFile`: Path to a private key file.
 
-!!!note
+!!! note
     The decoded content of the certificate and private key is written to the files /tmp/pprof.crt and /tmp/pprof.key of the remote pods respectively
 
 An example of how to configure this measurement to collect pprof HEAP and CPU profiling data from kube-apiserver and etcd is shown below:
 
 ```yaml
-   measurements:
-   - name: pprof
-     pprofInterval: 30m
-     pprofDirectory: pprof-data
-     pprofTargets:
-     - name: kube-apiserver-heap
-       namespace: "openshift-kube-apiserver"
-       labelSelector: {app: openshift-kube-apiserver}
-       bearerToken: thisIsNotAValidToken
-       url: https://localhost:6443/debug/pprof/heap
+  measurements:
+  - name: pprof
+    pprofInterval: 30m
+    pprofDirectory: pprof-data
+    pprofTargets:
+    - name: kube-apiserver-heap
+      namespace: "openshift-kube-apiserver"
+      labelSelector: {app: openshift-kube-apiserver}
+      bearerToken: thisIsNotAValidToken
+      url: https://localhost:6443/debug/pprof/heap
 
-     - name: etcd-heap
-       namespace: "openshift-etcd"
-       labelSelector: {app: etcd}
-       certFile: etcd-peer-pert.crt
-       keyFile: etcd-peer-pert.key
-       url: https://localhost:2379/debug/pprof/heap
+    - name: etcd-heap
+      namespace: "openshift-etcd"
+      labelSelector: {app: etcd}
+      certFile: etcd-peer-pert.crt
+      keyFile: etcd-peer-pert.key
+      url: https://localhost:2379/debug/pprof/heap
 ```
 
 !!! warning

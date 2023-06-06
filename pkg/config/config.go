@@ -44,7 +44,6 @@ var configSpec = Spec{
 		RequestTimeout: 15 * time.Second,
 		Measurements:   []mtypes.Measurement{},
 		IndexerConfig: indexers.IndexerConfig{
-			Enabled:            false,
 			InsecureSkipVerify: false,
 			MetricsDirectory:   "collected-metrics",
 			TarballName:        "kube-burner-metrics.tgz",
@@ -127,7 +126,7 @@ func Parse(uuid, c string, jobsRequired bool) (Spec, error) {
 		}
 		for _, job := range configSpec.Jobs {
 			if len(job.Namespace) > 62 {
-				log.Warnf("Namespace %s length has > 63 characters, truncating it", job.Namespace)
+				log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
 				job.Namespace = job.Namespace[:57]
 			}
 			if !job.NamespacedIterations && job.Churn {

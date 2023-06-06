@@ -4,10 +4,8 @@ This documentation provides an overview of the different jobs and their executio
 
 ## Pull Request workflow
 
----
 {% include-markdown "ci/pullrequest.md" %}
 
 ## Release workflow
 
----
 {% include-markdown "ci/release.md" %}
