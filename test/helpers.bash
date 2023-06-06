@@ -107,8 +107,9 @@ print_events() {
 
 check_metric_value() {
   endpoint="${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${1}"
-  RESULT=$(curl -sS "${endpoint}" | jq '.hits.total.value // error')
+  RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error')
   RETURN_CODE=$?
+  echo "Command: ${BATS_RUN_COMMAND}"
   if [ "${RETURN_CODE}" -ne 0 ]; then
     echo "Return code: ${RETURN_CODE}"
     return 1
