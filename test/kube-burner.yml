@@ -1,5 +1,5 @@
 ---
- 
+
 global:
   measurements:
   - name: podLatency
@@ -7,6 +7,7 @@ global:
   indexerConfig:
     type: local
     enabled: {{ .INDEXING }}
+    metricsDirectory: {{ .TEMP_FOLDER }}
 
 jobs:
   - name: namespaced
@@ -33,7 +34,7 @@ jobs:
       foo: bar
       complex.label/test: true
     objects:
-    
+
     - objectTemplate: objectTemplates/deployment.yml
       replicas: 1
       inputVars:

@@ -1,44 +1,47 @@
-# Pre-commit Checks
+The Commit Workflow, defined in the `commit.yml` file, is triggered on push events to any branch. It consists of a single job named **linter** that uses the linters defined in the `linters.yml` file to execute code linting on the repository.
 
-To maintain code quality and catch issues early on, we use pre-commit checks. These checks are automatically executed before each commit to ensure that the code complies with our standards.
+### Linters
 
-The following hooks have been enabled for this project:
+It consists of a single job named **linter**. The job performs the following steps:
 
-- [golangci-lint](https://github.com/golangci/golangci-lint)
-- [Shellcheck](https://github.com/jumanjihouse/pre-commit-hooks)
-- [Markdown Lint](https://github.com/markdownlint/markdownlint)
+1. Checks out the code
+1. Installs pre-commit.
+1. Runs pre-commit hooks to execute code linting based on `.pre-commit-config.yaml` file
 
-Main purpose for pre-commit is to allow developers to pass the Lint Checks before commiting the code. Same checks will be executed on all the commits once they are pushed to GitHub
+#### Running local pre-commit
 
-## Installation
+!!! info
+    Main purpose for pre-commit is to allow developers to pass the Lint Checks before commiting the code. Same checks will be executed on all the commits once they are pushed to GitHub
+
+##### Installation
 
 To install pre-commit checks locally, follow these steps:
 
-- Install [pre-commit](https://pre-commit.com/) by running the following command:
+1. Install [pre-commit](https://pre-commit.com/) by running the following command:
 
-```console
-pip install pre-commit
-```
+    ```console
+    pip install pre-commit
+    ```
 
-- `ruby` is required for running the Markdown Linter, installation will depends on your Operating System, for example, on Fedora:
+1. `ruby` is required for running the Markdown Linter, installation will depends on your Operating System, for example, on Fedora:
 
-```console
-dnf install -y ruby
-```
+    ```console
+    dnf install -y ruby
+    ```
 
-- Initialize pre-commit on the repo:
+1. Initialize pre-commit on the repo:
 
-```console
-pre-commit install
-```
+    ```console
+    pre-commit install
+    ```
 
-## Executing Manually
+##### Executing Manually
 
 To run pre-commit manually for all files, you can use `make lint`
 
-```console
-make lint
-```
+  ```console
+  make lint
+  ```
 
 Or you can run against an especific file:
 
@@ -60,7 +63,8 @@ golangci-lint............................................................Passed
 Markdownlint.............................................................Passed
 ```
 
-Using master as rev is not supported anymore on pre-commit, so reference has been pointed to the last version available.
+!!! warning
+    Using **master** as `rev` is not supported anymore on pre-commit. Hooks version could be outdated on the repo or on your local installation.
 
 Hooks can be updated using `pre-commit autoupdate`:
 

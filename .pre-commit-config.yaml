@@ -8,7 +8,7 @@ repos:
     rev: v0.12.0
     hooks:
       - id: markdownlint
-        args: [-r, ~MD013] # MD013 Line length
+        args: [-r, "~MD013,~MD002"]
   - repo: https://github.com/jumanjihouse/pre-commit-hooks
     rev: 3.0.0
     hooks:
