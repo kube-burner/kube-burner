@@ -15,7 +15,6 @@ jobs:
     strategy:
       matrix:
         k8s-version:
-        - v1.24.0
         - v1.25.0
         - v1.26.0
         - v1.27.0
