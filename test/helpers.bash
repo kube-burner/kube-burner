@@ -106,13 +106,14 @@ print_events() {
 }
 
 check_metric_value() {
-  RESULT=$(curl -sS "${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${1}" | jq '.hits.total.value // error')
-  RESULT_CODE=$?
-  if [ "${RESULT_CODE}" -ne 0 ]; then
-    echo "$1 not found on ${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${1}"
+  endpoint="${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${1}"
+  RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error')
+  RETURN_CODE=$?
+  if [ "${RETURN_CODE}" -ne 0 ]; then
+    echo "Return code: ${RETURN_CODE}"
     return 1
   elif [ "${RESULT}" == 0 ]; then
-    echo "Result: ${RESULT}"
+    echo "$1 not found in ${endpoint}"
     return 1
   else
     return 0
