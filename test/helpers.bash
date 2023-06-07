@@ -2,6 +2,9 @@
 # vi: ft=bash
 # shellcheck disable=SC2086
 
+KIND_VERSION=${KIND_VERSION:-v0.19.0}
+K8S_VERSION=${K8S_VERSION:-v1.27.0}
+
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
   echo "Downloading kind"

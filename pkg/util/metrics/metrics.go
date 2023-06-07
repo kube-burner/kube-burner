@@ -115,7 +115,3 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 		UserMetadataContent: userMetadataContent,
 	}
 }
-
-func CreateTarball(indexerConfig indexers.IndexerConfig) {
-	panic("unimplemented")
-}

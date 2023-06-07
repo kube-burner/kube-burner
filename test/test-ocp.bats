@@ -1,10 +1,11 @@
 #!/usr/bin/env bats
 # vi: ft=bash
-# shellcheck disable=SC2086
+# shellcheck disable=SC2086,SC2164
 
 load helpers.bash
 
 setup_file() {
+  cd ocp
   export BATS_TEST_TIMEOUT=600
   export ES_SERVER="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com"
   export ES_INDEX="kube-burner-ocp"
@@ -18,7 +19,7 @@ setup() {
 }
 
 teardown() {
-  echo "Last bats run command: ${BATS_RUN_COMMAND}"
+  echo "Last bats run command: ${BATS_RUN_COMMAND} from $(pwd)"
   oc delete ns -l kube-burner-uuid="${UUID}" --ignore-not-found
 }
 
