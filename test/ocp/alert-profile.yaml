@@ -1,0 +1,7 @@
+- expr: count(prometheus_build_info) > 0
+  severity: warning
+  description: Prometheus CI availability
+
+- expr: avg_over_time(prometheus_tsdb_wal_page_flushes_total[{{ .elapsed }}:]) > 0
+  severity: warning
+  description: Prometheus CI tsdb WAL flushes

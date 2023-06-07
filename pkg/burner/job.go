@@ -185,7 +185,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 			if globalConfig.IndexerConfig.Enabled {
 				metrics.ScrapeMetrics(prometheusClient, indexer)
-				metrics.HandleTarball(configSpec)
+				if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
+					metrics.CreateTarball(globalConfig.IndexerConfig)
+				}
 			}
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)

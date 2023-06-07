@@ -1,0 +1,5 @@
+- endpoint: http://localhost:9090
+  profile: metrics-profile.yaml
+  alertProfile: alert-profile.yaml
+- endpoint: http://localhost:9090
+  profile: metrics-profile.yaml

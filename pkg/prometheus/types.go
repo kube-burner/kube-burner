@@ -21,6 +21,13 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 )
 
+type Auth struct {
+	Username      string
+	Password      string
+	Token         string
+	SkipTLSVerify bool
+}
+
 // Prometheus describes the prometheus connection
 type Prometheus struct {
 	Client        *prometheus.Prometheus

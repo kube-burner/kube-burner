@@ -37,6 +37,7 @@ import (
 const (
 	alertsProfile = "alerts.yml"
 	ocpCfgDir     = "ocp-config"
+	stepSize      = 30 * time.Second
 )
 
 type BenchmarkMetadata struct {
@@ -196,7 +197,11 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
 		configSpec.GlobalConfig.MetricsProfile = metricsEndpoint.Profile
 		configSpec.GlobalConfig.AlertProfile = metricsEndpoint.AlertProfile
-		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, "", "", true, 30*time.Second, metadata)
+		auth := prometheus.Auth{
+			Token:         metricsEndpoint.Token,
+			SkipTLSVerify: true,
+		}
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, metadata)
 		if err != nil {
 			log.Fatal(err)
 		}

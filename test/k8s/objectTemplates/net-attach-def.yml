@@ -1,0 +1,28 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan-conf
+spec: 
+  config: '{
+      "cniVersion": "0.3.1",
+      "plugins": [
+        {
+          "type": "macvlan",
+          "capabilities": { "ips": true },
+          "master": "eth0",
+          "mode": "bridge",
+          "ipam": {
+            "type": "static",
+            "routes": [
+              {
+                "dst": "0.0.0.0/0",
+                "gw": "10.1.1.1"
+              }
+            ] 
+          }
+        }, {
+          "capabilities": { "mac": true },
+          "type": "tuning"
+        }
+      ]
+    }'
