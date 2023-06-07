@@ -1,6 +1,6 @@
 ![Kube-burner Logo](./media/logo/kube-burner-logo.png)
 
-[![Status](https://github.com/cloud-bulldozer/kube-burner/actions/workflows/pullrequest.yml/badge.svg?branch=master&event=push)](https://github.com/cloud-bulldozer/kube-burner/actions/workflows/pullrequest.yml)
+[![Build Status](https://github.com/cloud-bulldozer/kube-burner/workflows/Go/badge.svg?branch=master)](https://github.com/cloud-bulldozer/kube-burner/actions?query=workflow%3AGo)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cloud-bulldozer/kube-burner)](https://goreportcard.com/report/github.com/cloud-bulldozer/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 

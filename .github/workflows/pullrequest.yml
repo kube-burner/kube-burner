@@ -2,10 +2,6 @@
 name: Pull Request Workflow
 
 on:
-  push:
-    branches:
-      - master
-on:
   pull_request_target:
     branches:
       - master
