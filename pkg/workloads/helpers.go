@@ -169,7 +169,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	} else {
 		log.Infof("File %v available in the current directory, using it", cfg)
 	}
-	configSpec, err := config.Parse(cfg, true)
+	configSpec, err := config.Parse(wh.Metadata.UUID, cfg, true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
 		configSpec.GlobalConfig.MetricsProfile = metricsEndpoint.Profile
 		configSpec.GlobalConfig.AlertProfile = metricsEndpoint.AlertProfile
-		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, "", "", wh.Metadata.UUID, true, 30*time.Second, metadata)
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, "", "", true, 30*time.Second, metadata)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -210,7 +210,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		alertMs = append(alertMs, alertM)
 		alertM = nil
 	}
-	rc, err = burner.Run(configSpec, wh.Metadata.UUID, prometheusClients, alertMs, indexer, wh.timeout, metadata)
+	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
 		log.Fatal(err)
 	}

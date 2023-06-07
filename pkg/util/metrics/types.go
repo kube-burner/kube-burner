@@ -35,7 +35,6 @@ type ScraperConfig struct {
 	URL             string
 	Token           string
 	Username        string
-	UUID            string
 	StartTime       int64
 	EndTime         int64
 	JobName         string

@@ -96,7 +96,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Parse parses a configuration file
-func Parse(c string, jobsRequired bool) (Spec, error) {
+func Parse(uuid, c string, jobsRequired bool) (Spec, error) {
 	f, err := util.ReadConfig(c)
 	if err != nil {
 		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
@@ -138,6 +138,7 @@ func Parse(c string, jobsRequired bool) (Spec, error) {
 			}
 		}
 	}
+	configSpec.GlobalConfig.UUID = uuid
 	return configSpec, nil
 }
 

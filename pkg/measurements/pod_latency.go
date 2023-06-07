@@ -73,8 +73,6 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 	now := time.Now().UTC()
 	pod := obj.(*v1.Pod)
 	jobConfig := *factory.jobConfig
-	jobConfig.NamespaceLabels = nil // metric doesn't need this data
-	jobConfig.Objects = nil         // metric doesn't need this data
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
 		if strings.Contains(pod.Namespace, factory.jobConfig.Namespace) {
 			p.metrics[string(pod.UID)] = podMetric{
@@ -82,7 +80,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 				Namespace:  pod.Namespace,
 				Name:       pod.Name,
 				MetricName: podLatencyMeasurement,
-				UUID:       factory.uuid,
+				UUID:       globalCfg.UUID,
 				JobConfig:  jobConfig,
 				JobName:    factory.jobConfig.Name,
 				Metadata:   factory.metadata,
@@ -161,7 +159,7 @@ func (p *podLatency) stop() (int, error) {
 	if len(p.config.LatencyThresholds) > 0 {
 		rc = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
 	}
-	if kubeburnerCfg.IndexerConfig.Enabled {
+	if globalCfg.IndexerConfig.Enabled {
 		log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
 		p.index()
 	}
@@ -239,7 +237,7 @@ func (p *podLatency) calcQuantiles() {
 	for quantileName, v := range quantileMap {
 		podQ := metrics.LatencyQuantiles{
 			QuantileName: string(quantileName),
-			UUID:         factory.uuid,
+			UUID:         globalCfg.UUID,
 			Timestamp:    time.Now().UTC(),
 			JobName:      factory.jobConfig.Name,
 			JobConfig:    *jc,

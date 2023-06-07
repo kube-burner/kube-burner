@@ -74,7 +74,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 		if metricsScraperConfig.ActionIndex {
 			metadataContent = userMetadataContent
 		}
-		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, metricsScraperConfig.Username, metricsScraperConfig.Password, metricsScraperConfig.UUID, metricsScraperConfig.SkipTLSVerify, metricsScraperConfig.PrometheusStep, metadataContent)
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, metricsEndpoint.Token, metricsScraperConfig.Username, metricsScraperConfig.Password, metricsScraperConfig.SkipTLSVerify, metricsScraperConfig.PrometheusStep, metadataContent)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			updateParamIfEmpty(&metricsEndpoint.AlertProfile, metricsScraperConfig.AlertProfile)
 			updateParamIfEmpty(&metricsEndpoint.AlertProfile, configSpec.GlobalConfig.AlertProfile)
 			if metricsEndpoint.AlertProfile != "" {
-				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.UUID, indexer, p); err != nil {
+				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.ConfigSpec.GlobalConfig.UUID, indexer, p); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
 				}
 			}

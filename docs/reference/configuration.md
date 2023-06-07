@@ -1,8 +1,8 @@
 # Reference
 
-All the magic `kube-burner` does is described in its configuration file. As previously mentioned the location of this configuration file is provided by the flag `-c`. This flag points to YAML formatted file that consists consists of several sections.
+All the magic `kube-burner` does is described in its configuration file. As previously mentioned the location of this configuration file is provided by the flag `-c`. This flag points to a YAML formatted file that consists of several sections.
 
-It's possible to use [go-template](https://pkg.go.dev/text/template) syntax within this configuration file, also it's important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, we could define the `indexerConfig` section of our configuration file like:
+It's possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file, also it's important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, we could define the `indexerConfig` section of our configuration file like:
 
 ```yaml
 enabled: true
@@ -78,13 +78,13 @@ Each object element supports the following parameters:
 | `inputVars`            | Map of arbitrary input variables to inject to the object template | Object  | -       |
 | `namespaced`           | Whether to create a namespaced object or not                      | Boolean | true    |
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
-| `waitOptions`          | Customize how to wait for object to be ready                      | Object  | {}       |
+| `waitOptions`          | Customize [how to wait](#wait-options) for object to be ready     | Object  | {}       |
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
 
-!!! Info
-    Find more info aboutthe waiters implementation in the `pkg/burner/waiters.go` file
+!!! info
+    Find more info about the waiters implementation in the `pkg/burner/waiters.go` file
 
 ### Wait Options
 
@@ -136,9 +136,9 @@ Where:
 - `labelSelector`: Deletes the objects with the given labels.
 - `apiVersion`: API version from the k8s object.
 
-This type of job supports the some of the same parameters already described in the the [create job type](#create):
+This type of job supports the following parameters (some of them already described in the the [create job type section](#create)):
 
-- __waitForDeletion__: Wait for objects to be deleted before finishing the job. Defaults to true
+- `waitForDeletion`: Wait for objects to be deleted before finishing the job. Defaults to true
 - `name`
 - `qps`
 - `burst`
@@ -264,8 +264,7 @@ spec:
   type: ClusterIP
 ```
 
-!!! Tip
-    You can also use [golang template semantics](https://golang.org/pkg/text/template/) in your *objectTemplate* files.
+!!! tip "You can also use [golang template semantics](https://golang.org/pkg/text/template/) in your `objectTemplate` definitions"
 
 ```yaml
 kind: ImageStream
