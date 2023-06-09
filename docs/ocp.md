@@ -126,9 +126,13 @@ This workload is meant to fill with pause pods all the worker nodes from the clu
 
 It creates two Deployments, a client/curl and a server/nxing, and 1 Service backed by the previous server Pods. The client application has configured an startupProbe that makes requests to the previous Service every second with a timeout of 600s.
 
+Note: this workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable `iterationsPerNamespace`.
+
 ### node-density-heavy
 
 Creates two Deployments, a postgresql database and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a Service that is used by the client to reach the database.
+
+Note: this workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable `iterationsPerNamespace`.
 
 ## Reporting mode
 
