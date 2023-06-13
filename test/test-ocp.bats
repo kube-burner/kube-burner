@@ -59,12 +59,20 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "cluster-density-v2" {
+@test "cluster-density-v2 with indexing" {
   run kube-burner ocp cluster-density-v2 --iterations=2 --churn=false ${COMMON_FLAGS}
+  [ "$status" -eq 0 ]
+  run check_metric_value etcdVersion clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
   [ "$status" -eq 0 ]
 }
 
-@test "node-density-cni with gc=false" {
+@test "cluster-density-v2 with reporting" {
+  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=false --reporting ${COMMON_FLAGS} 
+  [ "$status" -eq 0 ]
+  run check_metric_value cpu-kubelet clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
+  [ "$status" -eq 0 ]
+
+@test "node-density-cni with gc=false and alerting=false" {
   # Disable gc and avoid metric indexing
   run kube-burner ocp node-density-cni --pods-per-node=75 --gc=false --uuid=${UUID} --alerting=false
   oc delete ns -l kube-burner-uuid=${UUID}
@@ -72,6 +80,6 @@ teardown_file() {
 }
 
 @test "cluster-density timeout check" {
-  run  kube-burner ocp cluster-density --iterations=1 --churn-duration=5m ${COMMON_FLAGS} --timeout=1s
+  run kube-burner ocp cluster-density --iterations=1 --churn-duration=5m --timeout=1s
   [ "$status" -eq 2 ]
 }
