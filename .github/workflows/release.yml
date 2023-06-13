@@ -1,10 +1,8 @@
 name: Release Workflow
 on:
-  workflow_call:
-  release:
-    types:
-      - created
-
+  push:
+    tags:
+      - "*" # triggers only if push new tag version
 jobs:
   release-build:
     uses: ./.github/workflows/gorelease.yml

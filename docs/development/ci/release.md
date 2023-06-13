@@ -1,8 +1,15 @@
-The Release Workflow, defined in the `release.yml` file, is triggered by a workflow call event or when a release is created. It has three jobs: **release-build**, **image-upload**, and **docs-update**.
+The Release workflow, defined in the `release.yml` file, when a new tag is pushed and is triggers three jobs: **release-build**, **image-upload**, and **docs-update**.
+
+```mermaid
+graph LR
+  A[new tag pushed] --> B[release_build];
+  A --> C[image-upload];
+  A --> D[docs-update];
+```
 
 #### Release Build
 
-Job uses the GoRelease workflow defined in the `gorelease.yml` file to create a new release of the project performing the following steps:
+This job uses the GoRelease workflow defined in the `gorelease.yml` file to create a new release of the project performing the following steps:
 
 1. Checks out the code into the Go module directory.
 1. Sets up Go 1.19.
@@ -10,7 +17,7 @@ Job uses the GoRelease workflow defined in the `gorelease.yml` file to create a 
 
 #### Image Upload
 
-Job uses the Upload Containers to Quay workflow defined in the `image-upload.yml` file to upload containers to the Quay registry for multiple architectures (arm64, amd64, ppc64le, s390x) performing the following steps:
+This job uses the Upload Containers to Quay workflow defined in the `image-upload.yml` file to upload containers to the Quay registry for multiple architectures (arm64, amd64, ppc64le, s390x) performing the following steps:
 
 1. Installs the dependencies required for multi-architecture builds.
 1. Checks out the code.
@@ -28,7 +35,7 @@ The "manifest" job builds a container manifest and runs after the "containers" j
 
 #### Docs Update
 
-The "docs-update" job uses the Generate and Deploy Docs workflow defined in the `docs.yml` file to generate and deploy the documentation performing the following steps:
+Uses the `Deploy docs` workflow defined in the `docs.yml` file to generate and deploy the documentation performing the following steps:
 
 1. Checks out the code.
 1. Sets up Python 3.x.

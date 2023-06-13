@@ -1,4 +1,12 @@
-The Pull Request Workflow, defined in the `pullrequest.yml` file, is triggered on `pull_request_target` events to the branches `master` and `main`. It has three jobs: **linters**, **build**, **tests**, and **report_results**.
+The pull Request Workflow, defined in the `pullrequest.yml` file, is triggered on `pull_request_target` events to the branches `master` and `main`. It has three jobs: **linters**, **build**, **tests**, and **report_results**.
+
+```mermaid
+graph LR
+  A[pull_request_target] --> B[linters];
+  B --> C[build];
+  C --> D[tests];
+  C --> D[report_results];
+```
 
 ### Linters
 
