@@ -30,8 +30,8 @@ In this section is described global job configuration, it holds the following pa
 
 kube-burner connects k8s clusters using the following methods in this order:
 
-- KUBECONFIG environment variable
-- $HOME/.kube/config
+- `KUBECONFIG` environment variable
+- `$HOME/.kube/config`
 - In-cluster config (Used when kube-burner runs inside a pod)
 
 ## Jobs
@@ -200,7 +200,7 @@ jobs:
 
 ## Churning Jobs
 
-Churn or the deletion and re-creation of objects, is supported for namespace based jobs only. This ocurs after the job has completed
+Churn is the deletion and re-creation of objects and is supported for namespace based jobs only. This occurs after the job has completed
 but prior to uploading metrics, if applicable. It deletes a percentage of contiguous namespaces randomly chosen and re-creates them
 with all of the appropriate objects. It will then wait for a specified delay (or none if set to 0) before deleting and recreating the
 next randomly chosen set. This cycle continues until the churn duration has passed.

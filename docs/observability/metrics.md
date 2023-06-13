@@ -16,7 +16,7 @@ The metrics profile file has the following structure:
 
 Where `query` holds the prometheus expression to evaluate, and `metricName` controls the value that kube-burner will set on the `metricName` field, useful to identify metrics from a specific query. More info in the [metric format section](#metric-format)
 
-In addition to range queries, kube-burner has the ability perform instant queries by adding the field `instant` to the desired metric. This kind of query is specially useful to get only one sample of a *static* metric such as a component version or the number of nodes of the cluster.
+In addition to range queries, kube-burner has the ability perform instant queries by adding the field `instant` to the desired metric. This kind of query is especially useful to get only one sample of a *static* metric such as a component version or the number of nodes of the cluster.
 
 ```yaml
 - query: kube_node_role
@@ -57,7 +57,7 @@ The collected metrics have the following shape:
 ]
 ```
 
-Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query`, `metricname` and `jobName`.
+Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query`, `metricName` and `jobName`.
 !!! info
     These extra fields are specially useful at the time of identifying and representing the collected metrics.
 
