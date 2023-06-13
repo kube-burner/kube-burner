@@ -1,11 +1,13 @@
-The Release workflow, defined in the `release.yml` file, when a new tag is pushed and is triggers three jobs: **release-build**, **image-upload**, and **docs-update**.
+The Release workflow, defined in the `release.yml` file, when a new tag is pushed it triggers: **release-build** and **image-upload**.
 
 ```mermaid
 graph LR
   A[new tag pushed] --> B[release_build];
   A --> C[image-upload];
-  A --> D[docs-update];
+  B --> D[docs-update];
 ```
+
+The `docs-update` job is triggered when a new release is `published`, this is done by the `release_build` job.
 
 #### Release Build
 
