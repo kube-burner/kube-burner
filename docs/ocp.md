@@ -87,7 +87,7 @@ Each iteration of **cluster-density** creates the following objects in each of t
 
 ### cluster-density-v2
 
-Very similar to [cluster-denstiy](#cluster-density), but with some key differences provided by NetworkPolicies and improved readinesProbes, that leads to a heavier load in the cluster's CNI plugin. Each iteration creates the following objects in each of the created namespaces:
+Very similar to [cluster-density](#cluster-density), but with some key differences provided by NetworkPolicies and improved readinessProbes, that leads to a heavier load in the cluster's CNI plugin. Each iteration creates the following objects in each of the created namespaces:
 
 - 1 ImagesStream
 - 1 Build. The OCP internal container registry must be set-up previously since the resulting container image will be pushed there.
@@ -104,7 +104,7 @@ Very similar to [cluster-denstiy](#cluster-density), but with some key differenc
 
 ### cluster-density-ms
 
-Lightest version of this workload family,each iteration the following objects in each of the created namespaces:
+Lightest version of this workload family, each iteration the following objects in each of the created namespaces:
 
 - 1 ImageStream
 - 4 Deployments with two pod replicas (pause) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
@@ -115,7 +115,7 @@ Lightest version of this workload family,each iteration the following objects in
 
 ## Node density workloads
 
-The workloads of this family create a single namespace with a set of Pods, Deployments Services, depending onf the workload.
+The workloads of this family create a single namespace with a set of Pods, Deployments Services, depending on the workload.
 
 ### node-density
 
@@ -125,13 +125,13 @@ This workload is meant to fill with pause pods all the worker nodes from the clu
 
 It creates two Deployments, a client/curl and a server/nxing, and 1 Service backed by the previous server Pods. The client application has configured an startupProbe that makes requests to the previous Service every second with a timeout of 600s.
 
-### node-density-heav
+### node-density-heavy
 
 Creates two Deployments, a postgresql database and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a Service that is used by the client to reach the database.
 
 ## Customizing workloads
 
-It's possible to customize the workload configuration by extracting, updating and finally running it:
+It's possible to customize any of the above workload configurations by extracting, updating and finally running it:
 
 ```console
 $ kube-burner ocp node-density --extract

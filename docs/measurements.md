@@ -89,7 +89,7 @@ And the metrics are:
 
 ### Pod latency thresholds
 
-It's possible to stablish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within this measurement:
+It's possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within this measurement:
 
 Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
 
@@ -99,7 +99,7 @@ Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
         thresholds:
         - conditionType: Ready
           metric: P99
-          thrshold: 2000ms
+          threshold: 2000ms
 ```
 
 Latency thresholds are evaluated at the end of each job, showing an informative message like the following:
@@ -109,11 +109,11 @@ INFO[2020-12-15 12:37:08] Evaluating latency thresholds
 WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured threshold: 2000ms
 ```
 
-In case of not meeting any of the configured thresholds, like the example above, **Kube-burner return code will be 1**
+In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
 
-## Pprof collection
+## pprof collection
 
-This measurement can be used to collect golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. Pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
+This measurement can be used to collect golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
 
 As some components require authentication to get profiling information, `kube-burner` provides two different modalities to address it:
 
