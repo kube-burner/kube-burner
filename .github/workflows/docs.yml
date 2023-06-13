@@ -1,5 +1,5 @@
 # docs.yml
-name: Generate and Deploy docs
+name: Deploy docs
 on:
   workflow_call:
 permissions:
