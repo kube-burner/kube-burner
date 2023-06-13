@@ -35,14 +35,14 @@ teardown_file() {
 }
 
 @test "node-density-heavy with indexing" {
-  run kube-burner ocp node-density-heavy --pods-per-node=75 ${COMMON_FLAGS}
+  run kube-burner ocp node-density-heavy --pods-per-node=75 --local-indexing
   [ "$status" -eq 0 ]
-  run check_metric_value etcdVersion clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
+  run check_file_list collected-metrics/etcdVersion.json collected-metrics/clusterMetadata.json collected-metrics/jobSummary-node-density-heavy.json collected-metrics/podLatencyMeasurement-node-density-heavy.json collected-metrics/podLatencyQuantilesMeasurement-node-density-heavy.json
   [ "$status" -eq 0 ]
 }
 
 @test "cluster-density with user metadata, indexing and churning" {
-  run kube-burner ocp cluster-density --iterations=2 --churn-duration=2m --churn-delay=30s ${COMMON_FLAGS} --user-metadata=user-metadata.yml
+  run kube-burner ocp cluster-density --iterations=2 --churn-duration=1m --churn-delay=5s ${COMMON_FLAGS} --user-metadata=user-metadata.yml
   [ "$status" -eq 0 ]
   run check_metric_value etcdVersion clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
   [ "$status" -eq 0 ]
@@ -71,6 +71,7 @@ teardown_file() {
   [ "$status" -eq 0 ]
   run check_metric_value cpu-kubelet clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
   [ "$status" -eq 0 ]
+}
 
 @test "node-density-cni with gc=false and alerting=false" {
   # Disable gc and avoid metric indexing

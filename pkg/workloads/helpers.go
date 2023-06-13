@@ -140,7 +140,6 @@ func (wh *WorkloadHelper) indexMetadata() {
 	wh.Metadata.EndDate = time.Now().UTC()
 	msg, err := (*indexer).Index([]interface{}{wh.Metadata}, indexers.IndexingOpts{
 		MetricName: wh.Metadata.MetricName,
-		JobName:    wh.Metadata.Benchmark,
 	})
 	if err != nil {
 		log.Error(err.Error())
