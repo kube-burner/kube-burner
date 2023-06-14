@@ -99,7 +99,7 @@ Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
     thresholds:
     - conditionType: Ready
       metric: P99
-      thrshold: 2000ms
+      threshold: 2000ms
 ```
 
 Latency thresholds are evaluated at the end of each job, showing an informative message like the following:
