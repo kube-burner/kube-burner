@@ -174,8 +174,8 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if wh.indexing {
-		indexerConfig := configSpec.GlobalConfig.IndexerConfig
+	indexerConfig := configSpec.GlobalConfig.IndexerConfig
+	if indexerConfig.Type != "" {
 		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 		indexer, err = indexers.NewIndexer(indexerConfig)
 		if err != nil {
