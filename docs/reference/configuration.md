@@ -19,8 +19,8 @@ In this section is described global job configuration, it holds the following pa
 
 | Option           | Description                                                                                              | Type           | Default      |
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|--------------|
-| `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/measurements)                            | List          | []          |
-| `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/observability/indexing)                 | Object        | {}           |
+| `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/latest/measurements)                            | List          | []          |
+| `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/latest/observability/indexing)                 | Object        | {}           |
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 15s         |
 | `prometheusURL`    | Prometheus URL endpoint, flag has precedence                                                             | String        | ""         |
 | `bearerToken`      | Bearer token to access the Prometheus endpoint                                                           | String        | ""         |
@@ -263,19 +263,19 @@ spec:
     targetPort: "{{.targetPort}}"
   type: ClusterIP
 ```
-
+<!-- markdownlint-disable -->
 !!! tip "You can also use [golang template semantics](https://golang.org/pkg/text/template/) in your `objectTemplate` definitions"
-
-```yaml
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  name: {{.prefix}}-{{.Replica}}
-spec:
-{{ if .image }}
-  dockerImageRepository: {{.image}}
-{{ end }}
-```
+    ```yaml
+    kind: ImageStream
+    apiVersion: image.openshift.io/v1
+    metadata:
+      name: {{.prefix}}-{{.Replica}}
+    spec:
+    {{ if .image }}
+      dockerImageRepository: {{.image}}
+    {{ end }}
+    ```
+<!-- markdownlint-restore -->
 
 ## Template functions
 
