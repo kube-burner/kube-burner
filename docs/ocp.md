@@ -99,9 +99,9 @@ Very similar to [cluster-density](#cluster-density), but with some key differenc
 - 10 Secrets containing 2048 character random string
 - 10 ConfigMaps containing a 2048 character random string
 - 3 NetworkPolicies:
-     1. 1 deny-all traffic
-     1. 1 allow traffic from client/nginx pods to server/nginx pods
-     1. 1 allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
+    - deny-all traffic
+    - allow traffic from client/nginx pods to server/nginx pods
+    - allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
 
 ### cluster-density-ms
 
