@@ -5,8 +5,7 @@ global:
   - name: podLatency
 
   indexerConfig:
-    type: local
-    enabled: {{ .INDEXING }}
+    type: {{ .INDEXING_TYPE }}
     metricsDirectory: {{ .TEMP_FOLDER }}
 
 jobs:

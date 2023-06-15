@@ -368,7 +368,7 @@ func (p *vmiLatency) stop() (int, error) {
 	p.normalizeMetrics()
 	p.calcQuantiles()
 	rc := metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
-	if globalCfg.IndexerConfig.Enabled {
+	if globalCfg.IndexerConfig.Type != "" {
 		p.index()
 	}
 	// Reset latency slices, required in multi-job benchmarks
@@ -385,6 +385,9 @@ func (p *vmiLatency) index() {
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
+	}
+	if p.config.PodLatencyMetrics == types.Quantiles {
+		delete(metricMap, podLatencyMeasurement)
 	}
 	for metricName, data := range metricMap {
 		indexingOpts.MetricName = metricName

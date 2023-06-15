@@ -78,14 +78,28 @@ check_files() {
   done
   if [[ ${rc} != 0 ]]; then
     echo "Content of ${TEMP_FOLDER}"
-    ls ${TEMP_FOLDER}
+    ls -l ${TEMP_FOLDER}
   fi
-  return ${rc}
+}
+
+check_file_list() {
+  for f in "${@}"; do
+    if [[ ! -f ${f} ]]; then
+      echo "File ${f} not found"
+      return 1
+    fi
+    if [[ $(jq .[0].metricName ${f}) == "" ]]; then
+      echo "Incorrect format in ${f}"
+      cat "${f}"
+      return 1
+    fi
+  done
+  return 0
 }
 
 test_init_checks() {
   rc=0
-  if [[ ${INDEXING} == "true" ]]; then
+  if [[ ${INDEXING_TYPE} == "local" ]]; then
     check_files
   fi
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 6
@@ -117,7 +131,7 @@ check_metric_value() {
       echo "Return code: ${RETURN_CODE}"
       return 1
     elif [ "${RESULT}" == 0 ]; then
-      echo "$1 not found in ${endpoint}"
+      echo "${metric} not found in ${endpoint}"
       return 1
     else
       return 0

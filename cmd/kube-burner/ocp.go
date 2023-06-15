@@ -30,7 +30,7 @@ import (
 )
 
 //go:embed ocp-config/*
-var OCPConfig embed.FS
+var ocpConfig embed.FS
 
 func openShiftCmd() *cobra.Command {
 	ocpCmd := &cobra.Command{
@@ -40,7 +40,6 @@ func openShiftCmd() *cobra.Command {
 	}
 	var wh workloads.WorkloadHelper
 	var indexingType indexers.IndexerType
-	var indexing bool
 	esServer := ocpCmd.PersistentFlags().String("es-server", "", "Elastic Search endpoint")
 	localIndexing := ocpCmd.PersistentFlags().Bool("local-indexing", false, "Enable local indexing")
 	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
@@ -53,12 +52,12 @@ func openShiftCmd() *cobra.Command {
 	gc := ocpCmd.PersistentFlags().Bool("gc", true, "Garbage collect created namespaces")
 	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
 	extract := ocpCmd.PersistentFlags().Bool("extract", false, "Extract workload in the current directory")
+	reporting := ocpCmd.PersistentFlags().Bool("reporting", false, "Enable benchmark report indexing")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.MarkFlagsMutuallyExclusive("es-server", "local-indexing")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
 		if *esServer != "" || *localIndexing {
-			indexing = true
 			if *esServer != "" {
 				indexingType = indexers.ElasticIndexer
 			} else {
@@ -71,10 +70,9 @@ func openShiftCmd() *cobra.Command {
 			"QPS":           fmt.Sprintf("%d", *qps),
 			"BURST":         fmt.Sprintf("%d", *burst),
 			"GC":            fmt.Sprintf("%v", *gc),
-			"INDEXING":      fmt.Sprintf("%v", indexing),
 			"INDEXING_TYPE": string(indexingType),
 		}
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, OCPConfig, indexing, *timeout, *metricsEndpoint)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, *reporting, ocpConfig, *timeout, *metricsEndpoint)
 		wh.Metadata.UUID = *uuid
 		if *extract {
 			if err := wh.ExtractWorkload(cmd.Name(), workloads.MetricsProfileMap[cmd.Name()]); err != nil {

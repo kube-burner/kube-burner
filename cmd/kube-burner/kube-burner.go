@@ -110,7 +110,7 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			if configSpec.GlobalConfig.IndexerConfig.Enabled || alertProfile != "" {
+			if configSpec.GlobalConfig.IndexerConfig.Type != "" || alertProfile != "" {
 				metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 					ConfigSpec:      configSpec,
 					Password:        password,
@@ -289,7 +289,7 @@ func alertCmd() *cobra.Command {
 					log.Fatal(err.Error())
 				}
 			}
-			if configSpec.GlobalConfig.IndexerConfig.Enabled {
+			if configSpec.GlobalConfig.IndexerConfig.Type != "" {
 				indexerConfig := configSpec.GlobalConfig.IndexerConfig
 				log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 				indexer, err = indexers.NewIndexer(indexerConfig)

@@ -159,7 +159,7 @@ func (p *podLatency) stop() (int, error) {
 	if len(p.config.LatencyThresholds) > 0 {
 		rc = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
 	}
-	if globalCfg.IndexerConfig.Enabled {
+	if globalCfg.IndexerConfig.Type != "" {
 		log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
 		p.index()
 	}
@@ -180,6 +180,9 @@ func (p *podLatency) index() {
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
+	}
+	if p.config.PodLatencyMetrics == types.Quantiles {
+		delete(metricMap, podLatencyMeasurement)
 	}
 	for metricName, data := range metricMap {
 		indexingOpts.MetricName = metricName

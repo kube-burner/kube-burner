@@ -2,7 +2,6 @@
 global:
   gc: {{.GC}}
   indexerConfig:
-    enabled: {{.INDEXING}}
     esServers: ["{{.ES_SERVER}}"]
     insecureSkipVerify: true
     defaultIndex: {{.ES_INDEX}}

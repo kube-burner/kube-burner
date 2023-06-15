@@ -37,10 +37,12 @@ The collected metrics have the following shape:
       "mode": "user"
     },
     "value": 0.3300880234732172,
-    "uuid": "bc82badf-0e43-48cc-aca8-fdaa6cee5a84",
+    "uuid": "<UUID>",
     "query": "sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) > 0",
     "metricName": "nodeCPU",
-    "jobName": "kube-burner-indexing"
+    "jobConfig": {
+      "truncated_job_configuration": "foobar"
+    }
   },
   {
     "timestamp": "2021-06-23T11:50:45+02:00",
@@ -49,10 +51,12 @@ The collected metrics have the following shape:
       "mode": "user"
     },
     "value": 0.31978102677038506,
-    "uuid": "bc82badf-0e43-48cc-aca8-fdaa6cee5a84",
+    "uuid": "<UUID>",
     "query": "sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) > 0",
     "metricName": "nodeCPU",
-    "jobName": "kube-burner-indexing"
+    "jobConfig": {
+      "truncated_job_configuration": "foobar"
+    }
   }
 ]
 ```
@@ -60,6 +64,58 @@ The collected metrics have the following shape:
 Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query`, `metricName` and `jobName`.
 !!! info
     These extra fields are specially useful at the time of identifying and representing the collected metrics.
+
+## Aggregating timeseries into a single document
+
+Kube-burner provides a mechanism to aggregate a Prometheus timeseries into a single value.
+The current supported aggregations are:
+
+- `avg`: Average value of the timeseries
+- `max`: Maximum value of the timeseries
+- `min`: Minimum value of the timeseries
+- `stdev`: Standard deviation of the timeseries values
+- `99`: 99th percentile of the timeseries values
+- `95`: 95th percentile of the timeseries values
+- `90`: 90th percentile of the timeseries values
+- `50`: 50th percentile of the timeseries values
+
+This feature is configured throught the metrics-profile configuration file as follows:
+
+```yaml
+# Average and maximum CPU usage observed in all worker's kubelets processes
+- query: irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m]) and on (node) kube_node_role{role="worker"}
+  metricName: cpu-kubelet
+  aggregations: [avg, max]
+```
+
+The above configuration will result in two documents:
+
+```json
+[
+  {
+    "uuid": "<UUID>",
+    "timestamp": "2023-06-12T23:18:49.285718843Z",
+    "value": 263544832,
+    "query": "irate(process_cpu_seconds_total{service=\"kubelet\",job=\"kubelet\"}[2m]) and on (node) kube_node_role{role=\"worker\"}",
+    "metricName": "cpu-kubelet",
+    "jobConfig": {
+      "truncated_job_configuration": "foobar"
+    },
+    "aggregation": "avg"
+  },
+  {
+    "uuid": "<UUID>",
+    "timestamp": "2023-06-12T23:18:49.285718843Z",
+    "value": 363543813,
+    "query": "irate(process_cpu_seconds_total{service=\"kubelet\",job=\"kubelet\"}[2m]) and on (node) kube_node_role{role=\"worker\"}",
+    "metricName": "cpu-kubelet",
+    "jobConfig": {
+      "truncated_job_configuration": "foobar"
+    },
+    "aggregation": "max"
+  }
+]
+```
 
 ## Using the elapsed variable
 

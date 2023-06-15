@@ -26,8 +26,8 @@ import (
 
 // NewNodeDensity holds node-density-heavy workload
 func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
-	var podsPerNode, probesPeriod int
-	var podReadyThreshold time.Duration
+	var podsPerNode int
+	var podReadyThreshold, probesPeriod time.Duration
 	cmd := &cobra.Command{
 		Use:          "node-density-heavy",
 		Short:        "Runs node-density-heavy workload",
@@ -42,14 +42,14 @@ func NewNodeDensityHeavy(wh *WorkloadHelper) *cobra.Command {
 			// We divide by two the number of pods to deploy to obtain the workload iterations
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint((totalPods-podCount)/2))
 			os.Setenv("POD_READY_THRESHOLD", fmt.Sprintf("%v", podReadyThreshold))
-			os.Setenv("PROBES_PERIOD", fmt.Sprint(probesPeriod))
+			os.Setenv("PROBES_PERIOD", fmt.Sprint(probesPeriod.Seconds()))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])
 		},
 	}
 	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 1*time.Hour, "Pod ready timeout threshold")
-	cmd.Flags().IntVar(&probesPeriod, "probes-period", 10, "Perf app readiness/livenes probes period in seconds")
+	cmd.Flags().DurationVar(&probesPeriod, "probes-period", 10*time.Second, "Perf app readiness/livenes probes period")
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
 	return cmd
 }
