@@ -24,7 +24,6 @@ jobs:
           git config --global user.name Docs deploy
           git config --global user.email docs@dummy.bot.com
       - run: pip install mkdocs-material mkdocs-include-markdown-plugin mike
-      - run: mike set-default --push latest
       - run: |
           mike deploy --push -m "Update docs to version ${RELEASE_TAG_VERSION}" --update-aliases ${RELEASE_TAG_VERSION} latest
       - run: mike set-default --push latest
