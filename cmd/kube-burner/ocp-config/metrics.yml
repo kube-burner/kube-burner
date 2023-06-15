@@ -56,30 +56,16 @@
 - query: (sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) > 0
   metricName: nodeCPU-Infra
 
-- query: node_memory_MemAvailable_bytes and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")
-  metricName: nodeMemoryAvailable-Masters
-
-- query: node_memory_MemAvailable_bytes and on (instance) label_replace(kube_node_role{role="worker"}, "instance", "$1", "node", "(.+)")
-  metricName: nodeMemoryAvailable-Workers
-
 # We compute memory utilization by substrating available memory to the total
+
+- query: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")
+  metricName: nodeMemoryUtilization-Masters
 
 - query: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="worker"}, "instance", "$1", "node", "(.+)")
   metricName: nodeMemoryUtilization-Workers
 
-- query: node_memory_MemAvailable_bytes and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")
-  metricName: nodeMemoryAvailable-Infra
-
-- query: node_memory_MemTotal_bytes and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)")
-  metricName: nodeMemoryTotal-Masters
-
-- query: node_memory_MemTotal_bytes and on (instance) label_replace(kube_node_role{role="worker"}, "instance", "$1", "node", "(.+)")
-  metricName: nodeMemoryTotal-Workers
-  instant: true
-
-- query: node_memory_MemTotal_bytes and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")
-  metricName: nodeMemoryTotal-Infra
-  instant: true
+- query: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")
+  metricName: nodeMemoryUtilization-Infra
 
 # Etcd metrics
 
