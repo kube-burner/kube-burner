@@ -230,7 +230,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			// hasn't been created yet
 			replicaWg.Add(1)
 			go func(n string) {
-				if obj.Namespaced {
+				if !obj.Namespaced {
 					n = ""
 				}
 				createRequest(obj.gvr, n, newObject)
