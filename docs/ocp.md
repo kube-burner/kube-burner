@@ -29,6 +29,7 @@ Flags:
       --local-indexing            Enable local indexing
       --metrics-endpoint string   YAML file with a list of metric endpoints
       --qps int                   QPS (default 20)
+      --reporting                 Enable benchmark report indexing
       --timeout duration          Benchmark timeout (default 3h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
       --uuid string               Benchmark UUID (default "d18989c4-4f8a-4a14-b711-9afae69a9140")
@@ -129,6 +130,12 @@ It creates two Deployments, a client/curl and a server/nxing, and 1 Service back
 
 Creates two Deployments, a postgresql database and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a Service that is used by the client to reach the database.
 
+## Reporting mode
+
+This mode can be enabled with the flag `--reporting`. By enabling this mode kube-burner will a metrics-profile and will index the [aggregated values of the defined timeseries](/kube-burner/metrics/observability/metrics/#aggregating-timeseries-into-a-single-document), and will index only the pod latency quantiles documents (`podLatencyQuantilesMeasurement`) rather than the full pod timeseries.
+
+This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/cmd/ocp-config/metrics-report.yml))
+
 ## Customizing workloads
 
 It's possible to customize any of the above workload configurations by extracting, updating and finally running it:
@@ -136,7 +143,7 @@ It's possible to customize any of the above workload configurations by extractin
 ```console
 $ kube-burner ocp node-density --extract
 $ ls
-alerts.yml  metrics.yml  node-density.yml  pod.yml
+alerts.yml  metrics.yml  node-density.yml  pod.yml  metrics-report.yml
 $ vi node-density.yml                               # Perform modifications accordingly
 $ kube-burner ocp node-density --pods-per-node=100  # Run workload
 ```

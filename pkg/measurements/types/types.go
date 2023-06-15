@@ -18,6 +18,28 @@ import (
 	"time"
 )
 
+type latencyMetric string
+
+const (
+	All            latencyMetric = "all"       // Both quantiles and per pod documents
+	Quantiles      latencyMetric = "quantiles" // Single quantile document
+	pprofDirectory string        = "pprof"
+)
+
+// UnmarshalYAML implements Unmarshaller to customize object defaults
+func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) error {
+	type rawMeasurement Measurement
+	measurement := rawMeasurement{
+		PProfDirectory:    pprofDirectory,
+		PodLatencyMetrics: All,
+	}
+	if err := unmarshal(&measurement); err != nil {
+		return err
+	}
+	*m = Measurement(measurement)
+	return nil
+}
+
 // Measurement holds the measurement configuration
 type Measurement struct {
 	// Name is the name the measurement
@@ -30,6 +52,8 @@ type Measurement struct {
 	PProfInterval time.Duration `yaml:"pprofInterval"`
 	// PProfDirectory output directory
 	PProfDirectory string `yaml:"pprofDirectory"`
+	// Pod latency metrics to index
+	PodLatencyMetrics latencyMetric `yaml:"podLatencyMetrics"`
 }
 
 // LatencyThreshold holds the thresholds configuration

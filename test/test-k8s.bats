@@ -17,6 +17,7 @@ setup_file() {
 setup() {
   export UUID; UUID=$(uuidgen)
   export TEMP_FOLDER; TEMP_FOLDER=$(mktemp -d)
+  export INDEXING_TYPE=""
 }
 
 teardown() {
@@ -30,13 +31,12 @@ teardown_file() {
 }
 
 @test "kube-burner init: no indexing" {
-  export INDEXING=false
   run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   [ "$status" -eq 0 ]
 }
 
 @test "kube-burner init: indexing only pod latency metrics" {
-  export INDEXING=true
+  export INDEXING_TYPE=local
   export LATENCY=true
   run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   [ "$status" -eq 0 ]
@@ -45,7 +45,7 @@ teardown_file() {
 }
 
 @test "kube-burner init: indexing, pod latency metrics and alerting" {
-  export INDEXING=true
+  export INDEXING_TYPE=local
   run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
   [ "$status" -eq 0 ]
   export LATENCY=true
@@ -55,7 +55,7 @@ teardown_file() {
 }
 
 @test "kube-burner init: indexing and metrics-endpoint" {
-  export INDEXING=true
+  export INDEXING_TYPE=local
   export ALERTING=true
   run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -e metrics-endpoints.yaml
   [ "$status" -eq 0 ]
@@ -64,13 +64,13 @@ teardown_file() {
 }
 
 @test "kube-burner index: metrics-endpoint with single prometheus endpoint" {
-  export INDEXING=true
+  export INDEXING_TYPE=local
   run kube-burner index -c kube-burner-index-single-endpoint.yml --uuid="${UUID}"  -u http://localhost:9090 -m metrics-profile.yaml
   [ "$status" -eq 0 ]
 }
 
 @test "kube-burner index: metrics-endpoint" {
-  export INDEXING=true
+  export INDEXING_TYPE=local
   run kube-burner index -c kube-burner.yml --uuid="${UUID}" -e metrics-endpoints.yaml
   [ "$status" -eq 0 ]
 }
