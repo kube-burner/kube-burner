@@ -86,8 +86,8 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		if o.Namespaced {
 			ex.NamespacedIterations = true
 		}
-		if !isNamespaced(gvk) {
-			obj.Namespaced = false
+		if isNamespaced(gvk) {
+			obj.Namespaced = true
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)

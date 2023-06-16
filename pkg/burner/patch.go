@@ -70,8 +70,8 @@ func setupPatchJob(jobConfig config.Job) Executor {
 			labelSelector: o.LabelSelector,
 			patchType:     o.PatchType,
 		}
-		if !isNamespaced(&gvk) {
-			obj.Namespaced = false
+		if isNamespaced(&gvk) {
+			obj.Namespaced = true
 		}
 		log.Infof("Job %s: Patch %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)

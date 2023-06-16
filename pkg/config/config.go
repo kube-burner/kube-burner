@@ -56,8 +56,7 @@ var configSpec = Spec{
 func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type rawObject Object
 	object := rawObject{
-		Namespaced: true,
-		Wait:       true,
+		Wait: true,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err
