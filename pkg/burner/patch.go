@@ -70,6 +70,9 @@ func setupPatchJob(jobConfig config.Job) Executor {
 			labelSelector: o.LabelSelector,
 			patchType:     o.PatchType,
 		}
+		if isNamespaced(&gvk) {
+			obj.Namespaced = true
+		}
 		log.Infof("Job %s: Patch %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
 	}
@@ -154,14 +157,23 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 			}
 		}
 	}
+
 	ns := originalItem.GetNamespace()
 	log.Debugf("Patching %s/%s in namespace %s", originalItem.GetKind(),
 		originalItem.GetName(), ns)
 	ex.limiter.Wait(context.TODO())
 
-	uns, err := dynamicClient.Resource(obj.gvr).Namespace(ns).
-		Patch(context.TODO(), originalItem.GetName(),
-			types.PatchType(obj.patchType), data, patchOptions)
+	var uns *unstructured.Unstructured
+	var err error
+	if obj.Namespaced {
+		uns, err = dynamicClient.Resource(obj.gvr).Namespace(ns).
+			Patch(context.TODO(), originalItem.GetName(),
+				types.PatchType(obj.patchType), data, patchOptions)
+	} else {
+		uns, err = dynamicClient.Resource(obj.gvr).
+			Patch(context.TODO(), originalItem.GetName(),
+				types.PatchType(obj.patchType), data, patchOptions)
+	}
 	if err != nil {
 		if errors.IsForbidden(err) {
 			log.Fatalf("Authorization error patching %s/%s: %s", originalItem.GetKind(), originalItem.GetName(), err)

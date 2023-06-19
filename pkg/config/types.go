@@ -84,7 +84,7 @@ type Object struct {
 	// LabelSelector objects with this labels will be removed
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// Namespaced this object is namespaced
-	Namespaced bool `yaml:"namespaced" json:"namespaced"`
+	Namespaced bool `yaml:"-" json:"-"`
 	// Wait for resource to be ready, it doesn't apply to all resources
 	Wait bool `yaml:"wait" json:"wait"`
 	// WaitOptions define custom behaviors when waiting for objects creation

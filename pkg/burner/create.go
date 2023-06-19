@@ -86,6 +86,9 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		if o.Namespaced {
 			ex.NamespacedIterations = true
 		}
+		if isNamespaced(gvk) {
+			obj.Namespaced = true
+		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
@@ -226,20 +229,23 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			// verify objects can lead into a race condition when some objects
 			// hasn't been created yet
 			replicaWg.Add(1)
-			go func() {
-				createRequest(obj.gvr, ns, newObject, obj.Namespaced)
+			go func(n string) {
+				if !obj.Namespaced {
+					n = ""
+				}
+				createRequest(obj.gvr, n, newObject)
 				replicaWg.Done()
-			}()
+			}(ns)
 		}(r)
 	}
 	wg.Wait()
 }
 
-func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, namespaced bool) {
+func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured) {
 	var uns *unstructured.Unstructured
 	var err error
 	RetryWithExponentialBackOff(func() (bool, error) {
-		if namespaced {
+		if ns != "" {
 			uns, err = dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		} else {
 			uns, err = dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
@@ -257,7 +263,7 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 			log.Error("Retrying object creation")
 			return false, nil
 		}
-		if namespaced {
+		if ns != "" {
 			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		} else {
 			log.Debugf("Created %s/%s", uns.GetKind(), uns.GetName(), ns)

@@ -13,7 +13,6 @@ jobs:
 
     - objectTemplate: objectTemplates/storageclass.yml
       replicas: 1
-      namespaced: false
 
     - objectTemplate: objectTemplates/net-attach-def.yml
       replicas: 1
