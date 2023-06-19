@@ -10,3 +10,6 @@ jobs:
   image-upload:
     uses: ./.github/workflows/image-upload.yml
     secrets: inherit
+
+  deploy-docs:
+    uses: ./.github/workflows/docs.yml
