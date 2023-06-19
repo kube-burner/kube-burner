@@ -35,7 +35,8 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 	var alertMs []*alerting.AlertManager
 	indexerConfig := configSpec.GlobalConfig.IndexerConfig
 	userMetadataContent := make(map[string]interface{})
-	if indexerConfig.Enabled {
+	if configSpec.GlobalConfig.IndexerConfig.Type != "" {
+		indexerConfig := configSpec.GlobalConfig.IndexerConfig
 		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 		indexer, err = indexers.NewIndexer(indexerConfig)
 		if err != nil {

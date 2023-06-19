@@ -15,9 +15,8 @@ nav:
 - Development:
   - development/index.md
   - Development: development/index.md
-  - CI:
-    - CI: development/ci.md
-    - Tests: development/ci/tests.md
+  - CI: development/ci.md
+  - Tests: development/ci/tests.md
 site_name: Kube-burner
 plugins:
   - search
@@ -31,8 +30,8 @@ theme:
   version: latest
   name: material
   font:
-    text: Noto Sans
-    code: Noto Sans Mono
+    text: Roboto
+    code: Roboto Mono
   palette:
     # Palette toggle for light mode
     - scheme: default

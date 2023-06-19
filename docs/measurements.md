@@ -5,21 +5,21 @@ Kube-burner allows to get further metrics using other mechanisms or data sources
 Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
 'kube-burner' supports the following measurements so far:
 
-!!!Warning
+!!! Warning
     `podLatency`, as any other measurement, is only captured during a benchmark runtime. It does not work with the `index` subcommand of kube-burner
 
 ## Pod latency
 
-Collects latencies from the different pod startup phases, these **latency metrics are in ms**. Can be enabled with:
+Collects latencies from the different pod startup phases, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
   measurements:
   - name: podLatency
 ```
 
-This measurement sends its metrics to configured indexer. The metrics collected are pod latency histograms and pod latency quantiles P99, P95 and P50.
+This measurement sends its metrics to configured indexer. The metrics collected are pod latency histograms (`podLatencyMeasurement`) and a four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`). It's possible to skip indexing the `podLatencyMeasurement` metric by configuring the field `podLatencyMetrics` of this measurement to `quantiles`.
 
-Pod latency sample:
+Pod latency sample, one document like the below is indexed per each pod created by the workload that enters in Running condition during the workload:
 
 ```json
 {
@@ -89,17 +89,17 @@ And the metrics are:
 
 ### Pod latency thresholds
 
-It's possible to stablish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within this measurement:
+It's possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within this measurement:
 
 Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
 
 ```yaml
-      measurements:
-      - name: podLatency
-        thresholds:
-        - conditionType: Ready
-          metric: P99
-          thrshold: 2000ms
+  measurements:
+  - name: podLatency
+    thresholds:
+    - conditionType: Ready
+      metric: P99
+      threshold: 2000ms
 ```
 
 Latency thresholds are evaluated at the end of each job, showing an informative message like the following:
@@ -109,44 +109,44 @@ INFO[2020-12-15 12:37:08] Evaluating latency thresholds
 WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured threshold: 2000ms
 ```
 
-In case of not meeting any of the configured thresholds, like the example above, **Kube-burner return code will be 1**
+In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
 
-## Pprof collection
+## pprof collection
 
-This measurement can be used to collect golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. Pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
+This measurement can be used to collect golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
 
 As some components require authentication to get profiling information, `kube-burner` provides two different modalities to address it:
 
 - **Bearer token authentication**: This modality is configured by the variable `bearerToken`, which holds a valid Bearer token that will be used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components
 - **Certificate Authentication**: Usually valid for etcd, this method can be configured using a combination of cert/privKey files or directly using the cert/privkey content, it can be tweaked with the following variables:
-    1. `cert`: Base64 encoded certificate.
-    1. `key`: Base64 encoded private key.
-    1. `certFile`: Path to a certificate file.
-    1. `keyFile`: Path to a private key file.
+    - `cert`: Base64 encoded certificate.
+    - `key`: Base64 encoded private key.
+    - `certFile`: Path to a certificate file.
+    - `keyFile`: Path to a private key file.
 
-!!!note
+!!! note
     The decoded content of the certificate and private key is written to the files /tmp/pprof.crt and /tmp/pprof.key of the remote pods respectively
 
 An example of how to configure this measurement to collect pprof HEAP and CPU profiling data from kube-apiserver and etcd is shown below:
 
 ```yaml
-   measurements:
-   - name: pprof
-     pprofInterval: 30m
-     pprofDirectory: pprof-data
-     pprofTargets:
-     - name: kube-apiserver-heap
-       namespace: "openshift-kube-apiserver"
-       labelSelector: {app: openshift-kube-apiserver}
-       bearerToken: thisIsNotAValidToken
-       url: https://localhost:6443/debug/pprof/heap
+  measurements:
+  - name: pprof
+    pprofInterval: 30m
+    pprofDirectory: pprof-data
+    pprofTargets:
+    - name: kube-apiserver-heap
+      namespace: "openshift-kube-apiserver"
+      labelSelector: {app: openshift-kube-apiserver}
+      bearerToken: thisIsNotAValidToken
+      url: https://localhost:6443/debug/pprof/heap
 
-     - name: etcd-heap
-       namespace: "openshift-etcd"
-       labelSelector: {app: etcd}
-       certFile: etcd-peer-pert.crt
-       keyFile: etcd-peer-pert.key
-       url: https://localhost:2379/debug/pprof/heap
+    - name: etcd-heap
+      namespace: "openshift-etcd"
+      labelSelector: {app: etcd}
+      certFile: etcd-peer-pert.crt
+      keyFile: etcd-peer-pert.key
+      url: https://localhost:2379/debug/pprof/heap
 ```
 
 !!! warning

@@ -29,6 +29,7 @@ Flags:
       --local-indexing            Enable local indexing
       --metrics-endpoint string   YAML file with a list of metric endpoints
       --qps int                   QPS (default 20)
+      --reporting                 Enable benchmark report indexing
       --timeout duration          Benchmark timeout (default 3h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
       --uuid string               Benchmark UUID (default "d18989c4-4f8a-4a14-b711-9afae69a9140")
@@ -87,7 +88,7 @@ Each iteration of **cluster-density** creates the following objects in each of t
 
 ### cluster-density-v2
 
-Very similar to [cluster-denstiy](#cluster-density), but with some key differences provided by NetworkPolicies and improved readinesProbes, that leads to a heavier load in the cluster's CNI plugin. Each iteration creates the following objects in each of the created namespaces:
+Very similar to [cluster-density](#cluster-density), but with some key differences provided by NetworkPolicies and improved readinessProbes, that leads to a heavier load in the cluster's CNI plugin. Each iteration creates the following objects in each of the created namespaces:
 
 - 1 ImagesStream
 - 1 Build. The OCP internal container registry must be set-up previously since the resulting container image will be pushed there.
@@ -98,13 +99,13 @@ Very similar to [cluster-denstiy](#cluster-density), but with some key differenc
 - 10 Secrets containing 2048 character random string
 - 10 ConfigMaps containing a 2048 character random string
 - 3 NetworkPolicies:
-     1. 1 deny-all traffic
-     1. 1 allow traffic from client/nginx pods to server/nginx pods
-     1. 1 allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
+    - deny-all traffic
+    - allow traffic from client/nginx pods to server/nginx pods
+    - allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
 
 ### cluster-density-ms
 
-Lightest version of this workload family,each iteration the following objects in each of the created namespaces:
+Lightest version of this workload family, each iteration the following objects in each of the created namespaces:
 
 - 1 ImageStream
 - 4 Deployments with two pod replicas (pause) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
@@ -115,7 +116,7 @@ Lightest version of this workload family,each iteration the following objects in
 
 ## Node density workloads
 
-The workloads of this family create a single namespace with a set of Pods, Deployments Services, depending onf the workload.
+The workloads of this family create a single namespace with a set of Pods, Deployments Services, depending on the workload.
 
 ### node-density
 
@@ -125,18 +126,24 @@ This workload is meant to fill with pause pods all the worker nodes from the clu
 
 It creates two Deployments, a client/curl and a server/nxing, and 1 Service backed by the previous server Pods. The client application has configured an startupProbe that makes requests to the previous Service every second with a timeout of 600s.
 
-### node-density-heav
+### node-density-heavy
 
 Creates two Deployments, a postgresql database and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a Service that is used by the client to reach the database.
 
+## Reporting mode
+
+This mode can be enabled with the flag `--reporting`. By enabling this mode kube-burner will a metrics-profile and will index the [aggregated values of the defined timeseries](/kube-burner/metrics/observability/metrics/#aggregating-timeseries-into-a-single-document), and will index only the pod latency quantiles documents (`podLatencyQuantilesMeasurement`) rather than the full pod timeseries.
+
+This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/cmd/ocp-config/metrics-report.yml))
+
 ## Customizing workloads
 
-It's possible to customize the workload configuration by extracting, updating and finally running it:
+It's possible to customize any of the above workload configurations by extracting, updating and finally running it:
 
 ```console
 $ kube-burner ocp node-density --extract
 $ ls
-alerts.yml  metrics.yml  node-density.yml  pod.yml
+alerts.yml  metrics.yml  node-density.yml  pod.yml  metrics-report.yml
 $ vi node-density.yml                               # Perform modifications accordingly
 $ kube-burner ocp node-density --pods-per-node=100  # Run workload
 ```

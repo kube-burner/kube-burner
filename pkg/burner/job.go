@@ -163,7 +163,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				innerRC = 1
 			}
 		}
-		if globalConfig.IndexerConfig.Enabled {
+		if globalConfig.IndexerConfig.Type != "" {
 			for _, job := range jobList {
 				// elapsedTime is recalculated for every job of the list
 				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
@@ -183,7 +183,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			}
 			prometheusClient.JobList = prometheusJobList
 			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-			if globalConfig.IndexerConfig.Enabled {
+			if globalConfig.IndexerConfig.Type != "" {
 				metrics.ScrapeMetrics(prometheusClient, indexer)
 				if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
 					metrics.CreateTarball(globalConfig.IndexerConfig)

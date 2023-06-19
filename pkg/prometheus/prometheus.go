@@ -47,7 +47,7 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 	}
 	if configSpec.GlobalConfig.MetricsProfile != "" {
 		if err := p.readProfile(configSpec.GlobalConfig.MetricsProfile); err != nil {
-			log.Fatalf("Metrics-profile error: %v", err.Error())
+			return &p, fmt.Errorf("metrics-profile error: %v", err.Error())
 		}
 	}
 	return &p, nil
@@ -67,7 +67,10 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	for _, md := range p.MetricProfile {
 		var datapoints []interface{}
 		t, _ := template.New("").Parse(md.Query)
-		t.Execute(&renderedQuery, vars)
+		if err := t.Execute(&renderedQuery, vars); err != nil {
+			log.Warnf("Error rendering query: %v", err)
+			continue
+		}
 		query := renderedQuery.String()
 		renderedQuery.Reset()
 		if md.Instant {
@@ -78,6 +81,25 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 			}
 			if err := p.parseVector(md.MetricName, query, v, &datapoints); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", query, err)
+			}
+		} else if len(md.Aggregations) > 0 {
+			for _, agg := range md.Aggregations {
+				result, err := p.Client.QueryRangeAggregatedTS(query, start, end, p.Step, agg)
+				if err != nil {
+					log.Warnf("Error found with query %s: %s", query, err)
+					continue
+				}
+				m := metric{
+					UUID:        p.UUID,
+					Query:       query,
+					MetricName:  md.MetricName,
+					JobConfig:   p.findJob(end),
+					Timestamp:   end,
+					Metadata:    p.metadata,
+					Aggregation: agg,
+					Value:       result,
+				}
+				datapoints = append(datapoints, m)
 			}
 		} else {
 			log.Debugf("Range query: %s", query)
@@ -92,7 +114,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 			}
 		}
 		indexerConfig := p.ConfigSpec.GlobalConfig.IndexerConfig
-		if indexerConfig.Enabled {
+		if indexerConfig.Type != "" {
 			log.Infof("Indexing metric %s", md.MetricName)
 			log.Debugf("Indexing [%d] documents", len(datapoints))
 			resp, err := (*indexer).Index(datapoints, indexers.IndexingOpts{MetricName: md.MetricName})
@@ -110,8 +132,11 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 func (p *Prometheus) findJob(timestamp time.Time) config.Job {
 	var jobConfig config.Job
 	for _, prometheusJob := range p.JobList {
-		if timestamp.Before(prometheusJob.End) {
+		if timestamp.Before(prometheusJob.End) || timestamp.Equal(prometheusJob.End) {
 			jobConfig = prometheusJob.JobConfig
+			if jobConfig.Name == "" {
+				jobConfig.Name = prometheusJob.Name
+			}
 		}
 	}
 	return jobConfig
@@ -124,9 +149,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, vector := range data {
-		jobConfig := p.findJob(vector.Timestamp.Time())
-		fmt.Println(jobConfig)
-		m := p.createMetric(query, metricName, jobConfig, vector.Metric, vector.Value, vector.Timestamp.Time())
+		m := p.createMetric(query, metricName, vector.Metric, vector.Value, vector.Timestamp.Time())
 		*metrics = append(*metrics, m)
 	}
 	return nil
@@ -140,16 +163,14 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 	}
 	for _, matrix := range data {
 		for _, val := range matrix.Values {
-			jobConfig := p.findJob(val.Timestamp.Time())
-
-			m := p.createMetric(query, metricName, jobConfig, matrix.Metric, val.Value, val.Timestamp.Time())
+			m := p.createMetric(query, metricName, matrix.Metric, val.Value, val.Timestamp.Time())
 			*metrics = append(*metrics, m)
 		}
 	}
 	return nil
 }
 
-// ReadProfile reads and parses metric profile configuration
+// ReadProfile reads, parses and validates metric profile configuration
 func (p *Prometheus) readProfile(metricsProfile string) error {
 	f, err := util.ReadConfig(metricsProfile)
 	if err != nil {
@@ -160,17 +181,28 @@ func (p *Prometheus) readProfile(metricsProfile string) error {
 	if err = yamlDec.Decode(&p.MetricProfile); err != nil {
 		return fmt.Errorf("error decoding metrics profile %s: %s", metricsProfile, err)
 	}
+	for i, md := range p.MetricProfile {
+		if md.Query == "" {
+			return fmt.Errorf("query not defined in %d element", i)
+		}
+		if md.Instant && len(md.Aggregations) > 0 {
+			return fmt.Errorf("instant and aggregation cannot be defined together")
+		}
+		if md.MetricName == "" {
+			return fmt.Errorf("metricName not defined in %d element", i)
+		}
+	}
 	return nil
 }
 
 // Create metric creates metric to be indexed
-func (p *Prometheus) createMetric(query, metricName string, jobConfig config.Job, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
+func (p *Prometheus) createMetric(query, metricName string, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
+	jobConfig := p.findJob(timestamp)
 	m := metric{
 		Labels:     make(map[string]string),
 		UUID:       p.UUID,
 		Query:      query,
 		MetricName: metricName,
-		JobName:    jobConfig.Name,
 		JobConfig:  jobConfig,
 		Timestamp:  timestamp,
 		Metadata:   p.metadata,

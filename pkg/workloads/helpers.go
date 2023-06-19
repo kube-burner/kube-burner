@@ -27,6 +27,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
@@ -35,9 +36,11 @@ import (
 )
 
 const (
-	alertsProfile = "alerts.yml"
-	ocpCfgDir     = "ocp-config"
-	stepSize      = 30 * time.Second
+	alertsProfile         = "alerts.yml"
+	ocpCfgDir             = "ocp-config"
+	stepSize              = 30 * time.Second
+	clusterMetadataMetric = "clusterMetadata"
+	reportProfile         = "metrics-report.yml"
 )
 
 type BenchmarkMetadata struct {
@@ -60,11 +63,13 @@ type WorkloadHelper struct {
 	alerting        bool
 	ocpConfig       embed.FS
 	ocpMetaAgent    ocpmetadata.Metadata
-	indexing        bool
+	reporting       bool
 }
 
+var configSpec config.Spec
+
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed.FS, indexing bool, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting, reporting bool, ocpConfig embed.FS, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
@@ -82,11 +87,11 @@ func NewWorkloadHelper(envVars map[string]string, alerting bool, ocpConfig embed
 	return WorkloadHelper{
 		envVars:         envVars,
 		alerting:        alerting,
+		reporting:       reporting,
 		metricsEndpoint: metricsEndpoint,
 		ocpConfig:       ocpConfig,
 		ocpMetaAgent:    ocpMetadata,
 		timeout:         timeout,
-		indexing:        indexing,
 	}
 }
 
@@ -118,6 +123,7 @@ func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 	if err != nil {
 		return err
 	}
+	wh.Metadata.MetricName = clusterMetadataMetric
 	if userMetadata != "" {
 		userMetadataContent, err := util.ReadUserMetadata(userMetadata)
 		if err != nil {
@@ -134,7 +140,6 @@ func (wh *WorkloadHelper) indexMetadata() {
 	wh.Metadata.EndDate = time.Now().UTC()
 	msg, err := (*indexer).Index([]interface{}{wh.Metadata}, indexers.IndexingOpts{
 		MetricName: wh.Metadata.MetricName,
-		JobName:    wh.Metadata.Benchmark,
 	})
 	if err != nil {
 		log.Error(err.Error())
@@ -170,12 +175,12 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	} else {
 		log.Infof("File %v available in the current directory, using it", cfg)
 	}
-	configSpec, err := config.Parse(wh.Metadata.UUID, cfg, true)
+	configSpec, err = config.Parse(wh.Metadata.UUID, cfg, true)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if wh.indexing {
-		indexerConfig := configSpec.GlobalConfig.IndexerConfig
+	indexerConfig := configSpec.GlobalConfig.IndexerConfig
+	if indexerConfig.Type != "" {
 		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 		indexer, err = indexers.NewIndexer(indexerConfig)
 		if err != nil {
@@ -185,6 +190,13 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	if wh.metricsEndpoint != "" {
 		metrics.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
 	} else {
+		// When benchmark reporting is enabled we hardcode metricsProfile
+		if wh.reporting {
+			metricsProfile = reportProfile
+			for i := range configSpec.GlobalConfig.Measurements {
+				configSpec.GlobalConfig.Measurements[i].PodLatencyMetrics = types.Quantiles
+			}
+		}
 		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
 			Endpoint:     wh.prometheusURL,
 			AlertProfile: alertsProfile,
@@ -220,7 +232,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		log.Fatal(err)
 	}
 	wh.Metadata.Passed = rc == 0
-	if wh.indexing {
+	if indexerConfig.Type != "" {
 		wh.indexMetadata()
 	}
 	log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
@@ -250,6 +262,9 @@ func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error
 		}
 	}
 	if err = createFile(path.Join(ocpCfgDir, metricsProfile), metricsProfile); err != nil {
+		return err
+	}
+	if err = createFile(path.Join(ocpCfgDir, reportProfile), reportProfile); err != nil {
 		return err
 	}
 	if err = createFile(path.Join(ocpCfgDir, alertsProfile), alertsProfile); err != nil {

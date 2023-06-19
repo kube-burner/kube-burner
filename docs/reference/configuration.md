@@ -19,8 +19,8 @@ In this section is described global job configuration, it holds the following pa
 
 | Option           | Description                                                                                              | Type           | Default      |
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|--------------|
-| `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/measurements)                            | List          | []          |
-| `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/observability/indexing)                 | Object        | {}           |
+| `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/latest/measurements)                            | List          | []          |
+| `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/latest/observability/indexing)                 | Object        | {}           |
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 15s         |
 | `prometheusURL`    | Prometheus URL endpoint, flag has precedence                                                             | String        | ""         |
 | `bearerToken`      | Bearer token to access the Prometheus endpoint                                                           | String        | ""         |
@@ -30,8 +30,8 @@ In this section is described global job configuration, it holds the following pa
 
 kube-burner connects k8s clusters using the following methods in this order:
 
-- KUBECONFIG environment variable
-- $HOME/.kube/config
+- `KUBECONFIG` environment variable
+- `$HOME/.kube/config`
 - In-cluster config (Used when kube-burner runs inside a pod)
 
 ## Jobs
@@ -40,29 +40,29 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 
 | Option               | Description                                                                      | Type    | Default |
 |----------------------|----------------------------------------------------------------------------------|---------|----------|
-| `name`                 | Job name                                                                         | String | ""      |
-| `jobType`              | Type of job to execute. More details at [job types](#job-types)                  | string | create  |
+| `name`                 | Job name                                                                         | String  | ""      |
+| `jobType`              | Type of job to execute. More details at [job types](#job-types)                  | string  | create  |
 | `jobIterations`        | How many times to execute the job                                                | Integer | 0       |
-| `namespace`            | Namespace base name to use                                                       | String | ""      |
+| `namespace`            | Namespace base name to use                                                       | String  | ""      |
 | `namespacedIterations` | Whether to create a namespace per job iteration                                  | Boolean | true    |
 | `cleanup`              | Cleanup clean up old namespaces                                                  | Boolean | true    |
 | `podWait`              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | false   |
 | `waitWhenFinished`     | Wait for all pods to be running when all iterations are completed                | Boolean | true    |
-| `maxWaitTimeout`       | Maximum wait timeout in seconds. (If podWait is enabled this timeout will be reseted with ) | Integer | 1h     | 12h |
-| `jobIterationDelay`    | How long to wait between each job iteration                                      | Duration | 0s      |
-| `jobPause`             | How long to pause after finishing the job                                        | Duration | 0s      |
+| `maxWaitTimeout`       | Maximum wait timeout per namespace                                               | Duration| 3h     |
+| `jobIterationDelay`    | How long to wait between each job iteration                                      | Duration| 0s      |
+| `jobPause`             | How long to pause after finishing the job                                        | Duration| 0s      |
 | `qps`                  | Limit object creation queries per second                                         | Integer | 0       |
 | `burst`                | Maximum burst for throttle                                                       | Integer | 0       |
-| `objects`              | List of objects the job will create. Detailed on the [objects section](#objects) | List | []      |
+| `objects`              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | []      |
 | `verifyObjects`        | Verify object count after running each job                                       | Boolean | true    |
 | `errorOnVerify`        | Set RC to 1 when objects verification fails                                      | Boolean | true    |
-| `preLoadImages`        | Kube-burner will create a DS before triggering the job to pull all the images of the job | true | true |
-| `preLoadPeriod`        | How long to wait for the preload daemonset                                       | Duration | 1m      |
+| `preLoadImages`        | Kube-burner will create a DS before triggering the job to pull all the images of the job   | true    |
+| `preLoadPeriod`        | How long to wait for the preload daemonset                                       | Duration| 1m     |
 | `namespaceLabels`      | Add custom labels to the namespaces created by kube-burner                       | Object  | {} |
 | `churn`                | Churn the workload. Only supports namespace based workloads                      | Boolean | false |
 | `churnPercent`         | Percentage of the jobIterations to churn each period                             | Integer | 10 |
-| `churnDuration`        | Length of time that the job is churned for                                       | Duration | 1h |
-| `churnDelay`           | Length of time to wait between each churn period                                 | Duration | 5m |
+| `churnDuration`        | Length of time that the job is churned for                                       | Duration| 1h |
+| `churnDelay`           | Length of time to wait between each churn period                                 | Duration| 5m |
 
 Examples of valid configuration files can be found at the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
 
@@ -199,7 +199,7 @@ jobs:
 
 ## Churning Jobs
 
-Churn or the deletion and re-creation of objects, is supported for namespace based jobs only. This ocurs after the job has completed
+Churn is the deletion and re-creation of objects and is supported for namespace based jobs only. This occurs after the job has completed
 but prior to uploading metrics, if applicable. It deletes a percentage of contiguous namespaces randomly chosen and re-creates them
 with all of the appropriate objects. It will then wait for a specified delay (or none if set to 0) before deleting and recreating the
 next randomly chosen set. This cycle continues until the churn duration has passed.
@@ -262,19 +262,19 @@ spec:
     targetPort: "{{.targetPort}}"
   type: ClusterIP
 ```
-
+<!-- markdownlint-disable -->
 !!! tip "You can also use [golang template semantics](https://golang.org/pkg/text/template/) in your `objectTemplate` definitions"
-
-```yaml
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  name: {{.prefix}}-{{.Replica}}
-spec:
-{{ if .image }}
-  dockerImageRepository: {{.image}}
-{{ end }}
-```
+    ```yaml
+    kind: ImageStream
+    apiVersion: image.openshift.io/v1
+    metadata:
+      name: {{.prefix}}-{{.Replica}}
+    spec:
+    {{ if .image }}
+      dockerImageRepository: {{.image}}
+    {{ end }}
+    ```
+<!-- markdownlint-restore -->
 
 ## Template functions
 

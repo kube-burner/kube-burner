@@ -1,7 +1,9 @@
 # docs.yml
-name: Generate and Deploy docs
+name: Deploy docs
 on:
-  workflow_call:
+  release:
+    types:
+    - published
 permissions:
   contents: write
 jobs:
@@ -24,3 +26,4 @@ jobs:
       - run: pip install mkdocs-material mkdocs-include-markdown-plugin mike
       - run: |
           mike deploy --push -m "Update docs to version ${RELEASE_TAG_VERSION}" --update-aliases ${RELEASE_TAG_VERSION} latest
+      - run: mike set-default --push latest

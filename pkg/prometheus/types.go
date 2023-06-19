@@ -32,7 +32,7 @@ type Auth struct {
 type Prometheus struct {
 	Client        *prometheus.Prometheus
 	Endpoint      string
-	MetricProfile metricProfile
+	MetricProfile []metricDefinition
 	Step          time.Duration
 	UUID          string
 	ConfigSpec    config.Spec
@@ -47,11 +47,12 @@ type Job struct {
 	JobConfig config.Job
 }
 
-// metricProfile describes what metrics kube-burner collects
-type metricProfile []struct {
-	Query      string `yaml:"query"`
-	MetricName string `yaml:"metricName"`
-	Instant    bool   `yaml:"instant"`
+// metricDefinition describes what metrics kube-burner collects
+type metricDefinition struct {
+	Query        string                   `yaml:"query"`
+	MetricName   string                   `yaml:"metricName"`
+	Instant      bool                     `yaml:"instant"`
+	Aggregations []prometheus.Aggregation `yaml:"aggregations"`
 }
 
 // MetricEndpoint describes prometheus endpoint to scrape
@@ -63,13 +64,13 @@ type MetricEndpoint struct {
 }
 
 type metric struct {
-	Timestamp  time.Time         `json:"timestamp"`
-	Labels     map[string]string `json:"labels"`
-	Value      float64           `json:"value"`
-	UUID       string            `json:"uuid"`
-	Query      string            `json:"query"`
-	MetricName string            `json:"metricName,omitempty"`
-	JobName    string            `json:"jobName,omitempty"`
-	JobConfig  config.Job        `json:"jobConfig,omitempty"`
-	Metadata   interface{}       `json:"metadata,omitempty"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Labels      map[string]string      `json:"labels,omitempty"`
+	Value       float64                `json:"value"`
+	UUID        string                 `json:"uuid"`
+	Query       string                 `json:"query"`
+	MetricName  string                 `json:"metricName,omitempty"`
+	JobConfig   config.Job             `json:"jobConfig,omitempty"`
+	Metadata    interface{}            `json:"metadata,omitempty"`
+	Aggregation prometheus.Aggregation `json:"aggregation,omitempty"`
 }
