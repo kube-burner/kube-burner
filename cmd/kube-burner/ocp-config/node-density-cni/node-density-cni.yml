@@ -14,7 +14,8 @@ jobs:
     jobIterations: {{.JOB_ITERATIONS}}
     qps: {{.QPS}}
     burst: {{.BURST}}
-    namespacedIterations: false
+    namespacedIterations: true
+    iterationsPerNamespace: 1000
     podWait: false
     waitWhenFinished: true
     preLoadImages: true
