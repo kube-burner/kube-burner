@@ -30,20 +30,17 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/restmapper"
 )
 
 func setupCreateJob(jobConfig config.Job) Executor {
-	apiGroupResouces, err := restmapper.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		log.Fatal(err)
-	}
-	mapper := restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
+	var err error
+	mapper := newRESTMapper()
 	waitClientSet, waitRestConfig, err = config.GetClientSet(jobConfig.QPS*2, jobConfig.Burst*2)
 	if err != nil {
 		log.Fatalf("Error creating wait clientSet: %s", err.Error())
@@ -86,9 +83,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		if o.Namespaced {
 			ex.NamespacedIterations = true
 		}
-		if isNamespaced(gvk) {
-			obj.Namespaced = true
-		}
+		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
