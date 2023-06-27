@@ -44,7 +44,6 @@ jobs:
         export PATH=${PATH}:/tmp/
         chmod +x /tmp/kube-burner
         bats -F pretty -T --report-formatter junit --print-output-on-failure test-k8s.bats
-        cp report.xml test-k8s-${{matrix.k8s-version}}-results.xml
       env:
         TERM: linux
         KIND_VERSION: v0.19.0
@@ -55,7 +54,7 @@ jobs:
       if: always()
       with:
         name: test-k8s-results
-        path: test/test-k8s-${{matrix.k8s-version}}-results.xml
+        path: test/report.xml
 
     - name: Publish Test Report
       uses: mikepenz/action-junit-report@v3
@@ -103,7 +102,6 @@ jobs:
         export PATH=${PATH}:/tmp/
         chmod +x /tmp/kube-burner
         bats -F pretty -T --report-formatter junit --print-output-on-failure test-ocp.bats
-        cp report.xml test-ocp-results.xml
       env:
         TERM: linux
         OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
@@ -115,7 +113,7 @@ jobs:
       if: always()
       with:
         name: test-ocp-results
-        path: test/test-ocp-results.xml
+        path: test/report.xml
 
     - name: Publish Test Report
       uses: mikepenz/action-junit-report@v3

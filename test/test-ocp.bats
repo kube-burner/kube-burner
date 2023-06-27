@@ -59,13 +59,6 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "cluster-density-v2 with indexing" {
-  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=false ${COMMON_FLAGS}
-  [ "$status" -eq 0 ]
-  run check_metric_value etcdVersion clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
-  [ "$status" -eq 0 ]
-}
-
 @test "cluster-density-v2 with reporting" {
   run kube-burner ocp cluster-density-v2 --iterations=2 --churn=false --reporting ${COMMON_FLAGS} 
   [ "$status" -eq 0 ]

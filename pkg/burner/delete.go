@@ -21,22 +21,18 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/restmapper"
 )
 
 func setupDeleteJob(jobConfig *config.Job) Executor {
 	var ex Executor
 	log.Debugf("Preparing delete job: %s", jobConfig.Name)
-	apiGroupResouces, err := restmapper.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		log.Fatal(err)
-	}
-	mapper := restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
+	mapper := newRESTMapper()
 	for _, o := range jobConfig.Objects {
 		if o.APIVersion == "" {
 			o.APIVersion = "v1"
@@ -53,9 +49,7 @@ func setupDeleteJob(jobConfig *config.Job) Executor {
 			gvr:           mapping.Resource,
 			labelSelector: o.LabelSelector,
 		}
-		if isNamespaced(&gvk) {
-			obj.Namespaced = true
-		}
+		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 		log.Debugf("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
 	}

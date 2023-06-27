@@ -38,6 +38,7 @@ func setupPatchJob(jobConfig config.Job) Executor {
 	var err error
 	log.Debugf("Preparing patch job: %s", jobConfig.Name)
 	var ex Executor
+	mapper := newRESTMapper()
 	for _, o := range jobConfig.Objects {
 		if o.APIVersion == "" {
 			o.APIVersion = "v1"
@@ -56,7 +57,10 @@ func setupPatchJob(jobConfig config.Job) Executor {
 		// because it would try to use the properties of the patch data to find
 		// the objects to patch.
 		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
-		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
+		mapping, err := mapper.RESTMapping(gvk.GroupKind())
+		if err != nil {
+			log.Fatal(err)
+		}
 		if len(o.LabelSelector) == 0 {
 			log.Fatalf("Empty labelSelectors not allowed with: %s", o.Kind)
 		}
@@ -64,15 +68,13 @@ func setupPatchJob(jobConfig config.Job) Executor {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
 		obj := object{
-			gvr:           gvr,
+			gvr:           mapping.Resource,
 			objectSpec:    t,
 			Object:        o,
 			labelSelector: o.LabelSelector,
 			patchType:     o.PatchType,
 		}
-		if isNamespaced(&gvk) {
-			obj.Namespaced = true
-		}
+		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 		log.Infof("Job %s: Patch %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
 	}

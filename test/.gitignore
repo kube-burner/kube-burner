@@ -1,6 +1,8 @@
 ocp/alerts.yml
 ocp/build.yml
 ocp/metrics.yml
+ocp/metrics-aggregated.yml
+ocp/metrics-report.yml
 ocp/node-density.yml
 ocp/pod.yml
 ocp/app-deployment.yml
@@ -13,7 +15,6 @@ ocp/deployment-client.yml
 ocp/deployment-server.yml
 ocp/deployment.yml
 ocp/imagestream.yml
-ocp/metrics-aggregated.yml
 ocp/node-density-cni.yml
 ocp/node-density-heavy.yml
 ocp/np-allow-from-clients.yml
