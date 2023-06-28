@@ -19,3 +19,5 @@ linters:
     - gosimple
     - unconvert
     - gocyclo
+    - gofmt
+    - govet
