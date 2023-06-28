@@ -115,7 +115,7 @@
   metricName: cpu-ovnkube-node-ovn-controller
   aggregations: [avg]
 
-- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovo-controller"}
+- query: container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovn-controller"}
   metricName: memory-ovnkube-node-ovn-controller
   aggregations: [avg, max]
 
