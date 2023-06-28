@@ -261,7 +261,7 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 		if ns != "" {
 			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		} else {
-			log.Debugf("Created %s/%s", uns.GetKind(), uns.GetName(), ns)
+			log.Debugf("Created %s/%s", uns.GetKind(), uns.GetName())
 		}
 		return true, err
 	}, 1*time.Second, 3, 0, 3)
