@@ -45,7 +45,7 @@
   metricName: memory-kube-controller-manager
   aggregations: [avg, max]
 
-- query: topk(3, sum(irate(container_cpu_system_seconds_total{namespace="openshift-kube-apiserver"}[2m])) by (pod))
+- query: topk(3, sum(irate(container_cpu_usage_seconds_total{namespace="openshift-kube-apiserver"}[2m])) by (pod))
   metricName: cpu-kube-apiserver
   aggregations: [avg]
 
@@ -53,7 +53,7 @@
   metricName: memory-kube-apiserver
   aggregations: [avg, max]
 
-- query: topk(3, sum(irate(container_cpu_system_seconds_total{namespace="openshift-etcd"}[2m])) by (pod))
+- query: topk(3, sum(irate(container_cpu_usage_seconds_total{namespace="openshift-etcd"}[2m])) by (pod))
   metricName: cpu-etcd
   aggregations: [avg]
 
@@ -63,7 +63,7 @@
 
 # OVNKubernetes
 
-- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="sbdb"}[2m])
+- query: irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="sbdb"}[2m])
   metricName: cpu-ovnkube-master-sbdb
   aggregations: [avg]
 
@@ -71,7 +71,7 @@
   metricName: memory-ovnkube-master-sbdb
   aggregations: [avg, max]
 
-- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="nbdb"}[2m])
+- query: irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="nbdb"}[2m])
   metricName: cpu-ovnkube-master-nbdb
   aggregations: [avg]
 
@@ -79,7 +79,7 @@
   metricName: memory-ovnkube-master-nbdb
   aggregations: [avg, max]
 
-- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="northd"}[2m])
+- query: irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="northd"}[2m])
   metricName: cpu-ovnkube-master-northd
   aggregations: [avg]
 
@@ -87,7 +87,7 @@
   metricName: memory-ovnkube-master-northd
   aggregations: [avg, max]
 
-- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="ovnkube-master"}[2m])
+- query: irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="ovnkube-master"}[2m])
   metricName: cpu-ovnkube-master-ovnkube-master
   aggregations: [avg]
 
@@ -95,7 +95,7 @@
   metricName: memory-ovnkube-master-ovnkube-master
   aggregations: [avg, max]
 
-- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="ovn-dbchecker"}[2m])
+- query: irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-master.+",container="ovn-dbchecker"}[2m])
   metricName: cpu-ovnkube-master-ovn-dbchecker
   aggregations: [avg]
 
@@ -103,7 +103,7 @@
   metricName: memory-ovnkube-master-ovn-dbchecker
   aggregations: [avg, max]
 
-- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovnkube-node"}[2m])
+- query: irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovnkube-node"}[2m])
   metricName: cpu-ovnkube-node-ovnkube-node
   aggregations: [avg]
 
@@ -111,7 +111,7 @@
   metricName: memory-ovnkube-node-ovnkube-node
   aggregations: [avg, max]
 
-- query: irate(container_cpu_system_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovn-controller"}[2m])
+- query: irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+",container="ovn-controller"}[2m])
   metricName: cpu-ovnkube-node-ovn-controller
   aggregations: [avg]
 
