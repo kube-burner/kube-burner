@@ -150,11 +150,12 @@ func (wh *WorkloadHelper) indexMetadata() {
 
 func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	metadata := map[string]interface{}{
-		"platform":   wh.Metadata.Platform,
-		"ocpVersion": wh.Metadata.OCPVersion,
-		"k8sVersion": wh.Metadata.K8SVersion,
-		"totalNodes": wh.Metadata.TotalNodes,
-		"sdnType":    wh.Metadata.SDNType,
+		"platform":        wh.Metadata.Platform,
+		"ocpVersion":      wh.Metadata.OCPVersion,
+		"ocpMajorVersion": wh.Metadata.OCPMajorVersion,
+		"k8sVersion":      wh.Metadata.K8SVersion,
+		"totalNodes":      wh.Metadata.TotalNodes,
+		"sdnType":         wh.Metadata.SDNType,
 	}
 	// Combine provided userMetadata with the regular OCP metadata
 	for k, v := range wh.Metadata.UserMetadata {
