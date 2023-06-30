@@ -38,7 +38,7 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 		UUID:       configSpec.GlobalConfig.UUID,
 		ConfigSpec: configSpec,
 		Endpoint:   url,
-		metadata:   metadata,
+		Metadata:   metadata,
 	}
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
 	p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
@@ -95,7 +95,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 					MetricName:  md.MetricName,
 					JobConfig:   p.findJob(end),
 					Timestamp:   end,
-					Metadata:    p.metadata,
+					Metadata:    p.Metadata,
 					Aggregation: agg,
 					Value:       result,
 				}
@@ -205,7 +205,7 @@ func (p *Prometheus) createMetric(query, metricName string, labels model.Metric,
 		MetricName: metricName,
 		JobConfig:  jobConfig,
 		Timestamp:  timestamp,
-		Metadata:   p.metadata,
+		Metadata:   p.Metadata,
 	}
 	for k, v := range labels {
 		if k != "__name__" {

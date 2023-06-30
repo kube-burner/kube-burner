@@ -37,7 +37,7 @@ type Prometheus struct {
 	UUID          string
 	ConfigSpec    config.Spec
 	JobList       []Job
-	metadata      map[string]interface{}
+	Metadata      map[string]interface{}
 }
 
 type Job struct {
