@@ -182,6 +182,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				}
 			}
 			prometheusClient.JobList = prometheusJobList
+			prometheusClient.Metadata = metadata
 			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 			if globalConfig.IndexerConfig.Type != "" {
 				metrics.ScrapeMetrics(prometheusClient, indexer)
