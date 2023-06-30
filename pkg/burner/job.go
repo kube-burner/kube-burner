@@ -121,7 +121,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					log.Infof("Churn percent: %v", job.ChurnPercent)
 					log.Infof("Churn delay: %v", job.ChurnDelay)
 				}
-				job.RunCreateJob(1, job.JobIterations)
+				job.RunCreateJob(0, job.JobIterations)
 				// If object verification is enabled
 				if job.VerifyObjects && !job.Verify() {
 					errMsg := "Object verification failed"

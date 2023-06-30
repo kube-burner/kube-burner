@@ -23,23 +23,22 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 )
 
-func createNamespace(clientset *kubernetes.Clientset, namespaceName string, nsLabels map[string]string) error {
+func createNamespace(namespaceName string, nsLabels map[string]string) error {
 	ns := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
 	}
 
 	return RetryWithExponentialBackOff(func() (done bool, err error) {
-		_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
+		_, err = ClientSet.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
 		if errors.IsForbidden(err) {
 			log.Fatalf("authorization error creating namespace %s: %s", ns.Name, err)
 			return false, err
 		}
 		if errors.IsAlreadyExists(err) {
 			log.Infof("Namespace %s already exists", ns.Name)
-			nsSpec, _ := clientset.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
+			nsSpec, _ := ClientSet.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
 			if nsSpec.Status.Phase == corev1.NamespaceTerminating {
 				log.Warnf("Namespace %s is in %v state, retrying", namespaceName, corev1.NamespaceTerminating)
 				return false, nil

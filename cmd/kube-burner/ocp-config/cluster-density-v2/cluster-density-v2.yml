@@ -18,7 +18,7 @@ jobs:
     podWait: false
     waitWhenFinished: true
     preLoadImages: true
-    preLoadPeriod: 30s
+    preLoadPeriod: 15s
     churn: {{.CHURN}}
     churnDuration: {{.CHURN_DURATION}}
     churnPercent: {{.CHURN_PERCENT}}

@@ -50,6 +50,7 @@ teardown_file() {
 
 @test "cluster-density" {
   run kube-burner ocp cluster-density --iterations=2 --churn=false --uuid=${UUID}
+  [ "$status" -eq 0 ]
 }
 
 @test "cluster-density-ms for multiple endpoints case with indexing" {

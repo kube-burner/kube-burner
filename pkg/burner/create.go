@@ -105,25 +105,25 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	}
 	if !ex.NamespacedIterations {
 		ns = ex.Namespace
-		if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
+		if err = createNamespace(ns, nsLabels); err != nil {
 			log.Fatal(err.Error())
 		}
 	}
 	// We have to sum 1 since the iterations start from 1
-	iterationProgress := (iterationEnd - iterationStart + 1) / 10
+	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
 	var namespacesCreated = make(map[string]bool)
 	var namespacesWaited = make(map[string]bool)
-	for i := iterationStart; i <= iterationEnd; i++ {
+	for i := iterationStart; i < iterationEnd; i++ {
 		if i == iterationStart+iterationProgress*percent {
-			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart+1)
+			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
-				if err = createNamespace(ClientSet, ns, nsLabels); err != nil {
+				if err = createNamespace(ns, nsLabels); err != nil {
 					log.Error(err.Error())
 					continue
 				}
@@ -152,7 +152,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
-		for i := iterationStart; i <= iterationEnd; i++ {
+		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
 				if namespacesWaited[ns] {
@@ -289,7 +289,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		// Max amount of churn is 100% of namespaces
 		randStart := 1
 		if ex.JobIterations-numToChurn+1 > 0 {
-			randStart = rand.Intn(ex.JobIterations-numToChurn+1) + 1
+			randStart = rand.Intn(ex.JobIterations - numToChurn + 1)
 		} else {
 			numToChurn = ex.JobIterations
 		}
@@ -314,7 +314,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"}, true)
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(randStart, numToChurn+randStart-1)
+		ex.RunCreateJob(randStart, numToChurn+randStart)
 		log.Infof("Sleeping for %v", ex.ChurnDelay)
 		time.Sleep(ex.ChurnDelay)
 	}

@@ -97,7 +97,7 @@ func createDSs(imageList []string, namespaceLabels map[string]string) error {
 	for label, value := range namespaceLabels {
 		nsLabels[label] = value
 	}
-	if err := createNamespace(ClientSet, preLoadNs, nsLabels); err != nil {
+	if err := createNamespace(preLoadNs, nsLabels); err != nil {
 		log.Fatal(err)
 	}
 	for i, image := range imageList {
