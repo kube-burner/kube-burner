@@ -28,6 +28,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/version"
 
@@ -238,11 +239,12 @@ func indexCmd() *cobra.Command {
 }
 
 func importCmd() *cobra.Command {
-	var configFile, tarball string
+	var configFile, tarball, userMetadata string
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "Import metrics tarball",
 		Run: func(cmd *cobra.Command, args []string) {
+			userMetadataContent := make(map[string]interface{})
 			configSpec, err := config.Parse("", configFile, false)
 			if err != nil {
 				log.Fatal(err.Error())
@@ -253,7 +255,13 @@ func importCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			err = metrics.ImportTarball(tarball, indexer, indexerConfig.MetricsDirectory)
+			if userMetadata != "" {
+				userMetadataContent, err = util.ReadUserMetadata(userMetadata)
+				if err != nil {
+					log.Fatalf("Error reading provided user metadata: %v", err)
+				}
+			}
+			err = metrics.ImportTarball(tarball, indexer, indexerConfig.MetricsDirectory, userMetadataContent)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -261,6 +269,7 @@ func importCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVar(&tarball, "tarball", "", "Metrics tarball file")
+	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.MarkFlagRequired("config")
 	cmd.MarkFlagRequired("tarball")
 	return cmd

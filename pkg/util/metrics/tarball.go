@@ -67,7 +67,7 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 	return nil
 }
 
-func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string) error {
+func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string, userMetadata map[string]interface{}) error {
 	log.Infof("Importing tarball %v", tarball)
 	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)
@@ -81,7 +81,7 @@ func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string)
 	}
 	tr := tar.NewReader(gzipReader)
 	for {
-		var metrics []interface{}
+		var metrics []map[string]any
 		hdr, err := tr.Next()
 		// io.EOF returned at the end of file
 		if err == io.EOF {
@@ -94,10 +94,14 @@ func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string)
 			return fmt.Errorf("Tarball read error: %v", err)
 		}
 		log.Infof("Importing metrics from %s", hdr.Name)
-		log.Infof("Writing metric to: %s", metricsDir)
-		_, err = (*indexer).Index(metrics, indexers.IndexingOpts{})
-		if err != nil {
-			return err
+		for _, document := range metrics {
+			log.Infof("Appending metadata %s", userMetadata)
+			document["metadata"] = userMetadata
+			log.Infof("Writing metric to: %s", metricsDir)
+			_, err = (*indexer).Index([]interface{}{document}, indexers.IndexingOpts{})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
