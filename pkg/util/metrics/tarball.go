@@ -95,8 +95,14 @@ func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string,
 		}
 		log.Infof("Importing metrics from %s", hdr.Name)
 		for _, document := range metrics {
-			log.Infof("Appending metadata %s", userMetadata)
-			document["metadata"] = userMetadata
+			if len(userMetadata) > 0 {
+				previousMetadata, _ := json.Marshal(document["metadata"])
+				if len(document["metadata"].(map[string]any)) > 0 {
+					log.Infof("Existing metadata %s", previousMetadata)
+					log.Infof("Replacing with metadata %s", userMetadata)
+				}
+				document["metadata"] = userMetadata
+			}
 			log.Infof("Writing metric to: %s", metricsDir)
 			_, err = (*indexer).Index([]interface{}{document}, indexers.IndexingOpts{})
 			if err != nil {
