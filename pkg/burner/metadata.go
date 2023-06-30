@@ -51,7 +51,10 @@ func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime flo
 	}
 	log.Infof("Indexing metric %s", jobSummaryMetric)
 	log.Debugf("Indexing [%d] documents", len(metadataInfo))
-	resp, err := (*indexer).Index(metadataInfo, indexers.IndexingOpts{MetricName: jobSummaryMetric, JobName: jobConfig.Name})
+	indexingOpts := indexers.IndexingOpts{
+		MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, jobConfig.Name),
+	}
+	resp, err := (*indexer).Index(metadataInfo, indexingOpts)
 	if err != nil {
 		log.Error(err)
 	} else {

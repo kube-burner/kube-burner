@@ -154,29 +154,54 @@ $ kube-burner ocp node-density --pods-per-node=100  # Run workload
 
 ## Cluster metadata
 
-When benchmark finishes, kube-burner will index the cluster metadata in the configured indexer. At the time of writing this document is based on the following golang struct:
+When the benchmark finishes, kube-burner will index the cluster metadata in the configured indexer. At the time of writing this document is based on the following golang struct:
 
 ```golang
-type clusterMetadata struct {
-    MetricName       string                 `json:"metricName,omitempty"`
-    UUID             string                 `json:"uuid"`
-    Platform         string                 `json:"platform"`
-    OCPVersion       string                 `json:"ocpVersion"`
-    K8SVersion       string                 `json:"k8sVersion"`
-    MasterNodesType  string                 `json:"masterNodesType"`
-    WorkerNodesType  string                 `json:"workerNodesType"`
-    InfraNodesType   string                 `json:"infraNodesType"`
-    WorkerNodesCount int                    `json:"workerNodesCount"`
-    InfraNodesCount  int                    `json:"infraNodesCount"`
-    TotalNodes       int                    `json:"totalNodes"`
-    SDNType          string                 `json:"sdnType"`
-    Benchmark        string                 `json:"benchmark"`
-    Timestamp        time.Time              `json:"timestamp"`
-    EndDate          time.Time              `json:"endDate"`
-    ClusterName      string                 `json:"clusterName"`
-    Passed           bool                   `json:"passed"`
-    Metadata         map[string]interface{} `json:"metadata,omitempty"`
+type BenchmarkMetadata struct {
+  ocpmetadata.ClusterMetadata
+  UUID         string                 `json:"uuid"`
+  Benchmark    string                 `json:"benchmark"`
+  Timestamp    time.Time              `json:"timestamp"`
+  EndDate      time.Time              `json:"endDate"`
+  Passed       bool                   `json:"passed"`
+  UserMetadata map[string]interface{} `json:"metadata,omitempty"`
 }
 ```
 
-Where metricName is hardcoded to `clusterMetadata`
+Where `ocpmetadata.ClusterMetadata` is an embed struct inherited from the [go-commons library](https://github.com/cloud-bulldozer/go-commons/blob/main/ocp-metadata/types.go) which has the following fields:
+
+```golang
+// Type to store cluster metadata
+type ClusterMetadata struct {
+  MetricName       string `json:"metricName,omitempty"`
+  Platform         string `json:"platform"`
+  OCPVersion       string `json:"ocpVersion"`
+  OCPMajorVersion  string `json:"ocpMajorVersion"`
+  K8SVersion       string `json:"k8sVersion"`
+  MasterNodesType  string `json:"masterNodesType"`
+  WorkerNodesType  string `json:"workerNodesType"`
+  MasterNodesCount int    `json:"masterNodesCount"`
+  InfraNodesType   string `json:"infraNodesType"`
+  WorkerNodesCount int    `json:"workerNodesCount"`
+  InfraNodesCount  int    `json:"infraNodesCount"`
+  TotalNodes       int    `json:"totalNodes"`
+  SDNType          string `json:"sdnType"`
+  ClusterName      string `json:"clusterName"`
+  Region           string `json:"region"`
+}
+```
+
+MetricName is hardcoded to `clusterMetadata`
+
+<!-- markdownlint-disable -->
+!!! Info
+    It's important to note that every document indexed when using an OCP wrapper workload will include an small subset of the previous fields:
+    ```yaml
+    platform
+    ocpVersion
+    ocpMajorVersion
+    k8sVersion
+    totalNodes
+    sdnType
+    ```
+<!-- markdownlint-restore -->

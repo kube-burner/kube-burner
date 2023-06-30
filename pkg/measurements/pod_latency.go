@@ -174,9 +174,6 @@ func (p *podLatency) stop() (int, error) {
 
 // index sends metrics to the configured indexer
 func (p *podLatency) index() {
-	indexingOpts := indexers.IndexingOpts{
-		JobName: factory.jobConfig.Name,
-	}
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
@@ -185,7 +182,9 @@ func (p *podLatency) index() {
 		delete(metricMap, podLatencyMeasurement)
 	}
 	for metricName, data := range metricMap {
-		indexingOpts.MetricName = metricName
+		indexingOpts := indexers.IndexingOpts{
+			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
+		}
 		log.Debugf("Indexing [%d] documents", len(data))
 		resp, err := (*factory.indexer).Index(data, indexingOpts)
 		if err != nil {

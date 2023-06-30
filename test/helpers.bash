@@ -77,7 +77,7 @@ check_files() {
     fi
   done
   if [[ ${rc} != 0 ]]; then
-    echo "Content of ${TEMP_FOLDER}"
+    echo "Content of ${TEMP_FOLDER}:"
     ls -l ${TEMP_FOLDER}
   fi
 }
@@ -86,6 +86,8 @@ check_file_list() {
   for f in "${@}"; do
     if [[ ! -f ${f} ]]; then
       echo "File ${f} not found"
+      echo "Content of $(dirname ${f}):"
+      ls -l "$(dirname ${f})"
       return 1
     fi
     if [[ $(jq .[0].metricName ${f}) == "" ]]; then
