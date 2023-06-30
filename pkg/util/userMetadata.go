@@ -16,5 +16,6 @@ func ReadUserMetadata(inputFile string) (map[string]interface{}, error) {
 	}
 	yamlDec := yaml.NewDecoder(f)
 	err = yamlDec.Decode(&userMetadata)
+	log.Infof("Loaded user metadata: %s", userMetadata)
 	return userMetadata, err
 }
