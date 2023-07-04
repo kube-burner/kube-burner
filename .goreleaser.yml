@@ -18,17 +18,17 @@ builds:
     ldflags:
       - -X github.com/cloud-bulldozer/kube-burner/pkg/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/kube-burner/pkg/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/kube-burner/pkg/version.Version={{.Version}}
 archives:
-  - name_template: "kube-burner-{{.Version}}-{{.Os}}-{{.Arch}}"
-    format: tar.gz
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- title .Tag }}-
+      {{- .Os }}-
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
     - goos: windows
       format: zip
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
     files:
       - LICENSE
 changelog:
