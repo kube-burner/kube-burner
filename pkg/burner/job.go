@@ -66,7 +66,7 @@ const (
 
 var ClientSet *kubernetes.Clientset
 var waitClientSet *kubernetes.Clientset
-var dynamicClient dynamic.Interface
+var DynamicClient dynamic.Interface
 var waitDynamicClient dynamic.Interface
 var discoveryClient *discovery.DiscoveryClient
 var restConfig *rest.Config
@@ -98,7 +98,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
-			dynamicClient = dynamic.NewForConfigOrDie(restConfig)
+			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			if job.PreLoadImages {
 				if err = preLoadImages(job); err != nil {
 					log.Fatal(err.Error())
@@ -114,6 +114,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					ctx, cancel := context.WithTimeout(context.Background(), timeout)
 					defer cancel()
 					CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
+					CleanupNonNamespacedResources(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
 				}
 				if job.Churn {
 					log.Info("Churning enabled")
@@ -205,6 +206,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		defer cancel()
 		log.Info("Garbage collecting remaining namespaces")
 		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
+		CleanupNonNamespacedResources(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
 	}
 	return rc, nil
 }
