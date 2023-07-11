@@ -133,7 +133,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		for objectIndex, obj := range ex.objects {
 			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
-		if ex.PodWait {
+		if ex.PodWait || ex.WaitWhenFinished {
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
@@ -146,35 +146,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 			time.Sleep(ex.JobIterationDelay)
 		}
 	}
-	// Wait for all replicas to be created
 	wg.Wait()
-	if ex.WaitWhenFinished && !ex.PodWait {
-		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
-		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
-		for i := iterationStart; i < iterationEnd; i++ {
-			if ex.NamespacedIterations {
-				ns = ex.generateNamespace(i)
-				if namespacesWaited[ns] {
-					continue
-				} else {
-					namespacesWaited[ns] = true
-				}
-			}
-			sem <- 1
-			wg.Add(1)
-			go func(ns string) {
-				ex.waitForObjects(ns)
-				<-sem
-				wg.Done()
-			}(ns)
-			// Wait for all namespaces to be ready
-			if !ex.NamespacedIterations {
-				break
-			}
-		}
-		wg.Wait()
-	}
 }
 
 // Simple integer division on the iteration allows us to batch iterations into

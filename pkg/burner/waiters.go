@@ -31,42 +31,45 @@ import (
 )
 
 func (ex *Executor) waitForObjects(ns string) {
+	sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
 		if obj.Wait {
+			sem <- 1
 			wg.Add(1)
 			if obj.WaitOptions.ForCondition != "" {
 				if !obj.Namespaced {
 					ns = ""
 				}
-				go waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, &wg)
+				go waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, &wg, &sem)
 			} else {
 				switch obj.kind {
 				case "Deployment":
-					go waitForDeployments(ns, ex.MaxWaitTimeout, &wg)
+					go waitForDeployments(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "ReplicaSet":
-					go waitForRS(ns, ex.MaxWaitTimeout, &wg)
+					go waitForRS(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "ReplicationController":
-					go waitForRC(ns, ex.MaxWaitTimeout, &wg)
+					go waitForRC(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "StatefulSet":
-					go waitForStatefulSet(ns, ex.MaxWaitTimeout, &wg)
+					go waitForStatefulSet(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "DaemonSet":
-					go waitForDS(ns, ex.MaxWaitTimeout, &wg)
+					go waitForDS(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "Pod":
-					go waitForPod(ns, ex.MaxWaitTimeout, &wg)
+					go waitForPod(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "Build", "BuildConfig":
-					go waitForBuild(ns, ex.MaxWaitTimeout, obj.Replicas, &wg)
+					go waitForBuild(ns, ex.MaxWaitTimeout, obj.Replicas, &wg, &sem)
 				case "VirtualMachine":
-					go waitForVM(ns, ex.MaxWaitTimeout, &wg)
+					go waitForVM(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "VirtualMachineInstance":
-					go waitForVMI(ns, ex.MaxWaitTimeout, &wg)
+					go waitForVMI(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "VirtualMachineInstanceReplicaSet":
-					go waitForVMIRS(ns, ex.MaxWaitTimeout, &wg)
+					go waitForVMIRS(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "Job":
-					go waitForJob(ns, ex.MaxWaitTimeout, &wg)
+					go waitForJob(ns, ex.MaxWaitTimeout, &wg, &sem)
 				case "PersistentVolumeClaim":
-					go waitForPVC(ns, ex.MaxWaitTimeout, &wg)
+					go waitForPVC(ns, ex.MaxWaitTimeout, &wg, &sem)
 				default:
+					<-sem
 					wg.Done()
 				}
 			}
@@ -76,7 +79,7 @@ func (ex *Executor) waitForObjects(ns string) {
 	log.Infof("Actions in namespace %v completed", ns)
 }
 
-func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	// TODO handle errors such as timeouts
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
@@ -92,9 +95,10 @@ func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGr
 		}
 		return true, nil
 	})
+	<-*sem
 }
 
-func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		rss, err := waitClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
@@ -109,9 +113,10 @@ func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		}
 		return true, nil
 	})
+	<-*sem
 }
 
-func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		stss, err := waitClientSet.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{})
@@ -126,9 +131,10 @@ func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGr
 		}
 		return true, nil
 	})
+	<-*sem
 }
 
-func waitForPVC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForPVC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		pvc, err := waitClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Bound"})
@@ -137,9 +143,10 @@ func waitForPVC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		}
 		return len(pvc.Items) == 0, nil
 	})
+	<-*sem
 }
 
-func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		rcs, err := waitClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
@@ -154,9 +161,10 @@ func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		}
 		return true, nil
 	})
+	<-*sem
 }
 
-func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		dss, err := waitClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
@@ -171,9 +179,10 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		}
 		return true, nil
 	})
+	<-*sem
 }
 
-func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		pods, err := waitClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
@@ -182,9 +191,10 @@ func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		}
 		return len(pods.Items) == 0, nil
 	})
+	<-*sem
 }
 
-func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *sync.WaitGroup) {
+func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	buildStatus := []string{"New", "Pending", "Running"}
 	var build types.UnstructuredContent
@@ -217,9 +227,10 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *syn
 		}
 		return true, nil
 	})
+	<-*sem
 }
 
-func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	gvr := schema.GroupVersionResource{
 		Group:    "batch",
@@ -227,12 +238,14 @@ func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Resource: "jobs",
 	}
 	verifyCondition(gvr, ns, "Complete", maxWaitTimeout)
+	<-*sem
 }
 
 func waitForCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration,
-	wg *sync.WaitGroup) {
+	wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	verifyCondition(gvr, ns, condition, maxWaitTimeout)
+	<-*sem
 }
 
 func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration) {
@@ -271,7 +284,7 @@ func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxW
 	})
 }
 
-func waitForVM(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForVM(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	vmGVR := schema.GroupVersionResource{
 		Group:    types.KubevirtGroup,
@@ -279,9 +292,10 @@ func waitForVM(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Resource: types.VirtualMachineResource,
 	}
 	verifyCondition(vmGVR, ns, "Ready", maxWaitTimeout)
+	<-*sem
 }
 
-func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	vmiGVR := schema.GroupVersionResource{
 		Group:    types.KubevirtGroup,
@@ -289,9 +303,10 @@ func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		Resource: types.VirtualMachineInstanceResource,
 	}
 	verifyCondition(vmiGVR, ns, "Ready", maxWaitTimeout)
+	<-*sem
 }
 
-func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
+func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup, sem *chan int) {
 	defer wg.Done()
 	var rs types.UnstructuredContent
 	vmiGVRRS := schema.GroupVersionResource{
@@ -319,4 +334,5 @@ func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 		}
 		return true, nil
 	})
+	<-*sem
 }
