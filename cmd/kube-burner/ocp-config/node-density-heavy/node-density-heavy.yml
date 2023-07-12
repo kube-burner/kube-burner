@@ -1,6 +1,7 @@
 ---
 global:
   gc: {{.GC}}
+  waitWhenFinished: true
   indexerConfig:
     esServers: ["{{.ES_SERVER}}"]
     insecureSkipVerify: true
