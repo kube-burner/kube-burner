@@ -15,23 +15,17 @@
 package config
 
 import (
-	//"bytes"
 	"context"
 	"fmt"
 
-	//"io"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
-
-	//"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	//"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
@@ -54,94 +48,10 @@ var configSpec = Spec{
 	},
 }
 
-// // UnmarshalYAML implements Unmarshaller to customize object defaults
-// func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
-// 	type rawObject Object
-// 	object := rawObject{
-// 		Wait: true,
-// 	}
-// 	if err := unmarshal(&object); err != nil {
-// 		return err
-// 	}
-// 	*o = Object(object)
-// 	return nil
-// }
-
-// // UnmarshalYAML implements Unmarshaller to customize job defaults
-// func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
-// 	type rawJob Job
-// 	raw := rawJob{
-// 		Cleanup:                true,
-// 		NamespacedIterations:   true,
-// 		IterationsPerNamespace: 1,
-// 		PodWait:                false,
-// 		WaitWhenFinished:       true,
-// 		VerifyObjects:          true,
-// 		ErrorOnVerify:          true,
-// 		JobType:                CreationJob,
-// 		WaitForDeletion:        true,
-// 		MaxWaitTimeout:         3 * time.Hour,
-// 		PreLoadImages:          true,
-// 		PreLoadPeriod:          1 * time.Minute,
-// 		Churn:                  false,
-// 		ChurnPercent:           10,
-// 		ChurnDuration:          1 * time.Hour,
-// 		ChurnDelay:             5 * time.Minute,
-// 	}
-// 	if err := unmarshal(&raw); err != nil {
-// 		return err
-// 	}
-// 	// Convert raw to Job
-// 	*j = Job(raw)
-// 	return nil
-// }
-
-// func SetDefaultNew(cfg *viper.Viper, key string, value interface{}) {
-// 	if cfg.Get(key) == nil {
-// 		cfg.Set(key, value)
-// 	}
-// }
-
 // Parse parses a configuration file
 func Parse(uuid, c string, jobsRequired bool) (Spec, error) {
 	cfg := viper.New()
 	cfg.SetConfigFile(c)
-	// defaults:=map[string]interface{}{
-	// 	"cleanup":true,
-	// 	"namespacedIterations":true,
-	// 	"iterationsPerNamespace":1,
-	// 	"podWait":false,
-	// 	"waitWhenFinished":true,
-	// 	"verifyObjects":true,
-	// 	"errorOnVerify":true,
-	// 	"jobType":CreationJob,
-	// 	"waitForDeletion":true,
-	// 	"maxWaitTimeout":3 * time.Hour,
-	// 	"preLoadImages": true,
-	// 	"preLoadPeriod": 1 * time.Minute,
-	// 	"churn":false,
-	// 	"churnPercent":10,
-	// 	"churnDuration": 1* time.Hour,
-	// 	"churnDelay": 5 * time.Minute,
-	// }
-
-	// cfg.SetDefault("jobs.0.cleanup", true)
-	// cfg.SetDefault("jobs.0.namespacedIterations", true)
-	// cfg.SetDefault("jobs.0.iterationsPerNamespace", 1)
-	// cfg.SetDefault("jobs.0.podWait", false)
-	// cfg.SetDefault("jobs.0.waitWhenFinished", true)
-	// cfg.SetDefault("jobs.0.verifyObjects", true)
-	// cfg.SetDefault("jobs.0.errorOnVerify", true)
-	// cfg.SetDefault("jobs.0.jobType", CreationJob)
-	// cfg.SetDefault("jobs.0.waitForDeletion", true)
-	// cfg.SetDefault("jobs.0.maxWaitTimeout", 3*time.Hour)
-	// cfg.SetDefault("jobs.0.preLoadImages", true)
-	// cfg.SetDefault("jobs.0.preLoadPeriod", 1*time.Minute)
-	// cfg.SetDefault("jobs.0.churn", false)
-	// cfg.SetDefault("jobs.0.churnPercent", 10)
-	// cfg.SetDefault("jobs.0.churnDuration", 1*time.Hour)
-	// cfg.SetDefault("jobs.0.churnDelay", 5*time.Minute)
-	// cfg.SetDefault("jobs.0.objects.0.wait", true)
 	if err := cfg.ReadInConfig(); err != nil {
 		return configSpec, fmt.Errorf("failed to read config file: %s", err)
 	}
