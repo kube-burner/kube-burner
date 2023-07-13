@@ -15,20 +15,23 @@
 package config
 
 import (
-	"bytes"
+	//"bytes"
 	"context"
 	"fmt"
-	"io"
+
+	//"io"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
-	log "github.com/sirupsen/logrus"
 
-	"gopkg.in/yaml.v3"
+	//"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+
+	//"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
@@ -51,74 +54,178 @@ var configSpec = Spec{
 	},
 }
 
-// UnmarshalYAML implements Unmarshaller to customize object defaults
-func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	type rawObject Object
-	object := rawObject{
-		Wait: true,
-	}
-	if err := unmarshal(&object); err != nil {
-		return err
-	}
-	*o = Object(object)
-	return nil
-}
+// // UnmarshalYAML implements Unmarshaller to customize object defaults
+// func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
+// 	type rawObject Object
+// 	object := rawObject{
+// 		Wait: true,
+// 	}
+// 	if err := unmarshal(&object); err != nil {
+// 		return err
+// 	}
+// 	*o = Object(object)
+// 	return nil
+// }
 
-// UnmarshalYAML implements Unmarshaller to customize job defaults
-func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	type rawJob Job
-	raw := rawJob{
-		Cleanup:                true,
-		NamespacedIterations:   true,
-		IterationsPerNamespace: 1,
-		PodWait:                false,
-		WaitWhenFinished:       true,
-		VerifyObjects:          true,
-		ErrorOnVerify:          true,
-		JobType:                CreationJob,
-		WaitForDeletion:        true,
-		MaxWaitTimeout:         3 * time.Hour,
-		PreLoadImages:          true,
-		PreLoadPeriod:          1 * time.Minute,
-		Churn:                  false,
-		ChurnPercent:           10,
-		ChurnDuration:          1 * time.Hour,
-		ChurnDelay:             5 * time.Minute,
-	}
-	if err := unmarshal(&raw); err != nil {
-		return err
-	}
-	// Convert raw to Job
-	*j = Job(raw)
-	return nil
-}
+// // UnmarshalYAML implements Unmarshaller to customize job defaults
+// func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
+// 	type rawJob Job
+// 	raw := rawJob{
+// 		Cleanup:                true,
+// 		NamespacedIterations:   true,
+// 		IterationsPerNamespace: 1,
+// 		PodWait:                false,
+// 		WaitWhenFinished:       true,
+// 		VerifyObjects:          true,
+// 		ErrorOnVerify:          true,
+// 		JobType:                CreationJob,
+// 		WaitForDeletion:        true,
+// 		MaxWaitTimeout:         3 * time.Hour,
+// 		PreLoadImages:          true,
+// 		PreLoadPeriod:          1 * time.Minute,
+// 		Churn:                  false,
+// 		ChurnPercent:           10,
+// 		ChurnDuration:          1 * time.Hour,
+// 		ChurnDelay:             5 * time.Minute,
+// 	}
+// 	if err := unmarshal(&raw); err != nil {
+// 		return err
+// 	}
+// 	// Convert raw to Job
+// 	*j = Job(raw)
+// 	return nil
+// }
+
+// func SetDefaultNew(cfg *viper.Viper, key string, value interface{}) {
+// 	if cfg.Get(key) == nil {
+// 		cfg.Set(key, value)
+// 	}
+// }
 
 // Parse parses a configuration file
 func Parse(uuid, c string, jobsRequired bool) (Spec, error) {
-	f, err := util.ReadConfig(c)
+	cfg := viper.New()
+	cfg.SetConfigFile(c)
+	// defaults:=map[string]interface{}{
+	// 	"cleanup":true,
+	// 	"namespacedIterations":true,
+	// 	"iterationsPerNamespace":1,
+	// 	"podWait":false,
+	// 	"waitWhenFinished":true,
+	// 	"verifyObjects":true,
+	// 	"errorOnVerify":true,
+	// 	"jobType":CreationJob,
+	// 	"waitForDeletion":true,
+	// 	"maxWaitTimeout":3 * time.Hour,
+	// 	"preLoadImages": true,
+	// 	"preLoadPeriod": 1 * time.Minute,
+	// 	"churn":false,
+	// 	"churnPercent":10,
+	// 	"churnDuration": 1* time.Hour,
+	// 	"churnDelay": 5 * time.Minute,
+	// }
+
+	// cfg.SetDefault("jobs.0.cleanup", true)
+	// cfg.SetDefault("jobs.0.namespacedIterations", true)
+	// cfg.SetDefault("jobs.0.iterationsPerNamespace", 1)
+	// cfg.SetDefault("jobs.0.podWait", false)
+	// cfg.SetDefault("jobs.0.waitWhenFinished", true)
+	// cfg.SetDefault("jobs.0.verifyObjects", true)
+	// cfg.SetDefault("jobs.0.errorOnVerify", true)
+	// cfg.SetDefault("jobs.0.jobType", CreationJob)
+	// cfg.SetDefault("jobs.0.waitForDeletion", true)
+	// cfg.SetDefault("jobs.0.maxWaitTimeout", 3*time.Hour)
+	// cfg.SetDefault("jobs.0.preLoadImages", true)
+	// cfg.SetDefault("jobs.0.preLoadPeriod", 1*time.Minute)
+	// cfg.SetDefault("jobs.0.churn", false)
+	// cfg.SetDefault("jobs.0.churnPercent", 10)
+	// cfg.SetDefault("jobs.0.churnDuration", 1*time.Hour)
+	// cfg.SetDefault("jobs.0.churnDelay", 5*time.Minute)
+	// cfg.SetDefault("jobs.0.objects.0.wait", true)
+	if err := cfg.ReadInConfig(); err != nil {
+		return configSpec, fmt.Errorf("failed to read config file: %s", err)
+	}
+
+	err := cfg.Unmarshal(&configSpec)
 	if err != nil {
-		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
+		return configSpec, fmt.Errorf("unable to unmarshal config file %v", err)
 	}
-	cfg, err := io.ReadAll(f)
-	if err != nil {
-		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
+
+	for i := range configSpec.Jobs {
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.cleanup", i)) {
+			configSpec.Jobs[i].Cleanup = true
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.namespacedIterations", i)) {
+			configSpec.Jobs[i].NamespacedIterations = true
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.iterationsPerNamespace", i)) {
+			configSpec.Jobs[i].IterationsPerNamespace = 1
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.podWait", i)) {
+			configSpec.Jobs[i].PodWait = false
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.waitWhenFinished", i)) {
+			configSpec.Jobs[i].WaitWhenFinished = true
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.verifyObjects", i)) {
+			configSpec.Jobs[i].VerifyObjects = true
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.errorOnVerify", i)) {
+			configSpec.Jobs[i].ErrorOnVerify = true
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.jobType", i)) {
+			configSpec.Jobs[i].JobType = CreationJob
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.waitForDeletion", i)) {
+			configSpec.Jobs[i].WaitForDeletion = true
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.maxWaitTimeout", i)) {
+			configSpec.Jobs[i].MaxWaitTimeout = 3 * time.Hour
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.preLoadImages", i)) {
+			configSpec.Jobs[i].PreLoadImages = true
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.churn", i)) {
+			configSpec.Jobs[i].Churn = false
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.churnDuration", i)) {
+			configSpec.Jobs[i].ChurnDuration = 1 * time.Hour
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.churnPercent", i)) {
+			configSpec.Jobs[i].ChurnPercent = 10
+		}
+
+		if !cfg.IsSet(fmt.Sprintf("jobs.%d.churnDelay", i)) {
+			configSpec.Jobs[i].ChurnDelay = 5 * time.Minute
+		}
+
+		for j := range configSpec.Jobs[i].Objects {
+			if !cfg.IsSet(fmt.Sprintf("jobs.%d.objects.%d.wait", i, j)) {
+				configSpec.Jobs[i].Objects[j].Wait = true
+			}
+		}
+
 	}
-	renderedCfg, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
-	if err != nil {
-		return configSpec, fmt.Errorf("Error rendering configuration template: %s", err)
-	}
-	if err != nil {
-		return configSpec, err
-	}
-	cfgReader := bytes.NewReader(renderedCfg)
-	yamlDec := yaml.NewDecoder(cfgReader)
-	yamlDec.KnownFields(true)
-	if err = yamlDec.Decode(&configSpec); err != nil {
-		return configSpec, fmt.Errorf("Error decoding configuration file %s: %s", c, err)
-	}
+
+	log.Printf("Check for defaults1234 %+v \n", cfg.GetString("jobs.0.jobType"))
+
 	if jobsRequired {
 		if len(configSpec.Jobs) <= 0 {
-			return configSpec, fmt.Errorf("No jobs found in the configuration file")
+			//Error string should not be captilised
+			return configSpec, fmt.Errorf("no jobs found in the configuration file")
 		}
 		if err := validateDNS1123(); err != nil {
 			return configSpec, err
@@ -138,6 +245,7 @@ func Parse(uuid, c string, jobsRequired bool) (Spec, error) {
 	}
 	configSpec.GlobalConfig.UUID = uuid
 	return configSpec, nil
+
 }
 
 // FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
