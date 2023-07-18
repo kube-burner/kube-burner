@@ -100,48 +100,54 @@ func createDSs(imageList []string, namespaceLabels map[string]string) error {
 	if err := createNamespace(preLoadNs, nsLabels); err != nil {
 		log.Fatal(err)
 	}
-	for i, image := range imageList {
-		dsName := fmt.Sprintf("preload-%d", i)
-		container := corev1.Container{
-			Name:            "kube-burner-rocks",
-			ImagePullPolicy: corev1.PullAlways,
-			Image:           image,
-		}
-		ds := appsv1.DaemonSet{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "DaemonSet",
-				APIVersion: "apps/v1",
+	dsName := "preload"
+	ds := appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: dsName,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": dsName},
 			},
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: dsName,
-			},
-			Spec: appsv1.DaemonSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"app": dsName},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": dsName},
 				},
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{"app": dsName},
-					},
-					Spec: corev1.PodSpec{
-						TerminationGracePeriodSeconds: pointer.Int64(0),
-						InitContainers:                []corev1.Container{container},
-						// Only Always restart policy is supported
-						Containers: []corev1.Container{
-							{
-								Name:  "sleep",
-								Image: "gcr.io/google_containers/pause-amd64:3.0",
-							},
+				Spec: corev1.PodSpec{
+					TerminationGracePeriodSeconds: pointer.Int64(0),
+					InitContainers:                []corev1.Container{},
+					// Only Always restart policy is supported
+					Containers: []corev1.Container{
+						{
+							Name:            "sleep",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullAlways,
 						},
 					},
 				},
 			},
+		},
+	}
+
+	// Add the list of containers using images
+	for i, image := range imageList {
+		container := corev1.Container{
+			Name:            fmt.Sprintf("container-%d", i),
+			ImagePullPolicy: corev1.PullAlways,
+			Image:           image,
+			Command:         []string{"echo", fmt.Sprintf("init container-%d completed", i)},
 		}
-		log.Infof("Pre-load: Creating DaemonSet using image %s in namespace %s", image, preLoadNs)
-		_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
-		if err != nil {
-			return err
-		}
+		ds.Spec.Template.Spec.InitContainers = append(ds.Spec.Template.Spec.InitContainers, container)
+	}
+
+	log.Infof("Pre-load: Creating DaemonSet using images %v in namespace %s", imageList, preLoadNs)
+	_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
+	if err != nil {
+		return err
 	}
 	return nil
 }
