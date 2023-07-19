@@ -26,6 +26,8 @@ import (
 // NewNodeDensity holds node-density-cni workload
 func NewNodeDensityCNI(wh *WorkloadHelper) *cobra.Command {
 	var podsPerNode int
+	var namespacedIterations bool
+	var iterationsPerNamespace int
 	cmd := &cobra.Command{
 		Use:          "node-density-cni",
 		Short:        "Runs node-density-cni workload",
@@ -38,11 +40,15 @@ func NewNodeDensityCNI(wh *WorkloadHelper) *cobra.Command {
 				log.Fatal(err)
 			}
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint((totalPods-podCount)/2))
+			os.Setenv("NAMESPACED_ITERATIONS", fmt.Sprint(namespacedIterations))
+			os.Setenv("ITERATIONS_PER_NAMESPACE", fmt.Sprint(iterationsPerNamespace))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])
 		},
 	}
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
+	cmd.Flags().BoolVar(&namespacedIterations, "namespaced-iterations", true, "Namespaced iterations")
+	cmd.Flags().IntVar(&iterationsPerNamespace, "iterations-per-namespace", 1000, "Iterations per namespace")
 	return cmd
 }
