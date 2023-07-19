@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/cloud-bulldozer/go-commons v1.0.7
+	github.com/cloud-bulldozer/go-commons v1.0.9
 	github.com/prometheus/common v0.44.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.0
