@@ -64,6 +64,8 @@ type GlobalConfig struct {
 	AlertProfile string `yaml:"alertProfile"`
 	// GC garbage collect created namespaces
 	GC bool `yaml:"gc" json:"gc"`
+	// GCTimeout garbage collection timeout
+	GCTimeout time.Duration `yaml:"gcTimeout"`
 }
 
 // Object defines an object that kube-burner will create

@@ -41,6 +41,7 @@ import (
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		GC:             false,
+		GCTimeout:      1 * time.Hour,
 		RequestTimeout: 15 * time.Second,
 		Measurements:   []mtypes.Measurement{},
 		IndexerConfig: indexers.IndexerConfig{

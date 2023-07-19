@@ -111,7 +111,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			switch job.JobType {
 			case config.CreationJob:
 				if job.Cleanup {
-					ctx, cancel := context.WithTimeout(context.Background(), timeout)
+					ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 					defer cancel()
 					CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
 				}
@@ -201,7 +201,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	}
 	if globalConfig.GC {
 		// Use timeout/4 to garbage collect namespaces
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 		defer cancel()
 		log.Info("Garbage collecting remaining namespaces")
 		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)

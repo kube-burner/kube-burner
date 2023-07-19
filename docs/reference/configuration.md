@@ -26,7 +26,8 @@ In this section is described global job configuration, it holds the following pa
 | `bearerToken`      | Bearer token to access the Prometheus endpoint                                                           | String        | ""         |
 | `metricsProfile`   | Path to the metrics profile configuration file                                                           | String         | ""         |
 | `metricsEndpoint`  | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String     | "" |
-| `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `gcTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 
 kube-burner connects k8s clusters using the following methods in this order:
 
@@ -49,7 +50,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `cleanup`              | Cleanup clean up old namespaces                                                  | Boolean | true    |
 | `podWait`              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | false   |
 | `waitWhenFinished`     | Wait for all pods to be running when all iterations are completed                | Boolean | true    |
-| `maxWaitTimeout`       | Maximum wait timeout per namespace                                               | Duration| 3h     |
+| `maxWaitTimeout`       | Maximum wait timeout per namespace                                               | Duration| 4h     |
 | `jobIterationDelay`    | How long to wait between each job iteration                                      | Duration| 0s      |
 | `jobPause`             | How long to pause after finishing the job                                        | Duration| 0s      |
 | `qps`                  | Limit object creation queries per second                                         | Integer | 0       |
