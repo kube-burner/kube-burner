@@ -60,11 +60,14 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `errorOnVerify`        | Set RC to 1 when objects verification fails                                      | Boolean | true    |
 | `preLoadImages`        | Kube-burner will create a DS before triggering the job to pull all the images of the job   | true    |
 | `preLoadPeriod`        | How long to wait for the preload daemonset                                       | Duration| 1m     |
+| `preloadNodeLabels`    | Add node selector labels for the resources created in preload stage              | Object  | {} |
 | `namespaceLabels`      | Add custom labels to the namespaces created by kube-burner                       | Object  | {} |
 | `churn`                | Churn the workload. Only supports namespace based workloads                      | Boolean | false |
 | `churnPercent`         | Percentage of the jobIterations to churn each period                             | Integer | 10 |
 | `churnDuration`        | Length of time that the job is churned for                                       | Duration| 1h |
 | `churnDelay`           | Length of time to wait between each churn period                                 | Duration| 5m |
+
+Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the `Lists and Dictionaries` in YAML syntax like mentioned [here](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries). Please feel free to refer YAML syntax more for details on a specific `Type` usage. 
 
 Examples of valid configuration files can be found at the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
 
