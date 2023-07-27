@@ -30,7 +30,7 @@ Flags:
       --metrics-endpoint string   YAML file with a list of metric endpoints
       --qps int                   QPS (default 20)
       --reporting                 Enable benchmark report indexing
-      --timeout duration          Benchmark timeout (default 3h0m0s)
+      --timeout duration          Benchmark timeout (default 4h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
       --uuid string               Benchmark UUID (default "d18989c4-4f8a-4a14-b711-9afae69a9140")
 

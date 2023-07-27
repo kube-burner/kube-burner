@@ -84,7 +84,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, indexer, metadata)
-		jobList := newExecutorList(configSpec, uuid)
+		jobList := newExecutorList(configSpec, uuid, timeout)
 		// Iterate job list
 		for jobPosition, job := range jobList {
 			if job.QPS == 0 || job.Burst == 0 {
@@ -111,7 +111,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			switch job.JobType {
 			case config.CreationJob:
 				if job.Cleanup {
-					ctx, cancel := context.WithTimeout(context.Background(), timeout)
+					ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 					defer cancel()
 					CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
 					CleanupNonNamespacedResources(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
@@ -202,7 +202,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	}
 	if globalConfig.GC {
 		// Use timeout/4 to garbage collect namespaces
-		ctx, cancel := context.WithTimeout(context.Background(), timeout/4)
+		ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 		defer cancel()
 		log.Info("Garbage collecting remaining namespaces")
 		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
@@ -212,7 +212,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, uuid string) []Executor {
+func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration) []Executor {
 	var ex Executor
 	var executorList []Executor
 	_, restConfig, err := config.GetClientSet(100, 100) // Hardcoded QPS/Burst
@@ -235,6 +235,7 @@ func newExecutorList(configSpec config.Spec, uuid string) []Executor {
 				log.Fatalf("Job names must be unique: %s", job.Name)
 			}
 		}
+		job.MaxWaitTimeout = timeout
 		// Limits the number of workers to QPS and Burst
 		ex.limiter = rate.NewLimiter(rate.Limit(job.QPS), job.Burst)
 		ex.Job = job

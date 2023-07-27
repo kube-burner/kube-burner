@@ -47,7 +47,7 @@ func preLoadImages(job Executor) error {
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
-	err = createDSs(imageList, job.NamespaceLabels)
+	err = createDSs(imageList, job.NamespaceLabels, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
@@ -90,7 +90,7 @@ func getJobImages(job Executor) ([]string, error) {
 	return imageList, nil
 }
 
-func createDSs(imageList []string, namespaceLabels map[string]string) error {
+func createDSs(imageList []string, namespaceLabels map[string]string, nodeSelectorLabels map[string]string) error {
 	nsLabels := map[string]string{
 		"kube-burner-preload": "true",
 	}
@@ -128,6 +128,7 @@ func createDSs(imageList []string, namespaceLabels map[string]string) error {
 							ImagePullPolicy: corev1.PullAlways,
 						},
 					},
+					NodeSelector: nodeSelectorLabels,
 				},
 			},
 		},

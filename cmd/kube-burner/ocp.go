@@ -46,7 +46,7 @@ func openShiftCmd() *cobra.Command {
 	metricsEndpoint := ocpCmd.PersistentFlags().String("metrics-endpoint", "", "YAML file with a list of metric endpoints")
 	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
 	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
-	timeout := ocpCmd.PersistentFlags().Duration("timeout", 3*time.Hour, "Benchmark timeout")
+	timeout := ocpCmd.PersistentFlags().Duration("timeout", 4*time.Hour, "Benchmark timeout")
 	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
 	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
 	gc := ocpCmd.PersistentFlags().Bool("gc", true, "Garbage collect created namespaces")

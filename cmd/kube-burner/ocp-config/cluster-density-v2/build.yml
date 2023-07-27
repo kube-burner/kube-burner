@@ -4,6 +4,10 @@ apiVersion: build.openshift.io/v1
 metadata:
   name: {{.JobName}}-{{.Replica}}
 spec:
+  resources:
+    requests:
+      cpu: 10m
+      memory: "10Mi"
   nodeSelector:
     node-role.kubernetes.io/worker: ""
   serviceAccount: builder
