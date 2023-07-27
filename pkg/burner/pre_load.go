@@ -47,6 +47,10 @@ func preLoadImages(job Executor) error {
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
+	if len(imageList) == 0 {
+		log.Infof("No images found to pre-load, continuing")
+		return nil
+	}
 	err = createDSs(imageList, job.NamespaceLabels, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
