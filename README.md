@@ -6,14 +6,14 @@
 
 # What is Kube-burner
 
-Kube-burner is a Kubernetes performance toolset. It provides multiple functionalities where the most hightliged can be summarized in:
+Kube-burner is a Kubernetes performance and scale test orchestration framework. It provides multi-faceted functionality, the most important of which are summarized below.
 
-- Create, delete and patch Kubernetes at scale.
+- Create, delete and patch Kubernetes resources at scale.
 - Prometheus metric collection and indexing.
 - Measurements.
 - Alerting.
 
-Kube-burner is a binary application written in golang that makes an intensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
+Kube-burner is a binary application written in golang that makes extensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
 
 ![Demo](docs/media/demo.gif)
 
@@ -31,6 +31,6 @@ In case you want to start tinkering with Kube-burner now:
 
 ## Contributing Guidelines, CI, and Code Style
 
-Please read the [Development section](https://cloud-bulldozer.github.io/kube-burner/development/) before contributing to this project. It provides information on how to contribute, guidelines for setting an environment a CI checks to be done before commiting code.
+Please read the [Contributing section](https://cloud-bulldozer.github.io/kube-burner/latest/contributing/) before contributing to this project. It provides information on how to contribute, guidelines for setting an environment a CI checks to be done before commiting code.
 
 This project utilizes a Continuous Integration (CI) pipeline to ensure code quality and maintain project standards. The CI process automatically builds, tests, and verifies the project on each commit and pull request.
