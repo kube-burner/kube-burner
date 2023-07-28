@@ -26,7 +26,8 @@ In this section is described global job configuration, it holds the following pa
 | `bearerToken`      | Bearer token to access the Prometheus endpoint                                                           | String        | ""         |
 | `metricsProfile`   | Path to the metrics profile configuration file                                                           | String         | ""         |
 | `metricsEndpoint`  | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String     | "" |
-| `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `gcTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 
 kube-burner connects k8s clusters using the following methods in this order:
 
@@ -49,7 +50,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `cleanup`              | Cleanup clean up old namespaces                                                  | Boolean | true    |
 | `podWait`              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | false   |
 | `waitWhenFinished`     | Wait for all pods to be running when all iterations are completed                | Boolean | true    |
-| `maxWaitTimeout`       | Maximum wait timeout per namespace                                               | Duration| 3h     |
+| `maxWaitTimeout`       | Maximum wait timeout per namespace                                               | Duration| 4h     |
 | `jobIterationDelay`    | How long to wait between each job iteration                                      | Duration| 0s      |
 | `jobPause`             | How long to pause after finishing the job                                        | Duration| 0s      |
 | `qps`                  | Limit object creation queries per second                                         | Integer | 0       |
@@ -59,11 +60,14 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `errorOnVerify`        | Set RC to 1 when objects verification fails                                      | Boolean | true    |
 | `preLoadImages`        | Kube-burner will create a DS before triggering the job to pull all the images of the job   | true    |
 | `preLoadPeriod`        | How long to wait for the preload daemonset                                       | Duration| 1m     |
+| `preloadNodeLabels`    | Add node selector labels for the resources created in preload stage              | Object  | {} |
 | `namespaceLabels`      | Add custom labels to the namespaces created by kube-burner                       | Object  | {} |
 | `churn`                | Churn the workload. Only supports namespace based workloads                      | Boolean | false |
 | `churnPercent`         | Percentage of the jobIterations to churn each period                             | Integer | 10 |
 | `churnDuration`        | Length of time that the job is churned for                                       | Duration| 1h |
 | `churnDelay`           | Length of time to wait between each churn period                                 | Duration| 5m |
+
+Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the `Lists and Dictionaries` in YAML syntax like mentioned [here](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries). Please feel free to refer YAML syntax more for details on a specific `Type` usage. 
 
 Examples of valid configuration files can be found at the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
 
