@@ -14,20 +14,22 @@ Configured in the `indexerConfig` object, they can be tweaked by the following p
 !!! Note
     At the moment `elastic` and `local` are the only supported indexers
 
-### Elastic
+### Elastic/OpenSearch
 
-This indexer send collected documents to Elasticsearch 7 instances.
+This indexer send collected documents to Elasticsearch 7 instances or OpenSearch instances.
 
-The `elastic` indexer can be configured by the parameters below:
+The `elastic` or `opensearch` indexer can be configured by the parameters below:
 
 | Option               | Description                                       | Type        | Default |
 |----------------------|---------------------------------------------------|-------------|---------|
-| `esServers`            | List of ES instances                              | List        | ""      |
+| `esServers`            | List of ES or Opensearch instances                | List        | ""      |
 | `defaultIndex`         | Default index to send the prometheus metrics into | String      | ""      |
 | `insecureSkipVerify`   | TLS certificate verification                      | Boolean     | false   |
 
+Since Opensearch is back compatible with Elasticsearch, and there are no version checks we are using. Kube-burner with OpenSearch indexing wouldn't raise any issues.
+
 !!!Info
-    It's possible to index documents in an authenticated ES instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the `esServers` parameter.
+    It's possible to index documents in an authenticated ES or OpenSearch instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the `esServers` parameter.
 
 ### Local
 
