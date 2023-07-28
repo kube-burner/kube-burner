@@ -4,14 +4,14 @@
 
 # What is Kube-burner
 
-Kube-burner is a Kubernetes performance toolset. It provides multiple functionalities where the most hightliged can be summarized in:
+Kube-burner is a Kubernetes performance and scale test orchestration toolset. It provides multi-faceted functionality, the most important of which are summarized below.
 
-- Create, delete and patch Kubernetes at scale.
+- Create, delete and patch Kubernetes resources at scale.
 - Prometheus metric collection and indexing.
 - Measurements.
 - Alerting.
 
-Kube-burner is a binary application written in golang that makes an intensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
+Kube-burner is a binary application written in golang that makes extensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
 
 ![Demo](media/demo.gif)
 
