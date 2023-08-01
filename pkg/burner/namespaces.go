@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -98,22 +99,50 @@ func CleanupNonNamespacedResources(ctx context.Context, l metav1.ListOptions, cl
 					log.Debugf("Unable to list resource: %s error: %v. Hence skipping it", resource.Name, err)
 					continue
 				}
-				if len(resources.Items) > 0 {
-					for _, item := range resources.Items {
-						go func(item unstructured.Unstructured) {
-							err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
-							if err != nil {
-								log.Errorf("Error deleting non-namespaced resources: %v", err)
-							}
-						}(item)
-					}
-					if cleanupWait {
-						waitForDeleteNonNamespacedResources(ctx, resourceInterface, l)
-					}
-				}
+				deleteNonNamespacedResources(ctx, resources, resourceInterface, l, cleanupWait)
 			}
 		}
 	}
+}
+
+// Cleanup non-namespaced resources using executor list
+func CleanupNonNamespacedResourcesUsingGvr(ctx context.Context, executorList []Executor, cleanupWait bool) {
+	log.Info("Deleting non-namespace resources specific to this benchmark")
+	for _, executor := range executorList {
+		for _, object := range executor.objects {
+			if !object.Namespaced {
+				resourceInterface := DynamicClient.Resource(object.gvr)
+				listOptions := metav1.ListOptions{
+					LabelSelector: labels.SelectorFromSet(object.labelSelector).String(),
+				}
+				resources, err := resourceInterface.List(ctx, listOptions)
+				if err != nil {
+					log.Debugf("Unable to list resources for object: %v error: %v. Hence skipping it", object.Object, err)
+					continue
+				}
+				deleteNonNamespacedResources(ctx, resources, resourceInterface, listOptions, cleanupWait)
+			}
+		}
+	}
+
+}
+
+func deleteNonNamespacedResources(ctx context.Context, resources *unstructured.UnstructuredList, resourceInterface dynamic.NamespaceableResourceInterface,
+	listOptions metav1.ListOptions, cleanupWait bool) {
+	if len(resources.Items) > 0 {
+		for _, item := range resources.Items {
+			go func(item unstructured.Unstructured) {
+				err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
+				if err != nil {
+					log.Errorf("Error deleting non-namespaced resources: %v", err)
+				}
+			}(item)
+		}
+		if cleanupWait {
+			waitForDeleteNonNamespacedResources(ctx, resourceInterface, listOptions)
+		}
+	}
+
 }
 
 func waitForDeleteNamespaces(ctx context.Context, l metav1.ListOptions) {

@@ -77,6 +77,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var err error
 	var rc int
 	var prometheusJobList []prometheus.Job
+	var jobList []Executor
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
@@ -84,7 +85,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, indexer, metadata)
-		jobList := newExecutorList(configSpec, uuid, timeout)
+		jobList = newExecutorList(configSpec, uuid, timeout)
 		// Iterate job list
 		for jobPosition, job := range jobList {
 			if job.QPS == 0 || job.Burst == 0 {
@@ -206,7 +207,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		defer cancel()
 		log.Info("Garbage collecting remaining namespaces")
 		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
-		CleanupNonNamespacedResources(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
+		CleanupNonNamespacedResourcesUsingGvr(ctx, jobList, true)
 	}
 	return rc, nil
 }
