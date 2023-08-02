@@ -6,28 +6,30 @@ Kube-burner can index the collected metrics metrics into a given indexer.
 
 Configured in the `indexerConfig` object, they can be tweaked by the following parameters:
 
-| Option               | Description           | Type     | Default |
-|----------------------|-----------------------|----------|---------|
-| `enabled`              | Enable indexing       | Boolean  | false   |
-| `type`                 | Type of indexer       | String   | ""      |
+| Option    | Description     | Type    | Default |
+| --------- | --------------- | ------- | ------- |
+| `enabled` | Enable indexing | Boolean | false   |
+| `type`    | Type of indexer | String  | ""      |
 
 !!! Note
-    At the moment `elastic` and `local` are the only supported indexers
+At the moment `elastic` and `local` are the only supported indexers
 
-### Elastic
+### Elastic/OpenSearch
 
-This indexer send collected documents to Elasticsearch 7 instances.
+This indexer send collected documents to Elasticsearch 7 instances or OpenSearch instances.
 
-The `elastic` indexer can be configured by the parameters below:
+The `elastic` or `opensearch` indexer can be configured by the parameters below:
 
-| Option               | Description                                       | Type        | Default |
-|----------------------|---------------------------------------------------|-------------|---------|
-| `esServers`            | List of ES instances                              | List        | ""      |
-| `defaultIndex`         | Default index to send the prometheus metrics into | String      | ""      |
-| `insecureSkipVerify`   | TLS certificate verification                      | Boolean     | false   |
+| Option               | Description                                       | Type    | Default |
+| -------------------- | ------------------------------------------------- | ------- | ------- |
+| `esServers`          | List of ES or Opensearch instances                | List    | ""      |
+| `defaultIndex`       | Default index to send the prometheus metrics into | String  | ""      |
+| `insecureSkipVerify` | TLS certificate verification                      | Boolean | false   |
+
+Since Opensearch is back compatible with Elasticsearch, and there are no version checks we are using. Kube-burner with OpenSearch indexing wouldn't raise any issues.
 
 !!!Info
-    It's possible to index documents in an authenticated ES instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the `esServers` parameter.
+It's possible to index documents in an authenticated ES or OpenSearch instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the `esServers` parameter.
 
 ### Local
 
@@ -35,11 +37,11 @@ This indexer writes collected metrics to local files.
 
 The `local` indexer can be configured by the parameters below:
 
-| Option               | Description                                       | Type           | Default |
-|----------------------|---------------------------------------------------|----------------|---------|
-| `metricsDirectory`     | Collected metric will be dumped here.           | String         | collected-metrics       |
-| `createTarball`        | Create metrics tarball                          | Boolean        | false      |
-| `tarballName`          | Name of the metrics tarball                     | String         | kube-burner-metrics.tgz      |
+| Option             | Description                           | Type    | Default                 |
+| ------------------ | ------------------------------------- | ------- | ----------------------- |
+| `metricsDirectory` | Collected metric will be dumped here. | String  | collected-metrics       |
+| `createTarball`    | Create metrics tarball                | Boolean | false                   |
+| `tarballName`      | Name of the metrics tarball           | String  | kube-burner-metrics.tgz |
 
 ## Job Summary
 
@@ -109,15 +111,15 @@ It's possible to scrape from multiple prometheus endpoints and send the results 
 A valid file provided to the `--metrics-endpoint` would look like this.
 
 ```yaml
-- endpoint: http://localhost:9090  # This is one of the Prometheus endpoints
-  token: <token>                   # Authentication token
-  profile: metrics.yaml            # Metrics profile to use in this target
-  alertProfile: alerts.yaml        # Alert profile, optional
+- endpoint: http://localhost:9090 # This is one of the Prometheus endpoints
+  token: <token> # Authentication token
+  profile: metrics.yaml # Metrics profile to use in this target
+  alertProfile: alerts.yaml # Alert profile, optional
 - endpoint: http://remotehost:9090 # Another Prometheus endpoint
   token: <token>
   profile: metrics.yaml
 ```
 
 !!!note
-    The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file.
-    The `profile` and `alertProfile` parameters are optional. If not provided they will be taken from the CLI flags.
+The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file.
+The `profile` and `alertProfile` parameters are optional. If not provided they will be taken from the CLI flags.
