@@ -30,16 +30,22 @@ jobs:
       pod-security.kubernetes.io/warn: privileged
     objects:
 
-      - objectTemplate: imagestream.yml
-        replicas: 1
+      - objectTemplate: service.yml
+        replicas: 5
 
-      - objectTemplate: build.yml
-        replicas: 1
+      - objectTemplate: route.yml
+        replicas: 2
 
       - objectTemplate: deployment-server.yml
         replicas: 3
         inputVars:
           podReplicas: 2
+
+      - objectTemplate: imagestream.yml
+        replicas: 1
+
+      - objectTemplate: build.yml
+        replicas: 1
 
       - objectTemplate: deployment-client.yml
         replicas: 2
