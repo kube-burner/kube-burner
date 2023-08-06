@@ -12,11 +12,11 @@ nav:
   - Indexing: observability/indexing.md
   - Alerting: observability/alerting.md
 - OpenShift Wrapper: ocp.md
-- Development:
-  - development/index.md
-  - Development: development/index.md
-  - CI: development/ci.md
-  - Tests: development/ci/tests.md
+- Contributing:
+  - contributing/index.md
+  - Contributing: contributing/index.md
+  - CI: contributing/ci.md
+  - Tests: contributing/ci/tests.md
 site_name: Kube-burner
 plugins:
   - search
