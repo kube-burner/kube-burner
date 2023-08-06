@@ -5,17 +5,18 @@ go 1.19
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/cloud-bulldozer/go-commons v1.0.9
+	github.com/openshift/client-go v0.0.0-20230718165156-6014fb98e86a
 	github.com/prometheus/common v0.44.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.27.1
-	k8s.io/apimachinery v0.27.1
+	k8s.io/api v0.27.2
+	k8s.io/apimachinery v0.27.2
 	k8s.io/client-go v0.27.1
 	k8s.io/kubectl v0.25.4
-	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
+	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 	kubevirt.io/api v0.58.0
 )
 
@@ -49,6 +50,7 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opensearch-project/opensearch-go v1.1.0 // indirect
+	github.com/openshift/api v0.0.0-20230718161610-2a3e8b481cec // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.15.1 // indirect
@@ -66,8 +68,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.23.5 // indirect
-	k8s.io/klog/v2 v2.90.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a // indirect
+	k8s.io/klog/v2 v2.100.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	kubevirt.io/containerized-data-importer-api v1.50.0 // indirect
 	kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

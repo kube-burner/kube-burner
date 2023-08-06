@@ -32,6 +32,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -64,6 +65,7 @@ type WorkloadHelper struct {
 	ocpConfig       embed.FS
 	ocpMetaAgent    ocpmetadata.Metadata
 	reporting       bool
+	restConfig      *rest.Config
 }
 
 var configSpec config.Spec
@@ -92,6 +94,7 @@ func NewWorkloadHelper(envVars map[string]string, alerting, reporting bool, ocpC
 		ocpConfig:       ocpConfig,
 		ocpMetaAgent:    ocpMetadata,
 		timeout:         timeout,
+		restConfig:      restConfig,
 	}
 }
 
