@@ -37,6 +37,7 @@ import (
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -154,11 +155,15 @@ func initCmd() *cobra.Command {
 func destroyCmd() *cobra.Command {
 	var uuid, configFile string
 	var timeout time.Duration
-	var err error
+	var rc int
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy old namespaces labeled with the given UUID.",
-		Args:  cobra.NoArgs,
+		PostRun: func(cmd *cobra.Command, args []string) {
+			log.Info("👋 Exiting kube-burner ", uuid)
+			os.Exit(rc)
+		},
+		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if configFile != "" {
 				_, err := config.Parse(uuid, configFile, false)
@@ -167,13 +172,16 @@ func destroyCmd() *cobra.Command {
 				}
 			}
 			listOptions := v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%s", uuid)}
-			burner.ClientSet, _, err = config.GetClientSet(0, 0)
+			clientSet, restConfig, err := config.GetClientSet(0, 0)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
+			burner.ClientSet = clientSet
+			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			burner.CleanupNamespaces(ctx, listOptions, true)
+			burner.CleanupNonNamespacedResources(ctx, listOptions, true)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")

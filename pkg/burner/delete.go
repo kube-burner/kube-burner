@@ -67,7 +67,7 @@ func (ex *Executor) RunDeleteJob() {
 			LabelSelector: labelSelector,
 		}
 		err := RetryWithExponentialBackOff(func() (done bool, err error) {
-			itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+			itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 			if err != nil {
 				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
 				return false, nil
@@ -90,9 +90,9 @@ func (ex *Executor) RunDeleteJob() {
 					log.Debugf("Removing %s/%s", item.GetKind(), item.GetName())
 				}
 				if obj.Namespaced {
-					err = dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+					err = DynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 				} else {
-					err = dynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+					err = DynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 				}
 				if err != nil {
 					log.Errorf("Error found removing %s %s: %s", item.GetKind(), item.GetName(), err)
@@ -101,7 +101,7 @@ func (ex *Executor) RunDeleteJob() {
 		}
 		if ex.Job.WaitForDeletion {
 			wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
-				itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+				itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 				if err != nil {
 					log.Error(err.Error())
 					return false, nil
