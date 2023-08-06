@@ -81,6 +81,7 @@ func NewWorkloadHelper(envVars map[string]string, alerting, reporting bool, ocpC
 		log.Fatal(err)
 	}
 	ocpMetadata, err := ocpmetadata.NewMetadata(restConfig)
+	burner.VerifyContainerRegistry(restConfig)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
