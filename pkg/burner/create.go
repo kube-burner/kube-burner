@@ -228,7 +228,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				if !obj.Namespaced {
 					n = ""
 				}
-				createRequest(obj.gvr, n, newObject)
+				createRequest(obj.gvr, n, newObject, ex.MaxWaitTimeout)
 				replicaWg.Done()
 			}(ns)
 		}(r)
@@ -236,7 +236,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 	wg.Wait()
 }
 
-func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured) {
+func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
 	RetryWithExponentialBackOff(func() (bool, error) {
@@ -264,7 +264,7 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 			log.Debugf("Created %s/%s", uns.GetKind(), uns.GetName())
 		}
 		return true, err
-	}, 1*time.Second, 3, 0, 3)
+	}, 1*time.Second, 3, 0, timeout)
 }
 
 // RunCreateJobWithChurn executes a churn creation job
