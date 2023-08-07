@@ -1,8 +1,8 @@
 # Metric profile
 
-The metric-collection feature is configured through a file pointed by the `metrics-profile` flag. Which can point to a local path or URL of a YAML formatted file containing a list of the prometheus expressions. Kube-burner will perform those queries one by one once all benchmark's jobs are done and transform them into a JSON formatted list.
+The metric-collection feature is configured through a file pointed by the `metrics-profile` flag, which can point to a local path or URL of a YAML-formatted file containing a list of the Prometheus expressions. Kube-burner will perform those queries one by one, once all benchmark jobs are done and transformed into a JSON-formatted list.
 
-In a single job benchmark, the queries are executed using the benchmark start and end time as time range. In multiple job benchmarks these queries are executed in a per job basis, and they take the different start, end time from the executed jobs.
+In a single job benchmark, the queries are executed using the benchmark start and end time as time range. In multiple job benchmarks, these queries are executed in a per job basis, and they take the different start and end times from the executed jobs.
 
 The metrics profile file has the following structure:
 
@@ -14,9 +14,9 @@ The metrics profile file has the following structure:
   metricName: nodeCPU
 ```
 
-Where `query` holds the prometheus expression to evaluate, and `metricName` controls the value that kube-burner will set on the `metricName` field, useful to identify metrics from a specific query. More info in the [metric format section](#metric-format)
+The `query` field holds the Prometheus expression to evaluate, and `metricName` controls the value that kube-burner will set on the `metricName` field. This is useful to identify metrics from a specific query. More information is available in the [metric format section](#metric-format).
 
-In addition to range queries, kube-burner has the ability perform instant queries by adding the field `instant` to the desired metric. This kind of query is especially useful to get only one sample of a *static* metric such as a component version or the number of nodes of the cluster.
+In addition to range queries, kube-burner has the ability perform instant queries by adding the field `instant` to the desired metric. This kind of query is especially useful to get only one sample of a *static* metric, such as a component version or the number of nodes of the cluster.
 
 ```yaml
 - query: kube_node_role
@@ -63,7 +63,7 @@ The collected metrics have the following shape:
 
 Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query`, `metricName` and `jobName`.
 !!! info
-    These extra fields are specially useful at the time of identifying and representing the collected metrics.
+    These extra fields are especially useful at the time of identifying and representing the collected metrics.
 
 ## Aggregating timeseries into a single document
 
@@ -79,7 +79,7 @@ The current supported aggregations are:
 - `90`: 90th percentile of the timeseries values
 - `50`: 50th percentile of the timeseries values
 
-This feature is configured throught the metrics-profile configuration file as follows:
+This feature is configured throughout the metrics-profile configuration file as follows:
 
 ```yaml
 # Average and maximum CPU usage observed in all worker's kubelets processes
@@ -88,7 +88,7 @@ This feature is configured throught the metrics-profile configuration file as fo
   aggregations: [avg, max]
 ```
 
-The above configuration will result in two documents:
+The above configuration results in two documents:
 
 ```json
 [
@@ -119,7 +119,7 @@ The above configuration will result in two documents:
 
 ## Using the elapsed variable
 
-There's a special go-template variable that can be used within the prometheus expressions of a metric profile, the variable `elapsed` is automatically populeted with the job duration duration, in minutes. This variable is specially useful in PromQL expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
+There is a special go-template variable that can be used within the Prometheus expressions of a metric profile; the variable `elapsed` is automatically populated with the job duration duration, in minutes. This variable is especially useful in PromQL expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
 
 For example, the following expression gets the top 3 CPU usage kubelets processes across the cluster.
 
@@ -128,4 +128,4 @@ For example, the following expression gets the top 3 CPU usage kubelets processe
   metricName: top3KubeletCPU
 ```
 
-Examples of metrics profiles can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples/). There're are also ElasticSearch based grafana dashboards available in the same examples directory.
+Examples of metrics profiles can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples/). There are also Elasticsearch based Grafana dashboards available in the same examples directory.
