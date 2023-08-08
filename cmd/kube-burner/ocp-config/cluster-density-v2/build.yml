@@ -6,7 +6,7 @@ metadata:
 spec:
   resources:
     requests:
-      cpu: 10m
+      cpu: 20m
       memory: "10Mi"
   nodeSelector:
     node-role.kubernetes.io/worker: ""
