@@ -1,7 +1,6 @@
 ---
 global:
   indexerConfig:
-    enabled: false
     esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
     insecureSkipVerify: true
     defaultIndex: kube-burner
