@@ -82,25 +82,6 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 			if err := p.parseVector(md.MetricName, query, v, &datapoints); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", query, err)
 			}
-		} else if len(md.Aggregations) > 0 {
-			for _, agg := range md.Aggregations {
-				result, err := p.Client.QueryRangeAggregatedTS(query, start, end, p.Step, agg)
-				if err != nil {
-					log.Warnf("Error found with query %s: %s", query, err)
-					continue
-				}
-				m := metric{
-					UUID:        p.UUID,
-					Query:       query,
-					MetricName:  md.MetricName,
-					JobConfig:   p.findJob(end),
-					Timestamp:   end,
-					Metadata:    p.metadata,
-					Aggregation: agg,
-					Value:       result,
-				}
-				datapoints = append(datapoints, m)
-			}
 		} else {
 			log.Debugf("Range query: %s", query)
 			v, err = p.Client.QueryRange(query, start, end, p.Step)
@@ -184,9 +165,6 @@ func (p *Prometheus) readProfile(metricsProfile string) error {
 	for i, md := range p.MetricProfile {
 		if md.Query == "" {
 			return fmt.Errorf("query not defined in %d element", i)
-		}
-		if md.Instant && len(md.Aggregations) > 0 {
-			return fmt.Errorf("instant and aggregation cannot be defined together")
 		}
 		if md.MetricName == "" {
 			return fmt.Errorf("metricName not defined in %d element", i)
