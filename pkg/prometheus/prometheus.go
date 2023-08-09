@@ -57,12 +57,12 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	start := p.JobList[0].Start
 	end := p.JobList[len(p.JobList)-1].End
-	elapsed := int(end.Sub(start).Minutes())
+	elapsed := int(end.Sub(start).Seconds())
 	var err error
 	var v model.Value
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
-	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
+	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
 	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 	for _, md := range p.MetricProfile {
 		var datapoints []interface{}
