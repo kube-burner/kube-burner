@@ -191,22 +191,33 @@ func destroyCmd() *cobra.Command {
 }
 
 func indexCmd() *cobra.Command {
-	var url, metricsEndpoint, metricsProfile, configFile, jobName string
+	var url, metricsEndpoint, metricsProfile, jobName string
 	var start, end int64
 	var username, password, uuid, token, userMetadata string
+	var esServer, esIndex, metricsDirectory string
+	var configSpec config.Spec
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
 	cmd := &cobra.Command{
 		Use:   "index",
 		Short: "Index kube-burner metrics",
+		Long:  "If no other indexer is specified, local indexer is used by default",
 		Args:  cobra.NoArgs,
 		PostRun: func(cmd *cobra.Command, args []string) {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			configSpec, err := config.Parse(uuid, configFile, false)
-			if err != nil {
-				log.Fatal(err.Error())
+			if esServer != "" && esIndex != "" {
+				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+					Type:    indexers.ElasticIndexer,
+					Servers: []string{esServer},
+					Index:   esIndex,
+				}
+			} else {
+				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+					Type:             indexers.LocalIndexer,
+					MetricsDirectory: metricsDirectory,
+				}
 			}
 			_ = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      configSpec,
@@ -237,10 +248,11 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
-	cmd.MarkFlagRequired("config")
+	cmd.Flags().StringVar(&metricsDirectory, "metrics-directory", "collected-metrics", "Directory to dump the metrics files in, when using local indexing")
+	cmd.Flags().StringVar(&esServer, "es-server", "", "Elastic Search endpoint")
+	cmd.Flags().StringVar(&esIndex, "es-index", "", "Elastic Search index")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
