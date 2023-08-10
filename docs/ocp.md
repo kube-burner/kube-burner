@@ -1,11 +1,11 @@
 # OpenShift Wrapper
 
-The kube-burner binary brings a very opinionated OpenShift wrapper designed to simplify the execution of different workloads in this kubernetes distribution.
+The kube-burner binary brings a very opinionated OpenShift wrapper designed to simplify the execution of different workloads in this Kubernetes distribution.
 This wrapper is hosted under the `kube-burner ocp` subcommand that currently looks like:
 
 ```console
 $ kube-burner ocp help
-This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads
+This subcommand is meant to be used against OpenShift clusters and serves as a shortcut to trigger well-known workloads
 
 Usage:
   kube-burner ocp [command]
@@ -30,7 +30,7 @@ Flags:
       --metrics-endpoint string   YAML file with a list of metric endpoints
       --qps int                   QPS (default 20)
       --reporting                 Enable benchmark report indexing
-      --timeout duration          Benchmark timeout (default 3h0m0s)
+      --timeout duration          Benchmark timeout (default 4h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
       --uuid string               Benchmark UUID (default "d18989c4-4f8a-4a14-b711-9afae69a9140")
 
@@ -42,7 +42,7 @@ Use "kube-burner ocp [command] --help" for more information about a command.
 
 ## Usage
 
-In order to trigger one of the supported workloads using this subcommand you have to run kube-burner using the subcommand ocp. The workloads are embed in the kube-burner binary:
+In order to trigger one of the supported workloads using this subcommand, you must run kube-burner using the subcommand `ocp`. The workloads are embedded in the kube-burner binary:
 
 Running node-density with 100 pods per node
 
@@ -60,45 +60,45 @@ With the command above, the wrapper will calculate the required number of pods t
 
 This wrapper provides the following benefits among others:
 
-- Provides a simplified execution of the supported workloads
-- Indexes OpenShift metadata along with the Benchmark result, this document can be found with the following query: `uuid: <benchmkark-uuid> AND metricName.keyword: "clusterMetadata"`
-- Prevents modifying configuration files to tweak some of the parameters of the workloads
+- Provides a simplified execution of the supported workloads.
+- Indexes OpenShift metadata along with the Benchmark result. This document can be found with the following query: `uuid: <benchmkark-uuid> AND metricName.keyword: "clusterMetadata"`
+- Prevents modifying configuration files to tweak some of the parameters of the workloads.
 - Discovers the Prometheus URL and authentication token, so the user does not have to perform those operations before using them.
 
 ## Cluster density workloads
 
-This workload family is a control-plane density focused workload that that creates different objects across the cluster. There're 3 different variants [cluster-density](#cluster-density), [cluster-density-v2](#cluster-density-v2) and [cluster-density-ms](#cluster-density-ms).
+This workload family is a control-plane density focused workload that that creates different objects across the cluster. There are 3 different variants [cluster-density](#cluster-density), [cluster-density-v2](#cluster-density-v2), and [cluster-density-ms](#cluster-density-ms).
 
-Each iteration of these create a new namespace, the three support similar configuration flags. Check them out from the subcommand help
+Each iteration of these create a new namespace, the three support similar configuration flags. Check them out from the subcommand help.
 
 !!! Info
-    Workload churning of 1h is enabled by default in the `cluster-density` workloads, you can disable it by passing `--churn=false` to the workload subcommand
+    Workload churning of 1h is enabled by default in the `cluster-density` workloads; you can disable it by passing `--churn=false` to the workload subcommand.
 
 ### cluster-density
 
-Each iteration of **cluster-density** creates the following objects in each of the dreated namespaces:
+Each iteration of **cluster-density** creates the following objects in each of the created namespaces:
 
-- 1 Imagestream
-- 1 Build. The OCP internal container registry must be set-up previously since the resulting container image will be pushed there.
-- 5 Deployments with two pod replicas (pause) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
-- 5 Services, each one pointing to the TCP/8080 and TCP/8443 ports of one of the previous deployments
-- 1 edge Route pointing to the to first service
-- 10 Secrets containing 2048 character random string
-- 10 ConfigMaps containing a 2048 character random string
+- 1 image stream.
+- 1 build. The OpenShift Container Platform (OCP) internal container registry must be set up previously because the resulting container image will be pushed there.
+- 5 deployments with two pod replicas (pause) mounting 4 secrets, 4 config maps, and 1 downward API volume each.
+- 5 services, each one pointing to the TCP/8080 and TCP/8443 ports of one of the previous deployments.
+- 1 edge route pointing to the to first service.
+- 10 secrets containing a 2048-character random string.
+- 10 config maps containing a 2048-character random string.
 
 ### cluster-density-v2
 
-Very similar to [cluster-density](#cluster-density), but with some key differences provided by NetworkPolicies and improved readinessProbes, that leads to a heavier load in the cluster's CNI plugin. Each iteration creates the following objects in each of the created namespaces:
+Very similar to [cluster-density](#cluster-density), but with some key differences provided by network policies and improved readiness probes, that leads to a heavier load in the cluster's CNI plugin. Each iteration creates the following objects in each of the created namespaces:
 
-- 1 ImagesStream
-- 1 Build. The OCP internal container registry must be set-up previously since the resulting container image will be pushed there.
-- 3 Deployments with two pod 2 replicas (nginx) mounting 4 Secrets, 4 configmaps and 1 downwardAPI volume each
-- 2 Deployments with two pod 2 replicas (curl) mounting 4 Secrets, 4 configmaps and 1 downwardAPI volume each. These pods have configured a readinessProbe that makes a request to one of the Services and one of the routes created by this workload every 10 seconds.
-- 5 Services, each one pointing to the TCP/8080 port of one of the nginx Deployments.
-- 2 edge Routes pointing to the to first and second Services respectively
-- 10 Secrets containing 2048 character random string
-- 10 ConfigMaps containing a 2048 character random string
-- 3 NetworkPolicies:
+- 1 image stream.
+- 1 build. The OCP internal container registry must be set-up previously because the resulting container image will be pushed there.
+- 3 deployments with two pod 2 replicas (nginx) mounting 4 secrets, 4 config maps, and 1 downward API volume each.
+- 2 deployments with two pod 2 replicas (curl) mounting 4 Secrets, 4 config maps and 1 downward API volume each. These pods have configured a readiness probe that makes a request to one of the services and one of the routes created by this workload every 10 seconds.
+- 5 services, each one pointing to the TCP/8080 port of one of the nginx deployments.
+- 2 edge routes pointing to the to first and second services respectively.
+- 10 secrets containing a 2048-character random string.
+- 10 config maps containing a 2048-character random string.
+- 3 network policies:
     - deny-all traffic
     - allow traffic from client/nginx pods to server/nginx pods
     - allow traffic from openshift-ingress namespace (where routers are deployed by default) to the namespace
@@ -107,16 +107,16 @@ Very similar to [cluster-density](#cluster-density), but with some key differenc
 
 Lightest version of this workload family, each iteration the following objects in each of the created namespaces:
 
-- 1 ImageStream
-- 4 Deployments with two pod replicas (pause) mounting 4 secrets, 4 configmaps and 1 downwardAPI volume each
-- 2 Services, each one pointing to the TCP/8080 and TCP/8443 ports of the first and second deployment respectively.
-- 1 edge Route pointing to the to first service
-- 20 Secrets containing 2048 character random string
-- 10 ConfigMaps containing a 2048 character random string
+- 1 image stream.
+- 4 deployments with two pod replicas (pause) mounting 4 secrets, 4 config maps, and 1 downward API volume each.
+- 2 services, each one pointing to the TCP/8080 and TCP/8443 ports of the first and second deployment respectively.
+- 1 edge route pointing to the to first service.
+- 20 secrets containing a 2048-character random string.
+- 10 config maps containing a 2048-character random string.
 
 ## Node density workloads
 
-The workloads of this family create a single namespace with a set of Pods, Deployments Services, depending on the workload.
+The workloads of this family create a single namespace with a set of pods, deployments, and services depending on the workload.
 
 ### node-density
 
@@ -124,13 +124,13 @@ This workload is meant to fill with pause pods all the worker nodes from the clu
 
 ### node-density-cni
 
-It creates two Deployments, a client/curl and a server/nxing, and 1 Service backed by the previous server Pods. The client application has configured an startupProbe that makes requests to the previous Service every second with a timeout of 600s.
+It creates two deployments, a client/curl and a server/nxing, and 1 service backed by the previous server pods. The client application has configured an startup probe that makes requests to the previous service every second with a timeout of 600s.
 
-Note: this workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable `iterationsPerNamespace`.
+Note: This workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable `iterationsPerNamespace`.
 
 ### node-density-heavy
 
-Creates two Deployments, a postgresql database and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a Service that is used by the client to reach the database.
+Creates two deployments, a postgresql database, and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a service that is used by the client to reach the database.
 
 Note: this workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable `iterationsPerNamespace`.
 
@@ -142,7 +142,7 @@ This feature is very useful to avoid sending thousands of documents to the confi
 
 ## Customizing workloads
 
-It's possible to customize any of the above workload configurations by extracting, updating and finally running it:
+It is possible to customize any of the above workload configurations by extracting, updating, and finally running it:
 
 ```console
 $ kube-burner ocp node-density --extract
@@ -154,7 +154,7 @@ $ kube-burner ocp node-density --pods-per-node=100  # Run workload
 
 ## Cluster metadata
 
-When the benchmark finishes, kube-burner will index the cluster metadata in the configured indexer. At the time of writing this document is based on the following golang struct:
+When the benchmark finishes, kube-burner will index the cluster metadata in the configured indexer. Currently. this is based on the following Golang struct:
 
 ```golang
 type BenchmarkMetadata struct {
@@ -168,7 +168,7 @@ type BenchmarkMetadata struct {
 }
 ```
 
-Where `ocpmetadata.ClusterMetadata` is an embed struct inherited from the [go-commons library](https://github.com/cloud-bulldozer/go-commons/blob/main/ocp-metadata/types.go) which has the following fields:
+Where `ocpmetadata.ClusterMetadata` is an embed struct inherited from the [go-commons library](https://github.com/cloud-bulldozer/go-commons/blob/main/ocp-metadata/types.go), which has the following fields:
 
 ```golang
 // Type to store cluster metadata

@@ -66,6 +66,8 @@ type GlobalConfig struct {
 	GC bool `yaml:"gc" json:"gc"`
 	// WaitWhenFinished Wait for pods to be running when all the jobs are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
+	// GCTimeout garbage collection timeout
+	GCTimeout time.Duration `yaml:"gcTimeout"`
 }
 
 // Object defines an object that kube-burner will create
@@ -135,6 +137,8 @@ type Job struct {
 	PreLoadImages bool `yaml:"preLoadImages" json:"preLoadImages,omitempty"`
 	// PreLoadPeriod determines the duration of the preload stage
 	PreLoadPeriod time.Duration `yaml:"preLoadPeriod" json:"preLoadPeriod,omitempty"`
+	// PreLoadNodeLabels add node selector labels to resources in preload stage
+	PreLoadNodeLabels map[string]string `yaml:"preLoadNodeLabels" json:"-"`
 	// NamespaceLabels add custom labels to namespaces created by kube-burner
 	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"-"`
 	// Churn workload

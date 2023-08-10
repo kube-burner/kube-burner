@@ -72,7 +72,7 @@ func (ex *Executor) Verify() bool {
 		err := RetryWithExponentialBackOff(func() (done bool, err error) {
 			replicas = 0
 			for {
-				objList, err = dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
+				objList, err = DynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
 				if err != nil {
 					log.Errorf("Error verifying object: %s", err)
 					return false, nil

@@ -1,8 +1,8 @@
 # Reference
 
-All the magic `kube-burner` does is described in its configuration file. As previously mentioned the location of this configuration file is provided by the flag `-c`. This flag points to a YAML formatted file that consists of several sections.
+All of the magic that `kube-burner` does is described in its configuration file. As previously mentioned, the location of this configuration file is provided by the flag `-c`. This flag points to a YAML-formatted file that consists of several sections.
 
-It's possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file, also it's important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, we could define the `indexerConfig` section of our configuration file like:
+It is possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file. It is also important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, you could define the `indexerConfig` section of your own configuration file, such as:
 
 ```yaml
 enabled: true
@@ -11,7 +11,7 @@ esServers: [{{ .ES_SERVER }}]
 defaultIndex: elasticsearch-index
 ```
 
-This feature can be very useful at the time of defining secrets such as the user and password of our indexer, or a token to use in pprof collection.
+This feature can be very useful at the time of defining secrets, such as the user and password of our indexer, or a token to use in pprof collection.
 
 ## Global
 
@@ -27,6 +27,7 @@ In this section is described global job configuration, it holds the following pa
 | `metricsProfile`   | Path to the metrics profile configuration file                                                           | String         | ""         |
 | `metricsEndpoint`  | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String     | "" |
 | `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `GCTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 | `waitWhenFinished` | Wait for all pods to be running when all jobs are completed                                             | Boolean        | false      |
 
 !!! note 
@@ -53,7 +54,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `cleanup`              | Cleanup clean up old namespaces                                                  | Boolean | true    |
 | `podWait`              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | false   |
 | `waitWhenFinished`     | Wait for all pods to be running when all iterations are completed                | Boolean | true    |
-| `maxWaitTimeout`       | Maximum wait timeout per namespace                                               | Duration| 3h     |
+| `maxWaitTimeout`       | Maximum wait timeout per namespace                                               | Duration| 4h     |
 | `jobIterationDelay`    | How long to wait between each job iteration                                      | Duration| 0s      |
 | `jobPause`             | How long to pause after finishing the job                                        | Duration| 0s      |
 | `qps`                  | Limit object creation queries per second                                         | Integer | 0       |
@@ -63,13 +64,16 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `errorOnVerify`        | Set RC to 1 when objects verification fails                                      | Boolean | true    |
 | `preLoadImages`        | Kube-burner will create a DS before triggering the job to pull all the images of the job   | true    |
 | `preLoadPeriod`        | How long to wait for the preload daemonset                                       | Duration| 1m     |
+| `preloadNodeLabels`    | Add node selector labels for the resources created in preload stage              | Object  | {} |
 | `namespaceLabels`      | Add custom labels to the namespaces created by kube-burner                       | Object  | {} |
 | `churn`                | Churn the workload. Only supports namespace based workloads                      | Boolean | false |
 | `churnPercent`         | Percentage of the jobIterations to churn each period                             | Integer | 10 |
 | `churnDuration`        | Length of time that the job is churned for                                       | Duration| 1h |
 | `churnDelay`           | Length of time to wait between each churn period                                 | Duration| 5m |
 
-Examples of valid configuration files can be found at the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
+Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
+
+Examples of valid configuration files can be found in the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
 
 ## Objects
 
@@ -98,7 +102,7 @@ If you want to override the default waiter behaviors, you can specify wait optio
 |--------------|---------------------------------------------------------|---------|---------|
 | `forCondition` | Wait for the object condition with this name to be true | String  | ""      |
 
-For example, the snippet below can be used to make kube-burner to wait for all containers from the pod defined at `pod.yml` to be ready
+For example, the snippet below can be used to make kube-burner wait for all containers from the pod defined at `pod.yml` to be ready.
 
 ```yaml
 objects:
@@ -110,11 +114,11 @@ objects:
 
 ### Default labels
 
-All objects created by kube-burner are labeled with. `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. They are used for internal purposes but they can also be used by the users.
+All objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. They are used for internal purposes, but they can also be used by the users.
 
 ## Job types
 
-Configured by the parameter `jobType`, kube-burner support three types of jobs with different parameters each,
+Configured by the parameter `jobType`, kube-burner supports three types of jobs with different parameters each.
 
 ### Create
 
@@ -140,9 +144,9 @@ Where:
 - `labelSelector`: Deletes the objects with the given labels.
 - `apiVersion`: API version from the k8s object.
 
-This type of job supports the following parameters (some of them already described in the the [create job type section](#create)):
+This type of job supports the following parameters. Some of them  are already described in the [create job type section](#create):
 
-- `waitForDeletion`: Wait for objects to be deleted before finishing the job. Defaults to true
+- `waitForDeletion`: Wait for objects to be deleted before finishing the job. Defaults to `true`.
 - `name`
 - `qps`
 - `burst`
@@ -151,7 +155,7 @@ This type of job supports the following parameters (some of them already describ
 
 ### Patch
 
-This type of jobs can be used to patch objects with the template described in the object list. This object list has the following structure:
+This type of job can be used to patch objects with the template described in the object list. This object list has the following structure:
 
 ```yaml
 objects:
@@ -168,7 +172,7 @@ Where:
 - `labelSelector`: Map with the labelSelector.
 - `objectTemplate`: The YAML template or JSON file to patch.
 - `apiVersion`: API version from the k8s object.
-- `patchType`: The kubernetes request patch type (see below).
+- `patchType`: The Kubernetes request patch type (see below).
 
 Valid patch types:
 
@@ -177,7 +181,7 @@ Valid patch types:
 - application/strategic-merge-patch+json
 - application/apply-patch+yaml (requires YAML)
 
-As mentioned previously, all objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. Thanks to this we could design a workload with one job to create objects and another one able to patch or remove the objects created by the previous
+As mentioned previously, all objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. Therefore, you can design a workload with one job to create objects and another one to patch or remove the objects created by the previous.
 
 ```yaml
 jobs:
@@ -204,9 +208,9 @@ jobs:
 
 ## Churning Jobs
 
-Churn is the deletion and re-creation of objects and is supported for namespace based jobs only. This occurs after the job has completed
+Churn is the deletion and re-creation of objects, and is supported for namespace-based jobs only. This occurs after the job has completed
 but prior to uploading metrics, if applicable. It deletes a percentage of contiguous namespaces randomly chosen and re-creates them
-with all of the appropriate objects. It will then wait for a specified delay (or none if set to 0) before deleting and recreating the
+with all of the appropriate objects. It will then wait for a specified delay (or none if set to `0`) before deleting and recreating the
 next randomly chosen set. This cycle continues until the churn duration has passed.
 
 An example implementation that would churn 20% of the 100 job iterations for 2 hours with no delay between sets:
@@ -231,7 +235,7 @@ jobs:
 
 ## Injected variables
 
-All object templates are injected the variables below by default
+All object templates are injected with the variables below by default:
 
 - `Iteration`: Job iteration number.
 - `Replica`: Object replica number. Keep in mind that this number is reset to 1 with each job iteration.
@@ -283,4 +287,4 @@ spec:
 
 ## Template functions
 
-In addition to the default [golang template semantics](https://golang.org/pkg/text/template/), Kube-burner is compiled with the [sprig library](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.
+In addition to the default [golang template semantics](https://golang.org/pkg/text/template/), kube-burner is compiled with the [sprig library](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.

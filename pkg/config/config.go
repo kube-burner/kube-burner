@@ -41,6 +41,7 @@ import (
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		GC:             false,
+		GCTimeout:      1 * time.Hour,
 		RequestTimeout: 15 * time.Second,
 		Measurements:   []mtypes.Measurement{},
 		IndexerConfig: indexers.IndexerConfig{
@@ -78,7 +79,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ErrorOnVerify:          true,
 		JobType:                CreationJob,
 		WaitForDeletion:        true,
-		MaxWaitTimeout:         3 * time.Hour,
+		MaxWaitTimeout:         4 * time.Hour,
 		PreLoadImages:          true,
 		PreLoadPeriod:          1 * time.Minute,
 		Churn:                  false,
