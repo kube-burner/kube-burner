@@ -65,6 +65,7 @@ type podMetric struct {
 type podLatency struct {
 	config           types.Measurement
 	watcher          *metrics.Watcher
+	metricLock       sync.RWMutex
 	metrics          map[string]podMetric
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
@@ -78,6 +79,8 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 	now := time.Now().UTC()
 	pod := obj.(*v1.Pod)
 	jobConfig := *factory.jobConfig
+	p.metricLock.Lock()
+	defer p.metricLock.Unlock()
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
 		if strings.Contains(pod.Namespace, factory.jobConfig.Namespace) {
 			p.metrics[string(pod.UID)] = podMetric{
@@ -97,6 +100,9 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 
 func (p *podLatency) handleUpdatePod(obj interface{}) {
 	pod := obj.(*v1.Pod)
+	p.metricLock.Lock()
+	defer p.metricLock.Unlock()
+
 	if pm, exists := p.metrics[string(pod.UID)]; exists && pm.podReady.IsZero() {
 		for _, c := range pod.Status.Conditions {
 			if c.Status == v1.ConditionTrue {
@@ -202,6 +208,8 @@ func (p *podLatency) index() {
 }
 
 func (p *podLatency) normalizeMetrics() {
+	p.metricLock.RLock()
+	defer p.metricLock.RUnlock()
 	for _, m := range p.metrics {
 		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {

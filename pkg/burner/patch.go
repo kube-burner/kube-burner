@@ -71,6 +71,7 @@ func setupPatchJob(jobConfig config.Job) Executor {
 			gvr:           mapping.Resource,
 			objectSpec:    t,
 			Object:        o,
+			kind:          o.Kind,
 			labelSelector: o.LabelSelector,
 			patchType:     o.PatchType,
 		}
@@ -86,34 +87,37 @@ func (ex *Executor) RunPatchJob() {
 	var itemList *unstructured.UnstructuredList
 	log.Infof("Running patch job %s", ex.Name)
 	var wg sync.WaitGroup
-	for _, obj := range ex.objects {
+	// This will apply all the changes in the patch job iteration, before moving on to the next iteration
+	for i := 1; i < ex.JobIterations; i++ {
+		for _, obj := range ex.objects {
 
-		labelSelector := labels.Set(obj.labelSelector).String()
-		listOptions := metav1.ListOptions{
-			LabelSelector: labelSelector,
-		}
-
-		// Try to find the list of resources by GroupVersionResource.
-		err := RetryWithExponentialBackOff(func() (done bool, err error) {
-			itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
-			if err != nil {
-				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
-				return false, nil
+			labelSelector := labels.Set(obj.labelSelector).String()
+			listOptions := metav1.ListOptions{
+				LabelSelector: labelSelector,
 			}
-			return true, nil
-		}, 1*time.Second, 3, 0, 3)
-		if err != nil {
-			continue
-		}
-		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
-		for i := 1; i < ex.JobIterations; i++ {
+
+			// Try to find the list of resources by GroupVersionResource.
+			err := RetryWithExponentialBackOff(func() (done bool, err error) {
+				itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+				if err != nil {
+					log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
+					return false, nil
+				}
+				return true, nil
+			}, 1*time.Second, 3, 0, 3)
+			if err != nil {
+				continue
+			}
+			log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
 			for _, item := range itemList.Items {
 				wg.Add(1)
 				go ex.patchHandler(obj, item, i, &wg)
 			}
 		}
+		// Wait for all changes to finish applying before moving on to the next iteration
+		wg.Wait()
 	}
-	wg.Wait()
+
 }
 
 func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructured,
@@ -185,6 +189,13 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 		}
 	} else {
 		log.Debugf("Patched %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
+	}
+
+	// We need to give Kubernetes a little time to actually apply the patch and make changes before we can wait on it
+	// If we aren't waiting for the job to finish, we can just carry on
+	if ex.WaitWhenFinished {
+		time.Sleep(50 * time.Millisecond)
+		ex.waitForObjects(ns)
 	}
 
 }
