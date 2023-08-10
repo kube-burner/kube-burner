@@ -49,6 +49,7 @@ var configSpec = Spec{
 			MetricsDirectory:   "collected-metrics",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
+		WaitWhenFinished: false,
 	},
 }
 
@@ -86,8 +87,14 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
 	}
+
 	if err := unmarshal(&raw); err != nil {
 		return err
+	}
+	// Applying overrides here
+	if configSpec.GlobalConfig.WaitWhenFinished {
+		raw.PodWait = false
+		raw.WaitWhenFinished = false
 	}
 	// Convert raw to Job
 	*j = Job(raw)

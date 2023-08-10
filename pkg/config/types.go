@@ -64,6 +64,8 @@ type GlobalConfig struct {
 	AlertProfile string `yaml:"alertProfile"`
 	// GC garbage collect created namespaces
 	GC bool `yaml:"gc" json:"gc"`
+	// WaitWhenFinished Wait for pods to be running when all the jobs are completed
+	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
 	// GCTimeout garbage collection timeout
 	GCTimeout time.Duration `yaml:"gcTimeout"`
 }
