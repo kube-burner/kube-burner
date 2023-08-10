@@ -65,67 +65,20 @@ Notice that kube-burner enriches the query results by adding some extra fields l
 !!! info
     These extra fields are especially useful at the time of identifying and representing the collected metrics.
 
-## Aggregating timeseries into a single document
-
-Kube-burner provides a mechanism to aggregate a Prometheus timeseries into a single value.
-The current supported aggregations are:
-
-- `avg`: Average value of the timeseries
-- `max`: Maximum value of the timeseries
-- `min`: Minimum value of the timeseries
-- `stdev`: Standard deviation of the timeseries values
-- `99`: 99th percentile of the timeseries values
-- `95`: 95th percentile of the timeseries values
-- `90`: 90th percentile of the timeseries values
-- `50`: 50th percentile of the timeseries values
-
-This feature is configured throughout the metrics-profile configuration file as follows:
-
-```yaml
-# Average and maximum CPU usage observed in all worker's kubelets processes
-- query: irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m]) and on (node) kube_node_role{role="worker"}
-  metricName: cpu-kubelet
-  aggregations: [avg, max]
-```
-
-The above configuration results in two documents:
-
-```json
-[
-  {
-    "uuid": "<UUID>",
-    "timestamp": "2023-06-12T23:18:49.285718843Z",
-    "value": 263544832,
-    "query": "irate(process_cpu_seconds_total{service=\"kubelet\",job=\"kubelet\"}[2m]) and on (node) kube_node_role{role=\"worker\"}",
-    "metricName": "cpu-kubelet",
-    "jobConfig": {
-      "truncated_job_configuration": "foobar"
-    },
-    "aggregation": "avg"
-  },
-  {
-    "uuid": "<UUID>",
-    "timestamp": "2023-06-12T23:18:49.285718843Z",
-    "value": 363543813,
-    "query": "irate(process_cpu_seconds_total{service=\"kubelet\",job=\"kubelet\"}[2m]) and on (node) kube_node_role{role=\"worker\"}",
-    "metricName": "cpu-kubelet",
-    "jobConfig": {
-      "truncated_job_configuration": "foobar"
-    },
-    "aggregation": "max"
-  }
-]
-```
 
 ## Using the elapsed variable
 
 There is a special go-template variable that can be used within the Prometheus expressions of a metric profile; the variable `elapsed` is automatically populated with the job duration duration, in minutes. This variable is especially useful in PromQL expressions using [aggregations over time functions](https://prometheus.io/docs/prometheus/latest/querying/functions/#aggregation_over_time).
 
-For example, the following expression gets the top 3 CPU usage kubelets processes across the cluster.
+For example, the following expression gets the top 3 datapoints with the average CPU usage kubelets processes in the cluster.
 
 ```yaml
 - query: irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m]) * 100 and on (node) topk(3,avg_over_time(irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m])[{{ .elapsed }}:]))
   metricName: top3KubeletCPU
+  instant: true
 ```
+
+!!! info
+    Note that in the [time-range:] notation, the colon specifies to get the values for the given duration
 
 Examples of metrics profiles can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples/). There are also Elasticsearch based Grafana dashboards available in the same examples directory.
