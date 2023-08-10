@@ -26,8 +26,12 @@ In this section is described global job configuration, it holds the following pa
 | `bearerToken`      | Bearer token to access the Prometheus endpoint                                                           | String        | ""         |
 | `metricsProfile`   | Path to the metrics profile configuration file                                                           | String         | ""         |
 | `metricsEndpoint`  | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String     | "" |
-| `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
-| `gcTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
+| `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `GCTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
+| `waitWhenFinished` | Wait for all pods to be running when all jobs are completed                                             | Boolean        | false      |
+
+!!! note 
+    The precedence order to wait on resources is Global.waitWhenFinished > Jod.waitWhenFinished > Job.podWait
 
 kube-burner connects k8s clusters using the following methods in this order:
 

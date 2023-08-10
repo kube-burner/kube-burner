@@ -17,6 +17,8 @@ package burner
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -77,10 +79,13 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var err error
 	var rc int
 	var prometheusJobList []prometheus.Job
+	var measurementStopFunctions []func() error
 	var jobList []Executor
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
+	globalWaitMap := make(map[string][]string)
+	executorMap := make(map[string]Executor)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
@@ -88,6 +93,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		jobList = newExecutorList(configSpec, uuid, timeout)
 		// Iterate job list
 		for jobPosition, job := range jobList {
+			var waitListNamespaces []string
 			if job.QPS == 0 || job.Burst == 0 {
 				log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
 			} else {
@@ -123,7 +129,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					log.Infof("Churn percent: %v", job.ChurnPercent)
 					log.Infof("Churn delay: %v", job.ChurnDelay)
 				}
-				job.RunCreateJob(0, job.JobIterations)
+				job.RunCreateJob(0, job.JobIterations, &waitListNamespaces)
 				// If object verification is enabled
 				if job.VerifyObjects && !job.Verify() {
 					errMsg := "Object verification failed"
@@ -137,6 +143,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				if job.Churn {
 					job.RunCreateJobWithChurn()
 				}
+				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
+				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
 			case config.DeletionJob:
 				job.RunDeleteJob()
 			case config.PatchJob:
@@ -148,21 +156,39 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			}
 
 			jobList[jobPosition].End = time.Now().UTC()
-			prometheusJob := prometheus.Job{
-				Start:     jobList[jobPosition].Start,
-				End:       jobList[jobPosition].End,
-				JobConfig: job.Job,
-			}
-			elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Round(time.Second)
 			// Don't append to Prometheus jobList when prometheus it's not initialized
 			if len(prometheusClients) > 0 {
+				prometheusJob := prometheus.Job{
+					Start:     jobList[jobPosition].Start,
+					End:       jobList[jobPosition].End,
+					JobConfig: job.Job,
+				}
 				prometheusJobList = append(prometheusJobList, prometheusJob)
 			}
-			log.Infof("Job %s took %v", job.Name, elapsedTime)
 			// We stop and index measurements per job
-			if err = measurements.Stop(); err != nil {
-				log.Errorf("Failed measurements: %v", err.Error())
-				innerRC = 1
+			if !globalConfig.WaitWhenFinished {
+				elapsedTime := jobList[jobPosition].End.Sub(jobList[jobPosition].Start).Round(time.Second)
+				log.Infof("Job %s took %v", job.Name, elapsedTime)
+				if err = measurements.Stop(); err != nil {
+					log.Errorf("Failed measurements: %v", err.Error())
+					innerRC = 1
+				}
+			} else {
+				measurementStopFunctions = append(measurementStopFunctions, measurements.Stop)
+			}
+		}
+		if globalConfig.WaitWhenFinished {
+			runWaitList(globalWaitMap, executorMap)
+			endTime := time.Now().UTC()
+			for jobIndex, stopFunc := range measurementStopFunctions {
+				jobList[jobIndex].End = endTime
+				if len(prometheusJobList) > jobIndex {
+					prometheusJobList[jobIndex].End = endTime
+				}
+				if err := stopFunc(); err != nil {
+					log.Errorf("Failed measurements: %v", err.Error())
+					innerRC = 1
+				}
 			}
 		}
 		if globalConfig.IndexerConfig.Type != "" {
@@ -244,4 +270,25 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 		executorList = append(executorList, ex)
 	}
 	return executorList
+}
+
+// Runs on wait list at the end of benchmark
+func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Executor) {
+	var wg sync.WaitGroup
+	for executorUUID, namespaces := range globalWaitMap {
+		executor := executorMap[executorUUID]
+		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
+		// This semaphore is used to limit the maximum number of concurrent goroutines
+		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
+		for _, ns := range namespaces {
+			sem <- 1
+			wg.Add(1)
+			go func(ns string) {
+				executor.waitForObjects(ns)
+				<-sem
+				wg.Done()
+			}(ns)
+		}
+		wg.Wait()
+	}
 }
