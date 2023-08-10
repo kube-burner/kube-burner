@@ -76,6 +76,9 @@ Where `quantileName` matches with the pod conditions and can be:
 - `ContainersReady`: Indicates whether all containers in the pod are ready.
 - `Ready`: The pod is able to service requests and should be added to the load balancing pools of all matching services.
 
+!!! note
+    There are a V2 version of these latencies as well. Both are being kept with the intention of monitoring them over time (i.e precision vs accuracy problem) Therefore, if you notice a significant discrepancy and want to tell us about it, please feel free to do so. Or else prefer to stay with the non-v2 and everything will continue to be the same as it always has been.
+
 !!! info
     More information about the pod conditions can be found at the [kubernetes documentation site](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions).
 

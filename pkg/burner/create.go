@@ -93,8 +93,9 @@ func setupCreateJob(jobConfig config.Job) Executor {
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
 	nsLabels := map[string]string{
-		"kube-burner-job":  ex.Name,
-		"kube-burner-uuid": ex.uuid,
+		"kube-burner-job":   ex.Name,
+		"kube-burner-uuid":  ex.uuid,
+		"kube-burner-runid": ex.runid,
 	}
 	var wg sync.WaitGroup
 	var ns string
@@ -198,6 +199,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				"kube-burner-uuid":  ex.uuid,
 				"kube-burner-job":   ex.Name,
 				"kube-burner-index": strconv.Itoa(objectIndex),
+				"kube-burner-runid": ex.runid,
 			}
 			templateData := map[string]interface{}{
 				jobName:      ex.Name,
@@ -219,6 +221,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				labels[k] = v
 			}
 			newObject.SetLabels(labels)
+			setMetadataLabels(newObject, labels)
 			json.Marshal(newObject.Object)
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,

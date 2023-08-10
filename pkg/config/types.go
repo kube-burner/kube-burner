@@ -45,6 +45,8 @@ type Spec struct {
 type GlobalConfig struct {
 	// Benchmark UUID
 	UUID string
+	// Benchmark RUNID
+	RUNID string
 	// IndexerConfig contains a IndexerConfig definition
 	IndexerConfig indexers.IndexerConfig `yaml:"indexerConfig"`
 	// Measurements describes a list of measurements kube-burner
