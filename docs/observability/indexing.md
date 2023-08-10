@@ -1,6 +1,6 @@
 # Indexing
 
-Kube-burner can index the collected metrics metrics into a given indexer.
+Kube-burner can index the collected metrics into a given indexer.
 
 ## Indexers
 
@@ -12,7 +12,7 @@ Configured in the `indexerConfig` object, they can be tweaked by the following p
 | `type`    | Type of indexer | String  | ""      |
 
 !!! Note
-At the moment `elastic` and `local` are the only supported indexers
+Currently, `elastic` and `local` are the only supported indexers
 
 ### Elastic/OpenSearch
 
@@ -22,14 +22,14 @@ The `elastic` or `opensearch` indexer can be configured by the parameters below:
 
 | Option               | Description                                       | Type    | Default |
 | -------------------- | ------------------------------------------------- | ------- | ------- |
-| `esServers`          | List of ES or Opensearch instances                | List    | ""      |
-| `defaultIndex`       | Default index to send the prometheus metrics into | String  | ""      |
+| `esServers`          | List of Elasticsearch or OpenSearch instances     | List    | ""      |
+| `defaultIndex`       | Default index to send the Prometheus metrics into | String  | ""      |
 | `insecureSkipVerify` | TLS certificate verification                      | Boolean | false   |
 
-Since Opensearch is back compatible with Elasticsearch, and there are no version checks we are using. Kube-burner with OpenSearch indexing wouldn't raise any issues.
+OpenSearch is backwards compatible with Elasticsearch and kube-burner does not use any version checks. Therefore, kube-burner with OpenSearch indexing should work as expected.
 
 !!!Info
-It's possible to index documents in an authenticated ES or OpenSearch instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the `esServers` parameter.
+It is possible to index documents in an authenticated Elasticsearch or OpenSearch instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the `esServers` parameter.
 
 ### Local
 
@@ -45,7 +45,7 @@ The `local` indexer can be configured by the parameters below:
 
 ## Job Summary
 
-When an indexer is configued, at the end of each job, a document holding the job summary is indexed. This is useful to identify the parameters the job was executed with:
+When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with.
 
 This document looks like:
 
@@ -88,12 +88,9 @@ This document looks like:
 
 ## Metric exporting & importing
 
-When using the `local` indexer, it's possible to dump all the collected metrics to a tarball, so we import them later, this is useful in disconnected environments, where kube-burner doesn't have direct access to a ElasticSearch instance. Metrics exporting can be configured by `createTarball` field of the indexer config as noted in the [local indexer](#local).
+When using the `local` indexer, it is possible to dump all of the collected metrics into a tarball, which you can import later. This is useful in disconnected environments, where kube-burner does not have direct access to an Elasticsearch instance. Metrics exporting can be configured by `createTarball` field of the indexer config as noted in the [local indexer](#local).
 
-The metric exporting feature is available in by using the `init` and `index` subcommands.
-
-Once we've enabled it, a tarball (`kube-burner-metrics-<timestamp>.tgz`) containing all metrics will be generated in the current working directory.
-This tarball can be imported and indexed by kube-burner with the `import` subcommand. For example:
+The metric exporting feature is available through the `init` and `index` subcommands. Once you enabled it, a tarball (`kube-burner-metrics-<timestamp>.tgz`) containing all metrics is generated in the current working directory. This tarball can be imported and indexed by kube-burner with the `import` subcommand. For example:
 
 ```console
 $ kube-burner/bin/kube-burner import --config kubelet-config.yml --tarball kube-burner-metrics-1624441857.tgz
@@ -106,9 +103,9 @@ INFO[2021-06-23 11:39:43] Successfully indexed [1] documents in 208ms in kube-bu
 
 ## Scraping from multiple endpoints
 
-It's possible to scrape from multiple prometheus endpoints and send the results to the target indexer with the `init` and `index` subcommands. This feature is configured by the flag `--metrics-endpoint`, which points to a YAML file with the required configuration.
+It is possible to scrape from multiple Prometheus endpoints and send the results to the target indexer with the `init` and `index` subcommands. This feature is configured by the flag `--metrics-endpoint`, which points to a YAML file with the required configuration.
 
-A valid file provided to the `--metrics-endpoint` would look like this.
+A valid file provided to the `--metrics-endpoint` looks like this:
 
 ```yaml
 - endpoint: http://localhost:9090 # This is one of the Prometheus endpoints
@@ -122,4 +119,4 @@ A valid file provided to the `--metrics-endpoint` would look like this.
 
 !!!note
 The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file.
-The `profile` and `alertProfile` parameters are optional. If not provided they will be taken from the CLI flags.
+The `profile` and `alertProfile` parameters are optional. If not provided, they will be taken from the CLI flags.

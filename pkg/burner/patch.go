@@ -95,7 +95,7 @@ func (ex *Executor) RunPatchJob() {
 
 		// Try to find the list of resources by GroupVersionResource.
 		err := RetryWithExponentialBackOff(func() (done bool, err error) {
-			itemList, err = dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+			itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 			if err != nil {
 				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
 				return false, nil
@@ -168,11 +168,11 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 	var uns *unstructured.Unstructured
 	var err error
 	if obj.Namespaced {
-		uns, err = dynamicClient.Resource(obj.gvr).Namespace(ns).
+		uns, err = DynamicClient.Resource(obj.gvr).Namespace(ns).
 			Patch(context.TODO(), originalItem.GetName(),
 				types.PatchType(obj.patchType), data, patchOptions)
 	} else {
-		uns, err = dynamicClient.Resource(obj.gvr).
+		uns, err = DynamicClient.Resource(obj.gvr).
 			Patch(context.TODO(), originalItem.GetName(),
 				types.PatchType(obj.patchType), data, patchOptions)
 	}
