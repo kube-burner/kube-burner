@@ -16,7 +16,7 @@ nav:
   - contributing/index.md
   - Contributing: contributing/index.md
   - CI: contributing/ci.md
-  - Tests: contributing/ci/tests.md
+  - Tests: contributing/assets/tests.md
 site_name: Kube-burner
 plugins:
   - search
