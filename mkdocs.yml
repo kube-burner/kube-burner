@@ -15,7 +15,10 @@ nav:
 - Contributing:
   - contributing/index.md
   - Contributing: contributing/index.md
-  - CI: contributing/ci.md
+  - CI: 
+    - CI Introduction: contributing/ci.md
+    - Pull Request: contributing/ci/pullrequest.md
+    - Release: contributing/ci/release.md
   - Tests: contributing/ci/tests.md
 site_name: Kube-burner
 plugins:
