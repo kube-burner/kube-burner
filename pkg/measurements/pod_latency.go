@@ -172,7 +172,9 @@ func (p *podLatency) stop() (int, error) {
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
+		if pq.QuantileName != "PodScheduledV2" && pq.QuantileName != "InitializedV2" && pq.QuantileName != "ContainersReadyV2" && pq.QuantileName != "ReadyV2" {
+			log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
+		}
 	}
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
