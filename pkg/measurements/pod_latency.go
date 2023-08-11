@@ -79,7 +79,8 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	jobConfig := *factory.jobConfig
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
-		if strings.Contains(pod.Namespace, factory.jobConfig.Namespace) {
+		runid, exists := pod.Labels["kube-burner-runid"]
+		if exists && runid == globalCfg.RUNID {
 			p.metrics[string(pod.UID)] = podMetric{
 				Timestamp:           now,
 				CreationTimestampV2: pod.CreationTimestamp.Time.UTC(),
@@ -226,6 +227,10 @@ func (p *podLatency) normalizeMetrics() {
 			log.Tracef("ContainersReadyLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.ContainersReadyLatency = 0
 		}
+		if m.ContainersReadyLatencyV2 < 0 {
+			log.Tracef("ContainersReadyLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			m.ContainersReadyLatencyV2 = 0
+		}
 		log.Tracef("ContainersReadyLatency: %+v for pod %+v", m.ContainersReadyLatency, m.Name)
 		log.Tracef("ContainersReadyLatencyV2: %+v for pod %+v", m.ContainersReadyLatencyV2, m.Name)
 
@@ -234,6 +239,10 @@ func (p *podLatency) normalizeMetrics() {
 		if m.SchedulingLatency < 0 {
 			log.Tracef("SchedulingLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.SchedulingLatency = 0
+		}
+		if m.SchedulingLatencyV2 < 0 {
+			log.Tracef("SchedulingLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			m.SchedulingLatencyV2 = 0
 		}
 		log.Tracef("SchedulingLatency: %+v for pod %+v", m.SchedulingLatency, m.Name)
 		log.Tracef("SchedulingLatencyV2: %+v for pod %+v", m.SchedulingLatencyV2, m.Name)
@@ -244,6 +253,10 @@ func (p *podLatency) normalizeMetrics() {
 			log.Tracef("InitializedLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.InitializedLatency = 0
 		}
+		if m.InitializedLatencyV2 < 0 {
+			log.Tracef("InitializedLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			m.InitializedLatencyV2 = 0
+		}
 		log.Tracef("InitializedLatency: %+v for pod %+v", m.InitializedLatency, m.Name)
 		log.Tracef("InitializedLatencyV2: %+v for pod %+v", m.InitializedLatencyV2, m.Name)
 
@@ -252,6 +265,10 @@ func (p *podLatency) normalizeMetrics() {
 		if m.PodReadyLatency < 0 {
 			log.Tracef("PodReadyLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.PodReadyLatency = 0
+		}
+		if m.PodReadyLatencyV2 < 0 {
+			log.Tracef("PodReadyLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			m.PodReadyLatencyV2 = 0
 		}
 		log.Tracef("PodReadyLatency: %+v for pod %+v", m.PodReadyLatency, m.Name)
 		log.Tracef("PodReadyLatencyV2: %+v for pod %+v", m.PodReadyLatencyV2, m.Name)
