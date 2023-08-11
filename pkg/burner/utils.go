@@ -50,6 +50,23 @@ func prepareTemplate(original []byte) ([]byte, error) {
 	return original, nil
 }
 
+// Helps to set metadata labels
+func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string) {
+	// Will be useful for the resources like Deployments and Replicasets. Because
+	// object.SetLabels(labels) doesn't actually set labels for the underlying
+	// objects (i.e Pods under deployment/replicastes). So this function should help
+	// us achieve that without breaking any of our labeling functionality.
+	templatePath := []string{"spec", "template", "metadata", "labels"}
+	metadata, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
+	if !found {
+		return
+	}
+	for k, v := range labels {
+		metadata[k] = v
+	}
+	unstructured.SetNestedMap(obj.Object, metadata, templatePath...)
+}
+
 func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
 	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
 	if err != nil {

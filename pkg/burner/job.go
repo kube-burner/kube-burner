@@ -55,6 +55,7 @@ type Executor struct {
 	End     time.Time
 	config.Job
 	uuid    string
+	runid   string
 	limiter *rate.Limiter
 }
 
@@ -267,6 +268,7 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 		ex.limiter = rate.NewLimiter(rate.Limit(job.QPS), job.Burst)
 		ex.Job = job
 		ex.uuid = uuid
+		ex.runid = configSpec.GlobalConfig.RUNID
 		executorList = append(executorList, ex)
 	}
 	return executorList
