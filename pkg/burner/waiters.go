@@ -85,7 +85,8 @@ func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGr
 			return false, err
 		}
 		for _, dep := range deps.Items {
-			if *dep.Spec.Replicas != dep.Status.ReadyReplicas {
+			// We need to wait for Updated & Ready replicas (they're slightly different) to ensure the deployment is ready
+			if *dep.Spec.Replicas != dep.Status.UpdatedReplicas || *dep.Spec.Replicas != dep.Status.ReadyReplicas {
 				log.Debugf("Waiting for replicas from deployments in ns %s to be ready", ns)
 				return false, nil
 			}

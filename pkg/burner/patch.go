@@ -191,10 +191,7 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 		log.Debugf("Patched %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 	}
 
-	// We need to give Kubernetes a little time to actually apply the patch and make changes before we can wait on it
-	// If we aren't waiting for the job to finish, we can just carry on
 	if ex.WaitWhenFinished {
-		time.Sleep(50 * time.Millisecond)
 		ex.waitForObjects(ns)
 	}
 
