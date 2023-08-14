@@ -96,7 +96,7 @@ The "build" job uses the file `builders.yml` file to build binaries and images, 
 
 ### Tests
 
-{% include-markdown "tests.md" %}
+{% include-markdown "./tests.md" %}
 
 ### Report Results
 
