@@ -57,12 +57,12 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	start := p.JobList[0].Start
 	end := p.JobList[len(p.JobList)-1].End
-	elapsed := int(end.Sub(start).Minutes())
+	elapsed := int(end.Sub(start).Seconds())
 	var err error
 	var v model.Value
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
-	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
+	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
 	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 	for _, md := range p.MetricProfile {
 		var datapoints []interface{}
@@ -81,25 +81,6 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 			}
 			if err := p.parseVector(md.MetricName, query, v, &datapoints); err != nil {
 				log.Warnf("Error found parsing result from query %s: %s", query, err)
-			}
-		} else if len(md.Aggregations) > 0 {
-			for _, agg := range md.Aggregations {
-				result, err := p.Client.QueryRangeAggregatedTS(query, start, end, p.Step, agg)
-				if err != nil {
-					log.Warnf("Error found with query %s: %s", query, err)
-					continue
-				}
-				m := metric{
-					UUID:        p.UUID,
-					Query:       query,
-					MetricName:  md.MetricName,
-					JobConfig:   p.findJob(end),
-					Timestamp:   end,
-					Metadata:    p.metadata,
-					Aggregation: agg,
-					Value:       result,
-				}
-				datapoints = append(datapoints, m)
 			}
 		} else {
 			log.Debugf("Range query: %s", query)
@@ -184,9 +165,6 @@ func (p *Prometheus) readProfile(metricsProfile string) error {
 	for i, md := range p.MetricProfile {
 		if md.Query == "" {
 			return fmt.Errorf("query not defined in %d element", i)
-		}
-		if md.Instant && len(md.Aggregations) > 0 {
-			return fmt.Errorf("instant and aggregation cannot be defined together")
 		}
 		if md.MetricName == "" {
 			return fmt.Errorf("metricName not defined in %d element", i)

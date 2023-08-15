@@ -28,6 +28,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 
+	uid "github.com/satori/go.uuid"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -40,6 +41,7 @@ import (
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
+		RUNID:          uid.NewV4().String(),
 		GC:             false,
 		GCTimeout:      1 * time.Hour,
 		RequestTimeout: 15 * time.Second,
@@ -49,6 +51,7 @@ var configSpec = Spec{
 			MetricsDirectory:   "collected-metrics",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
+		WaitWhenFinished: false,
 	},
 }
 
@@ -86,8 +89,14 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
 	}
+
 	if err := unmarshal(&raw); err != nil {
 		return err
+	}
+	// Applying overrides here
+	if configSpec.GlobalConfig.WaitWhenFinished {
+		raw.PodWait = false
+		raw.WaitWhenFinished = false
 	}
 	// Convert raw to Job
 	*j = Job(raw)

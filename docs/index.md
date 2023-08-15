@@ -6,19 +6,19 @@
 
 Kube-burner is a Kubernetes performance and scale test orchestration toolset. It provides multi-faceted functionality, the most important of which are summarized below.
 
-- Create, delete and patch Kubernetes resources at scale.
+- Create, delete, and patch Kubernetes resources at scale.
 - Prometheus metric collection and indexing.
 - Measurements.
 - Alerting.
 
-Kube-burner is a binary application written in golang that makes extensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
+Kube-burner is a binary application written in Golang that makes extensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
 
 ![Demo](media/demo.gif)
 
-# Quick starting with Kube-burner
+# Quick starting with kube-burner
 
-In case you want to start tinkering with Kube-burner now:
+To start tinkering with kube-burner now:
 
 - Find binaries for different CPU architectures and operating systems in the [releases section of the repository](https://github.com/cloud-bulldozer/kube-burner/releases).
-- There's also a container image repository available at [quay](https://quay.io/repository/cloud-bulldozer/kube-burner?tab=tags).
-- Some valid examples of configuration files, metrics profiles and grafana dashboards can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples) of the repository.
+- Use the container image repository available at [quay](https://quay.io/repository/cloud-bulldozer/kube-burner?tab=tags).
+- Referemce valid examples of configuration files, metrics profiles, and Grafana dashboards in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples) of the repository.

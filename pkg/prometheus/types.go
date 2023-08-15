@@ -49,10 +49,9 @@ type Job struct {
 
 // metricDefinition describes what metrics kube-burner collects
 type metricDefinition struct {
-	Query        string                   `yaml:"query"`
-	MetricName   string                   `yaml:"metricName"`
-	Instant      bool                     `yaml:"instant"`
-	Aggregations []prometheus.Aggregation `yaml:"aggregations"`
+	Query      string `yaml:"query"`
+	MetricName string `yaml:"metricName"`
+	Instant    bool   `yaml:"instant"`
 }
 
 // MetricEndpoint describes prometheus endpoint to scrape
@@ -64,13 +63,12 @@ type MetricEndpoint struct {
 }
 
 type metric struct {
-	Timestamp   time.Time              `json:"timestamp"`
-	Labels      map[string]string      `json:"labels,omitempty"`
-	Value       float64                `json:"value"`
-	UUID        string                 `json:"uuid"`
-	Query       string                 `json:"query"`
-	MetricName  string                 `json:"metricName,omitempty"`
-	JobConfig   config.Job             `json:"jobConfig,omitempty"`
-	Metadata    interface{}            `json:"metadata,omitempty"`
-	Aggregation prometheus.Aggregation `json:"aggregation,omitempty"`
+	Timestamp  time.Time         `json:"timestamp"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	Value      float64           `json:"value"`
+	UUID       string            `json:"uuid"`
+	Query      string            `json:"query"`
+	MetricName string            `json:"metricName,omitempty"`
+	JobConfig  config.Job        `json:"jobConfig,omitempty"`
+	Metadata   interface{}       `json:"metadata,omitempty"`
 }
