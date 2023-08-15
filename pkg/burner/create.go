@@ -91,10 +91,11 @@ func setupCreateJob(jobConfig config.Job) Executor {
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
+func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
 	nsLabels := map[string]string{
-		"kube-burner-job":  ex.Name,
-		"kube-burner-uuid": ex.uuid,
+		"kube-burner-job":   ex.Name,
+		"kube-burner-uuid":  ex.uuid,
+		"kube-burner-runid": ex.runid,
 	}
 	var wg sync.WaitGroup
 	var ns string
@@ -108,6 +109,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 		if err = createNamespace(ns, nsLabels); err != nil {
 			log.Fatal(err.Error())
 		}
+		*waitListNamespaces = append(*waitListNamespaces, ns)
 	}
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
@@ -128,12 +130,13 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 					continue
 				}
 				namespacesCreated[ns] = true
+				*waitListNamespaces = append(*waitListNamespaces, ns)
 			}
 		}
 		for objectIndex, obj := range ex.objects {
 			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
 		}
-		if ex.PodWait {
+		if !ex.WaitWhenFinished && ex.PodWait {
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
@@ -148,7 +151,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int) {
 	}
 	// Wait for all replicas to be created
 	wg.Wait()
-	if ex.WaitWhenFinished && !ex.PodWait {
+	if ex.WaitWhenFinished {
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
@@ -196,6 +199,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				"kube-burner-uuid":  ex.uuid,
 				"kube-burner-job":   ex.Name,
 				"kube-burner-index": strconv.Itoa(objectIndex),
+				"kube-burner-runid": ex.runid,
 			}
 			templateData := map[string]interface{}{
 				jobName:      ex.Name,
@@ -217,6 +221,7 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 				labels[k] = v
 			}
 			newObject.SetLabels(labels)
+			setMetadataLabels(newObject, labels)
 			json.Marshal(newObject.Object)
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
@@ -314,7 +319,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"}, true)
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(randStart, numToChurn+randStart)
+		ex.RunCreateJob(randStart, numToChurn+randStart, &[]string{})
 		log.Infof("Sleeping for %v", ex.ChurnDelay)
 		time.Sleep(ex.ChurnDelay)
 	}

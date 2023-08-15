@@ -15,8 +15,10 @@ nav:
 - Contributing:
   - contributing/index.md
   - Contributing: contributing/index.md
-  - CI: contributing/ci.md
-  - Tests: contributing/ci/tests.md
+  - GitHub Workflows:
+    - contributing/pullrequest.md
+    - contributing/release.md
+  - Tests: contributing/tests.md
 site_name: Kube-burner
 plugins:
   - search

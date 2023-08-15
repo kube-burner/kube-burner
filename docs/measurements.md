@@ -1,6 +1,6 @@
 # Measurements
 
-Kube-burner allows to get further metrics using other mechanisms or data sources such as the own kubernetes API, these mechanisms are called measurements.
+Kube-burner allows you to get further metrics using other mechanisms or data sources, such as the Kubernetes API. These mechanisms are called measurements.
 
 Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
 'kube-burner' supports the following measurements so far:
@@ -17,9 +17,9 @@ Collects latencies from the different pod startup phases, these **latency metric
   - name: podLatency
 ```
 
-This measurement sends its metrics to configured indexer. The metrics collected are pod latency histograms (`podLatencyMeasurement`) and a four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`). It's possible to skip indexing the `podLatencyMeasurement` metric by configuring the field `podLatencyMetrics` of this measurement to `quantiles`.
+This measurement sends its metrics to a configured indexer. The metrics collected are pod latency histograms (`podLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`). It is possible to skip indexing the `podLatencyMeasurement` metric by configuring the field `podLatencyMetrics` of this measurement to `quantiles`.
 
-Pod latency sample, one document like the below is indexed per each pod created by the workload that enters in Running condition during the workload:
+One document, such as the following, is indexed per each pod created by the workload that enters in `Running` condition during the workload:
 
 ```json
 {
@@ -69,12 +69,15 @@ Pod latency quantile sample:
 }
 ```
 
-Where quantileName matches with the pod conditions and can be:
+Where `quantileName` matches with the pod conditions and can be:
 
 - `PodScheduled`: Pod has been scheduled in to a node.
 - `Initialized`: All init containers in the pod have started successfully
 - `ContainersReady`: Indicates whether all containers in the pod are ready.
-- `Ready`: The pod is able to service reqeusts and should be added to the load balancing pools of all matching services.
+- `Ready`: The pod is able to service requests and should be added to the load balancing pools of all matching services.
+
+!!! note
+    There are a V2 version of these latencies as well. Both are being kept with the intention of monitoring them over time (i.e precision vs accuracy problem) Therefore, if you notice a significant discrepancy and want to tell us about it, please feel free to do so. Or else prefer to stay with the non-v2 and everything will continue to be the same as it always has been.
 
 !!! info
     More information about the pod conditions can be found at the [kubernetes documentation site](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions).
@@ -89,7 +92,7 @@ And the metrics are:
 
 ### Pod latency thresholds
 
-It's possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within this measurement:
+It is possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within this measurement:
 
 Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
 
@@ -113,7 +116,7 @@ In case of not meeting any of the configured thresholds, like the example above,
 
 ## pprof collection
 
-This measurement can be used to collect golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
+This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
 
 As some components require authentication to get profiling information, `kube-burner` provides two different modalities to address it:
 

@@ -32,6 +32,7 @@ archives:
     files:
       - LICENSE
 changelog:
+  use: github
   sort: asc
   filters:
     exclude:

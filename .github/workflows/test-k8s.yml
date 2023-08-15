@@ -49,19 +49,6 @@ jobs:
         KIND_VERSION: v0.19.0
         K8S_VERSION: ${{matrix.k8s-version}}
 
-    - name: Upload test results artifact
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: test-k8s-results
-        path: test/report.xml
-
-    - name: Publish Test Report
-      uses: mikepenz/action-junit-report@v3
-      if: always()
-      with:
-        report_paths: test/report.xml
-
   ocp-wrapper:
     runs-on: ubuntu-latest
     concurrency:
@@ -108,15 +95,3 @@ jobs:
         OPENSHIFT_USER: ${{ secrets.OPENSHIFT_USER }}
         OPENSHIFT_PASSWORD: ${{ secrets.OPENSHIFT_PASSWORD }}
 
-    - name: Upload test results artifact
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: test-ocp-results
-        path: test/report.xml
-
-    - name: Publish Test Report
-      uses: mikepenz/action-junit-report@v3
-      if: always()
-      with:
-        report_paths: test/report.xml

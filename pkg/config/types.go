@@ -45,6 +45,8 @@ type Spec struct {
 type GlobalConfig struct {
 	// Benchmark UUID
 	UUID string
+	// Benchmark RUNID
+	RUNID string
 	// IndexerConfig contains a IndexerConfig definition
 	IndexerConfig indexers.IndexerConfig `yaml:"indexerConfig"`
 	// Measurements describes a list of measurements kube-burner
@@ -64,6 +66,8 @@ type GlobalConfig struct {
 	AlertProfile string `yaml:"alertProfile"`
 	// GC garbage collect created namespaces
 	GC bool `yaml:"gc" json:"gc"`
+	// WaitWhenFinished Wait for pods to be running when all the jobs are completed
+	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
 	// GCTimeout garbage collection timeout
 	GCTimeout time.Duration `yaml:"gcTimeout"`
 }
