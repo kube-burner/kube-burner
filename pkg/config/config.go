@@ -129,6 +129,9 @@ func Parse(uuid, c string) (Spec, error) {
 	if len(configSpec.Jobs) <= 0 {
 		return configSpec, fmt.Errorf("No jobs found in the configuration file")
 	}
+	if err := jobIsDuped(); err != nil {
+		return configSpec, err
+	}
 	if err := validateDNS1123(); err != nil {
 		return configSpec, err
 	}
@@ -225,4 +228,15 @@ func buildConfig(kubeconfigPath string) (*rest.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}}).ClientConfig()
+}
+
+func jobIsDuped() error {
+	jobCount := make(map[string]int)
+	for _, job := range configSpec.Jobs {
+		jobCount[job.Name]++
+		if jobCount[job.Name] > 1 {
+			return fmt.Errorf("Job names must be unique")
+		}
+	}
+	return nil
 }
