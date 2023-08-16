@@ -17,6 +17,7 @@ package burner
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -104,7 +105,7 @@ func (ex *Executor) Verify() bool {
 				}
 			}
 			return true, nil
-		}, 1*time.Second, 3, 0, 3)
+		}, 1*time.Second, 3, 0, 1*time.Minute)
 		// Mark success to false if we found an error
 		if err != nil {
 			success = false
@@ -161,7 +162,8 @@ func VerifyContainerRegistry(restConfig *rest.Config) bool {
 }
 
 // RetryWithExponentialBackOff a utility for retrying the given function with exponential backoff.
-func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, factor, jitter float64, steps int) error {
+func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, factor, jitter float64, timeout time.Duration) error {
+	steps := int(math.Ceil(math.Log(float64(timeout)/(float64(duration)*(1+jitter))) / math.Log(factor)))
 	backoff := wait.Backoff{
 		Duration: duration,
 		Factor:   factor,
