@@ -16,7 +16,7 @@ builds:
       - s390x
     dir: ./cmd/kube-burner/
     ldflags:
-      - -X github.com/cloud-bulldozer/kube-burner/pkg/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/kube-burner/pkg/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/kube-burner/pkg/version.Version={{.Version}}
+      - -X github.com/cloud-bulldozer/go-commons/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/go-commons/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/go-commons/version.Version={{.Version}}
 archives:
   - format: tar.gz
     name_template: >-
