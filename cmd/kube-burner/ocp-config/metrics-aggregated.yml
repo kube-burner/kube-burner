@@ -124,6 +124,9 @@
 - query: sum(kube_node_status_condition{status="true"}) by (condition)
   metricName: nodeStatus
 
+- query: count(kube_replicaset_labels{})
+  metricName: replicaSets
+
 # Prometheus metrics
 
 - query: openshift:prometheus_tsdb_head_series:sum{job="prometheus-k8s"}
