@@ -202,7 +202,6 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 
 func (a *AlertManager) index(alertSet []interface{}) {
 	log.Info("Indexing alerts")
-	log.Infof("Indexing alert %s", alertMetricName)
 	log.Debugf("Indexing [%d] documents", len(alertSet))
 	resp, err := (*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
 	if err != nil {

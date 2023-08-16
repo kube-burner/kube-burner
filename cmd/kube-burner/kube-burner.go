@@ -107,7 +107,7 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			configSpec, err := config.Parse(uuid, configFile, false)
+			configSpec, err := config.Parse(uuid, configFile)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -153,7 +153,7 @@ func initCmd() *cobra.Command {
 }
 
 func destroyCmd() *cobra.Command {
-	var uuid, configFile string
+	var uuid string
 	var timeout time.Duration
 	var rc int
 	cmd := &cobra.Command{
@@ -165,12 +165,6 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			if configFile != "" {
-				_, err := config.Parse(uuid, configFile, false)
-				if err != nil {
-					log.Fatal(err.Error())
-				}
-			}
 			listOptions := v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%s", uuid)}
 			clientSet, restConfig, err := config.GetClientSet(0, 0)
 			if err != nil {
@@ -250,7 +244,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-indexing", "Indexing job name")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
-	cmd.Flags().StringVar(&metricsDirectory, "metrics-directory", "collected-metrics", "Directory to dump the metrics files in, when using local indexing")
+	cmd.Flags().StringVar(&metricsDirectory, "metrics-directory", "collected-metrics", "Directory to dump the metrics files in, when using default local indexing")
 	cmd.Flags().StringVar(&esServer, "es-server", "", "Elastic Search endpoint")
 	cmd.Flags().StringVar(&esIndex, "es-index", "", "Elastic Search index")
 	cmd.Flags().SortFlags = false
@@ -258,14 +252,24 @@ func indexCmd() *cobra.Command {
 }
 
 func importCmd() *cobra.Command {
-	var configFile, tarball string
+	var tarball string
+	var esServer, esIndex, metricsDirectory string
+	var configSpec config.Spec
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "Import metrics tarball",
 		Run: func(cmd *cobra.Command, args []string) {
-			configSpec, err := config.Parse("", configFile, false)
-			if err != nil {
-				log.Fatal(err.Error())
+			if esServer != "" && esIndex != "" {
+				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+					Type:    indexers.ElasticIndexer,
+					Servers: []string{esServer},
+					Index:   esIndex,
+				}
+			} else {
+				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+					Type:             indexers.LocalIndexer,
+					MetricsDirectory: metricsDirectory,
+				}
 			}
 			indexerConfig := configSpec.GlobalConfig.IndexerConfig
 			log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
@@ -279,9 +283,10 @@ func importCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVar(&tarball, "tarball", "", "Metrics tarball file")
-	cmd.MarkFlagRequired("config")
+	cmd.Flags().StringVar(&metricsDirectory, "metrics-directory", "collected-metrics", "Directory to dump the metrics files in, when using default local indexing")
+	cmd.Flags().StringVar(&esServer, "es-server", "", "Elastic Search endpoint")
+	cmd.Flags().StringVar(&esIndex, "es-index", "", "Elastic Search index")
 	cmd.MarkFlagRequired("tarball")
 	return cmd
 }
@@ -289,7 +294,8 @@ func importCmd() *cobra.Command {
 func alertCmd() *cobra.Command {
 	var configSpec config.Spec
 	var err error
-	var url, alertProfile, configFile, username, password, uuid, token string
+	var url, alertProfile, username, password, uuid, token string
+	var esServer, esIndex, metricsDirectory string
 	var start, end int64
 	var skipTLSVerify bool
 	var alertM *alerting.AlertManager
@@ -303,10 +309,16 @@ func alertCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			if configFile != "" {
-				configSpec, err = config.Parse(uuid, configFile, false)
-				if err != nil {
-					log.Fatal(err.Error())
+			if esServer != "" && esIndex != "" {
+				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+					Type:    indexers.ElasticIndexer,
+					Servers: []string{esServer},
+					Index:   esIndex,
+				}
+			} else if metricsDirectory != "" {
+				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+					Type:             indexers.LocalIndexer,
+					MetricsDirectory: metricsDirectory,
 				}
 			}
 			if configSpec.GlobalConfig.IndexerConfig.Type != "" {
@@ -316,12 +328,6 @@ func alertCmd() *cobra.Command {
 				if err != nil {
 					log.Fatal(err.Error())
 				}
-			}
-			if url == "" {
-				url = configSpec.GlobalConfig.PrometheusURL
-			}
-			if token == "" {
-				token = configSpec.GlobalConfig.BearerToken
 			}
 			auth := prometheus.Auth{
 				Username:      username,
@@ -353,7 +359,9 @@ func alertCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64VarP(&start, "start", "", time.Now().Unix()-3600, "Epoch start time")
 	cmd.Flags().Int64VarP(&end, "end", "", time.Now().Unix(), "Epoch end time")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.Flags().StringVar(&metricsDirectory, "metrics-directory", "", "Directory to dump the alert files in, enables local indexing when specified")
+	cmd.Flags().StringVar(&esServer, "es-server", "", "Elastic Search endpoint")
+	cmd.Flags().StringVar(&esIndex, "es-index", "", "Elastic Search index")
 	cmd.MarkFlagRequired("prometheus-url")
 	cmd.MarkFlagRequired("alert-profile")
 	cmd.Flags().SortFlags = false
