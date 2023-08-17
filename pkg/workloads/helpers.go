@@ -46,13 +46,13 @@ const (
 
 type BenchmarkMetadata struct {
 	ocpmetadata.ClusterMetadata
-	UUID         string                 `json:"uuid"`
-	Benchmark    string                 `json:"benchmark"`
-	Timestamp    time.Time              `json:"timestamp"`
-	EndDate      time.Time              `json:"endDate"`
-	Passed       bool                   `json:"passed"`
-	Errors       string                 `json:"errors"`
-	UserMetadata map[string]interface{} `json:"metadata,omitempty"`
+	UUID            string                 `json:"uuid"`
+	Benchmark       string                 `json:"benchmark"`
+	Timestamp       time.Time              `json:"timestamp"`
+	EndDate         time.Time              `json:"endDate"`
+	Passed          bool                   `json:"passed"`
+	ExecutionErrors string                 `json:"executionErrors"`
+	UserMetadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type WorkloadHelper struct {
@@ -234,7 +234,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	}
 	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
-		wh.Metadata.Errors = err.Error()
+		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)
 	}
 	wh.Metadata.Passed = rc == 0
