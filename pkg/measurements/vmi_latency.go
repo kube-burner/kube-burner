@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
@@ -71,12 +72,14 @@ type vmiMetric struct {
 	vmReady        time.Time
 	VMReadyLatency int `json:"vmReadyLatency"`
 
-	MetricName string `json:"metricName"`
-	JobName    string `json:"jobName"`
-	UUID       string `json:"uuid"`
-	Namespace  string `json:"namespace"`
-	Name       string `json:"podName"`
-	NodeName   string `json:"nodeName"`
+	MetricName string      `json:"metricName"`
+	JobName    string      `json:"jobName"`
+	JobConfig  config.Job  `json:"jobConfig"`
+	Metadata   interface{} `json:"metadata,omitempty"`
+	UUID       string      `json:"uuid"`
+	Namespace  string      `json:"namespace"`
+	Name       string      `json:"podName"`
+	NodeName   string      `json:"nodeName"`
 }
 
 type vmiLatency struct {
@@ -107,6 +110,8 @@ func (p *vmiLatency) handleCreateVM(obj interface{}) {
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
 				JobName:    factory.jobConfig.Name,
+				JobConfig:  *factory.jobConfig,
+				Metadata:   factory.metadata,
 			}
 		}
 	}
