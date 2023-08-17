@@ -240,13 +240,14 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 	}
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
-		if job.JobType == config.CreationJob {
+		switch job.JobType {
+		case config.CreationJob:
 			ex = setupCreateJob(job)
-		} else if job.JobType == config.DeletionJob {
+		case config.DeletionJob:
 			ex = setupDeleteJob(&job)
-		} else if job.JobType == config.PatchJob {
+		case config.PatchJob:
 			ex = setupPatchJob(job)
-		} else {
+		default:
 			log.Fatalf("Unknown jobType: %s", job.JobType)
 		}
 		for _, j := range executorList {
