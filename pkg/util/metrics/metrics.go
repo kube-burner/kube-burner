@@ -53,9 +53,26 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 	if metricsScraperConfig.MetricsEndpoint != "" || metricsScraperConfig.MetricsProfile != "" || metricsScraperConfig.AlertProfile != "" {
 		updateParamIfEmpty(&metricsScraperConfig.MetricsEndpoint, configSpec.GlobalConfig.MetricsEndpoint)
 		updateParamIfEmpty(&metricsScraperConfig.URL, configSpec.GlobalConfig.PrometheusURL)
-		validateMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, metricsScraperConfig.URL)
+		if metricsScraperConfig.OcpMetaData == nil {
+			validateMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, metricsScraperConfig.URL)
+		}
 		if metricsScraperConfig.MetricsEndpoint != "" {
 			DecodeMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, &metricsEndpoints)
+			if metricsScraperConfig.OcpMetaData != nil {
+				isClusterPrometheusFound := false
+				for _, metricsEndpoint := range metricsEndpoints {
+					if metricsEndpoint.Endpoint == metricsScraperConfig.URL {
+						isClusterPrometheusFound = true
+						break
+					}
+				}
+				if !isClusterPrometheusFound {
+					metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
+						Endpoint: metricsScraperConfig.URL,
+						Token:    metricsScraperConfig.Token,
+					})
+				}
+			}
 		} else {
 			updateParamIfEmpty(&metricsScraperConfig.Token, configSpec.GlobalConfig.BearerToken)
 			metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
@@ -73,7 +90,12 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 		}
 		metadataContent := map[string]interface{}{}
 		if metricsScraperConfig.ActionIndex {
-			metadataContent = userMetadataContent
+			if metricsScraperConfig.OcpMetaData != nil {
+				metadataContent = metricsScraperConfig.OcpMetaData
+			}
+			for k, v := range userMetadataContent {
+				metadataContent[k] = v
+			}
 		}
 		auth := prometheus.Auth{
 			Username:      metricsScraperConfig.Username,
