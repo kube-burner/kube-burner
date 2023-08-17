@@ -54,7 +54,7 @@ func createNamespace(namespaceName string, nsLabels map[string]string) error {
 		}
 		log.Debugf("Created namespace: %s", ns.Name)
 		return true, err
-	}, 5*time.Second, 3, 0, 8)
+	}, 5*time.Second, 3, 0, 5*time.Hour)
 }
 
 // CleanupNamespaces deletes namespaces with the given selector

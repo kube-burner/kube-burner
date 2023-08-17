@@ -19,6 +19,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +32,9 @@ func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 		Use:   variant,
 		Short: fmt.Sprintf("Runs %v workload", variant),
 		PreRun: func(cmd *cobra.Command, args []string) {
+			if !burner.VerifyContainerRegistry(wh.restConfig) {
+				os.Exit(1)
+			}
 			wh.Metadata.Benchmark = cmd.Name()
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(iterations))
 			os.Setenv("CHURN", fmt.Sprint(churn))

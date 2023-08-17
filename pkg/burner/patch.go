@@ -101,7 +101,7 @@ func (ex *Executor) RunPatchJob() {
 				return false, nil
 			}
 			return true, nil
-		}, 1*time.Second, 3, 0, 3)
+		}, 1*time.Second, 3, 0, ex.MaxWaitTimeout)
 		if err != nil {
 			continue
 		}
