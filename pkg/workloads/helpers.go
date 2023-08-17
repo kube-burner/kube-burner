@@ -99,8 +99,6 @@ func NewWorkloadHelper(envVars map[string]string, alerting, reporting bool, ocpC
 	}
 }
 
-var indexer *indexers.Indexer
-
 // SetKubeBurnerFlags configures the required environment variables and flags for kube-burner
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	var err error
@@ -139,7 +137,7 @@ func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 	return nil
 }
 
-func (wh *WorkloadHelper) indexMetadata() {
+func (wh *WorkloadHelper) indexMetadata(indexer *indexers.Indexer) {
 	log.Info("Indexing cluster metadata document")
 	wh.Metadata.EndDate = time.Now().UTC()
 	msg, err := (*indexer).Index([]interface{}{wh.Metadata}, indexers.IndexingOpts{
@@ -184,6 +182,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var indexer *indexers.Indexer
 	indexerConfig := configSpec.GlobalConfig.IndexerConfig
 	if indexerConfig.Type != "" {
 		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
@@ -239,7 +238,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	}
 	wh.Metadata.Passed = rc == 0
 	if indexerConfig.Type != "" {
-		wh.indexMetadata()
+		wh.indexMetadata(indexer)
 	}
 	log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
 	os.Exit(rc)

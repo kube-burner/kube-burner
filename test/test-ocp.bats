@@ -78,3 +78,13 @@ teardown_file() {
   run kube-burner ocp cluster-density --iterations=1 --churn-duration=5m --timeout=1s
   [ "$status" -eq 2 ]
 }
+
+@test "index locally with cluster prometheus" {
+  run kube-burner ocp index --uuid="${UUID}" --metrics-profile metrics-profile.yaml
+  [ "$status" -eq 0 ]
+}
+
+@test "index with metrics-endpoints and sending metrics to ES" {
+  run kube-burner ocp index --uuid="${UUID}" --metrics-endpoint metrics-endpoints.yaml --es-server=https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443 --es-index=ripsaw-kube-burner
+  [ "$status" -eq 0 ]
+}

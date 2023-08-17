@@ -5,7 +5,7 @@ This wrapper is hosted under the `kube-burner ocp` subcommand that currently loo
 
 ```console
 $ kube-burner ocp help
-This subcommand is meant to be used against OpenShift clusters and serves as a shortcut to trigger well-known workloads
+This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads
 
 Usage:
   kube-burner ocp [command]
@@ -14,6 +14,7 @@ Available Commands:
   cluster-density    Runs cluster-density workload
   cluster-density-ms Runs cluster-density-ms workload
   cluster-density-v2 Runs cluster-density-v2 workload
+  index              Runs index sub-command
   node-density       Runs node-density workload
   node-density-cni   Runs node-density-cni workload
   node-density-heavy Runs node-density-heavy workload
@@ -32,7 +33,7 @@ Flags:
       --reporting                 Enable benchmark report indexing
       --timeout duration          Benchmark timeout (default 4h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
-      --uuid string               Benchmark UUID (default "d18989c4-4f8a-4a14-b711-9afae69a9140")
+      --uuid string               Benchmark UUID (default "e082ae4b-0ff2-4c38-ba07-7481ec487e8d")
 
 Global Flags:
       --log-level string   Allowed values: debug, info, warn, error, fatal (default "info")
@@ -133,6 +134,28 @@ Note: This workload calculates the number of iterations to create from the numbe
 Creates two deployments, a postgresql database, and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a service that is used by the client to reach the database.
 
 Note: this workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable `iterationsPerNamespace`.
+
+## Index
+
+Just like the traditional kube-burner, ocp wrapper also has an indexing functionality which is exposed as `index` subcommand. 
+```console
+$ kube-burner ocp index --help
+If no other indexer is specified, local indexer is used by default
+
+Usage:
+  kube-burner ocp index [flags]
+
+Flags:
+  -m, --metrics-profile string     Metrics profile file (default "metrics.yml")
+      --metrics-directory string   Directory to dump the metrics files in, when using default local indexing (default "collected-metrics")
+  -s, --step duration              Prometheus step size (default 30s)
+      --start int                  Epoch start time
+      --end int                    Epoch end time
+  -j, --job-name string            Indexing job name (default "kube-burner-ocp-indexing")
+      --user-metadata string       User provided metadata file, in YAML format
+  -h, --help                       help for index
+```
+Please refer to [indexing](observability/indexing.md) section for better understanding on the functionality.
 
 ## Reporting mode
 
