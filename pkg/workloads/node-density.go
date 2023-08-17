@@ -49,7 +49,7 @@ func NewNodeDensity(wh *WorkloadHelper) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&podsPerNode, "pods-per-node", 245, "Pods per node")
-	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 5*time.Second, "Pod ready timeout threshold")
+	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 15*time.Second, "Pod ready timeout threshold")
 	cmd.Flags().StringVar(&containerImage, "container-image", "gcr.io/google_containers/pause:3.1", "Container image")
 	return cmd
 }

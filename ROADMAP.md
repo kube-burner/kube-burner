@@ -17,3 +17,10 @@ This document is meant to define high-level plans for the kube-burner project an
 - [ ] [[RFE Enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/138) A standalone measure command to just fetch measurements of a workload.
 - [ ] [[RFE Enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/248) Functionality to capture prometheus dump inspired by [promdump](https://github.com/ihcsim/promdump) tool.
 - [ ] [[RFE CI/CD]](https://github.com/cloud-bulldozer/kube-burner/issues/112) To have unit tests implemented in place as our application is growing continously.
+- [ ] [[RFE Enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/413) To improve measurement calculations in benchmark by considering resources only specific to our run in the entire cluster.
+- [ ] [[RFE Enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/408) Ability to check if the ingress controller is up and running in a workload that contains routes.
+- [ ] [[RFE Enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/426) Add measurements around persistent volume lifecycles along with pod/vmi latencies and pprof metrics that we have currently.
+- [ ] [[RFE Enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/433) Ship grafana dashboards used to represent indexed metrics along with --reporting mode.
+- [ ] [[RFE Enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/438) Add failure reason of a benchmark in the local indexing results. Or else to look for an option to back propagate the error to upper level i.e just before the benchmark exits.
+- [ ] [[RFE Enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/439) To have an option to audit our own execution, and help our users understand if a run is valid or not. This would be really useful in scenarios where there is an environmental problem in our system under test.
+- [ ] [[RFE enhancement]](https://github.com/cloud-bulldozer/kube-burner/issues/427) Add storage control plane related scenarios to ocp wrapper. An additional functionality that creates PVCs, bind them to PVs, mount them in pods and finally reclaims them.
