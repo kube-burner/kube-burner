@@ -66,6 +66,7 @@ type podLatency struct {
 	config           types.Measurement
 	watcher          *metrics.Watcher
 	metrics          map[string]podMetric
+	metricLock       sync.RWMutex
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
 }
@@ -77,7 +78,8 @@ func init() {
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	now := time.Now().UTC()
 	pod := obj.(*v1.Pod)
-	jobConfig := *factory.jobConfig
+	p.metricLock.Lock()
+	defer p.metricLock.Unlock()
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
 		runid, exists := pod.Labels["kube-burner-runid"]
 		if exists && runid == globalCfg.RUNID {
@@ -88,7 +90,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 				Name:                pod.Name,
 				MetricName:          podLatencyMeasurement,
 				UUID:                globalCfg.UUID,
-				JobConfig:           jobConfig,
+				JobConfig:           *factory.jobConfig,
 				JobName:             factory.jobConfig.Name,
 				Metadata:            factory.metadata,
 			}
@@ -98,6 +100,8 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 
 func (p *podLatency) handleUpdatePod(obj interface{}) {
 	pod := obj.(*v1.Pod)
+	p.metricLock.Lock()
+	defer p.metricLock.Unlock()
 	if pm, exists := p.metrics[string(pod.UID)]; exists && pm.podReady.IsZero() {
 		for _, c := range pod.Status.Conditions {
 			if c.Status == v1.ConditionTrue {

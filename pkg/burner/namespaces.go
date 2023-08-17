@@ -106,7 +106,7 @@ func CleanupNonNamespacedResources(ctx context.Context, l metav1.ListOptions, cl
 }
 
 // Cleanup non-namespaced resources using executor list
-func CleanupNonNamespacedResourcesUsingGvr(ctx context.Context, executorList []Executor, cleanupWait bool) {
+func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, executorList []Executor, cleanupWait bool) {
 	log.Info("Deleting non-namespace resources specific to this benchmark")
 	for _, executor := range executorList {
 		for _, object := range executor.objects {

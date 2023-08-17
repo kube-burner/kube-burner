@@ -80,7 +80,6 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var err error
 	var rc int
 	var prometheusJobList []prometheus.Job
-	var measurementStopFunctions []func() error
 	var jobList []Executor
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -122,7 +121,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 					defer cancel()
 					CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
-					CleanupNonNamespacedResources(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
+					CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
+
 				}
 				if job.Churn {
 					log.Info("Churning enabled")
@@ -174,22 +174,13 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					log.Errorf("Failed measurements: %v", err.Error())
 					innerRC = 1
 				}
-			} else {
-				measurementStopFunctions = append(measurementStopFunctions, measurements.Stop)
 			}
 		}
 		if globalConfig.WaitWhenFinished {
 			runWaitList(globalWaitMap, executorMap)
-			endTime := time.Now().UTC()
-			for jobIndex, stopFunc := range measurementStopFunctions {
-				jobList[jobIndex].End = endTime
-				if len(prometheusJobList) > jobIndex {
-					prometheusJobList[jobIndex].End = endTime
-				}
-				if err := stopFunc(); err != nil {
-					log.Errorf("Failed measurements: %v", err.Error())
-					innerRC = 1
-				}
+			if err = measurements.Stop(); err != nil {
+				log.Errorf("Failed measurements: %v", err.Error())
+				innerRC = 1
 			}
 		}
 		if globalConfig.IndexerConfig.Type != "" {
@@ -234,7 +225,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		defer cancel()
 		log.Info("Garbage collecting remaining namespaces")
 		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
-		CleanupNonNamespacedResourcesUsingGvr(ctx, jobList, true)
+		CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 	}
 	return rc, nil
 }
@@ -249,13 +240,14 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 	}
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
-		if job.JobType == config.CreationJob {
+		switch job.JobType {
+		case config.CreationJob:
 			ex = setupCreateJob(job)
-		} else if job.JobType == config.DeletionJob {
+		case config.DeletionJob:
 			ex = setupDeleteJob(&job)
-		} else if job.JobType == config.PatchJob {
+		case config.PatchJob:
 			ex = setupPatchJob(job)
-		} else {
+		default:
 			log.Fatalf("Unknown jobType: %s", job.JobType)
 		}
 		for _, j := range executorList {
