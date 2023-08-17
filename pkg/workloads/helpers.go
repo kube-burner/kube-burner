@@ -51,6 +51,7 @@ type BenchmarkMetadata struct {
 	Timestamp    time.Time              `json:"timestamp"`
 	EndDate      time.Time              `json:"endDate"`
 	Passed       bool                   `json:"passed"`
+	Errors       string                 `json:"errors"`
 	UserMetadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -233,7 +234,8 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	}
 	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
-		log.Fatal(err)
+		wh.Metadata.Errors = err.Error()
+		log.Error(err)
 	}
 	wh.Metadata.Passed = rc == 0
 	if indexerConfig.Type != "" {
