@@ -188,6 +188,7 @@ type ClusterMetadata struct {
   SDNType          string `json:"sdnType"`
   ClusterName      string `json:"clusterName"`
   Region           string `json:"region"`
+  ExecutionErrors  string `json:"executionErrors"`
 }
 ```
 

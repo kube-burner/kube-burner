@@ -31,6 +31,7 @@ type Watcher struct {
 	Informer    cache.SharedInformer
 }
 
+// NewWatcher return a new ListWatcher of the specified resource and namespace
 func NewWatcher(restClient *rest.RESTClient, name string, resource string, namespace string) *Watcher {
 	lw := cache.NewFilteredListWatchFromClient(
 		restClient,

@@ -22,7 +22,9 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
+
 	"k8s.io/client-go/rest"
 )
 
@@ -37,7 +39,7 @@ type measurementFactory struct {
 
 type measurement interface {
 	start(*sync.WaitGroup)
-	stop() (int, error)
+	stop() error
 	setConfig(types.Measurement) error
 }
 
@@ -100,22 +102,12 @@ func Start() {
 }
 
 // Stop stops registered measurements
-// if a measurement fails, returns a list of the failed measurements or nil
+// returns a concatenated list of error strings with a new line between each string
 func Stop() error {
-	var err error
-	var r int
-	failedMeasurements := []string{}
+	errs := []error{}
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Stopping measurement: %s", name)
-		if r, err = measurement.stop(); err != nil {
-			log.Errorf("Error stopping measurement %s: %s", name, err)
-		}
-		if r != 0 {
-			failedMeasurements = append(failedMeasurements, name)
-		}
+		errs = append(errs, measurement.stop())
 	}
-	if len(failedMeasurements) > 0 {
-		return fmt.Errorf("%v", failedMeasurements)
-	}
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
