@@ -27,6 +27,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -66,6 +67,7 @@ type podLatency struct {
 	config           types.Measurement
 	watcher          *metrics.Watcher
 	metrics          map[string]podMetric
+	metricLock       sync.RWMutex
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
 }
@@ -76,8 +78,9 @@ func init() {
 
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	now := time.Now().UTC()
-	pod := obj.(*v1.Pod)
-	jobConfig := *factory.jobConfig
+	pod := obj.(*corev1.Pod)
+	p.metricLock.Lock()
+	defer p.metricLock.Unlock()
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
 		runid, exists := pod.Labels["kube-burner-runid"]
 		if exists && runid == globalCfg.RUNID {
@@ -88,7 +91,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 				Name:                pod.Name,
 				MetricName:          podLatencyMeasurement,
 				UUID:                globalCfg.UUID,
-				JobConfig:           jobConfig,
+				JobConfig:           *factory.jobConfig,
 				JobName:             factory.jobConfig.Name,
 				Metadata:            factory.metadata,
 			}
@@ -98,24 +101,26 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 
 func (p *podLatency) handleUpdatePod(obj interface{}) {
 	pod := obj.(*v1.Pod)
+	p.metricLock.Lock()
+	defer p.metricLock.Unlock()
 	if pm, exists := p.metrics[string(pod.UID)]; exists && pm.podReady.IsZero() {
 		for _, c := range pod.Status.Conditions {
-			if c.Status == v1.ConditionTrue {
+			if c.Status == corev1.ConditionTrue {
 				switch c.Type {
-				case v1.PodScheduled:
+				case corev1.PodScheduled:
 					if pm.scheduled.IsZero() {
 						pm.scheduled = c.LastTransitionTime.Time.UTC()
 						pm.NodeName = pod.Spec.NodeName
 					}
-				case v1.PodInitialized:
+				case corev1.PodInitialized:
 					if pm.initialized.IsZero() {
 						pm.initialized = c.LastTransitionTime.Time.UTC()
 					}
-				case v1.ContainersReady:
+				case corev1.ContainersReady:
 					if pm.containersReady.IsZero() {
 						pm.containersReady = c.LastTransitionTime.Time.UTC()
 					}
-				case v1.PodReady:
+				case corev1.PodReady:
 					if pm.podReady.IsZero() {
 						log.Debugf("Pod %s is ready", pod.Name)
 						pm.podReady = c.LastTransitionTime.Time.UTC()
@@ -144,7 +149,7 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"podWatcher",
 		"pods",
-		v1.NamespaceAll,
+		corev1.NamespaceAll,
 	)
 	p.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreatePod,
@@ -158,13 +163,13 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 }
 
 // Stop stops podLatency measurement
-func (p *podLatency) stop() (int, error) {
-	var rc int
+func (p *podLatency) stop() error {
+	var err error
 	p.watcher.StopWatcher()
 	p.normalizeMetrics()
 	p.calcQuantiles()
 	if len(p.config.LatencyThresholds) > 0 {
-		rc = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
+		err = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
 	}
 	if globalCfg.IndexerConfig.Type != "" {
 		log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
@@ -178,7 +183,7 @@ func (p *podLatency) stop() (int, error) {
 	}
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
-	return rc, nil
+	return err
 }
 
 // index sends metrics to the configured indexer
@@ -280,17 +285,17 @@ func (p *podLatency) normalizeMetrics() {
 
 func (p *podLatency) calcQuantiles() {
 	quantiles := []float64{0.5, 0.95, 0.99}
-	quantileMap := map[v1.PodConditionType][]int{}
+	quantileMap := map[corev1.PodConditionType][]int{}
 	jc := factory.jobConfig
 	jc.Objects = nil
 	for _, normLatency := range p.normLatencies {
-		quantileMap[v1.PodScheduled] = append(quantileMap[v1.PodScheduled], normLatency.(podMetric).SchedulingLatency)
+		quantileMap[corev1.PodScheduled] = append(quantileMap[corev1.PodScheduled], normLatency.(podMetric).SchedulingLatency)
 		quantileMap["PodScheduledV2"] = append(quantileMap["PodScheduledV2"], normLatency.(podMetric).SchedulingLatencyV2)
-		quantileMap[v1.ContainersReady] = append(quantileMap[v1.ContainersReady], normLatency.(podMetric).ContainersReadyLatency)
+		quantileMap[corev1.ContainersReady] = append(quantileMap[corev1.ContainersReady], normLatency.(podMetric).ContainersReadyLatency)
 		quantileMap["ContainersReadyV2"] = append(quantileMap["ContainersReadyV2"], normLatency.(podMetric).ContainersReadyLatencyV2)
-		quantileMap[v1.PodInitialized] = append(quantileMap[v1.PodInitialized], normLatency.(podMetric).InitializedLatency)
+		quantileMap[corev1.PodInitialized] = append(quantileMap[corev1.PodInitialized], normLatency.(podMetric).InitializedLatency)
 		quantileMap["InitializedV2"] = append(quantileMap["InitializedV2"], normLatency.(podMetric).InitializedLatencyV2)
-		quantileMap[v1.PodReady] = append(quantileMap[v1.PodReady], normLatency.(podMetric).PodReadyLatency)
+		quantileMap[corev1.PodReady] = append(quantileMap[corev1.PodReady], normLatency.(podMetric).PodReadyLatency)
 		quantileMap["ReadyV2"] = append(quantileMap["ReadyV2"], normLatency.(podMetric).PodReadyLatencyV2)
 	}
 	for quantileName, v := range quantileMap {
@@ -325,7 +330,7 @@ func (p *podLatency) validateConfig() error {
 	var metricFound bool
 	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
 	for _, th := range p.config.LatencyThresholds {
-		if th.ConditionType == string(v1.ContainersReady) || th.ConditionType == string(v1.PodInitialized) || th.ConditionType == string(v1.PodReady) || th.ConditionType == string(v1.PodScheduled) {
+		if th.ConditionType == string(corev1.ContainersReady) || th.ConditionType == string(corev1.PodInitialized) || th.ConditionType == string(corev1.PodReady) || th.ConditionType == string(corev1.PodScheduled) {
 			for _, lm := range latencyMetrics {
 				if th.Metric == lm {
 					metricFound = true

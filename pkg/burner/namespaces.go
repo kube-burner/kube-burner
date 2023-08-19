@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -23,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -106,15 +106,13 @@ func CleanupNonNamespacedResources(ctx context.Context, l metav1.ListOptions, cl
 }
 
 // Cleanup non-namespaced resources using executor list
-func CleanupNonNamespacedResourcesUsingGvr(ctx context.Context, executorList []Executor, cleanupWait bool) {
+func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, executorList []Executor, cleanupWait bool) {
 	log.Info("Deleting non-namespace resources specific to this benchmark")
 	for _, executor := range executorList {
 		for _, object := range executor.objects {
 			if !object.Namespaced {
 				resourceInterface := DynamicClient.Resource(object.gvr)
-				listOptions := metav1.ListOptions{
-					LabelSelector: labels.SelectorFromSet(object.labelSelector).String(),
-				}
+				listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", executor.Name)}
 				resources, err := resourceInterface.List(ctx, listOptions)
 				if err != nil {
 					log.Debugf("Unable to list resources for object: %v error: %v. Hence skipping it", object.Object, err)

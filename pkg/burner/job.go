@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -30,9 +31,9 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -80,8 +81,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var err error
 	var rc int
 	var prometheusJobList []prometheus.Job
-	var measurementStopFunctions []func() error
 	var jobList []Executor
+	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
@@ -121,8 +122,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				if job.Cleanup {
 					ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 					defer cancel()
-					CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
-					CleanupNonNamespacedResources(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
+					CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
+					CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 				}
 				if job.Churn {
 					log.Info("Churning enabled")
@@ -133,13 +134,13 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				job.RunCreateJob(0, job.JobIterations, &waitListNamespaces)
 				// If object verification is enabled
 				if job.VerifyObjects && !job.Verify() {
-					errMsg := "Object verification failed"
-					// If errorOnVerify is enabled. Set RC to 1
+					err := errors.New("object verification failed")
+					// If errorOnVerify is enabled. Set RC to 1 and append error
 					if job.ErrorOnVerify {
-						errMsg += ". Setting return code to 1"
 						innerRC = 1
+						errs = append(errs, err)
 					}
-					log.Error(errMsg)
+					log.Error(err.Error())
 				}
 				if job.Churn {
 					job.RunCreateJobWithChurn()
@@ -171,25 +172,18 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				elapsedTime := jobList[jobPosition].End.Sub(jobList[jobPosition].Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 				if err = measurements.Stop(); err != nil {
-					log.Errorf("Failed measurements: %v", err.Error())
+					errs = append(errs, err)
+					log.Error(err.Error())
 					innerRC = 1
 				}
-			} else {
-				measurementStopFunctions = append(measurementStopFunctions, measurements.Stop)
 			}
 		}
 		if globalConfig.WaitWhenFinished {
 			runWaitList(globalWaitMap, executorMap)
-			endTime := time.Now().UTC()
-			for jobIndex, stopFunc := range measurementStopFunctions {
-				jobList[jobIndex].End = endTime
-				if len(prometheusJobList) > jobIndex {
-					prometheusJobList[jobIndex].End = endTime
-				}
-				if err := stopFunc(); err != nil {
-					log.Errorf("Failed measurements: %v", err.Error())
-					innerRC = 1
-				}
+			if err = measurements.Stop(); err != nil {
+				errs = append(errs, err)
+				log.Error(err.Error())
+				innerRC = 1
 			}
 		}
 		if globalConfig.IndexerConfig.Type != "" {
@@ -201,12 +195,13 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		}
 		// We initialize cleanup as soon as the benchmark finishes
 		if globalConfig.GC {
-			go CleanupNamespaces(context.TODO(), v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
+			go CleanupNamespaces(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
 		}
 		for idx, prometheusClient := range prometheusClients {
 			// If alertManager is configured
 			if alertMs[idx] != nil {
-				if alertMs[idx].Evaluate(jobList[0].Start, jobList[len(jobList)-1].End) == 1 {
+				if err := alertMs[idx].Evaluate(jobList[0].Start, jobList[len(jobList)-1].End); err != nil {
+					errs = append(errs, err)
 					innerRC = 1
 				}
 			}
@@ -225,7 +220,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	select {
 	case rc = <-res:
 	case <-time.After(timeout):
-		log.Errorf("%v timeout reached", timeout)
+		err := fmt.Errorf("%v timeout reached", timeout)
+		log.Errorf(err.Error())
+		errs = append(errs, err)
 		rc = rcTimeout
 	}
 	if globalConfig.GC {
@@ -233,10 +230,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 		defer cancel()
 		log.Info("Garbage collecting remaining namespaces")
-		CleanupNamespaces(ctx, v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
-		CleanupNonNamespacedResourcesUsingGvr(ctx, jobList, true)
+		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
+		CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 	}
-	return rc, nil
+	return rc, utilerrors.NewAggregate(errs)
 }
 
 // newExecutorList Returns a list of executors
@@ -249,13 +246,14 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 	}
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
-		if job.JobType == config.CreationJob {
+		switch job.JobType {
+		case config.CreationJob:
 			ex = setupCreateJob(job)
-		} else if job.JobType == config.DeletionJob {
+		case config.DeletionJob:
 			ex = setupDeleteJob(&job)
-		} else if job.JobType == config.PatchJob {
+		case config.PatchJob:
 			ex = setupPatchJob(job)
-		} else {
+		default:
 			log.Fatalf("Unknown jobType: %s", job.JobType)
 		}
 		for _, j := range executorList {
