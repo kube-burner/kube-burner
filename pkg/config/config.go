@@ -147,6 +147,10 @@ func Parse(uuid, c string, jobsRequired bool) (Spec, error) {
 		}
 	}
 	configSpec.GlobalConfig.UUID = uuid
+	if configSpec.GlobalConfig.IndexerConfig.MetricsDirectory == "collected-metrics" {
+		configSpec.GlobalConfig.IndexerConfig.MetricsDirectory += "-" + uuid
+	}
+
 	return configSpec, nil
 }
 
