@@ -35,9 +35,9 @@ teardown_file() {
 }
 
 @test "node-density-heavy with indexing" {
-  run kube-burner ocp node-density-heavy --pods-per-node=75 --local-indexing
+  run kube-burner ocp node-density-heavy --pods-per-node=75 --uuid=abcd --local-indexing
   [ "$status" -eq 0 ]
-  run check_file_list collected-metrics/etcdVersion.json collected-metrics/clusterMetadata.json collected-metrics/jobSummary-node-density-heavy.json collected-metrics/podLatencyMeasurement-node-density-heavy.json collected-metrics/podLatencyQuantilesMeasurement-node-density-heavy.json
+  run check_file_list collected-metrics-abcd/etcdVersion.json collected-metrics-abcd/clusterMetadata.json collected-metrics-abcd/jobSummary-node-density-heavy.json collected-metrics-abcd/podLatencyMeasurement-node-density-heavy.json collected-metrics-abcd/podLatencyQuantilesMeasurement-node-density-heavy.json
   [ "$status" -eq 0 ]
 }
 
