@@ -125,7 +125,8 @@
   metricName: nodeStatus
 
 - query: count(kube_replicaset_labels{})
-  metricName: replicaSets
+  metricName: replicaSetCount
+  instant: true
 
 # Prometheus metrics
 
