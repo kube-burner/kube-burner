@@ -64,14 +64,12 @@ teardown_file() {
 }
 
 @test "kube-burner index: metrics-endpoint with single prometheus endpoint" {
-  export INDEXING_TYPE=local
-  run kube-burner index -c kube-burner-index-single-endpoint.yml --uuid="${UUID}"  -u http://localhost:9090 -m metrics-profile.yaml
+  run kube-burner index --uuid="${UUID}"  -u http://localhost:9090 -m metrics-profile.yaml
   [ "$status" -eq 0 ]
 }
 
-@test "kube-burner index: metrics-endpoint" {
-  export INDEXING_TYPE=local
-  run kube-burner index -c kube-burner.yml --uuid="${UUID}" -e metrics-endpoints.yaml
+@test "kube-burner index: metrics-endpoint and sending metrics to ES" {
+  run kube-burner index --uuid="${UUID}" -e metrics-endpoints.yaml --es-server=https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443 --es-index=ripsaw-kube-burner
   [ "$status" -eq 0 ]
 }
 
