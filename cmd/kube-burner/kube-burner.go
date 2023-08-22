@@ -166,7 +166,7 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			listOptions := v1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%s", uuid)}
+			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%s", uuid)}
 			clientSet, restConfig, err := config.GetClientSet(0, 0)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
