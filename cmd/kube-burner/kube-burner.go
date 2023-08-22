@@ -36,7 +36,7 @@ import (
 
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -128,7 +128,8 @@ func initCmd() *cobra.Command {
 			}
 			rc, err = burner.Run(configSpec, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
 			if err != nil {
-				log.Fatalf(err.Error())
+				log.Errorf(err.Error())
+				os.Exit(rc)
 			}
 		},
 	}
@@ -344,9 +345,11 @@ func alertCmd() *cobra.Command {
 			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
-			rc := alertM.Evaluate(startTime, endTime)
+
 			log.Info("👋 Exiting kube-burner ", uuid)
-			os.Exit(rc)
+			if err := alertM.Evaluate(startTime, endTime); err != nil {
+				os.Exit(1)
+			}
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")

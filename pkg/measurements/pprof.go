@@ -29,7 +29,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/scheme"
 
@@ -83,7 +83,7 @@ func (p *pprof) start(measurementWg *sync.WaitGroup) {
 
 func getPods(target types.PProftarget) []corev1.Pod {
 	labelSelector := labels.Set(target.LabelSelector).String()
-	podList, err := factory.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), v1.ListOptions{LabelSelector: labelSelector})
+	podList, err := factory.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		log.Errorf("Error found listing pods labeled with %s: %s", labelSelector, err)
 	}
@@ -179,9 +179,9 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 	wg.Wait()
 }
 
-func (p *pprof) stop() (int, error) {
+func (p *pprof) stop() error {
 	p.stopChannel <- true
-	return 0, nil
+	return nil
 }
 
 func readCerts(cert, privKey string) (string, string, error) {
