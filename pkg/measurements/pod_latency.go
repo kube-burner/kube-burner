@@ -231,54 +231,54 @@ func (p *podLatency) normalizeMetrics() {
 		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
 		m.ContainersReadyLatencyV2 = int(m.containersReady.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.ContainersReadyLatency < 0 {
-			log.Tracef("ContainersReadyLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.ContainersReadyLatency = 0
 		}
 		if m.ContainersReadyLatencyV2 < 0 {
-			log.Tracef("ContainersReadyLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("ContainersReadyLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.ContainersReadyLatencyV2 = 0
 		}
-		log.Tracef("ContainersReadyLatency: %+v for pod %+v", m.ContainersReadyLatency, m.Name)
-		log.Tracef("ContainersReadyLatencyV2: %+v for pod %+v", m.ContainersReadyLatencyV2, m.Name)
+		log.Tracef("ContainersReadyLatency: %v for pod %v", m.ContainersReadyLatency, m.Name)
+		log.Tracef("ContainersReadyLatencyV2: %v for pod %v", m.ContainersReadyLatencyV2, m.Name)
 
 		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
 		m.SchedulingLatencyV2 = int(m.scheduled.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.SchedulingLatency < 0 {
-			log.Tracef("SchedulingLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.SchedulingLatency = 0
 		}
 		if m.SchedulingLatencyV2 < 0 {
-			log.Tracef("SchedulingLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("SchedulingLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.SchedulingLatencyV2 = 0
 		}
-		log.Tracef("SchedulingLatency: %+v for pod %+v", m.SchedulingLatency, m.Name)
-		log.Tracef("SchedulingLatencyV2: %+v for pod %+v", m.SchedulingLatencyV2, m.Name)
+		log.Tracef("SchedulingLatency: %v for pod %v", m.SchedulingLatency, m.Name)
+		log.Tracef("SchedulingLatencyV2: %v for pod %v", m.SchedulingLatencyV2, m.Name)
 
 		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
 		m.InitializedLatencyV2 = int(m.initialized.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.InitializedLatency < 0 {
-			log.Tracef("InitializedLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("InitializedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.InitializedLatency = 0
 		}
 		if m.InitializedLatencyV2 < 0 {
-			log.Tracef("InitializedLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("InitializedLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.InitializedLatencyV2 = 0
 		}
-		log.Tracef("InitializedLatency: %+v for pod %+v", m.InitializedLatency, m.Name)
-		log.Tracef("InitializedLatencyV2: %+v for pod %+v", m.InitializedLatencyV2, m.Name)
+		log.Tracef("InitializedLatency: %v for pod %v", m.InitializedLatency, m.Name)
+		log.Tracef("InitializedLatencyV2: %v for pod %v", m.InitializedLatencyV2, m.Name)
 
 		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
 		m.PodReadyLatencyV2 = int(m.podReady.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.PodReadyLatency < 0 {
-			log.Tracef("PodReadyLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("PodReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.PodReadyLatency = 0
 		}
 		if m.PodReadyLatencyV2 < 0 {
-			log.Tracef("PodReadyLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("PodReadyLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.PodReadyLatencyV2 = 0
 		}
-		log.Tracef("PodReadyLatency: %+v for pod %+v", m.PodReadyLatency, m.Name)
-		log.Tracef("PodReadyLatencyV2: %+v for pod %+v", m.PodReadyLatencyV2, m.Name)
+		log.Tracef("PodReadyLatency: %v for pod %v", m.PodReadyLatency, m.Name)
+		log.Tracef("PodReadyLatencyV2: %v for pod %v", m.PodReadyLatencyV2, m.Name)
 		p.normLatencies = append(p.normLatencies, m)
 	}
 }
