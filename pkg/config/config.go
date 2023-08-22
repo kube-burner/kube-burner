@@ -104,7 +104,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Parse parses a configuration file
-func Parse(uuid, c string, jobsRequired bool) (Spec, error) {
+func Parse(uuid, c string) (Spec, error) {
 	f, err := util.ReadConfig(c)
 	if err != nil {
 		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
@@ -126,24 +126,25 @@ func Parse(uuid, c string, jobsRequired bool) (Spec, error) {
 	if err = yamlDec.Decode(&configSpec); err != nil {
 		return configSpec, fmt.Errorf("Error decoding configuration file %s: %s", c, err)
 	}
-	if jobsRequired {
-		if len(configSpec.Jobs) <= 0 {
-			return configSpec, fmt.Errorf("No jobs found in the configuration file")
+	if len(configSpec.Jobs) <= 0 {
+		return configSpec, fmt.Errorf("No jobs found in the configuration file")
+	}
+	if err := jobIsDuped(); err != nil {
+		return configSpec, err
+	}
+	if err := validateDNS1123(); err != nil {
+		return configSpec, err
+	}
+	for _, job := range configSpec.Jobs {
+		if len(job.Namespace) > 62 {
+			log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
+			job.Namespace = job.Namespace[:57]
 		}
-		if err := validateDNS1123(); err != nil {
-			return configSpec, err
+		if !job.NamespacedIterations && job.Churn {
+			log.Fatal("Cannot have Churn enabled without Namespaced Iterations also enabled")
 		}
-		for _, job := range configSpec.Jobs {
-			if len(job.Namespace) > 62 {
-				log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
-				job.Namespace = job.Namespace[:57]
-			}
-			if !job.NamespacedIterations && job.Churn {
-				log.Fatal("Cannot have Churn enabled without Namespaced Iterations also enabled")
-			}
-			if job.JobIterations < 1 && job.JobType == CreationJob {
-				log.Fatalf("Job %s has < 1 iterations", job.Name)
-			}
+		if job.JobIterations < 1 && job.JobType == CreationJob {
+			log.Fatalf("Job %s has < 1 iterations", job.Name)
 		}
 	}
 	configSpec.GlobalConfig.UUID = uuid
@@ -231,4 +232,15 @@ func buildConfig(kubeconfigPath string) (*rest.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}}).ClientConfig()
+}
+
+func jobIsDuped() error {
+	jobCount := make(map[string]int)
+	for _, job := range configSpec.Jobs {
+		jobCount[job.Name]++
+		if jobCount[job.Name] > 1 {
+			return fmt.Errorf("Job names must be unique")
+		}
+	}
+	return nil
 }

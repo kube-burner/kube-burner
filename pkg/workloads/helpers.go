@@ -180,7 +180,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	} else {
 		log.Infof("File %v available in the current directory, using it", cfg)
 	}
-	configSpec, err = config.Parse(wh.Metadata.UUID, cfg, true)
+	configSpec, err = config.Parse(wh.Metadata.UUID, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
