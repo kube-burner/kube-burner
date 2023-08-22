@@ -27,6 +27,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -77,7 +78,7 @@ func init() {
 
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	now := time.Now().UTC()
-	pod := obj.(*v1.Pod)
+	pod := obj.(*corev1.Pod)
 	p.metricLock.Lock()
 	defer p.metricLock.Unlock()
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
@@ -104,22 +105,22 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 	defer p.metricLock.Unlock()
 	if pm, exists := p.metrics[string(pod.UID)]; exists && pm.podReady.IsZero() {
 		for _, c := range pod.Status.Conditions {
-			if c.Status == v1.ConditionTrue {
+			if c.Status == corev1.ConditionTrue {
 				switch c.Type {
-				case v1.PodScheduled:
+				case corev1.PodScheduled:
 					if pm.scheduled.IsZero() {
 						pm.scheduled = c.LastTransitionTime.Time.UTC()
 						pm.NodeName = pod.Spec.NodeName
 					}
-				case v1.PodInitialized:
+				case corev1.PodInitialized:
 					if pm.initialized.IsZero() {
 						pm.initialized = c.LastTransitionTime.Time.UTC()
 					}
-				case v1.ContainersReady:
+				case corev1.ContainersReady:
 					if pm.containersReady.IsZero() {
 						pm.containersReady = c.LastTransitionTime.Time.UTC()
 					}
-				case v1.PodReady:
+				case corev1.PodReady:
 					if pm.podReady.IsZero() {
 						log.Debugf("Pod %s is ready", pod.Name)
 						pm.podReady = c.LastTransitionTime.Time.UTC()
@@ -148,7 +149,7 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"podWatcher",
 		"pods",
-		v1.NamespaceAll,
+		corev1.NamespaceAll,
 	)
 	p.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreatePod,
@@ -162,13 +163,13 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 }
 
 // Stop stops podLatency measurement
-func (p *podLatency) stop() (int, error) {
-	var rc int
+func (p *podLatency) stop() error {
+	var err error
 	p.watcher.StopWatcher()
 	p.normalizeMetrics()
 	p.calcQuantiles()
 	if len(p.config.LatencyThresholds) > 0 {
-		rc = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
+		err = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
 	}
 	if globalCfg.IndexerConfig.Type != "" {
 		log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
@@ -182,7 +183,7 @@ func (p *podLatency) stop() (int, error) {
 	}
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
-	return rc, nil
+	return err
 }
 
 // index sends metrics to the configured indexer
@@ -230,71 +231,71 @@ func (p *podLatency) normalizeMetrics() {
 		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
 		m.ContainersReadyLatencyV2 = int(m.containersReady.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.ContainersReadyLatency < 0 {
-			log.Tracef("ContainersReadyLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.ContainersReadyLatency = 0
 		}
 		if m.ContainersReadyLatencyV2 < 0 {
-			log.Tracef("ContainersReadyLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("ContainersReadyLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.ContainersReadyLatencyV2 = 0
 		}
-		log.Tracef("ContainersReadyLatency: %+v for pod %+v", m.ContainersReadyLatency, m.Name)
-		log.Tracef("ContainersReadyLatencyV2: %+v for pod %+v", m.ContainersReadyLatencyV2, m.Name)
+		log.Tracef("ContainersReadyLatency: %v for pod %v", m.ContainersReadyLatency, m.Name)
+		log.Tracef("ContainersReadyLatencyV2: %v for pod %v", m.ContainersReadyLatencyV2, m.Name)
 
 		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
 		m.SchedulingLatencyV2 = int(m.scheduled.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.SchedulingLatency < 0 {
-			log.Tracef("SchedulingLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.SchedulingLatency = 0
 		}
 		if m.SchedulingLatencyV2 < 0 {
-			log.Tracef("SchedulingLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("SchedulingLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.SchedulingLatencyV2 = 0
 		}
-		log.Tracef("SchedulingLatency: %+v for pod %+v", m.SchedulingLatency, m.Name)
-		log.Tracef("SchedulingLatencyV2: %+v for pod %+v", m.SchedulingLatencyV2, m.Name)
+		log.Tracef("SchedulingLatency: %v for pod %v", m.SchedulingLatency, m.Name)
+		log.Tracef("SchedulingLatencyV2: %v for pod %v", m.SchedulingLatencyV2, m.Name)
 
 		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
 		m.InitializedLatencyV2 = int(m.initialized.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.InitializedLatency < 0 {
-			log.Tracef("InitializedLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("InitializedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.InitializedLatency = 0
 		}
 		if m.InitializedLatencyV2 < 0 {
-			log.Tracef("InitializedLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("InitializedLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.InitializedLatencyV2 = 0
 		}
-		log.Tracef("InitializedLatency: %+v for pod %+v", m.InitializedLatency, m.Name)
-		log.Tracef("InitializedLatencyV2: %+v for pod %+v", m.InitializedLatencyV2, m.Name)
+		log.Tracef("InitializedLatency: %v for pod %v", m.InitializedLatency, m.Name)
+		log.Tracef("InitializedLatencyV2: %v for pod %v", m.InitializedLatencyV2, m.Name)
 
 		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
 		m.PodReadyLatencyV2 = int(m.podReady.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.PodReadyLatency < 0 {
-			log.Tracef("PodReadyLatency for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("PodReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.PodReadyLatency = 0
 		}
 		if m.PodReadyLatencyV2 < 0 {
-			log.Tracef("PodReadyLatencyV2 for pod %+v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("PodReadyLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.PodReadyLatencyV2 = 0
 		}
-		log.Tracef("PodReadyLatency: %+v for pod %+v", m.PodReadyLatency, m.Name)
-		log.Tracef("PodReadyLatencyV2: %+v for pod %+v", m.PodReadyLatencyV2, m.Name)
+		log.Tracef("PodReadyLatency: %v for pod %v", m.PodReadyLatency, m.Name)
+		log.Tracef("PodReadyLatencyV2: %v for pod %v", m.PodReadyLatencyV2, m.Name)
 		p.normLatencies = append(p.normLatencies, m)
 	}
 }
 
 func (p *podLatency) calcQuantiles() {
 	quantiles := []float64{0.5, 0.95, 0.99}
-	quantileMap := map[v1.PodConditionType][]int{}
+	quantileMap := map[corev1.PodConditionType][]int{}
 	jc := factory.jobConfig
 	jc.Objects = nil
 	for _, normLatency := range p.normLatencies {
-		quantileMap[v1.PodScheduled] = append(quantileMap[v1.PodScheduled], normLatency.(podMetric).SchedulingLatency)
+		quantileMap[corev1.PodScheduled] = append(quantileMap[corev1.PodScheduled], normLatency.(podMetric).SchedulingLatency)
 		quantileMap["PodScheduledV2"] = append(quantileMap["PodScheduledV2"], normLatency.(podMetric).SchedulingLatencyV2)
-		quantileMap[v1.ContainersReady] = append(quantileMap[v1.ContainersReady], normLatency.(podMetric).ContainersReadyLatency)
+		quantileMap[corev1.ContainersReady] = append(quantileMap[corev1.ContainersReady], normLatency.(podMetric).ContainersReadyLatency)
 		quantileMap["ContainersReadyV2"] = append(quantileMap["ContainersReadyV2"], normLatency.(podMetric).ContainersReadyLatencyV2)
-		quantileMap[v1.PodInitialized] = append(quantileMap[v1.PodInitialized], normLatency.(podMetric).InitializedLatency)
+		quantileMap[corev1.PodInitialized] = append(quantileMap[corev1.PodInitialized], normLatency.(podMetric).InitializedLatency)
 		quantileMap["InitializedV2"] = append(quantileMap["InitializedV2"], normLatency.(podMetric).InitializedLatencyV2)
-		quantileMap[v1.PodReady] = append(quantileMap[v1.PodReady], normLatency.(podMetric).PodReadyLatency)
+		quantileMap[corev1.PodReady] = append(quantileMap[corev1.PodReady], normLatency.(podMetric).PodReadyLatency)
 		quantileMap["ReadyV2"] = append(quantileMap["ReadyV2"], normLatency.(podMetric).PodReadyLatencyV2)
 	}
 	for quantileName, v := range quantileMap {
@@ -329,7 +330,7 @@ func (p *podLatency) validateConfig() error {
 	var metricFound bool
 	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
 	for _, th := range p.config.LatencyThresholds {
-		if th.ConditionType == string(v1.ContainersReady) || th.ConditionType == string(v1.PodInitialized) || th.ConditionType == string(v1.PodReady) || th.ConditionType == string(v1.PodScheduled) {
+		if th.ConditionType == string(corev1.ContainersReady) || th.ConditionType == string(corev1.PodInitialized) || th.ConditionType == string(corev1.PodReady) || th.ConditionType == string(corev1.PodScheduled) {
 			for _, lm := range latencyMetrics {
 				if th.Metric == lm {
 					metricFound = true

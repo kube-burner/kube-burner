@@ -22,6 +22,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // LatencyQuantiles holds the latency measurement quantiles
@@ -52,8 +53,10 @@ func (plq *LatencyQuantiles) SetQuantile(quantile float64, qValue int) {
 	}
 }
 
-func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}) int {
-	var rc int
+// CheckThreshold checks latency thresholds
+// returns a concatenated list of error strings with a new line between each string
+func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}) error {
+	errs := []error{}
 	log.Info("Evaluating latency thresholds")
 	for _, phase := range thresholds {
 		for _, pq := range quantiles {
@@ -61,15 +64,13 @@ func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}
 				// Required to acccess the attribute by name
 				r := reflect.ValueOf(pq.(LatencyQuantiles))
 				v := r.FieldByName(phase.Metric).Int()
-				latency := float32(v) / 1000
-				msg := fmt.Sprintf("❗ %s %s latency (%.2fs) higher than configured threshold: %v", phase.Metric, phase.ConditionType, latency, phase.Threshold)
 				if v > phase.Threshold.Milliseconds() {
-					log.Error(msg)
-					rc = 1
+					latency := float32(v) / 1000
+					err := fmt.Errorf("podLatency: %s %s latency (%.2fs) higher than configured threshold: %v", phase.Metric, phase.ConditionType, latency, phase.Threshold)
+					errs = append(errs, err)
 				}
-				continue
 			}
 		}
 	}
-	return rc
+	return utilerrors.NewAggregate(errs)
 }

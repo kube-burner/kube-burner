@@ -46,12 +46,13 @@ const (
 
 type BenchmarkMetadata struct {
 	ocpmetadata.ClusterMetadata
-	UUID         string                 `json:"uuid"`
-	Benchmark    string                 `json:"benchmark"`
-	Timestamp    time.Time              `json:"timestamp"`
-	EndDate      time.Time              `json:"endDate"`
-	Passed       bool                   `json:"passed"`
-	UserMetadata map[string]interface{} `json:"metadata,omitempty"`
+	UUID            string                 `json:"uuid"`
+	Benchmark       string                 `json:"benchmark"`
+	Timestamp       time.Time              `json:"timestamp"`
+	EndDate         time.Time              `json:"endDate"`
+	Passed          bool                   `json:"passed"`
+	ExecutionErrors string                 `json:"executionErrors"`
+	UserMetadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type WorkloadHelper struct {
@@ -179,7 +180,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	} else {
 		log.Infof("File %v available in the current directory, using it", cfg)
 	}
-	configSpec, err = config.Parse(wh.Metadata.UUID, cfg, true)
+	configSpec, err = config.Parse(wh.Metadata.UUID, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -233,7 +234,8 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	}
 	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
-		log.Fatal(err)
+		wh.Metadata.ExecutionErrors = err.Error()
+		log.Error(err)
 	}
 	wh.Metadata.Passed = rc == 0
 	if indexerConfig.Type != "" {

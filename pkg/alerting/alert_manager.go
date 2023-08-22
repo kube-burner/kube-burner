@@ -28,13 +28,12 @@ import (
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 type severityLevel string
 
 const (
-	Passed                        = 0
-	Failed                        = 1
 	sevWarn         severityLevel = "warning"
 	sevError        severityLevel = "error"
 	sevCritical     severityLevel = "critical"
@@ -100,18 +99,18 @@ func (a *AlertManager) readProfile(alertProfileCfg string) error {
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&a.alertProfile); err != nil {
-		return fmt.Errorf("Error decoding alert profile %s: %s", alertProfileCfg, err)
+		return fmt.Errorf("error decoding alert profile %s: %s", alertProfileCfg, err)
 	}
 	return a.validateTemplates()
 }
 
 // Evaluate evaluates expressions
-func (a *AlertManager) Evaluate(start, end time.Time) int {
+func (a *AlertManager) Evaluate(start, end time.Time) error {
+	errs := []error{}
 	log.Infof("Evaluating alerts for prometheus: %v", a.prometheus.Endpoint)
 	var alertList []interface{}
 	elapsed := int(end.Sub(start).Minutes())
 	var renderedQuery bytes.Buffer
-	result := Passed
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
 	for _, alert := range a.alertProfile {
@@ -119,28 +118,26 @@ func (a *AlertManager) Evaluate(start, end time.Time) int {
 		t.Execute(&renderedQuery, vars)
 		expr := renderedQuery.String()
 		renderedQuery.Reset()
-		log.Infof("Evaluating expression: '%s'", expr)
+		log.Debugf("Evaluating expression: '%s'", expr)
 		v, err := a.prometheus.Client.QueryRange(expr, start, end, a.prometheus.Step)
 		if err != nil {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alarmResult, alertData, err := parseMatrix(v, alert.Description, alert.Severity)
+		alertData, err := parseMatrix(v, alert.Description, alert.Severity)
 		if err != nil {
-			log.Error(err)
+			log.Error(err.Error())
+			errs = append(errs, err)
 		}
 		for _, alertSet := range alertData {
 			alertSet.UUID = a.uuid
 			alertList = append(alertList, alertSet)
 		}
-		if alarmResult == Failed {
-			result = Failed
-		}
 	}
 	if len(alertList) > 0 && a.indexer != nil {
 		a.index(alertList)
 	}
-	return result
+	return utilerrors.NewAggregate(errs)
 }
 
 func (a *AlertManager) validateTemplates() error {
@@ -152,16 +149,16 @@ func (a *AlertManager) validateTemplates() error {
 	return nil
 }
 
-func parseMatrix(value model.Value, description string, severity severityLevel) (int, []alert, error) {
+func parseMatrix(value model.Value, description string, severity severityLevel) ([]alert, error) {
 	var renderedDesc bytes.Buffer
 	var templateData descriptionTemplate
 	// The same query can fire multiple alerts, so we have to return an array of them
 	var alertSet []alert
-	result := Passed
+	errs := []error{}
 	t, _ := template.New("").Parse(strings.Join(append(baseTemplate, description), ""))
 	data, ok := value.(model.Matrix)
 	if !ok {
-		return result, alertSet, fmt.Errorf("unsupported result format: %s", value.Type().String())
+		return alertSet, fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, v := range data {
 		templateData.Labels = make(map[string]string)
@@ -173,10 +170,11 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 			// Take 3 decimals
 			templateData.Value = math.Round(float64(val.Value)*1000) / 1000
 			if err := t.Execute(&renderedDesc, templateData); err != nil {
-				log.Errorf("Rendering error: %s", err)
-				result = Failed
+				msg := fmt.Errorf("alert rendering error: %s", err)
+				log.Error(msg.Error())
+				errs = append(errs, err)
 			}
-			msg := fmt.Sprintf("🚨 Alert at %v: '%s'", val.Timestamp.Time().Format(time.RFC3339), renderedDesc.String())
+			msg := fmt.Sprintf("alert at %v: '%s'", val.Timestamp.Time().Format(time.RFC3339), renderedDesc.String())
 			alertSet = append(alertSet, alert{
 				Timestamp:   val.Timestamp.Time(),
 				Severity:    string(severity),
@@ -185,24 +183,22 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 			})
 			switch severity {
 			case sevWarn:
-				log.Warn(msg)
+				log.Warnf("🚨 %s", msg)
 			case sevError:
-				result = Failed
-				log.Error(msg)
+				errs = append(errs, fmt.Errorf(msg))
 			case sevCritical:
-				log.Fatal(msg)
+				log.Fatalf("🚨 %s", msg)
 			default:
-				log.Info(msg)
+				log.Infof("🚨 %s", msg)
 			}
 			break
 		}
 	}
-	return result, alertSet, nil
+	return alertSet, utilerrors.NewAggregate(errs)
 }
 
 func (a *AlertManager) index(alertSet []interface{}) {
 	log.Info("Indexing alerts")
-	log.Infof("Indexing alert %s", alertMetricName)
 	log.Debugf("Indexing [%d] documents", len(alertSet))
 	resp, err := (*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
 	if err != nil {
