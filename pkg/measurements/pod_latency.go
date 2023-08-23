@@ -39,28 +39,23 @@ const (
 )
 
 type podMetric struct {
-	Timestamp                time.Time `json:"timestamp"`
-	CreationTimestampV2      time.Time `json:"creationTimestampV2"`
-	scheduled                time.Time
-	SchedulingLatency        int `json:"schedulingLatency"`
-	SchedulingLatencyV2      int `json:"schedulingLatency_v2"`
-	initialized              time.Time
-	InitializedLatency       int `json:"initializedLatency"`
-	InitializedLatencyV2     int `json:"initializedLatency_v2"`
-	containersReady          time.Time
-	ContainersReadyLatency   int `json:"containersReadyLatency"`
-	ContainersReadyLatencyV2 int `json:"containersReadyLatency_v2"`
-	podReady                 time.Time
-	PodReadyLatency          int         `json:"podReadyLatency"`
-	PodReadyLatencyV2        int         `json:"podReadyLatency_v2"`
-	MetricName               string      `json:"metricName"`
-	JobName                  string      `json:"jobName"`
-	JobConfig                config.Job  `json:"jobConfig"`
-	UUID                     string      `json:"uuid"`
-	Namespace                string      `json:"namespace"`
-	Name                     string      `json:"podName"`
-	NodeName                 string      `json:"nodeName"`
-	Metadata                 interface{} `json:"metadata,omitempty"`
+	Timestamp              time.Time `json:"timestamp"`
+	scheduled              time.Time
+	SchedulingLatency      int `json:"schedulingLatency"`
+	initialized            time.Time
+	InitializedLatency     int `json:"initializedLatency"`
+	containersReady        time.Time
+	ContainersReadyLatency int `json:"containersReadyLatency"`
+	podReady               time.Time
+	PodReadyLatency        int         `json:"podReadyLatency"`
+	MetricName             string      `json:"metricName"`
+	JobName                string      `json:"jobName"`
+	JobConfig              config.Job  `json:"jobConfig"`
+	UUID                   string      `json:"uuid"`
+	Namespace              string      `json:"namespace"`
+	Name                   string      `json:"podName"`
+	NodeName               string      `json:"nodeName"`
+	Metadata               interface{} `json:"metadata,omitempty"`
 }
 
 type podLatency struct {
@@ -77,7 +72,6 @@ func init() {
 }
 
 func (p *podLatency) handleCreatePod(obj interface{}) {
-	now := time.Now().UTC()
 	pod := obj.(*corev1.Pod)
 	p.metricLock.Lock()
 	defer p.metricLock.Unlock()
@@ -85,15 +79,14 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 		runid, exists := pod.Labels["kube-burner-runid"]
 		if exists && runid == globalCfg.RUNID {
 			p.metrics[string(pod.UID)] = podMetric{
-				Timestamp:           now,
-				CreationTimestampV2: pod.CreationTimestamp.Time.UTC(),
-				Namespace:           pod.Namespace,
-				Name:                pod.Name,
-				MetricName:          podLatencyMeasurement,
-				UUID:                globalCfg.UUID,
-				JobConfig:           *factory.jobConfig,
-				JobName:             factory.jobConfig.Name,
-				Metadata:            factory.metadata,
+				Timestamp:  pod.CreationTimestamp.Time.UTC(),
+				Namespace:  pod.Namespace,
+				Name:       pod.Name,
+				MetricName: podLatencyMeasurement,
+				UUID:       globalCfg.UUID,
+				JobConfig:  *factory.jobConfig,
+				JobName:    factory.jobConfig.Name,
+				Metadata:   factory.metadata,
 			}
 		}
 	}
@@ -166,7 +159,11 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 func (p *podLatency) stop() error {
 	var err error
 	p.watcher.StopWatcher()
-	p.normalizeMetrics()
+	errorRate := p.normalizeMetrics()
+	if errorRate > 10.00 {
+		log.Info("Latency errors beyond 10%. Hence invalidating the results")
+		return fmt.Errorf("Something is wrong with system under test. Pod latencies confidencelevel: %f, errorRate: %f", (100.00 - errorRate), errorRate)
+	}
 	p.calcQuantiles()
 	if len(p.config.LatencyThresholds) > 0 {
 		err = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
@@ -177,10 +174,9 @@ func (p *podLatency) stop() error {
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		if pq.QuantileName != "PodScheduledV2" && pq.QuantileName != "InitializedV2" && pq.QuantileName != "ContainersReadyV2" && pq.QuantileName != "ReadyV2" {
-			log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
-		}
+		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
 	}
+	log.Infof("Pod latencies confidencelevel: %f, errorRate: %f", (100.00 - errorRate), errorRate)
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
 	return err
@@ -209,10 +205,13 @@ func (p *podLatency) index() {
 	}
 }
 
-func (p *podLatency) normalizeMetrics() {
+func (p *podLatency) normalizeMetrics() float64 {
+	totalPods := 0
+	erroredPods := 0
 	for _, m := range p.metrics {
 		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {
+			log.Tracef("Pod %v latency ignored as it did not reach Ready state", m.Name)
 			continue
 		}
 		// latencyTime should be always larger than zero, however, in some cases, it might be a
@@ -222,65 +221,42 @@ func (p *podLatency) normalizeMetrics() {
 		// in kubelet, this is because apiserver does not support RFC339NANO. The newly introduced
 		// v2 latencies are currently under AB testing which blindly trust kubernetes as source of
 		// truth and will prevent us from those over 1s delays as well as <0 cases.
-
-		creationTimeStampsDiff := int(m.Timestamp.Sub(m.CreationTimestampV2).Milliseconds())
-		if creationTimeStampsDiff >= 1000 {
-			log.Tracef("Difference between V1 and V2 creation timestamps for pod %+v is >=1s and is %+v seconds", m.Name, float64(creationTimeStampsDiff)/1000)
-		}
-
+		errorFlag := 0
 		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
-		m.ContainersReadyLatencyV2 = int(m.containersReady.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.ContainersReadyLatency < 0 {
 			log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+			errorFlag = 1
 			m.ContainersReadyLatency = 0
 		}
-		if m.ContainersReadyLatencyV2 < 0 {
-			log.Tracef("ContainersReadyLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			m.ContainersReadyLatencyV2 = 0
-		}
-		log.Tracef("ContainersReadyLatency: %v for pod %v", m.ContainersReadyLatency, m.Name)
-		log.Tracef("ContainersReadyLatencyV2: %v for pod %v", m.ContainersReadyLatencyV2, m.Name)
 
 		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
-		m.SchedulingLatencyV2 = int(m.scheduled.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.SchedulingLatency < 0 {
 			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+			errorFlag = 1
 			m.SchedulingLatency = 0
 		}
-		if m.SchedulingLatencyV2 < 0 {
-			log.Tracef("SchedulingLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			m.SchedulingLatencyV2 = 0
-		}
-		log.Tracef("SchedulingLatency: %v for pod %v", m.SchedulingLatency, m.Name)
-		log.Tracef("SchedulingLatencyV2: %v for pod %v", m.SchedulingLatencyV2, m.Name)
 
 		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
-		m.InitializedLatencyV2 = int(m.initialized.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.InitializedLatency < 0 {
 			log.Tracef("InitializedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+			errorFlag = 1
 			m.InitializedLatency = 0
 		}
-		if m.InitializedLatencyV2 < 0 {
-			log.Tracef("InitializedLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			m.InitializedLatencyV2 = 0
-		}
-		log.Tracef("InitializedLatency: %v for pod %v", m.InitializedLatency, m.Name)
-		log.Tracef("InitializedLatencyV2: %v for pod %v", m.InitializedLatencyV2, m.Name)
 
 		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
-		m.PodReadyLatencyV2 = int(m.podReady.Sub(m.CreationTimestampV2).Milliseconds())
 		if m.PodReadyLatency < 0 {
 			log.Tracef("PodReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+			errorFlag = 1
 			m.PodReadyLatency = 0
 		}
-		if m.PodReadyLatencyV2 < 0 {
-			log.Tracef("PodReadyLatencyV2 for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			m.PodReadyLatencyV2 = 0
-		}
-		log.Tracef("PodReadyLatency: %v for pod %v", m.PodReadyLatency, m.Name)
-		log.Tracef("PodReadyLatencyV2: %v for pod %v", m.PodReadyLatencyV2, m.Name)
+		totalPods++
+		erroredPods += errorFlag
 		p.normLatencies = append(p.normLatencies, m)
 	}
+	if totalPods == 0 {
+		return 0.0
+	}
+	return float64(erroredPods) / float64(totalPods) * 100.0
 }
 
 func (p *podLatency) calcQuantiles() {
@@ -290,13 +266,9 @@ func (p *podLatency) calcQuantiles() {
 	jc.Objects = nil
 	for _, normLatency := range p.normLatencies {
 		quantileMap[corev1.PodScheduled] = append(quantileMap[corev1.PodScheduled], normLatency.(podMetric).SchedulingLatency)
-		quantileMap["PodScheduledV2"] = append(quantileMap["PodScheduledV2"], normLatency.(podMetric).SchedulingLatencyV2)
 		quantileMap[corev1.ContainersReady] = append(quantileMap[corev1.ContainersReady], normLatency.(podMetric).ContainersReadyLatency)
-		quantileMap["ContainersReadyV2"] = append(quantileMap["ContainersReadyV2"], normLatency.(podMetric).ContainersReadyLatencyV2)
 		quantileMap[corev1.PodInitialized] = append(quantileMap[corev1.PodInitialized], normLatency.(podMetric).InitializedLatency)
-		quantileMap["InitializedV2"] = append(quantileMap["InitializedV2"], normLatency.(podMetric).InitializedLatencyV2)
 		quantileMap[corev1.PodReady] = append(quantileMap[corev1.PodReady], normLatency.(podMetric).PodReadyLatency)
-		quantileMap["ReadyV2"] = append(quantileMap["ReadyV2"], normLatency.(podMetric).PodReadyLatencyV2)
 	}
 	for quantileName, v := range quantileMap {
 		podQ := metrics.LatencyQuantiles{
