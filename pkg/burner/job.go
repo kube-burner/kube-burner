@@ -82,6 +82,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var rc int
 	var prometheusJobList []prometheus.Job
 	var jobList []Executor
+	var cleanupStart, cleanupEnd time.Time
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -186,35 +187,16 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				innerRC = 1
 			}
 		}
-		if globalConfig.IndexerConfig.Type != "" {
-			for _, job := range jobList {
-				// elapsedTime is recalculated for every job of the list
-				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
-				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Job, job.Start, metadata)
-			}
-		}
+		cleanupStart = time.Now().UTC()
 		// We initialize cleanup as soon as the benchmark finishes
 		if globalConfig.GC {
 			go CleanupNamespaces(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
 		}
-		for idx, prometheusClient := range prometheusClients {
-			// If alertManager is configured
-			if alertMs[idx] != nil {
-				if err := alertMs[idx].Evaluate(jobList[0].Start, jobList[len(jobList)-1].End); err != nil {
-					errs = append(errs, err)
-					innerRC = 1
-				}
-			}
-			prometheusClient.JobList = prometheusJobList
-			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-			if globalConfig.IndexerConfig.Type != "" {
-				metrics.ScrapeMetrics(prometheusClient, indexer)
-				if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
-					metrics.CreateTarball(globalConfig.IndexerConfig)
-				}
-			}
+		scrapeErrs := scrapeAndIndex(prometheusClients, alertMs, prometheusJobList, globalConfig, indexer, jobList[0].Start, jobList[len(jobList)-1].End)
+		if len(scrapeErrs) > 0 {
+			errs = append(errs, scrapeErrs...)
+			innerRC = 1
 		}
-		log.Infof("Finished execution with UUID: %s", uuid)
 		res <- innerRC
 	}()
 	select {
@@ -233,6 +215,25 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
 		CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 	}
+	cleanupEnd = time.Now().UTC()
+	if globalConfig.GCMetrics {
+		log.Info("Scraping metrics during garbage collection phase")
+		for i := range prometheusJobList {
+			prometheusJobList[i].Start = cleanupStart
+			prometheusJobList[i].End = cleanupEnd
+		}
+		scrapeErrs := scrapeAndIndex(prometheusClients, alertMs, prometheusJobList, globalConfig, indexer, cleanupStart, cleanupEnd)
+		if len(scrapeErrs) > 0 {
+			errs = append(errs, scrapeErrs...)
+		}
+	}
+	if globalConfig.IndexerConfig.Type != "" {
+		for _, job := range jobList {
+			// elapsedTime is recalculated for every job of the list
+			indexjobSummaryInfo(indexer, uuid, job, cleanupStart, cleanupEnd, metadata)
+		}
+	}
+	log.Infof("Finished execution with UUID: %s", uuid)
 	return rc, utilerrors.NewAggregate(errs)
 }
 
@@ -291,4 +292,25 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 		}
 		wg.Wait()
 	}
+}
+
+func scrapeAndIndex(prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, prometheusJobList []prometheus.Job, globalConfig config.GlobalConfig, indexer *indexers.Indexer, startTime, endTime time.Time) []error {
+	errs := []error{}
+	for idx, prometheusClient := range prometheusClients {
+		// If alertManager is configured
+		if alertMs[idx] != nil {
+			if err := alertMs[idx].Evaluate(startTime, endTime); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		prometheusClient.JobList = prometheusJobList
+		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
+		if globalConfig.IndexerConfig.Type != "" {
+			metrics.ScrapeMetrics(prometheusClient, indexer)
+			if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
+				metrics.CreateTarball(globalConfig.IndexerConfig)
+			}
+		}
+	}
+	return errs
 }

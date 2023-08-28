@@ -232,6 +232,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		alertMs = append(alertMs, alertM)
 		alertM = nil
 	}
+	configSpec.GlobalConfig.GCMetrics = (wh.envVars["GC_METRICS"] == "true")
 	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()

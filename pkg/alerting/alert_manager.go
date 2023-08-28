@@ -174,9 +174,9 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 				log.Error(msg.Error())
 				errs = append(errs, err)
 			}
-			msg := fmt.Sprintf("alert at %v: '%s'", val.Timestamp.Time().Format(time.RFC3339), renderedDesc.String())
+			msg := fmt.Sprintf("alert at %v: '%s'", val.Timestamp.Time().UTC().Format(time.RFC3339), renderedDesc.String())
 			alertSet = append(alertSet, alert{
-				Timestamp:   val.Timestamp.Time(),
+				Timestamp:   val.Timestamp.Time().UTC(),
 				Severity:    string(severity),
 				Description: renderedDesc.String(),
 				MetricName:  alertMetricName,

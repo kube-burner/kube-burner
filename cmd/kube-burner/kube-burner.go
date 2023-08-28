@@ -85,7 +85,7 @@ func initCmd() *cobra.Command {
 	var err error
 	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
 	var username, password, uuid, token, configMap, namespace, userMetadata string
-	var skipTLSVerify bool
+	var skipTLSVerify, gcMetrics bool
 	var prometheusStep time.Duration
 	var timeout time.Duration
 	var rc int
@@ -108,6 +108,7 @@ func initCmd() *cobra.Command {
 				configFile = "config.yml"
 			}
 			configSpec, err := config.Parse(uuid, configFile)
+			configSpec.GlobalConfig.GCMetrics = gcMetrics
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -145,6 +146,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.Flags().BoolVar(&gcMetrics, "gc-metrics", false, "Collect metrics during garbage collection")
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
@@ -386,7 +388,7 @@ func main() {
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		log.SetReportCaller(true)
 		formatter := &log.TextFormatter{
-			TimestampFormat: "2006-01-02 15:04:05",
+			TimestampFormat: time.RFC3339 + " UTC",
 			FullTimestamp:   true,
 			DisableColors:   true,
 			CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
