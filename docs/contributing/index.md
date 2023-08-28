@@ -9,7 +9,7 @@ For submitting a change upstream, please fork the repository and clone your fork
 $ git clone http://github.com/YOUR-USERNAME/kube-burner
 $ cd kube-burner
 $ git checkout -b <branch_name>
-$ make all
+$ make lint
 $ git add <changes>
 $ git commit -m -s "<Details of the Commit>"
 $ git push
