@@ -5,7 +5,7 @@ nav:
 - Command line: cli.md
 - Reference: reference/configuration.md
 - Measurements: measurements.md
-- Observability & alerting: 
+- Observability & Alerting: 
   - observability/index.md
   - Overview: observability/index.md
   - Collecting metrics: observability/metrics.md
