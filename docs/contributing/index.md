@@ -9,16 +9,15 @@ For submitting a change upstream, please fork the repository and clone your fork
 $ git clone http://github.com/YOUR-USERNAME/kube-burner
 $ cd kube-burner
 $ git checkout -b <branch_name>
-$ <make change>
+$ make lint
 $ git add <changes>
-$ git commit -a
-$ <insert good message>
+$ git commit -m -s "<Details of the Commit>"
 $ git push
 ```
 
 ## CI and Linting
 
-For running pre-commit checks on your code before comitting code and opening a PR, you can use the `pre-commit run` functionality.  See [CI docs](https://cloud-bulldozer.github.io/kube-burner/latest/contributing/ci) for more information.
+For running pre-commit checks on your code before comitting code and opening a PR, you can use the `pre-commit run` functionality.  See [CI docs](https://cloud-bulldozer.github.io/kube-burner/latest/contributing/pullrequest/#running-local-pre-commit) for more information on running pre-commits.
 
 ## Building
 

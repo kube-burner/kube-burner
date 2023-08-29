@@ -42,7 +42,7 @@ i.e:
 
 ## Checking alerts
 
-It is possible to look for alerts without triggering a kube-burner workload by using the `check-alerts` [subcommand](/cli/#check-alerts). Similar to the `index` CLI option, this option accepts the flags `--start` and `--end` to evaluate the alerts at a given time range.
+It is possible to look for alerts without triggering a kube-burner workload by using the `check-alerts` [subcommand](https://cloud-bulldozer.github.io/kube-burner/latest/cli/#check-alerts). Similar to the `index` CLI option, this option accepts the flags `--start` and `--end` to evaluate the alerts at a given time range.
 
 ```shell
 $ kube-burner check-alerts -u https://prometheus.url.com -t ${token} -a alert-profile.yml
