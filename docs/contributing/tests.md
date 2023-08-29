@@ -4,7 +4,7 @@ Tests are orchestrated using [BATS](https://bats-core.readthedocs.io/en/stable/)
 
 #### Test K8s
 
-For testing kube-burner on a real k8s environment, we use [Kind](https://kind.sigs.k8s.io/), with different K8s versions.
+For testing kube-burner on a real k8s environment, we use [kind](https://kind.sigs.k8s.io/), with different K8s versions.
 
 It creates a quick k8s deployment using containers with podman.
 

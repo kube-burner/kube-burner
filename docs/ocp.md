@@ -159,9 +159,9 @@ Please refer to [indexing](observability/indexing.md) section for better underst
 
 ## Reporting mode
 
-This mode can be enabled with the flag `--reporting`. By enabling this mode kube-burner will a metrics-profile and will index the [aggregated values of the defined timeseries](/kube-burner/metrics/observability/metrics/#aggregating-timeseries-into-a-single-document), and will index only the pod latency quantiles documents (`podLatencyQuantilesMeasurement`) rather than the full pod timeseries.
+This mode can be enabled with the flag `--reporting`. By enabling this mode kube-burner will create a metrics-profile and will index the [aggregated values of the defined timeseries](/kube-burner/metrics/observability/metrics/#aggregating-timeseries-into-a-single-document), and will index only the pod latency quantiles documents (`podLatencyQuantilesMeasurement`) rather than the full pod timeseries.
 
-This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/cmd/ocp-config/metrics-report.yml))
+This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml))
 
 ## Customizing workloads
 
