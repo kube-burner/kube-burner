@@ -5,7 +5,6 @@ All of the magic that `kube-burner` does is described in its configuration file.
 It is possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file. It is also important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, you could define the `indexerConfig` section of your own configuration file, such as:
 
 ```yaml
-enabled: true
 type: elastic
 esServers: [{{ .ES_SERVER }}]
 defaultIndex: elasticsearch-index
