@@ -76,10 +76,10 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 	p.metricLock.Lock()
 	defer p.metricLock.Unlock()
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
-		runid, exists := pod.Labels["kube-burner-runid"]
-		if exists && runid == globalCfg.RUNID {
+		timestamp, isValid := validatePod(factory.jobConfig.JobType, pod)
+		if isValid {
 			p.metrics[string(pod.UID)] = podMetric{
-				Timestamp:  pod.CreationTimestamp.Time.UTC(),
+				Timestamp:  timestamp,
 				Namespace:  pod.Namespace,
 				Name:       pod.Name,
 				MetricName: podLatencyMeasurement,
@@ -161,8 +161,8 @@ func (p *podLatency) stop() error {
 	p.watcher.StopWatcher()
 	errorRate := p.normalizeMetrics()
 	if errorRate > 10.00 {
-		log.Info("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("Something is wrong with system under test. Pod latencies confidencelevel: %f, errorRate: %f", (100.00 - errorRate), errorRate)
+		log.Error("Latency errors beyond 10%. Hence invalidating the results")
+		return fmt.Errorf("Something is wrong with system under test. Pod latencies error rate was: %.2f", errorRate)
 	}
 	p.calcQuantiles()
 	if len(p.config.LatencyThresholds) > 0 {
@@ -176,7 +176,7 @@ func (p *podLatency) stop() error {
 		pq := q.(metrics.LatencyQuantiles)
 		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
 	}
-	log.Infof("Pod latencies confidencelevel: %f, errorRate: %f", (100.00 - errorRate), errorRate)
+	log.Infof("Pod latencies error rate was: %.2f", errorRate)
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
 	return err
@@ -317,4 +317,17 @@ func (p *podLatency) validateConfig() error {
 		}
 	}
 	return nil
+}
+
+// validatePod validates a pod based on job type and returns its timestamp for latency calculation.
+// It returns a timestamp and a boolean value indicating validation details.
+func validatePod(jobType config.JobType, pod *v1.Pod) (time.Time, bool) {
+	if jobType == config.CreationJob {
+		runid, exists := pod.Labels["kube-burner-runid"]
+		if exists && runid == globalCfg.RUNID {
+			return pod.CreationTimestamp.Time.UTC(), true
+		}
+		return pod.CreationTimestamp.Time.UTC(), false
+	}
+	return pod.Status.StartTime.Time.UTC(), true
 }

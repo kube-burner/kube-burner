@@ -77,7 +77,7 @@ Where `quantileName` matches with the pod conditions and can be:
 - `Ready`: The pod is able to service requests and should be added to the load balancing pools of all matching services.
 
 !!! note
-    We also log the confidence level and the errorRate of the latencies for user's understanding. Currently the threshold for the errorRate is 10% and we do not log latencies if the error is > 10% which indicates a problem with environment.(i.e system under test)
+    We also log the errorRate of the latencies for user's understanding. It indicates the percentage of pods out of all pods in the workload that got errored during the latency calculations. Currently the threshold for the errorRate is 10% and we do not log latencies if the error is > 10% which indicates a problem with environment.(i.e system under test)
 
 !!! info
     More information about the pod conditions can be found at the [kubernetes documentation site](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions).
