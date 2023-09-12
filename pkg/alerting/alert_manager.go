@@ -17,7 +17,9 @@ package alerting
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"math"
+	"path"
 	"strings"
 	"text/template"
 	"time"
@@ -78,21 +80,28 @@ type descriptionTemplate struct {
 }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(alertProfileCfg, uuid string, indexer *indexers.Indexer, prometheusClient *prometheus.Prometheus) (*AlertManager, error) {
+func NewAlertManager(alertProfileCfg, uuid string, indexer *indexers.Indexer, prometheusClient *prometheus.Prometheus, embedConfig bool) (*AlertManager, error) {
 	log.Infof("🔔 Initializing alert manager for prometheus: %v", prometheusClient.Endpoint)
 	a := AlertManager{
 		prometheus: prometheusClient,
 		uuid:       uuid,
 		indexer:    indexer,
 	}
-	if err := a.readProfile(alertProfileCfg); err != nil {
+	if err := a.readProfile(alertProfileCfg, embedConfig); err != nil {
 		return &a, err
 	}
 	return &a, nil
 }
 
-func (a *AlertManager) readProfile(alertProfileCfg string) error {
-	f, err := util.ReadConfig(alertProfileCfg)
+func (a *AlertManager) readProfile(alertProfileCfg string, embedConfig bool) error {
+	var f io.Reader
+	var err error
+	if embedConfig {
+		alertProfileCfg = path.Join(path.Dir(a.prometheus.ConfigSpec.EmbedFSDir), alertProfileCfg)
+		f, err = util.ReadEmbedConfig(a.prometheus.ConfigSpec.EmbedFS, alertProfileCfg)
+	} else {
+		f, err = util.ReadConfig(alertProfileCfg)
+	}
 	if err != nil {
 		log.Fatalf("Error reading alert profile %s: %s", alertProfileCfg, err)
 	}

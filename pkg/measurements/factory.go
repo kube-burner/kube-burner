@@ -50,7 +50,6 @@ var globalCfg config.GlobalConfig
 // NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(configSpec config.Spec, indexer *indexers.Indexer, metadata map[string]interface{}) {
 	globalCfg = configSpec.GlobalConfig
-	log.Info("📈 Creating measurement factory")
 	_, restConfig, err := config.GetClientSet(0, 0)
 	if err != nil {
 		log.Fatalf("Error creating clientSet: %s", err)
@@ -82,7 +81,7 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 			return fmt.Errorf("Config validation error: %s", err)
 		}
 		mf.createFuncs[measurement.Name] = measurementFunc
-		log.Infof("Registered measurement: %s", measurement.Name)
+		log.Infof("📈 Registered measurement: %s", measurement.Name)
 	}
 	return nil
 }
