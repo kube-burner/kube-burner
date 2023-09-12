@@ -108,7 +108,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
-			if job.PreLoadImages {
+			if job.PreLoadImages && job.JobType == config.CreationJob {
 				if err = preLoadImages(job); err != nil {
 					log.Fatal(err.Error())
 				}
