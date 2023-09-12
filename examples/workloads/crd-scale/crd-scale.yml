@@ -1,0 +1,22 @@
+---
+global:
+  gc: true
+  indexerConfig:
+    esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
+    insecureSkipVerify: true
+    defaultIndex: kube-burner
+    type: elastic
+
+jobs:
+  - name: crd-scale
+    jobIterations: 1000
+    qps: 20
+    burst: 20
+    namespacedIterations: false
+    namespace: crd-scale
+    waitWhenFinished: false
+    objects:
+
+      - objectTemplate: templates/example-crd.yml
+        replicas: 1
+
