@@ -92,6 +92,7 @@ func openShiftCmd() *cobra.Command {
 		workloads.NewClusterDensity(&wh, "cluster-density"),
 		workloads.NewClusterDensity(&wh, "cluster-density-v2"),
 		workloads.NewClusterDensity(&wh, "cluster-density-ms"),
+		workloads.NewCrdScale(&wh),
 		workloads.NewNodeDensity(&wh),
 		workloads.NewNodeDensityHeavy(&wh),
 		workloads.NewNodeDensityCNI(&wh),
