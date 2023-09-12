@@ -106,7 +106,7 @@ func (ex *Executor) RunPatchJob() {
 			continue
 		}
 		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
-		for i := 1; i < ex.JobIterations; i++ {
+		for i := 0; i < ex.JobIterations; i++ {
 			for _, item := range itemList.Items {
 				wg.Add(1)
 				go ex.patchHandler(obj, item, i, &wg)
@@ -120,7 +120,6 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 	iteration int, wg *sync.WaitGroup) {
 
 	defer wg.Done()
-
 	// There are several patch modes. Three of them are client-side, and one
 	// of them is server-side.
 	var data []byte

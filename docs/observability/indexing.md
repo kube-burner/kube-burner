@@ -8,11 +8,10 @@ Configured in the `indexerConfig` object, they can be tweaked by the following p
 
 | Option    | Description     | Type    | Default |
 | --------- | --------------- | ------- | ------- |
-| `enabled` | Enable indexing | Boolean | false   |
 | `type`    | Type of indexer | String  | ""      |
 
 !!! Note
-Currently, `elastic` and `local` are the only supported indexers
+    Currently, `elastic`, `opensearch` and `local` are the only supported indexers
 
 ### Elastic/OpenSearch
 
@@ -28,8 +27,8 @@ The `elastic` or `opensearch` indexer can be configured by the parameters below:
 
 OpenSearch is backwards compatible with Elasticsearch and kube-burner does not use any version checks. Therefore, kube-burner with OpenSearch indexing should work as expected.
 
-!!!Info
-It is possible to index documents in an authenticated Elasticsearch or OpenSearch instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the `esServers` parameter.
+!!! info
+    It is possible to index documents in an authenticated Elasticsearch or OpenSearch instance using the notation `http(s)://[username]:[password]@[address]:[port]` in the `esServers` parameter.
 
 ### Local
 
@@ -117,6 +116,5 @@ A valid file provided to the `--metrics-endpoint` looks like this:
   profile: metrics.yaml
 ```
 
-!!!note
-The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file.
-The `profile` and `alertProfile` parameters are optional. If not provided, they will be taken from the CLI flags.
+!!! Note
+    The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file. The `profile` and `alertProfile` parameters are optional. If not provided, they will be taken from the CLI flags.
