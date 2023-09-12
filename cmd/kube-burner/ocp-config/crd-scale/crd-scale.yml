@@ -1,0 +1,21 @@
+---
+global:
+  gc: {{.GC}}
+  indexerConfig:
+    esServers: ["{{.ES_SERVER}}"]
+    insecureSkipVerify: true
+    defaultIndex: {{.ES_INDEX}}
+    type: {{.INDEXING_TYPE}}
+jobs:
+  - name: crd-scale
+    namespace: crd-scale
+    jobIterations: {{.JOB_ITERATIONS}}
+    qps: {{.QPS}}
+    burst: {{.BURST}}
+    namespacedIterations: false
+    waitWhenFinished: false
+    objects:
+
+      - objectTemplate: example-crd.yml
+        replicas: 1
+
