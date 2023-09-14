@@ -119,6 +119,9 @@
   metricName: replicaSetCount
   instant: true
 
+- query: count(kube_pod_info{} AND ON (pod) kube_pod_status_phase{phase="Running"}==1)
+  metricName: podDistribution
+
 # Prometheus metrics
 
 - query: openshift:prometheus_tsdb_head_series:sum{job="prometheus-k8s"}
