@@ -47,89 +47,89 @@
 
 # Control-plane
 
-- query: avg(avg_over_time(topk(1, sum(rate(container_cpu_usage_seconds_total{namespace="openshift-kube-controller-manager"}[2m])) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(1, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-kube-controller-manager"}[2m])) by (pod))[{{.elapsed}}:]))
   metricName: cpu-kube-controller-manager
   instant: true
 
-- query: avg(avg_over_time(topk(1, sum(container_memory_rss{namespace="openshift-kube-controller-manager"}) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(1, sum(container_memory_rss{name!="", namespace="openshift-kube-controller-manager"}) by (pod))[{{.elapsed}}:]))
   metricName: memory-kube-controller-manager
   instant: true
 
-- query: max(max_over_time(topk(1, sum(container_memory_rss{namespace="openshift-kube-controller-manager"}) by (pod))[{{.elapsed}}:]))
+- query: max(max_over_time(topk(1, sum(container_memory_rss{name!="", namespace="openshift-kube-controller-manager"}) by (pod))[{{.elapsed}}:]))
   metricName: maxmemory-kube-controller-manager
   instant: true
 
-- query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{namespace="openshift-kube-apiserver"}[2m])) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-kube-apiserver"}[2m])) by (pod))[{{.elapsed}}:]))
   metricName: cpu-kube-apiserver
   instant: true
 
-- query: avg(avg_over_time(topk(3, sum(container_memory_rss{namespace="openshift-kube-apiserver"}) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(3, sum(container_memory_rss{name!="", namespace="openshift-kube-apiserver"}) by (pod))[{{.elapsed}}:]))
   metricName: memory-kube-apiserver
   instant: true
 
-- query: max(max_over_time(topk(3, sum(container_memory_rss{namespace="openshift-kube-apiserver"}) by (pod))[{{.elapsed}}:]))
+- query: max(max_over_time(topk(3, sum(container_memory_rss{name!="", namespace="openshift-kube-apiserver"}) by (pod))[{{.elapsed}}:]))
   metricName: max-memory-kube-apiserver
   instant: true
 
-- query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{namespace="openshift-apiserver"}[2m])) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-apiserver"}[2m])) by (pod))[{{.elapsed}}:]))
   metricName: cpu-openshift-apiserver
   instant: true
 
-- query: avg(avg_over_time(topk(3, sum(container_memory_rss{namespace="openshift-apiserver"}) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(3, sum(container_memory_rss{name!="", namespace="openshift-apiserver"}) by (pod))[{{.elapsed}}:]))
   metricName: memory-openshift-apiserver
   instant: true
 
-- query: max(max_over_time(topk(3, sum(container_memory_rss{namespace="openshift-apiserver"}) by (pod))[{{.elapsed}}:]))
+- query: max(max_over_time(topk(3, sum(container_memory_rss{name!="", namespace="openshift-apiserver"}) by (pod))[{{.elapsed}}:]))
   metricName: max-memory-openshift-apiserver
   instant: true
 
-- query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{namespace="openshift-etcd"}[2m])) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-etcd"}[2m])) by (pod))[{{.elapsed}}:]))
   metricName: cpu-etcd
   instant: true
 
-- query: avg(avg_over_time(topk(1, sum(irate(container_cpu_usage_seconds_total{namespace="openshift-controller-manager"}[2m])) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(1, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-controller-manager"}[2m])) by (pod))[{{.elapsed}}:]))
   metricName: cpu-openshift-controller-manager
   instant: true
 
-- query: avg(avg_over_time(topk(1, sum(container_memory_rss{namespace="openshift-controller-manager"}) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(1, sum(container_memory_rss{name!="", namespace="openshift-controller-manager"}) by (pod))[{{.elapsed}}:]))
   metricName: memory-openshift-controller-manager
   instant: true
 
-- query: max(max_over_time(topk(1, sum(container_memory_rss{namespace="openshift-controller-manager"}) by (pod))[{{.elapsed}}:]))
+- query: max(max_over_time(topk(1, sum(container_memory_rss{name!="", namespace="openshift-controller-manager"}) by (pod))[{{.elapsed}}:]))
   metricName: max-memory-openshift-controller-manager
   instant: true
 
-- query: avg(avg_over_time(topk(3,sum(container_memory_rss{namespace="openshift-etcd", name!=""}) by (pod))[{{.elapsed}}:]))
+- query: avg(avg_over_time(topk(3,sum(container_memory_rss{name!="", namespace="openshift-etcd"}) by (pod))[{{.elapsed}}:]))
   metricName: memory-etcd
   instant: true
 
-- query: max(max_over_time(topk(3,sum(container_memory_rss{namespace="openshift-etcd", name!=""}) by (pod))[{{.elapsed}}:]))
+- query: max(max_over_time(topk(3,sum(container_memory_rss{name!="", namespace="openshift-etcd"}) by (pod))[{{.elapsed}}:]))
   metricName: max-memory-etcd
   instant: true
 
 # OVNKubernetes - standard & IC
 
-- query: avg(avg_over_time(irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"(ovnkube-master|ovnkube-control-plane).+", container!="POD"}[2m])[{{.elapsed}}:])) by (container)
+- query: avg(avg_over_time(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-ovn-kubernetes", pod=~"(ovnkube-master|ovnkube-control-plane).+", container!="POD"}[2m])[{{.elapsed}}:])) by (container)
   metricName: cpu-ovn-control-plane
   instant: true
 
-- query: avg(avg_over_time(container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"(ovnkube-master|ovnkube-control-plane).+", container!="POD"}[{{.elapsed}}:])) by (container)
+- query: avg(avg_over_time(container_memory_rss{name!="", namespace="openshift-ovn-kubernetes", pod=~"(ovnkube-master|ovnkube-control-plane).+", container!="POD"}[{{.elapsed}}:])) by (container)
   metricName: memory-ovn-control-plane
   instant: true
 
-- query: max(avg_over_time(container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"(ovnkube-master|ovnkube-control-plane).+", container!="POD"}[{{.elapsed}}:])) by (container)
+- query: max(avg_over_time(container_memory_rss{name!="", namespace="openshift-ovn-kubernetes", pod=~"(ovnkube-master|ovnkube-control-plane).+", container!="POD"}[{{.elapsed}}:])) by (container)
   metricName: max-memory-ovn-control-plane
   instant: true
 
-- query: avg(avg_over_time(irate(container_cpu_usage_seconds_total{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+", container!="POD"}[2m])[{{.elapsed}}:])) by (container)
+- query: avg(avg_over_time(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+", container!="POD"}[2m])[{{.elapsed}}:])) by (container)
   metricName: cpu-ovnkube-node
   instant: true
 
-- query: avg(avg_over_time(container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+", container!="POD"}[{{.elapsed}}:])) by (container)
+- query: avg(avg_over_time(container_memory_rss{name!="", namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+", container!="POD"}[{{.elapsed}}:])) by (container)
   metricName: memory-ovnkube-node
   instant: true
 
-- query: max(max_over_time(container_memory_rss{namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+", container!="POD"}[{{.elapsed}}:])) by (container)
+- query: max(max_over_time(container_memory_rss{name!="", namespace="openshift-ovn-kubernetes", pod=~"ovnkube-node.+", container!="POD"}[{{.elapsed}}:])) by (container)
   metricName: max-memory-ovnkube-node
   instant: true
 
@@ -173,27 +173,27 @@
 
 # Monitoring and ingress
 
-- query: avg(avg_over_time(sum(irate(container_cpu_usage_seconds_total{namespace="openshift-monitoring", pod=~"prometheus-k8s.+"}[2m])) by (pod)[{{.elapsed}}:]))
+- query: avg(avg_over_time(sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-monitoring", pod=~"prometheus-k8s.+"}[2m])) by (pod)[{{.elapsed}}:]))
   metricName: cpu-prometheus
   instant: true
 
-- query: avg(avg_over_time(sum(container_memory_rss{namespace="openshift-monitoring", pod=~"prometheus-k8s.+"}) by (pod)[{{.elapsed}}:]))
+- query: avg(avg_over_time(sum(container_memory_rss{name!="", namespace="openshift-monitoring", pod=~"prometheus-k8s.+"}) by (pod)[{{.elapsed}}:]))
   metricName: memory-prometheus
   instant: true
 
-- query: max(max_over_time(sum(container_memory_rss{namespace="openshift-monitoring", pod=~"prometheus-k8s.+"}) by (pod)[{{.elapsed}}:]))
+- query: max(max_over_time(sum(container_memory_rss{name!="", namespace="openshift-monitoring", pod=~"prometheus-k8s.+"}) by (pod)[{{.elapsed}}:]))
   metricName: max-memory-prometheus
   instant: true
 
-- query: avg(avg_over_time(sum(irate(container_cpu_usage_seconds_total{namespace="openshift-ingress", pod=~"router-default.+"}[2m])) by (pod)[{{.elapsed}}:]))
+- query: avg(avg_over_time(sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-ingress", pod=~"router-default.+"}[2m])) by (pod)[{{.elapsed}}:]))
   metricName: cpu-router
   instant: true
 
-- query: avg(avg_over_time(sum(container_memory_rss{namespace="openshift-ingress", pod=~"router-default.+"}) by (pod)[{{.elapsed}}:]))
+- query: avg(avg_over_time(sum(container_memory_rss{name!="", namespace="openshift-ingress", pod=~"router-default.+"}) by (pod)[{{.elapsed}}:]))
   metricName: memory-router
   instant: true
 
-- query: max(max_over_time(sum(container_memory_rss{namespace="openshift-ingress", pod=~"router-default.+"}) by (pod)[{{.elapsed}}:]))
+- query: max(max_over_time(sum(container_memory_rss{name!="", namespace="openshift-ingress", pod=~"router-default.+"}) by (pod)[{{.elapsed}}:]))
   metricName: max-memory-router
   instant: true
 
