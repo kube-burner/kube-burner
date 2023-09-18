@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"strconv"
@@ -75,6 +76,8 @@ var waitDynamicClient dynamic.Interface
 var discoveryClient *discovery.DiscoveryClient
 var restConfig *rest.Config
 var waitRestConfig *rest.Config
+var embedFS embed.FS
+var embedFSDir string
 
 //nolint:gocyclo
 func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
@@ -82,6 +85,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var rc int
 	var prometheusJobList []prometheus.Job
 	var jobList []Executor
+	embedFS = configSpec.EmbedFS
+	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID

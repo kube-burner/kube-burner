@@ -29,6 +29,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -107,9 +108,13 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			configSpec, err := config.Parse(uuid, configFile)
+			f, err := util.ReadConfig(configFile)
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
+			}
+			configSpec, err := config.Parse(uuid, f)
+			if err != nil {
+				log.Fatalf("Config error: %s", err.Error())
 			}
 			if configSpec.GlobalConfig.IndexerConfig.Type != "" || alertProfile != "" {
 				metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
@@ -336,13 +341,13 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, map[string]interface{}{})
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, map[string]interface{}{}, false)
 			if err != nil {
 				log.Fatal(err)
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p, false); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 
