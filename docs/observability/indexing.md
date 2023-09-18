@@ -44,7 +44,7 @@ The `local` indexer can be configured by the parameters below:
 
 ## Job Summary
 
-When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. And also the timestamps will be useful to filter out the metrics both during execution phase (i.e `timestmap` and `endTimestamp`) as well as the cleanup phase (i.e `cleanupTimestamp` and `cleanupEndTimestamp`).
+When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. Also the timestamps will be useful to filter out the metrics both during execution phase (i.e `timestmap` and `endTimestamp`) as well as the cleanup phase (i.e `cleanupTimestamp` and `cleanupEndTimestamp`).
 
 This document looks like:
 

@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"strconv"
@@ -75,6 +76,8 @@ var waitDynamicClient dynamic.Interface
 var discoveryClient *discovery.DiscoveryClient
 var restConfig *rest.Config
 var waitRestConfig *rest.Config
+var embedFS embed.FS
+var embedFSDir string
 
 //nolint:gocyclo
 func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
@@ -83,6 +86,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var prometheusJobList []prometheus.Job
 	var jobList []Executor
 	var cleanupStart, cleanupEnd time.Time
+	embedFS = configSpec.EmbedFS
+	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -216,8 +221,21 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 	}
 	cleanupEnd = time.Now().UTC()
+	if globalConfig.IndexerConfig.Type != "" {
+		for _, job := range jobList {
+			indexJobSummaryInfo(indexer, uuid, job, cleanupStart, cleanupEnd, metadata)
+		}
+	}
 	if globalConfig.GCMetrics {
-		log.Info("Scraping metrics during garbage collection phase")
+		if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer {
+			globalConfig.IndexerConfig.MetricsDirectory += "-cleanup"
+			log.Infof("📁 Creating cleanup indexer: %s", indexers.LocalIndexer)
+			indexer, err = indexers.NewIndexer(globalConfig.IndexerConfig)
+			if err != nil {
+				log.Fatalf("%v cleanup indexer: %v", indexers.LocalIndexer, err.Error())
+			}
+		}
+		log.Info("Attempting to collect metrics during garbage collection phase")
 		for i := range prometheusJobList {
 			prometheusJobList[i].Start = cleanupStart
 			prometheusJobList[i].End = cleanupEnd
@@ -227,12 +245,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			errs = append(errs, scrapeErrs...)
 		}
 	}
-	if globalConfig.IndexerConfig.Type != "" {
-		for _, job := range jobList {
-			// elapsedTime is recalculated for every job of the list
-			indexjobSummaryInfo(indexer, uuid, job, cleanupStart, cleanupEnd, metadata)
-		}
-	}
+
 	log.Infof("Finished execution with UUID: %s", uuid)
 	return rc, utilerrors.NewAggregate(errs)
 }

@@ -17,6 +17,7 @@ package workloads
 import (
 	"embed"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -165,24 +166,35 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	for k, v := range wh.Metadata.UserMetadata {
 		metadata[k] = v
 	}
+	var f io.Reader
 	var rc int
 	var err error
 	var alertM *alerting.AlertManager
 	var prometheusClients []*prometheus.Prometheus
 	var alertMs []*alerting.AlertManager
 	var metricsEndpoints []prometheus.MetricEndpoint
-	cfg := fmt.Sprintf("%s.yml", workload)
-	if _, err := os.Stat(cfg); err != nil {
-		log.Debugf("File %v not available in the current directory, extracting it", cfg)
-		if err := wh.ExtractWorkload(workload, metricsProfile); err != nil {
-			log.Fatalf("Error extracting workload: %v", err)
+	var embedConfig bool
+	configFile := fmt.Sprintf("%s.yml", workload)
+	if _, err := os.Stat(configFile); err != nil {
+		f, err = util.ReadEmbedConfig(wh.ocpConfig, path.Join(ocpCfgDir, workload, configFile))
+		embedConfig = true
+		if err != nil {
+			log.Fatalf("Error reading configuration file: %v", err.Error())
 		}
 	} else {
-		log.Infof("File %v available in the current directory, using it", cfg)
+		log.Infof("File %v available in the current directory, using it", configFile)
+		f, err = util.ReadConfig(configFile)
+		if err != nil {
+			log.Fatalf("Error reading configuration file %s: %s", configFile, err)
+		}
 	}
-	configSpec, err = config.Parse(wh.Metadata.UUID, cfg)
+	configSpec, err = config.Parse(wh.Metadata.UUID, f)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if embedConfig {
+		configSpec.EmbedFS = wh.ocpConfig
+		configSpec.EmbedFSDir = path.Join(ocpCfgDir, workload)
 	}
 	indexerConfig := configSpec.GlobalConfig.IndexerConfig
 	if indexerConfig.Type != "" {
@@ -193,6 +205,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		}
 	}
 	if wh.metricsEndpoint != "" {
+		embedConfig = false
 		metrics.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
 	} else {
 		// When benchmark reporting is enabled we hardcode metricsProfile
@@ -218,12 +231,12 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			Token:         metricsEndpoint.Token,
 			SkipTLSVerify: true,
 		}
-		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, metadata)
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, metadata, embedConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
 		if wh.alerting && configSpec.GlobalConfig.AlertProfile != "" {
-			alertM, err = alerting.NewAlertManager(configSpec.GlobalConfig.AlertProfile, wh.Metadata.UUID, indexer, p)
+			alertM, err = alerting.NewAlertManager(configSpec.GlobalConfig.AlertProfile, wh.Metadata.UUID, indexer, p, embedConfig)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -261,6 +274,9 @@ func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error
 		defer fd.Close()
 		fd.Write(fileContent)
 		return nil
+	}
+	if err = createFile(ocpCfgDir, fmt.Sprintf("%v.yml", workload)); err != nil {
+		return err
 	}
 	for _, f := range dirContent {
 		err := createFile(path.Join(ocpCfgDir, workload, f.Name()), f.Name())

@@ -40,7 +40,7 @@ type jobSummary struct {
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, job Executor, cleanupStart, cleanupEnd time.Time, metadata map[string]interface{}) {
+func indexJobSummaryInfo(indexer *indexers.Indexer, uuid string, job Executor, cleanupStart, cleanupEnd time.Time, metadata map[string]interface{}) {
 	elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
 	metadataInfo := []interface{}{
 		jobSummary{

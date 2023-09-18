@@ -16,11 +16,13 @@ package burner
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
+	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -40,6 +42,7 @@ import (
 
 func setupCreateJob(jobConfig config.Job) Executor {
 	var err error
+	var f io.Reader
 	mapper := newRESTMapper()
 	waitClientSet, waitRestConfig, err = config.GetClientSet(jobConfig.QPS*2, jobConfig.Burst*2)
 	if err != nil {
@@ -54,7 +57,13 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		f, err := util.ReadConfig(o.ObjectTemplate)
+		e := embed.FS{}
+		if embedFS == e {
+			f, err = util.ReadConfig(o.ObjectTemplate)
+		} else {
+			objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
+			f, err = util.ReadEmbedConfig(embedFS, objectTemplate)
+		}
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}

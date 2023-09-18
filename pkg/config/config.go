@@ -105,18 +105,14 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Parse parses a configuration file
-func Parse(uuid, c string) (Spec, error) {
-	f, err := util.ReadConfig(c)
-	if err != nil {
-		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
-	}
+func Parse(uuid string, f io.Reader) (Spec, error) {
 	cfg, err := io.ReadAll(f)
 	if err != nil {
-		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
+		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
 	}
 	renderedCfg, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
 	if err != nil {
-		return configSpec, fmt.Errorf("Error rendering configuration template: %s", err)
+		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}
 	if err != nil {
 		return configSpec, err
@@ -125,10 +121,10 @@ func Parse(uuid, c string) (Spec, error) {
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&configSpec); err != nil {
-		return configSpec, fmt.Errorf("Error decoding configuration file %s: %s", c, err)
+		return configSpec, fmt.Errorf("error decoding configuration file: %s", err)
 	}
 	if len(configSpec.Jobs) <= 0 {
-		return configSpec, fmt.Errorf("No jobs found in the configuration file")
+		return configSpec, fmt.Errorf("no jobs found in the configuration file")
 	}
 	if err := jobIsDuped(); err != nil {
 		return configSpec, err
@@ -152,7 +148,6 @@ func Parse(uuid, c string) (Spec, error) {
 	if configSpec.GlobalConfig.IndexerConfig.MetricsDirectory == "collected-metrics" {
 		configSpec.GlobalConfig.IndexerConfig.MetricsDirectory += "-" + uuid
 	}
-
 	return configSpec, nil
 }
 
