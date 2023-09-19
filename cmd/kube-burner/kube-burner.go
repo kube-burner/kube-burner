@@ -207,6 +207,7 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
@@ -311,10 +312,8 @@ func alertCmd() *cobra.Command {
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
-		PostRun: func(cmd *cobra.Command, args []string) {
-			log.Info("👋 Exiting kube-burner ", uuid)
-		},
 		Run: func(cmd *cobra.Command, args []string) {
+			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
@@ -351,8 +350,9 @@ func alertCmd() *cobra.Command {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 
+			err = alertM.Evaluate(startTime, endTime)
 			log.Info("👋 Exiting kube-burner ", uuid)
-			if err := alertM.Evaluate(startTime, endTime); err != nil {
+			if err != nil {
 				os.Exit(1)
 			}
 		},
