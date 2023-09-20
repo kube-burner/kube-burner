@@ -264,32 +264,27 @@ func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error
 	if err != nil {
 		return err
 	}
-	createFile := func(filePath, fileName string) error {
-		fileContent, _ := wh.ocpConfig.ReadFile(filePath)
-		fd, err := os.Create(fileName)
-		if err != nil {
-			return err
-		}
-		defer fd.Close()
-		fd.Write(fileContent)
-		return nil
-	}
-	if err = createFile(ocpCfgDir, fmt.Sprintf("%v.yml", workload)); err != nil {
+	workloadContent, _ := wh.ocpConfig.ReadFile(ocpCfgDir)
+	if err = util.CreateFile(fmt.Sprintf("%v.yml", workload), workloadContent); err != nil {
 		return err
 	}
 	for _, f := range dirContent {
-		err := createFile(path.Join(ocpCfgDir, workload, f.Name()), f.Name())
+		fileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, workload, f.Name()))
+		err := util.CreateFile(f.Name(), fileContent)
 		if err != nil {
 			return err
 		}
 	}
-	if err = createFile(path.Join(ocpCfgDir, metricsProfile), metricsProfile); err != nil {
+	metricsProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, metricsProfile))
+	if err = util.CreateFile(metricsProfile, metricsProfileContent); err != nil {
 		return err
 	}
-	if err = createFile(path.Join(ocpCfgDir, reportProfile), reportProfile); err != nil {
+	reportProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, reportProfile))
+	if err = util.CreateFile(metricsProfile, reportProfileContent); err != nil {
 		return err
 	}
-	if err = createFile(path.Join(ocpCfgDir, alertsProfile), alertsProfile); err != nil {
+	alertsProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, alertsProfile))
+	if err = util.CreateFile(metricsProfile, alertsProfileContent); err != nil {
 		return err
 	}
 	return nil

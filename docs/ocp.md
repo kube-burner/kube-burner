@@ -17,6 +17,9 @@ Available Commands:
   node-density       Runs node-density workload
   node-density-cni   Runs node-density-cni workload
   node-density-heavy Runs node-density-heavy workload
+  networkpolicy-multitenant Runs networkpolicy-multitenant workload
+  networkpolicy-matchlabels Runs networkpolicy-matchlabels workload
+  networkpolicy-matchexpressions Runs networkpolicy-matchexpressions workload
 
 Flags:
       --alerting                  Enable alerting (default true)
@@ -133,6 +136,33 @@ Note: This workload calculates the number of iterations to create from the numbe
 Creates two deployments, a postgresql database, and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a service that is used by the client to reach the database.
 
 Note: this workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable `iterationsPerNamespace`.
+
+## Network Policy workloads
+
+With the help of [networkpolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/) object we can control traffic flow at the IP address or port level in Kubernetes. A networkpolicy can come in various shapes and sizes. Allow traffic from a specific namespace, Deny traffic from a specific pod IP, Deny all traffic, etc. Hence we have come up with a few test cases which try to cover most of them. They are as follows.
+
+### networkpolicy-multitenant
+
+- 500 namespaces
+- 20 pods in each namespace. Each pod acts as a server and a client
+- Default deny networkpolicy is applied first that blocks traffic to any test namespace
+- 3 network policies in each namespace that allows traffic from the same namespace and two other namespaces using namespace selectors
+
+### networkpolicy-matchlabels
+
+- 5 namespaces
+- 100 pods in each namespace. Each pod acts as a server and a client
+- Each pod with 2 labels and each label shared is by 5 pods
+- Default deny networkpolicy is applied first
+- Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods with some other randomly selected label. This translates to 40 networkpolicies/namespace
+
+### networkpolicy-matchexpressions
+
+- 5 namespaces
+- 25 pods in each namespace. Each pod acts as a server and a client
+- Each pod with 2 labels and each label shared is by 5 pods
+- Default deny networkpolicy is applied first
+- Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods which *don't* have some other randomly-selected label. This translates to 10 networkpolicies/namespace
 
 ## Reporting mode
 
