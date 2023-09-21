@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../media/logo/kube-burner-logo-mini.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.3.2">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.0">
     
     
       
@@ -24,10 +24,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.30068a00.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.9f615399.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.85d0ee34.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.649f08f9.min.css">
       
       
 
@@ -607,6 +607,40 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#network-policy-workloads" class="md-nav__link">
+    Network Policy workloads
+  </a>
+  
+    <nav class="md-nav" aria-label="Network Policy workloads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#networkpolicy-multitenant" class="md-nav__link">
+    networkpolicy-multitenant
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#networkpolicy-matchlabels" class="md-nav__link">
+    networkpolicy-matchlabels
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#networkpolicy-matchexpressions" class="md-nav__link">
+    networkpolicy-matchexpressions
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reporting-mode" class="md-nav__link">
     Reporting mode
   </a>
@@ -862,6 +896,9 @@ This wrapper is hosted under the <code>kube-burner ocp</code> subcommand that cu
 <span class="go">  node-density       Runs node-density workload</span>
 <span class="go">  node-density-cni   Runs node-density-cni workload</span>
 <span class="go">  node-density-heavy Runs node-density-heavy workload</span>
+<span class="go">  networkpolicy-multitenant Runs networkpolicy-multitenant workload</span>
+<span class="go">  networkpolicy-matchlabels Runs networkpolicy-matchlabels workload</span>
+<span class="go">  networkpolicy-matchexpressions Runs networkpolicy-matchexpressions workload</span>
 
 <span class="go">Flags:</span>
 <span class="go">      --alerting                  Enable alerting (default true)</span>
@@ -956,6 +993,31 @@ This wrapper is hosted under the <code>kube-burner ocp</code> subcommand that cu
 <h3 id="node-density-heavy">node-density-heavy<a class="headerlink" href="#node-density-heavy" title="Permanent link">&para;</a></h3>
 <p>Creates two deployments, a postgresql database, and a simple client that performs periodic insert queries (configured through liveness and readiness probes) on the previous database and a service that is used by the client to reach the database.</p>
 <p>Note: this workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable <code>iterationsPerNamespace</code>.</p>
+<h2 id="network-policy-workloads">Network Policy workloads<a class="headerlink" href="#network-policy-workloads" title="Permanent link">&para;</a></h2>
+<p>With the help of <a href="https://kubernetes.io/docs/concepts/services-networking/network-policies/">networkpolicy</a> object we can control traffic flow at the IP address or port level in Kubernetes. A networkpolicy can come in various shapes and sizes. Allow traffic from a specific namespace, Deny traffic from a specific pod IP, Deny all traffic, etc. Hence we have come up with a few test cases which try to cover most of them. They are as follows.</p>
+<h3 id="networkpolicy-multitenant">networkpolicy-multitenant<a class="headerlink" href="#networkpolicy-multitenant" title="Permanent link">&para;</a></h3>
+<ul>
+<li>500 namespaces</li>
+<li>20 pods in each namespace. Each pod acts as a server and a client</li>
+<li>Default deny networkpolicy is applied first that blocks traffic to any test namespace</li>
+<li>3 network policies in each namespace that allows traffic from the same namespace and two other namespaces using namespace selectors</li>
+</ul>
+<h3 id="networkpolicy-matchlabels">networkpolicy-matchlabels<a class="headerlink" href="#networkpolicy-matchlabels" title="Permanent link">&para;</a></h3>
+<ul>
+<li>5 namespaces</li>
+<li>100 pods in each namespace. Each pod acts as a server and a client</li>
+<li>Each pod with 2 labels and each label shared is by 5 pods</li>
+<li>Default deny networkpolicy is applied first</li>
+<li>Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods with some other randomly selected label. This translates to 40 networkpolicies/namespace</li>
+</ul>
+<h3 id="networkpolicy-matchexpressions">networkpolicy-matchexpressions<a class="headerlink" href="#networkpolicy-matchexpressions" title="Permanent link">&para;</a></h3>
+<ul>
+<li>5 namespaces</li>
+<li>25 pods in each namespace. Each pod acts as a server and a client</li>
+<li>Each pod with 2 labels and each label shared is by 5 pods</li>
+<li>Default deny networkpolicy is applied first</li>
+<li>Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods which <em>don't</em> have some other randomly-selected label. This translates to 10 networkpolicies/namespace</li>
+</ul>
 <h2 id="reporting-mode">Reporting mode<a class="headerlink" href="#reporting-mode" title="Permanent link">&para;</a></h2>
 <p>This mode can be enabled with the flag <code>--reporting</code>. By enabling this mode kube-burner will create a metrics-profile and will index the <a href="/kube-burner/metrics/observability/metrics/#aggregating-timeseries-into-a-single-document">aggregated values of the defined timeseries</a>, and will index only the pod latency quantiles documents (<code>podLatencyQuantilesMeasurement</code>) rather than the full pod timeseries.</p>
 <p>This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in <a href="https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml">metrics-report.yml</a>)</p>
@@ -1097,10 +1159,10 @@ This wrapper is hosted under the <code>kube-burner ocp</code> subcommand that cu
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy"], "search": "../assets/javascripts/workers/search.dfff1995.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy"], "search": "../assets/javascripts/workers/search.a264c092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"limit": 3, "provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.dff1b7c8.min.js"></script>
+      <script src="../assets/javascripts/bundle.4e0fa4ba.min.js"></script>
       
     
   </body>
