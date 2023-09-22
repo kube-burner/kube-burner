@@ -26,5 +26,21 @@ jobs:
       - name: Deploy docs
         run: mike deploy --push -m "Update docs to version ${{ github.ref_name  }}" --update-aliases ${{ github.ref_name }} latest
 
+      - name: Delete docs for older tags
+        run: |
+          echo "Keeping documentation for latest tags"
+          all_tags=$(git tag --sort=-v:refname)
+          tags_to_keep=$(echo "$all_tags" | head -n 3)
+          for tag in $all_tags; do
+            if [[ $tags_to_keep != *"$tag"* ]]; then
+              if mike list | grep -q "$tag"; then
+                echo "Deleting documentation for tag: $tag"
+                mike delete "$tag"
+              else
+                echo "Documentation for tag $tag not found. Skipping deletion."
+              fi
+            fi
+          done
+
       - name: Set latest as default doc branch
         run: mike set-default --push latest
