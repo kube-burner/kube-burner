@@ -26,6 +26,7 @@ plugins:
 extra:
   version:
     provider: mike
+    limit: 3
 extra_css:
   - css/extra.css
 theme:
