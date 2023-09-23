@@ -197,7 +197,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		if globalConfig.GC {
 			go CleanupNamespaces(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
 		}
-		scrapeErrs := scrapeAndIndex(prometheusClients, alertMs, prometheusJobList, globalConfig, indexer, jobList[0].Start, jobList[len(jobList)-1].End)
+		scrapeErrs := scrapeAndIndex(prometheusClients, alertMs, prometheusJobList, globalConfig.IndexerConfig, indexer, jobList[0].Start, jobList[len(jobList)-1].End)
 		if len(scrapeErrs) > 0 {
 			errs = append(errs, scrapeErrs...)
 			innerRC = 1
@@ -228,24 +228,25 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	}
 	if globalConfig.GCMetrics {
 		if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer {
+			prevMetricsDir := globalConfig.IndexerConfig.MetricsDirectory
 			globalConfig.IndexerConfig.MetricsDirectory += "-cleanup"
 			log.Infof("📁 Creating cleanup indexer: %s", indexers.LocalIndexer)
 			indexer, err = indexers.NewIndexer(globalConfig.IndexerConfig)
 			if err != nil {
 				log.Fatalf("%v cleanup indexer: %v", indexers.LocalIndexer, err.Error())
 			}
+			globalConfig.IndexerConfig.MetricsDirectory = prevMetricsDir
 		}
 		log.Info("Attempting to collect metrics during garbage collection phase")
 		for i := range prometheusJobList {
 			prometheusJobList[i].Start = cleanupStart
 			prometheusJobList[i].End = cleanupEnd
 		}
-		scrapeErrs := scrapeAndIndex(prometheusClients, alertMs, prometheusJobList, globalConfig, indexer, cleanupStart, cleanupEnd)
+		scrapeErrs := scrapeAndIndex(prometheusClients, alertMs, prometheusJobList, globalConfig.IndexerConfig, indexer, cleanupStart, cleanupEnd)
 		if len(scrapeErrs) > 0 {
 			errs = append(errs, scrapeErrs...)
 		}
 	}
-
 	log.Infof("Finished execution with UUID: %s", uuid)
 	return rc, utilerrors.NewAggregate(errs)
 }
@@ -307,7 +308,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 	}
 }
 
-func scrapeAndIndex(prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, prometheusJobList []prometheus.Job, globalConfig config.GlobalConfig, indexer *indexers.Indexer, startTime, endTime time.Time) []error {
+func scrapeAndIndex(prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, prometheusJobList []prometheus.Job, indexerConfig indexers.IndexerConfig, indexer *indexers.Indexer, startTime, endTime time.Time) []error {
 	errs := []error{}
 	for idx, prometheusClient := range prometheusClients {
 		// If alertManager is configured
@@ -318,10 +319,10 @@ func scrapeAndIndex(prometheusClients []*prometheus.Prometheus, alertMs []*alert
 		}
 		prometheusClient.JobList = prometheusJobList
 		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-		if globalConfig.IndexerConfig.Type != "" {
+		if indexerConfig.Type != "" {
 			metrics.ScrapeMetrics(prometheusClient, indexer)
-			if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
-				metrics.CreateTarball(globalConfig.IndexerConfig)
+			if indexerConfig.Type == indexers.LocalIndexer && indexerConfig.CreateTarball {
+				metrics.CreateTarball(indexerConfig)
 			}
 		}
 	}
