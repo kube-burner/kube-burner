@@ -287,7 +287,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.ChurnPercent*ex.JobIterations/100), 1))
 	now := time.Now().UTC()
-	rand.Seed(now.UnixNano())
+	rand.NewSource(now.UnixNano())
 	// Create timer for the churn duration
 	timer := time.After(ex.ChurnDuration)
 	// Patch to label namespaces for deletion

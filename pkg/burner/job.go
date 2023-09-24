@@ -255,7 +255,7 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 		case config.CreationJob:
 			ex = setupCreateJob(job)
 		case config.DeletionJob:
-			ex = setupDeleteJob(&job)
+			ex = setupDeleteJob(job)
 		case config.PatchJob:
 			ex = setupPatchJob(job)
 		default:
