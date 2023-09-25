@@ -15,14 +15,10 @@
 package workloads
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
-	"path"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -36,17 +32,6 @@ func NewNetworkPolicy(wh *WorkloadHelper, variant string) *cobra.Command {
 		Short: fmt.Sprintf("Runs %v workload", variant),
 		PreRun: func(cmd *cobra.Command, args []string) {
 			wh.Metadata.Benchmark = cmd.Name()
-			crrfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, "clusterrole.yml"))
-			crr := exec.Command("oc", "apply", "-f", "-")
-			crr.Stdin = bytes.NewReader(crrfileContent)
-			crrbfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, "clusterrolebinding.yml"))
-			crrb := exec.Command("oc", "apply", "-f", "-")
-			crrb.Stdin = bytes.NewReader(crrbfileContent)
-			_, errCrr := crr.CombinedOutput()
-			_, errCrrb := crrb.CombinedOutput()
-			if errCrr != nil || errCrrb != nil {
-				log.Fatal("Failed to apply RBAC policies")
-			}
 			os.Setenv("JOB_ITERATIONS", fmt.Sprint(iterations))
 			os.Setenv("CHURN", fmt.Sprint(churn))
 			os.Setenv("CHURN_DURATION", fmt.Sprintf("%v", churnDuration))

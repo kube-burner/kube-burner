@@ -276,11 +276,11 @@ func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error
 		return err
 	}
 	reportProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, reportProfile))
-	if err = util.CreateFile(metricsProfile, reportProfileContent); err != nil {
+	if err = util.CreateFile(reportProfile, reportProfileContent); err != nil {
 		return err
 	}
 	alertsProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, alertsProfile))
-	if err = util.CreateFile(metricsProfile, alertsProfileContent); err != nil {
+	if err = util.CreateFile(alertsProfile, alertsProfileContent); err != nil {
 		return err
 	}
 	return nil
