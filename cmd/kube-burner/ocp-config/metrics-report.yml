@@ -107,6 +107,20 @@
   metricName: max-memory-etcd
   instant: true
 
+ # multus
+
+- query: avg(avg_over_time(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-multus", pod=~"(multus).+", container!="POD"}[2m])[{{.elapsed}}:])) by (container)
+  metricName: cpu-multus
+  instant: true
+
+- query: avg(avg_over_time(container_memory_rss{name!="", namespace="openshift-multus", pod=~"(multus).+", container!="POD"}[{{.elapsed}}:])) by (container)
+  metricName: memory-multus
+  instant: true
+
+- query: max(avg_over_time(container_memory_rss{name!="", namespace="openshift-multus", pod=~"(multus).+", container!="POD"}[{{.elapsed}}:])) by (container)
+  metricName: max-memory-multus
+  instant: true
+
 # OVNKubernetes - standard & IC
 
 - query: avg(avg_over_time(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-ovn-kubernetes", pod=~"(ovnkube-master|ovnkube-control-plane).+", container!="POD"}[2m])[{{.elapsed}}:])) by (container)
