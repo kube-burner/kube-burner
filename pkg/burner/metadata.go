@@ -25,41 +25,34 @@ import (
 )
 
 type jobSummary struct {
-	Timestamp           time.Time              `json:"timestamp"`
-	EndTimestamp        time.Time              `json:"endTimestamp"`
-	UUID                string                 `json:"uuid"`
-	MetricName          string                 `json:"metricName"`
-	ElapsedTime         float64                `json:"elapsedTime"`
-	CleanupTimestamp    time.Time              `json:"cleanupTimestamp"`
-	CleanupEndTimestamp time.Time              `json:"cleanupEndTimestamp"`
-	JobConfig           config.Job             `json:"jobConfig"`
-	Metadata            map[string]interface{} `json:"metadata"`
-	Version             string                 `json:"version"`
+	Timestamp   time.Time              `json:"timestamp"`
+	UUID        string                 `json:"uuid"`
+	MetricName  string                 `json:"metricName"`
+	ElapsedTime float64                `json:"elapsedTime"`
+	JobConfig   config.Job             `json:"jobConfig"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	Version     string                 `json:"version"`
 }
 
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexJobSummaryInfo(indexer *indexers.Indexer, uuid string, job Executor, cleanupStart, cleanupEnd time.Time, metadata map[string]interface{}) {
-	elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
+func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
-			UUID:                uuid,
-			ElapsedTime:         elapsedTime,
-			JobConfig:           job.Job,
-			MetricName:          jobSummaryMetric,
-			Timestamp:           job.Start,
-			EndTimestamp:        job.End,
-			CleanupTimestamp:    cleanupStart,
-			CleanupEndTimestamp: cleanupEnd,
-			Metadata:            metadata,
-			Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
+			UUID:        uuid,
+			ElapsedTime: elapsedTime,
+			JobConfig:   jobConfig,
+			MetricName:  jobSummaryMetric,
+			Timestamp:   timestamp,
+			Metadata:    metadata,
+			Version:     fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
 		},
 	}
 	log.Infof("Indexing metric %s", jobSummaryMetric)
 	log.Debugf("Indexing [%d] documents", len(metadataInfo))
 	indexingOpts := indexers.IndexingOpts{
-		MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, job.Job.Name),
+		MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, jobConfig.Name),
 	}
 	resp, err := (*indexer).Index(metadataInfo, indexingOpts)
 	if err != nil {
