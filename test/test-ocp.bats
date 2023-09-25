@@ -78,3 +78,8 @@ teardown_file() {
   run kube-burner ocp cluster-density --iterations=1 --churn-duration=5m --timeout=1s
   [ "$status" -eq 2 ]
 }
+
+@test "networkpolicy-multitenant" {
+  run kube-burner ocp networkpolicy-multitenant --iterations 5  ${COMMON_FLAGS}
+  [ "$status" -eq 0 ]
+}
