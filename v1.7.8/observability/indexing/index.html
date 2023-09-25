@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../../media/logo/kube-burner-logo-mini.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.0">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.2">
     
     
       
@@ -24,10 +24,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.9f615399.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.d451bc0e.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.649f08f9.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.a5377069.min.css">
       
       
 
@@ -359,9 +359,10 @@
       
     
     
+    
+    
     <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
-        
         
         
         
@@ -380,7 +381,8 @@
 
             </a>
             
-              <label class="md-nav__link " for="__nav_5">
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -611,9 +613,10 @@
       
     
     
+    
+    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         
@@ -632,7 +635,8 @@
 
             </a>
             
-              <label class="md-nav__link " for="__nav_7">
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -681,14 +685,16 @@
       
     
     
+    
+    
     <li class="md-nav__item md-nav__item--nested">
       
         
         
         
-        
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_3" >
         
+          
           <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
             
   
@@ -898,13 +904,16 @@
 </tbody>
 </table>
 <h2 id="job-summary">Job Summary<a class="headerlink" href="#job-summary" title="Permanent link">&para;</a></h2>
-<p>When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with.</p>
+<p>When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. Also the timestamps will be useful to filter out the metrics both during execution phase (i.e <code>timestmap</code> and <code>endTimestamp</code>) as well as the cleanup phase (i.e <code>cleanupTimestamp</code> and <code>cleanupEndTimestamp</code>).</p>
 <p>This document looks like:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2020-11-13T13:55:31.654185032+01:00&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;bdb7584a-d2cd-4185-8bfa-1387cc31f99e&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2023-08-29T00:17:27.942960538Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;endTimestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2023-08-29T00:18:15.817272025Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16&quot;</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;jobSummary&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;elapsedTime&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">8.768932955</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;elapsedTime&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">48</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cleanupTimestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2023-08-29T00:18:18.015107794Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cleanupEndTimestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2023-08-29T00:18:49.014541929Z&quot;</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;jobConfig&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="nt">&quot;jobIterations&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;jobIterationDelay&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
@@ -987,7 +996,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../metrics/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Collecting metrics" rel="prev">
+          <a href="../metrics/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Collecting metrics">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
@@ -1004,7 +1013,7 @@
         
         
           
-          <a href="../alerting/" class="md-footer__link md-footer__link--next" aria-label="Next: Alerting" rel="next">
+          <a href="../alerting/" class="md-footer__link md-footer__link--next" aria-label="Next: Alerting">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
@@ -1046,7 +1055,7 @@
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a264c092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"limit": 3, "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.4e0fa4ba.min.js"></script>
+      <script src="../../assets/javascripts/bundle.726fbb30.min.js"></script>
       
     
   </body>
