@@ -50,6 +50,7 @@ func openShiftCmd() *cobra.Command {
 	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
 	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
 	gc := ocpCmd.PersistentFlags().Bool("gc", true, "Garbage collect created namespaces")
+	gcMetrics := ocpCmd.PersistentFlags().Bool("gc-metrics", false, "Collect metrics during garbage collection")
 	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
 	extract := ocpCmd.PersistentFlags().Bool("extract", false, "Extract workload in the current directory")
 	reporting := ocpCmd.PersistentFlags().Bool("reporting", false, "Enable benchmark report indexing")
@@ -70,6 +71,7 @@ func openShiftCmd() *cobra.Command {
 			"QPS":           fmt.Sprintf("%d", *qps),
 			"BURST":         fmt.Sprintf("%d", *burst),
 			"GC":            fmt.Sprintf("%v", *gc),
+			"GC_METRICS":    fmt.Sprintf("%v", *gcMetrics),
 			"INDEXING_TYPE": string(indexingType),
 		}
 		wh = workloads.NewWorkloadHelper(envVars, *alerting, *reporting, ocpConfig, *timeout, *metricsEndpoint)

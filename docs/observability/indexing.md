@@ -44,16 +44,19 @@ The `local` indexer can be configured by the parameters below:
 
 ## Job Summary
 
-When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with.
+When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. Also the timestamps will be useful to filter out the metrics both during execution phase (i.e `timestmap` and `endTimestamp`) as well as the cleanup phase (i.e `cleanupTimestamp` and `cleanupEndTimestamp`).
 
 This document looks like:
 
 ```json
 {
-  "timestamp": "2020-11-13T13:55:31.654185032+01:00",
-  "uuid": "bdb7584a-d2cd-4185-8bfa-1387cc31f99e",
+  "timestamp": "2023-08-29T00:17:27.942960538Z",
+  "endTimestamp": "2023-08-29T00:18:15.817272025Z",
+  "uuid": "83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16",
   "metricName": "jobSummary",
-  "elapsedTime": 8.768932955,
+  "elapsedTime": 48,
+  "cleanupTimestamp": "2023-08-29T00:18:18.015107794Z",
+  "cleanupEndTimestamp": "2023-08-29T00:18:49.014541929Z",
   "jobConfig": {
     "jobIterations": 10,
     "jobIterationDelay": 0,

@@ -26,6 +26,7 @@ In this section is described global job configuration, it holds the following pa
 | `metricsProfile`   | Path to the metrics profile configuration file                                                           | String         | ""         |
 | `metricsEndpoint`  | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String     | "" |
 | `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `GCMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
 | `GCTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 | `waitWhenFinished` | Wait for all pods to be running when all jobs are completed                                             | Boolean        | false      |
 
