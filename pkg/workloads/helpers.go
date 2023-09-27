@@ -196,14 +196,6 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		configSpec.EmbedFS = wh.ocpConfig
 		configSpec.EmbedFSDir = path.Join(ocpCfgDir, workload)
 	}
-	indexerConfig := configSpec.GlobalConfig.IndexerConfig
-	if indexerConfig.Type != "" {
-		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
-		indexer, err = indexers.NewIndexer(indexerConfig)
-		if err != nil {
-			log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
-		}
-	}
 	if wh.metricsEndpoint != "" {
 		embedConfig = false
 		metrics.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
@@ -245,11 +237,15 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		alertMs = append(alertMs, alertM)
 		alertM = nil
 	}
+	configSpec.GlobalConfig.GCMetrics = (wh.envVars["GC_METRICS"] == "true")
+	indexerConfig := configSpec.GlobalConfig.IndexerConfig
+	refreshIndexer(indexerConfig)
 	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)
 	}
+	refreshIndexer(indexerConfig)
 	wh.Metadata.Passed = rc == 0
 	if indexerConfig.Type != "" {
 		wh.indexMetadata()
@@ -280,12 +276,24 @@ func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error
 		return err
 	}
 	reportProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, reportProfile))
-	if err = util.CreateFile(metricsProfile, reportProfileContent); err != nil {
+	if err = util.CreateFile(reportProfile, reportProfileContent); err != nil {
 		return err
 	}
 	alertsProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, alertsProfile))
-	if err = util.CreateFile(metricsProfile, alertsProfileContent); err != nil {
+	if err = util.CreateFile(alertsProfile, alertsProfileContent); err != nil {
 		return err
 	}
 	return nil
+}
+
+// refreshIndexer updates indexer as we have a reference object propagating in code.
+func refreshIndexer(indexerConfig indexers.IndexerConfig) {
+	var err error
+	if indexerConfig.Type != "" {
+		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
+		indexer, err = indexers.NewIndexer(indexerConfig)
+		if err != nil {
+			log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
+		}
+	}
 }

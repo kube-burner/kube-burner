@@ -9,6 +9,15 @@ global:
   measurements:
     - name: podLatency
 jobs:
+  - name: create-bindings
+    namespace: networkpolicy-multitenant
+    jobIterations: 1
+    objects:
+      - objectTemplate: ../clusterrole.yml
+        replicas: 1
+      - objectTemplate: ../clusterrolebinding.yml
+        replicas: 1
+
   - name: networkpolicy-multitenant
     namespace: networkpolicy-multitenant
     jobIterations: {{.JOB_ITERATIONS}}

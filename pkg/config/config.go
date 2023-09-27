@@ -43,6 +43,7 @@ var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		RUNID:          uid.NewV4().String(),
 		GC:             false,
+		GCMetrics:      false,
 		GCTimeout:      1 * time.Hour,
 		RequestTimeout: 15 * time.Second,
 		Measurements:   []mtypes.Measurement{},

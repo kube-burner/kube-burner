@@ -132,7 +132,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, vector := range data {
-		m := p.createMetric(query, metricName, vector.Metric, vector.Value, vector.Timestamp.Time())
+		m := p.createMetric(query, metricName, vector.Metric, vector.Value, vector.Timestamp.Time().UTC())
 		*metrics = append(*metrics, m)
 	}
 	return nil
@@ -146,7 +146,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 	}
 	for _, matrix := range data {
 		for _, val := range matrix.Values {
-			m := p.createMetric(query, metricName, matrix.Metric, val.Value, val.Timestamp.Time())
+			m := p.createMetric(query, metricName, matrix.Metric, val.Value, val.Timestamp.Time().UTC())
 			*metrics = append(*metrics, m)
 		}
 	}

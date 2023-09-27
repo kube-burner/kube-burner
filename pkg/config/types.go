@@ -75,6 +75,8 @@ type GlobalConfig struct {
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
 	// GCTimeout garbage collection timeout
 	GCTimeout time.Duration `yaml:"gcTimeout"`
+	// Boolean flag to collect metrics during garbage collection
+	GCMetrics bool `yaml:"gcMetrics"`
 }
 
 // Object defines an object that kube-burner will create
