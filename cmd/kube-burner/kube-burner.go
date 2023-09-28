@@ -391,7 +391,7 @@ func main() {
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		log.SetReportCaller(true)
 		formatter := &log.TextFormatter{
-			TimestampFormat: time.RFC3339,
+			TimestampFormat: "2006-01-02 15:04:05",
 			FullTimestamp:   true,
 			DisableColors:   true,
 			CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
