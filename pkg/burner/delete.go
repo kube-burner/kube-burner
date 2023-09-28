@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func setupDeleteJob(jobConfig *config.Job) Executor {
+func setupDeleteJob(jobConfig config.Job) Executor {
 	var ex Executor
 	log.Debugf("Preparing delete job: %s", jobConfig.Name)
 	mapper := newRESTMapper()
@@ -53,7 +53,6 @@ func setupDeleteJob(jobConfig *config.Job) Executor {
 		log.Debugf("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
 		ex.objects = append(ex.objects, obj)
 	}
-	jobConfig.PreLoadImages = false
 	return ex
 }
 
@@ -86,18 +85,19 @@ func (ex *Executor) RunDeleteJob() {
 				var err error
 				if obj.Namespaced {
 					log.Debugf("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
-				} else {
-					log.Debugf("Removing %s/%s", item.GetKind(), item.GetName())
-				}
-				if obj.Namespaced {
 					err = DynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 				} else {
+					log.Debugf("Removing %s/%s", item.GetKind(), item.GetName())
 					err = DynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 				}
 				if err != nil {
-					log.Errorf("Error found removing %s %s: %s", item.GetKind(), item.GetName(), err)
+					log.Errorf("Error found removing %s/%s: %s", item.GetKind(), item.GetName(), err)
 				}
 			}(item)
+			if ex.JobIterationDelay > 0 {
+				log.Infof("Sleeping for %v", ex.JobIterationDelay)
+				time.Sleep(ex.JobIterationDelay)
+			}
 		}
 		if ex.Job.WaitForDeletion {
 			wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
