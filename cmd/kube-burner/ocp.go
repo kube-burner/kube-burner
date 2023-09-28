@@ -53,7 +53,7 @@ func openShiftCmd() *cobra.Command {
 	gcMetrics := ocpCmd.PersistentFlags().Bool("gc-metrics", false, "Collect metrics during garbage collection")
 	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
 	extract := ocpCmd.PersistentFlags().Bool("extract", false, "Extract workload in the current directory")
-	reporting := ocpCmd.PersistentFlags().Bool("reporting", false, "Enable benchmark report indexing")
+	profileType := ocpCmd.PersistentFlags().String("profile-type", "regular", "Metrics profile to use, supported options are: regular, reporting or both")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.MarkFlagsMutuallyExclusive("es-server", "local-indexing")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
@@ -74,7 +74,7 @@ func openShiftCmd() *cobra.Command {
 			"GC_METRICS":    fmt.Sprintf("%v", *gcMetrics),
 			"INDEXING_TYPE": string(indexingType),
 		}
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, *reporting, ocpConfig, *timeout, *metricsEndpoint)
+		wh = workloads.NewWorkloadHelper(envVars, *alerting, *profileType, ocpConfig, *timeout, *metricsEndpoint)
 		wh.Metadata.UUID = *uuid
 		if *extract {
 			if err := wh.ExtractWorkload(cmd.Name(), workloads.MetricsProfileMap[cmd.Name()]); err != nil {

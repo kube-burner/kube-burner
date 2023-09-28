@@ -32,7 +32,7 @@ Flags:
       --local-indexing            Enable local indexing
       --metrics-endpoint string   YAML file with a list of metric endpoints
       --qps int                   QPS (default 20)
-      --reporting                 Enable benchmark report indexing
+      --profile-type string       Metrics profile to use, supported options are: regular, reporting or both
       --timeout duration          Benchmark timeout (default 4h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
       --uuid string               Benchmark UUID (default "d18989c4-4f8a-4a14-b711-9afae69a9140")
@@ -164,11 +164,9 @@ With the help of [networkpolicy](https://kubernetes.io/docs/concepts/services-ne
 - Default deny networkpolicy is applied first
 - Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods which *don't* have some other randomly-selected label. This translates to 10 networkpolicies/namespace
 
-## Reporting mode
+## Metrics-profile type
 
-This mode can be enabled with the flag `--reporting`. By enabling this mode kube-burner will create a metrics-profile and will index the [aggregated values of the defined timeseries](/kube-burner/metrics/observability/metrics/#aggregating-timeseries-into-a-single-document), and will index only the pod latency quantiles documents (`podLatencyQuantilesMeasurement`) rather than the full pod timeseries.
-
-This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml))
+By specifying `--profile-type`, kube-burner can use two different metrics-profile when scraping metrics from prometheus. By default uses the `regular` one which is bound to the workload in question, but it's possible to use [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml), specified by `reporting`, which is a profile very useful to reduce the number of documents sent to the configured indexer. Thanks to the combination of aggregations and instant queries for prometheus metrics, and 4 summaries for pod latency measurements, only a few documents will be indexed per benchmark. It's also possible to use `both` profiles in the same run.
 
 ## Customizing workloads
 
