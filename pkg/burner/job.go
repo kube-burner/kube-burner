@@ -190,9 +190,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
-			cleanupStart := time.Now().UTC()
 			// If gcMetrics is enabled, garbage collection must be blocker
 			if globalConfig.GCMetrics {
+				cleanupStart := time.Now().UTC()
 				CleanupNamespaces(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
 				// We add an extra dummy job to prometheusJobList to index metrics from this stage
 				prometheusJobList = append(prometheusJobList, prometheus.Job{
@@ -241,7 +241,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		errs = append(errs, err)
 		rc = rcTimeout
 	}
-	if globalConfig.GC {
+	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation run in background, so we have to ensure there's no garbage left
+	if globalConfig.GC && !globalConfig.GCMetrics {
 		// Use timeout/4 to garbage collect namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 		defer cancel()
