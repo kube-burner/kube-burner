@@ -193,7 +193,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			// If gcMetrics is enabled, garbage collection must be blocker
 			if globalConfig.GCMetrics {
 				cleanupStart := time.Now().UTC()
-				CleanupNamespaces(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
+				ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+				defer cancel()
+				CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
+				CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 				// We add an extra dummy job to prometheusJobList to index metrics from this stage
 				prometheusJobList = append(prometheusJobList, prometheus.Job{
 					Start: cleanupStart,
@@ -203,6 +206,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					},
 				})
 			} else {
+				go CleanupNonNamespacedResourcesUsingGVR(context.TODO(), jobList, true)
 				go CleanupNamespaces(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
 			}
 		}
