@@ -32,7 +32,7 @@ Flags:
       --local-indexing            Enable local indexing
       --metrics-endpoint string   YAML file with a list of metric endpoints
       --qps int                   QPS (default 20)
-      --profile-type string       Metrics profile to use, supported options are: regular, reporting or both
+      --profile-type string       Metrics profile to use, supported options are: regular, reporting or both (default "both")
       --timeout duration          Benchmark timeout (default 4h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
       --uuid string               Benchmark UUID (default "d18989c4-4f8a-4a14-b711-9afae69a9140")
@@ -166,7 +166,9 @@ With the help of [networkpolicy](https://kubernetes.io/docs/concepts/services-ne
 
 ## Metrics-profile type
 
-By specifying `--profile-type`, kube-burner can use two different metrics-profile when scraping metrics from prometheus. By default uses the `regular` one which is bound to the workload in question, but it's possible to use [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml), specified by `reporting`, which is a profile very useful to reduce the number of documents sent to the configured indexer. Thanks to the combination of aggregations and instant queries for prometheus metrics, and 4 summaries for pod latency measurements, only a few documents will be indexed per benchmark. It's also possible to use `both` profiles in the same run.
+By specifying `--profile-type`, kube-burner can use two different metrics profiles when scraping metrics from prometheus. By default is configured with `both`, meaning that it will use the regular metrics profiles bound to the workload in question and the reporting metrics profile.
+
+While when using the regular profiles ([metrics-aggregated](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-aggregated.yml) or [metrics](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics.yml)), kube-burner scrapes and indexes metrics timeseries, the reporting one is a very useful profile to reduce the number of documents sent to the configured indexer. Thanks to the combination of aggregations and instant queries for prometheus metrics, and 4 summaries for pod latency measurements, only a few documents will be indexed per benchmark. This flag makes possible to specify one or both of these profiles indistinctly.
 
 ## Customizing workloads
 

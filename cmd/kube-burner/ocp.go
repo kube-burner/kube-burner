@@ -53,7 +53,7 @@ func openShiftCmd() *cobra.Command {
 	gcMetrics := ocpCmd.PersistentFlags().Bool("gc-metrics", false, "Collect metrics during garbage collection")
 	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
 	extract := ocpCmd.PersistentFlags().Bool("extract", false, "Extract workload in the current directory")
-	profileType := ocpCmd.PersistentFlags().String("profile-type", "regular", "Metrics profile to use, supported options are: regular, reporting or both")
+	profileType := ocpCmd.PersistentFlags().String("profile-type", "both", "Metrics profile to use, supported options are: regular, reporting or both")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.MarkFlagsMutuallyExclusive("es-server", "local-indexing")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {

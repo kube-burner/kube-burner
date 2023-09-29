@@ -61,7 +61,7 @@ teardown_file() {
 }
 
 @test "cluster-density-v2 with profile-type=both" {
-  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=false --profile-type=both ${COMMON_FLAGS} 
+  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=false --profile-type=both ${COMMON_FLAGS}
   [ "$status" -eq 0 ]
   run check_metric_value cpu-kubelet clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement etcdVersion
   [ "$status" -eq 0 ]
