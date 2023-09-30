@@ -43,6 +43,7 @@ var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		RUNID:          uid.NewV4().String(),
 		GC:             false,
+		GCMetrics:      false,
 		GCTimeout:      1 * time.Hour,
 		RequestTimeout: 15 * time.Second,
 		Measurements:   []mtypes.Measurement{},
@@ -104,18 +105,14 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Parse parses a configuration file
-func Parse(uuid, c string) (Spec, error) {
-	f, err := util.ReadConfig(c)
-	if err != nil {
-		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
-	}
+func Parse(uuid string, f io.Reader) (Spec, error) {
 	cfg, err := io.ReadAll(f)
 	if err != nil {
-		return configSpec, fmt.Errorf("Error reading configuration file %s: %s", c, err)
+		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
 	}
 	renderedCfg, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
 	if err != nil {
-		return configSpec, fmt.Errorf("Error rendering configuration template: %s", err)
+		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}
 	if err != nil {
 		return configSpec, err
@@ -124,10 +121,10 @@ func Parse(uuid, c string) (Spec, error) {
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&configSpec); err != nil {
-		return configSpec, fmt.Errorf("Error decoding configuration file %s: %s", c, err)
+		return configSpec, fmt.Errorf("error decoding configuration file: %s", err)
 	}
 	if len(configSpec.Jobs) <= 0 {
-		return configSpec, fmt.Errorf("No jobs found in the configuration file")
+		return configSpec, fmt.Errorf("no jobs found in the configuration file")
 	}
 	if err := jobIsDuped(); err != nil {
 		return configSpec, err
@@ -135,10 +132,10 @@ func Parse(uuid, c string) (Spec, error) {
 	if err := validateDNS1123(); err != nil {
 		return configSpec, err
 	}
-	for _, job := range configSpec.Jobs {
+	for i, job := range configSpec.Jobs {
 		if len(job.Namespace) > 62 {
 			log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
-			job.Namespace = job.Namespace[:57]
+			configSpec.Jobs[i].Namespace = job.Namespace[:57]
 		}
 		if !job.NamespacedIterations && job.Churn {
 			log.Fatal("Cannot have Churn enabled without Namespaced Iterations also enabled")
@@ -146,12 +143,14 @@ func Parse(uuid, c string) (Spec, error) {
 		if job.JobIterations < 1 && job.JobType == CreationJob {
 			log.Fatalf("Job %s has < 1 iterations", job.Name)
 		}
+		if job.JobType == DeletionJob {
+			configSpec.Jobs[i].PreLoadImages = false
+		}
 	}
 	configSpec.GlobalConfig.UUID = uuid
 	if configSpec.GlobalConfig.IndexerConfig.MetricsDirectory == "collected-metrics" {
 		configSpec.GlobalConfig.IndexerConfig.MetricsDirectory += "-" + uuid
 	}
-
 	return configSpec, nil
 }
 

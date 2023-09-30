@@ -15,73 +15,84 @@
 package workloads
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // NewIndex orchestrates indexing for ocp wrapper
-func NewIndex(wh *WorkloadHelper) *cobra.Command {
+func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent *ocpmetadata.Metadata) *cobra.Command {
 	var metricsProfile, jobName string
 	var start, end int64
 	var userMetadata, metricsDirectory string
 	var prometheusStep time.Duration
-	var err error
+	var uuid string
 	cmd := &cobra.Command{
 		Use:          "index",
 		Short:        "Runs index sub-command",
 		Long:         "If no other indexer is specified, local indexer is used by default",
 		SilenceUsage: true,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			uuid, _ = cmd.Flags().GetString("uuid")
+		},
 		PostRun: func(cmd *cobra.Command, args []string) {
-			log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
+			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			ocpMetadata := map[string]interface{}{
-				"platform":        wh.Metadata.Platform,
-				"ocpVersion":      wh.Metadata.OCPVersion,
-				"ocpMajorVersion": wh.Metadata.OCPMajorVersion,
-				"k8sVersion":      wh.Metadata.K8SVersion,
-				"totalNodes":      wh.Metadata.TotalNodes,
-				"sdnType":         wh.Metadata.SDNType,
+			clusterMetadata, err := ocpMetaAgent.GetClusterMetadata()
+			if err != nil {
+				log.Fatal("Error obtaining clusterMetadata: ", err.Error())
 			}
-			if wh.envVars["ES_SERVER"] != "" && wh.envVars["ES_INDEX"] != "" {
+			ocpMetadata := make(map[string]interface{})
+			jsonData, err := json.Marshal(clusterMetadata)
+			if err != nil {
+				log.Fatal("Error getting clusterMetadata json: ", err.Error())
+			}
+			if err := json.Unmarshal(jsonData, &ocpMetadata); err != nil {
+				log.Fatal("Errar unmarshalling clusterMetadata: ", err.Error())
+			}
+			esServer, _ := cmd.Flags().GetString("es-server")
+			esIndex, _ := cmd.Flags().GetString("es-index")
+			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
-					Servers: []string{wh.envVars["ES_SERVER"]},
-					Index:   wh.envVars["ES_INDEX"],
+					Servers: []string{esServer},
+					Index:   esIndex,
 				}
 			} else {
 				if metricsDirectory == "collected-metrics" {
-					metricsDirectory = metricsDirectory + "-" + wh.Metadata.UUID
+					metricsDirectory = metricsDirectory + "-" + uuid
 				}
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:             indexers.LocalIndexer,
 					MetricsDirectory: metricsDirectory,
 				}
 			}
-			wh.prometheusURL, wh.prometheusToken, err = wh.ocpMetaAgent.GetPrometheus()
+			prometheusURL, prometheusToken, err := ocpMetaAgent.GetPrometheus()
 			if err != nil {
 				log.Fatal("Error obtaining prometheus information from cluster: ", err.Error())
 			}
 			scraperOutput := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      configSpec,
 				PrometheusStep:  prometheusStep,
-				MetricsEndpoint: wh.metricsEndpoint,
+				MetricsEndpoint: *metricsEndpoint,
 				MetricsProfile:  metricsProfile,
 				SkipTLSVerify:   true,
-				URL:             wh.prometheusURL,
-				Token:           wh.prometheusToken,
+				URL:             prometheusURL,
+				Token:           prometheusToken,
 				StartTime:       start,
 				EndTime:         end,
-				JobName:         jobName + "-" + wh.Metadata.UUID,
+				JobName:         jobName + "-" + uuid,
 				ActionIndex:     true,
 				UserMetaData:    userMetadata,
 				OcpMetaData:     ocpMetadata,
 			})
-			wh.indexMetadata(scraperOutput.Indexer)
+			IndexMetadata(scraperOutput.Indexer, *metadata)
 		},
 	}
 	cmd.Flags().StringVar(&metricsProfile, "metrics-profile", "metrics.yml", "Metrics profile file")

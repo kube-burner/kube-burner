@@ -18,6 +18,9 @@ Available Commands:
   node-density       Runs node-density workload
   node-density-cni   Runs node-density-cni workload
   node-density-heavy Runs node-density-heavy workload
+  networkpolicy-multitenant Runs networkpolicy-multitenant workload
+  networkpolicy-matchlabels Runs networkpolicy-matchlabels workload
+  networkpolicy-matchexpressions Runs networkpolicy-matchexpressions workload
 
 Flags:
       --alerting                  Enable alerting (default true)
@@ -135,6 +138,33 @@ Creates two deployments, a postgresql database, and a simple client that perform
 
 Note: this workload calculates the number of iterations to create from the number of nodes and desired pods per node.  In order to keep the test scalable and performant, chunks of 1000 iterations will by broken into separate namespaces, using the config variable `iterationsPerNamespace`.
 
+## Network Policy workloads
+
+With the help of [networkpolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/) object we can control traffic flow at the IP address or port level in Kubernetes. A networkpolicy can come in various shapes and sizes. Allow traffic from a specific namespace, Deny traffic from a specific pod IP, Deny all traffic, etc. Hence we have come up with a few test cases which try to cover most of them. They are as follows.
+
+### networkpolicy-multitenant
+
+- 500 namespaces
+- 20 pods in each namespace. Each pod acts as a server and a client
+- Default deny networkpolicy is applied first that blocks traffic to any test namespace
+- 3 network policies in each namespace that allows traffic from the same namespace and two other namespaces using namespace selectors
+
+### networkpolicy-matchlabels
+
+- 5 namespaces
+- 100 pods in each namespace. Each pod acts as a server and a client
+- Each pod with 2 labels and each label shared is by 5 pods
+- Default deny networkpolicy is applied first
+- Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods with some other randomly selected label. This translates to 40 networkpolicies/namespace
+
+### networkpolicy-matchexpressions
+
+- 5 namespaces
+- 25 pods in each namespace. Each pod acts as a server and a client
+- Each pod with 2 labels and each label shared is by 5 pods
+- Default deny networkpolicy is applied first
+- Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods which *don't* have some other randomly-selected label. This translates to 10 networkpolicies/namespace
+
 ## Index
 
 Just like the traditional kube-burner, ocp wrapper also has an indexing functionality which is exposed as `index` subcommand. 
@@ -161,7 +191,7 @@ Please refer to [indexing](observability/indexing.md) section for better underst
 
 This mode can be enabled with the flag `--reporting`. By enabling this mode kube-burner will create a metrics-profile and will index the [aggregated values of the defined timeseries](/kube-burner/metrics/observability/metrics/#aggregating-timeseries-into-a-single-document), and will index only the pod latency quantiles documents (`podLatencyQuantilesMeasurement`) rather than the full pod timeseries.
 
-This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml))
+This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml)
 
 ## Customizing workloads
 

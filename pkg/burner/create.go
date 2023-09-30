@@ -16,11 +16,13 @@ package burner
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
+	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -40,6 +42,7 @@ import (
 
 func setupCreateJob(jobConfig config.Job) Executor {
 	var err error
+	var f io.Reader
 	mapper := newRESTMapper()
 	waitClientSet, waitRestConfig, err = config.GetClientSet(jobConfig.QPS*2, jobConfig.Burst*2)
 	if err != nil {
@@ -54,7 +57,13 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		f, err := util.ReadConfig(o.ObjectTemplate)
+		e := embed.FS{}
+		if embedFS == e {
+			f, err = util.ReadConfig(o.ObjectTemplate)
+		} else {
+			objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
+			f, err = util.ReadEmbedConfig(embedFS, objectTemplate)
+		}
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
@@ -278,7 +287,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.ChurnPercent*ex.JobIterations/100), 1))
 	now := time.Now().UTC()
-	rand.Seed(now.UnixNano())
+	rand.NewSource(now.UnixNano())
 	// Create timer for the churn duration
 	timer := time.After(ex.ChurnDuration)
 	// Patch to label namespaces for deletion

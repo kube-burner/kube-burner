@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"strconv"
@@ -75,6 +76,8 @@ var waitDynamicClient dynamic.Interface
 var discoveryClient *discovery.DiscoveryClient
 var restConfig *rest.Config
 var waitRestConfig *rest.Config
+var embedFS embed.FS
+var embedFSDir string
 
 //nolint:gocyclo
 func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
@@ -82,6 +85,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var rc int
 	var prometheusJobList []prometheus.Job
 	var jobList []Executor
+	var cleanupStart, cleanupEnd time.Time
+	embedFS = configSpec.EmbedFS
+	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -186,35 +192,16 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				innerRC = 1
 			}
 		}
-		if globalConfig.IndexerConfig.Type != "" {
-			for _, job := range jobList {
-				// elapsedTime is recalculated for every job of the list
-				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
-				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.Job, job.Start, metadata)
-			}
-		}
+		cleanupStart = time.Now().UTC()
 		// We initialize cleanup as soon as the benchmark finishes
 		if globalConfig.GC {
 			go CleanupNamespaces(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
 		}
-		for idx, prometheusClient := range prometheusClients {
-			// If alertManager is configured
-			if alertMs[idx] != nil {
-				if err := alertMs[idx].Evaluate(jobList[0].Start, jobList[len(jobList)-1].End); err != nil {
-					errs = append(errs, err)
-					innerRC = 1
-				}
-			}
-			prometheusClient.JobList = prometheusJobList
-			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-			if globalConfig.IndexerConfig.Type != "" {
-				metrics.ScrapeMetrics(prometheusClient, indexer)
-				if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
-					metrics.CreateTarball(globalConfig.IndexerConfig)
-				}
-			}
+		scrapeErrs := scrapeAndIndex(prometheusClients, alertMs, prometheusJobList, globalConfig.IndexerConfig, indexer, jobList[0].Start, jobList[len(jobList)-1].End)
+		if len(scrapeErrs) > 0 {
+			errs = append(errs, scrapeErrs...)
+			innerRC = 1
 		}
-		log.Infof("Finished execution with UUID: %s", uuid)
 		res <- innerRC
 	}()
 	select {
@@ -233,6 +220,34 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
 		CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 	}
+	cleanupEnd = time.Now().UTC()
+	if globalConfig.IndexerConfig.Type != "" {
+		for _, job := range jobList {
+			indexJobSummaryInfo(indexer, uuid, job, cleanupStart, cleanupEnd, metadata)
+		}
+	}
+	if globalConfig.GCMetrics {
+		if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer {
+			prevMetricsDir := globalConfig.IndexerConfig.MetricsDirectory
+			globalConfig.IndexerConfig.MetricsDirectory += "-cleanup"
+			log.Infof("📁 Creating cleanup indexer: %s", indexers.LocalIndexer)
+			indexer, err = indexers.NewIndexer(globalConfig.IndexerConfig)
+			if err != nil {
+				log.Fatalf("%v cleanup indexer: %v", indexers.LocalIndexer, err.Error())
+			}
+			globalConfig.IndexerConfig.MetricsDirectory = prevMetricsDir
+		}
+		log.Info("Attempting to collect metrics during garbage collection phase")
+		for i := range prometheusJobList {
+			prometheusJobList[i].Start = cleanupStart
+			prometheusJobList[i].End = cleanupEnd
+		}
+		scrapeErrs := scrapeAndIndex(prometheusClients, alertMs, prometheusJobList, globalConfig.IndexerConfig, indexer, cleanupStart, cleanupEnd)
+		if len(scrapeErrs) > 0 {
+			errs = append(errs, scrapeErrs...)
+		}
+	}
+	log.Infof("Finished execution with UUID: %s", uuid)
 	return rc, utilerrors.NewAggregate(errs)
 }
 
@@ -250,7 +265,7 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 		case config.CreationJob:
 			ex = setupCreateJob(job)
 		case config.DeletionJob:
-			ex = setupDeleteJob(&job)
+			ex = setupDeleteJob(job)
 		case config.PatchJob:
 			ex = setupPatchJob(job)
 		default:
@@ -291,4 +306,25 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 		}
 		wg.Wait()
 	}
+}
+
+func scrapeAndIndex(prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, prometheusJobList []prometheus.Job, indexerConfig indexers.IndexerConfig, indexer *indexers.Indexer, startTime, endTime time.Time) []error {
+	errs := []error{}
+	for idx, prometheusClient := range prometheusClients {
+		// If alertManager is configured
+		if alertMs[idx] != nil {
+			if err := alertMs[idx].Evaluate(startTime, endTime); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		prometheusClient.JobList = prometheusJobList
+		// If prometheus is enabled query metrics from the start of the first job to the end of the last one
+		if indexerConfig.Type != "" {
+			metrics.ScrapeMetrics(prometheusClient, indexer)
+			if indexerConfig.Type == indexers.LocalIndexer && indexerConfig.CreateTarball {
+				metrics.CreateTarball(indexerConfig)
+			}
+		}
+	}
+	return errs
 }

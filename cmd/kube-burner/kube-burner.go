@@ -29,6 +29,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -85,7 +86,7 @@ func initCmd() *cobra.Command {
 	var err error
 	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
 	var username, password, uuid, token, configMap, namespace, userMetadata string
-	var skipTLSVerify bool
+	var skipTLSVerify, gcMetrics bool
 	var prometheusStep time.Duration
 	var timeout time.Duration
 	var rc int
@@ -107,10 +108,15 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			configSpec, err := config.Parse(uuid, configFile)
+			f, err := util.ReadConfig(configFile)
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
+			configSpec, err := config.Parse(uuid, f)
+			if err != nil {
+				log.Fatalf("Config error: %s", err.Error())
+			}
+			configSpec.GlobalConfig.GCMetrics = gcMetrics
 			if configSpec.GlobalConfig.IndexerConfig.Type != "" || alertProfile != "" {
 				metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 					ConfigSpec:      configSpec,
@@ -145,6 +151,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.Flags().BoolVar(&gcMetrics, "gc-metrics", false, "Collect metrics during garbage collection")
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
@@ -202,6 +209,7 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
@@ -306,10 +314,8 @@ func alertCmd() *cobra.Command {
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
-		PostRun: func(cmd *cobra.Command, args []string) {
-			log.Info("👋 Exiting kube-burner ", uuid)
-		},
 		Run: func(cmd *cobra.Command, args []string) {
+			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
@@ -336,18 +342,19 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, map[string]interface{}{})
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, map[string]interface{}{}, false)
 			if err != nil {
 				log.Fatal(err)
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p, false); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 
+			err = alertM.Evaluate(startTime, endTime)
 			log.Info("👋 Exiting kube-burner ", uuid)
-			if err := alertM.Evaluate(startTime, endTime); err != nil {
+			if err != nil {
 				os.Exit(1)
 			}
 		},

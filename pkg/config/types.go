@@ -15,6 +15,7 @@
 package config
 
 import (
+	"embed"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -39,6 +40,10 @@ type Spec struct {
 	GlobalConfig GlobalConfig `yaml:"global"`
 	// Jobs list of kube-burner jobs
 	Jobs []Job `yaml:"jobs"`
+	// EmbedFS embed filesystem instance
+	EmbedFS embed.FS
+	// EmbedFSDir Directory in which the configuration files are in the embed filesystem
+	EmbedFSDir string
 }
 
 // GlobalConfig holds the global configuration
@@ -70,6 +75,8 @@ type GlobalConfig struct {
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
 	// GCTimeout garbage collection timeout
 	GCTimeout time.Duration `yaml:"gcTimeout"`
+	// Boolean flag to collect metrics during garbage collection
+	GCMetrics bool `yaml:"gcMetrics"`
 }
 
 // Object defines an object that kube-burner will create

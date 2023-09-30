@@ -21,4 +21,4 @@ To start tinkering with kube-burner now:
 
 - Find binaries for different CPU architectures and operating systems in the [releases section of the repository](https://github.com/cloud-bulldozer/kube-burner/releases).
 - Use the container image repository available at [quay](https://quay.io/repository/cloud-bulldozer/kube-burner?tab=tags).
-- Referemce valid examples of configuration files, metrics profiles, and Grafana dashboards in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples) of the repository.
+- Reference valid examples of configuration files, metrics profiles, and Grafana dashboards in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples) of the repository.

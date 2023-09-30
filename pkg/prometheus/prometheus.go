@@ -17,7 +17,9 @@ package prometheus
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"math"
+	"path"
 	"text/template"
 	"time"
 
@@ -31,7 +33,7 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:       step,
@@ -46,8 +48,8 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 		return &p, err
 	}
 	if configSpec.GlobalConfig.MetricsProfile != "" {
-		if err := p.readProfile(configSpec.GlobalConfig.MetricsProfile); err != nil {
-			return &p, fmt.Errorf("metrics-profile error: %v", err.Error())
+		if err := p.readProfile(configSpec.GlobalConfig.MetricsProfile, embedConfig); err != nil {
+			return &p, fmt.Errorf("metrics-profile: %v", err.Error())
 		}
 	}
 	return &p, nil
@@ -130,7 +132,7 @@ func (p *Prometheus) parseVector(metricName, query string, value model.Value, me
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, vector := range data {
-		m := p.createMetric(query, metricName, vector.Metric, vector.Value, vector.Timestamp.Time())
+		m := p.createMetric(query, metricName, vector.Metric, vector.Value, vector.Timestamp.Time().UTC())
 		*metrics = append(*metrics, m)
 	}
 	return nil
@@ -144,7 +146,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 	}
 	for _, matrix := range data {
 		for _, val := range matrix.Values {
-			m := p.createMetric(query, metricName, matrix.Metric, val.Value, val.Timestamp.Time())
+			m := p.createMetric(query, metricName, matrix.Metric, val.Value, val.Timestamp.Time().UTC())
 			*metrics = append(*metrics, m)
 		}
 	}
@@ -152,8 +154,15 @@ func (p *Prometheus) parseMatrix(metricName, query string, value model.Value, me
 }
 
 // ReadProfile reads, parses and validates metric profile configuration
-func (p *Prometheus) readProfile(metricsProfile string) error {
-	f, err := util.ReadConfig(metricsProfile)
+func (p *Prometheus) readProfile(metricsProfile string, embedConfig bool) error {
+	var f io.Reader
+	var err error
+	if embedConfig {
+		metricsProfile = path.Join(path.Dir(p.ConfigSpec.EmbedFSDir), metricsProfile)
+		f, err = util.ReadEmbedConfig(p.ConfigSpec.EmbedFS, metricsProfile)
+	} else {
+		f, err = util.ReadConfig(metricsProfile)
+	}
 	if err != nil {
 		return fmt.Errorf("error reading metrics profile %s: %s", metricsProfile, err)
 	}

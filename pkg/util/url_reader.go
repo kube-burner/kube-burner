@@ -15,6 +15,7 @@
 package util
 
 import (
+	"embed"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
+
+// ReadEmbedConfig reads configuration files from the given embed filesystem
+func ReadEmbedConfig(embedFs embed.FS, configFile string) (io.Reader, error) {
+	f, err := embedFs.Open(configFile)
+	return f, err
+}
 
 // ReadConfig reads configuration from the given path or URL
 func ReadConfig(configFile string) (io.Reader, error) {

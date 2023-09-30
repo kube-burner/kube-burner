@@ -26,10 +26,11 @@ In this section is described global job configuration, it holds the following pa
 | `metricsProfile`   | Path to the metrics profile configuration file                                                           | String         | ""         |
 | `metricsEndpoint`  | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String     | "" |
 | `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `GCMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
 | `GCTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 | `waitWhenFinished` | Wait for all pods to be running when all jobs are completed                                             | Boolean        | false      |
 
-!!! note 
+!!! note
     The precedence order to wait on resources is Global.waitWhenFinished > Job.waitWhenFinished > Job.podWait
 
 kube-burner connects k8s clusters using the following methods in this order:
@@ -54,7 +55,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `podWait`              | Wait for all pods to be running before moving forward to the next job iteration  | Boolean | false   |
 | `waitWhenFinished`     | Wait for all pods to be running when all iterations are completed                | Boolean | true    |
 | `maxWaitTimeout`       | Maximum wait timeout per namespace                                               | Duration| 4h     |
-| `jobIterationDelay`    | How long to wait between each job iteration                                      | Duration| 0s      |
+| `jobIterationDelay`    | How long to wait between each job iteration. This is also the wait interval between each delete operation | Duration| 0s      |
 | `jobPause`             | How long to pause after finishing the job                                        | Duration| 0s      |
 | `qps`                  | Limit object creation queries per second                                         | Integer | 0       |
 | `burst`                | Maximum burst for throttle                                                       | Integer | 0       |
@@ -162,7 +163,7 @@ objects:
   labelSelector: {kube-burner-job: cluster-density}
   objectTemplate: templates/deployment_patch_add_label.json
   patchType: "application/strategic-merge-patch+json"
-  apiVersion: apps/v1s
+  apiVersion: apps/v1
 ```
 
 Where:

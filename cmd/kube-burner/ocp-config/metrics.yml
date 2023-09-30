@@ -22,10 +22,10 @@
 
 # Containers & pod metrics
 
-- query: (sum(irate(container_cpu_usage_seconds_total{name!="",container!~"POD|",namespace=~"openshift-(etcd|.*apiserver|ovn-kubernetes|sdn|ingress|.*controller-manager|.*scheduler)"}[2m]) * 100) by (container, pod, namespace, node)) > 0
+- query: (sum(irate(container_cpu_usage_seconds_total{name!="",container!~"POD|",namespace=~"openshift-(etcd|.*apiserver|ovn-kubernetes|network-node-identity|multus|sdn|ingress|.*controller-manager|.*scheduler)"}[2m]) * 100) by (container, pod, namespace, node)) > 0
   metricName: containerCPU
 
-- query: sum(container_memory_rss{name!="",container!~"POD|",namespace=~"openshift-(etcd|.*apiserver|ovn-kubernetes|sdn|ingress|.*controller-manager|.*scheduler)"}) by (container, pod, namespace, node)
+- query: sum(container_memory_rss{name!="",container!~"POD|",namespace=~"openshift-(etcd|.*apiserver|ovn-kubernetes|network-node-identity|multus|sdn|ingress|.*controller-manager|.*scheduler)"}) by (container, pod, namespace, node)
   metricName: containerMemory
 
 # Kubelet & CRI-O runtime metrics
@@ -119,7 +119,7 @@
   metricName: replicaSetCount
   instant: true
 
-- query: count(kube_pod_info{} AND ON (pod) kube_pod_status_phase{phase="Running"}==1)
+- query: count(kube_pod_info{} AND ON (pod) kube_pod_status_phase{phase="Running"}==1) by (node)
   metricName: podDistribution
 
 # Prometheus metrics
