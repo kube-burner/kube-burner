@@ -120,11 +120,13 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 func (p *Prometheus) findJob(timestamp time.Time) config.Job {
 	var jobConfig config.Job
 	for _, prometheusJob := range p.JobList {
-		if timestamp.After(prometheusJob.Start) || timestamp.Equal(prometheusJob.Start) {
+		if (prometheusJob.Start.Equal(timestamp) || prometheusJob.Start.Before(timestamp)) &&
+			(prometheusJob.End.Equal(timestamp) || prometheusJob.End.After(timestamp)) {
 			jobConfig = prometheusJob.JobConfig
-			if jobConfig.Name == "" {
+			if jobConfig.Name == "" { // Needed for index subcommand
 				jobConfig.Name = prometheusJob.Name
 			}
+			break
 		}
 	}
 	return jobConfig
