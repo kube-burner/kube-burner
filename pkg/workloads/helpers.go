@@ -45,6 +45,14 @@ const (
 	reportProfile         = "metrics-report.yml"
 )
 
+type ProfileType string
+
+const (
+	regular   ProfileType = "regular"
+	reporting ProfileType = "reporting"
+	both      ProfileType = "both"
+)
+
 type BenchmarkMetadata struct {
 	ocpmetadata.ClusterMetadata
 	UUID            string                 `json:"uuid"`
@@ -66,14 +74,14 @@ type WorkloadHelper struct {
 	alerting        bool
 	ocpConfig       embed.FS
 	OcpMetaAgent    ocpmetadata.Metadata
-	reporting       bool
+	profileType     string
 	restConfig      *rest.Config
 }
 
 var configSpec config.Spec
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting, reporting bool, ocpConfig embed.FS, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, profileType string, ocpConfig embed.FS, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
@@ -91,12 +99,12 @@ func NewWorkloadHelper(envVars map[string]string, alerting, reporting bool, ocpC
 	return WorkloadHelper{
 		envVars:         envVars,
 		alerting:        alerting,
-		reporting:       reporting,
 		MetricsEndpoint: metricsEndpoint,
 		ocpConfig:       ocpConfig,
 		OcpMetaAgent:    ocpMetadata,
 		timeout:         timeout,
 		restConfig:      restConfig,
+		profileType:     profileType,
 	}
 }
 
@@ -187,19 +195,31 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		embedConfig = false
 		metrics.DecodeMetricsEndpoint(wh.MetricsEndpoint, &metricsEndpoints)
 	} else {
-		// When benchmark reporting is enabled we hardcode metricsProfile
-		if wh.reporting {
-			metricsProfile = reportProfile
-			for i := range configSpec.GlobalConfig.Measurements {
-				configSpec.GlobalConfig.Measurements[i].PodLatencyMetrics = types.Quantiles
-			}
-		}
-		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
+		regularProfile := prometheus.MetricEndpoint{
 			Endpoint:     wh.prometheusURL,
 			AlertProfile: alertsProfile,
 			Profile:      metricsProfile,
 			Token:        wh.prometheusToken,
-		})
+		}
+		reportingProfile := prometheus.MetricEndpoint{
+			Endpoint: wh.prometheusURL,
+			Profile:  reportProfile,
+			Token:    wh.prometheusToken,
+		}
+		switch ProfileType(wh.profileType) {
+		case regular:
+			metricsEndpoints = append(metricsEndpoints, regularProfile)
+		case reporting:
+			reportingProfile.AlertProfile = alertsProfile
+			metricsEndpoints = append(metricsEndpoints, reportingProfile)
+			for i := range configSpec.GlobalConfig.Measurements {
+				configSpec.GlobalConfig.Measurements[i].PodLatencyMetrics = types.Quantiles
+			}
+		case both:
+			metricsEndpoints = append(metricsEndpoints, regularProfile, reportingProfile)
+		default:
+			log.Fatalf("Metrics profile type not supported: %v", wh.profileType)
+		}
 	}
 	for _, metricsEndpoint := range metricsEndpoints {
 		// Updating the prometheus endpoint actually being used in spec.
