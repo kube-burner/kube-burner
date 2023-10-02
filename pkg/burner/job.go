@@ -198,9 +198,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
 				CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 				// We add an extra dummy job to prometheusJobList to index metrics from this stage
+				cleanupEnd := time.Now().UTC()
 				prometheusJobList = append(prometheusJobList, prometheus.Job{
 					Start: cleanupStart,
-					End:   time.Now().UTC(),
+					End:   cleanupEnd,
 					JobConfig: config.Job{
 						Name: garbageCollectionJob,
 					},
@@ -214,7 +215,12 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			for _, job := range prometheusJobList {
 				// elapsedTime is recalculated for every job of the list
 				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
-				indexjobSummaryInfo(indexer, uuid, elapsedTime, job.JobConfig, job.Start, metadata)
+				jobTimings := timings{
+					Timestamp:   job.Start,
+					EndTimstamp: job.End,
+					ElapsedTime: elapsedTime,
+				}
+				indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
 			}
 		}
 		for idx, prometheusClient := range prometheusClients {

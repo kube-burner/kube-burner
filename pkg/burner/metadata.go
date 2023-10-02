@@ -24,29 +24,33 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type timings struct {
+	Timestamp   time.Time `json:"timestamp"`
+	EndTimstamp time.Time `json:"endTimestamp"`
+	ElapsedTime float64   `json:"endDate"`
+}
+
 type jobSummary struct {
-	Timestamp   time.Time              `json:"timestamp"`
-	UUID        string                 `json:"uuid"`
-	MetricName  string                 `json:"metricName"`
-	ElapsedTime float64                `json:"elapsedTime"`
-	JobConfig   config.Job             `json:"jobConfig"`
-	Metadata    map[string]interface{} `json:"metadata"`
-	Version     string                 `json:"version"`
+	timings
+	UUID       string                 `json:"uuid"`
+	MetricName string                 `json:"metricName"`
+	JobConfig  config.Job             `json:"jobConfig"`
+	Metadata   map[string]interface{} `json:"metadata"`
+	Version    string                 `json:"version"`
 }
 
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, elapsedTime float64, jobConfig config.Job, timestamp time.Time, metadata map[string]interface{}) {
+func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, jobTimings timings, jobConfig config.Job, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
-			UUID:        uuid,
-			ElapsedTime: elapsedTime,
-			JobConfig:   jobConfig,
-			MetricName:  jobSummaryMetric,
-			Timestamp:   timestamp,
-			Metadata:    metadata,
-			Version:     fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
+			UUID:       uuid,
+			JobConfig:  jobConfig,
+			MetricName: jobSummaryMetric,
+			Metadata:   metadata,
+			Version:    fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
+			timings:    jobTimings,
 		},
 	}
 	log.Infof("Indexing metric %s", jobSummaryMetric)
