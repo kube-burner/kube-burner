@@ -5,7 +5,7 @@ This wrapper is hosted under the `kube-burner ocp` subcommand that currently loo
 
 ```console
 $ kube-burner ocp help
-This subcommand is meant to be used against OpenShift clusters and serves as a shortcut to trigger well-known workloads
+This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads
 
 Usage:
   kube-burner ocp [command]
@@ -14,6 +14,7 @@ Available Commands:
   cluster-density    Runs cluster-density workload
   cluster-density-ms Runs cluster-density-ms workload
   cluster-density-v2 Runs cluster-density-v2 workload
+  index              Runs index sub-command
   node-density       Runs node-density workload
   node-density-cni   Runs node-density-cni workload
   node-density-heavy Runs node-density-heavy workload
@@ -35,7 +36,7 @@ Flags:
       --profile-type string       Metrics profile to use, supported options are: regular, reporting or both (default "both")
       --timeout duration          Benchmark timeout (default 4h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
-      --uuid string               Benchmark UUID (default "d18989c4-4f8a-4a14-b711-9afae69a9140")
+      --uuid string               Benchmark UUID (default "e082ae4b-0ff2-4c38-ba07-7481ec487e8d")
 
 Global Flags:
       --log-level string   Allowed values: debug, info, warn, error, fatal (default "info")
@@ -164,8 +165,32 @@ With the help of [networkpolicy](https://kubernetes.io/docs/concepts/services-ne
 - Default deny networkpolicy is applied first
 - Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods which *don't* have some other randomly-selected label. This translates to 10 networkpolicies/namespace
 
-## Metrics-profile type
+## Index
 
+Just like the traditional kube-burner, ocp wrapper also has an indexing functionality which is exposed as `index` subcommand. 
+```console
+$ kube-burner ocp index --help
+If no other indexer is specified, local indexer is used by default
+
+Usage:
+  kube-burner ocp index [flags]
+
+Flags:
+  -m, --metrics-profile string     Metrics profile file (default "metrics.yml")
+      --metrics-directory string   Directory to dump the metrics files in, when using default local indexing (default "collected-metrics")
+  -s, --step duration              Prometheus step size (default 30s)
+      --start int                  Epoch start time
+      --end int                    Epoch end time
+  -j, --job-name string            Indexing job name (default "kube-burner-ocp-indexing")
+      --user-metadata string       User provided metadata file, in YAML format
+  -h, --help                       help for index
+```
+Please refer to [indexing](observability/indexing.md) section for better understanding on the functionality.
+
+## Reporting mode
+This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml)
+
+## Metrics-profile type
 By specifying `--profile-type`, kube-burner can use two different metrics profiles when scraping metrics from prometheus. By default is configured with `both`, meaning that it will use the regular metrics profiles bound to the workload in question and the reporting metrics profile.
 
 While when using the regular profiles ([metrics-aggregated](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-aggregated.yml) or [metrics](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics.yml)), kube-burner scrapes and indexes metrics timeseries, the reporting one is a very useful profile to reduce the number of documents sent to the configured indexer. Thanks to the combination of aggregations and instant queries for prometheus metrics, and 4 summaries for pod latency measurements, only a few documents will be indexed per benchmark. This flag makes possible to specify one or both of these profiles indistinctly.

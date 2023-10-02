@@ -68,12 +68,12 @@ type WorkloadHelper struct {
 	envVars         map[string]string
 	prometheusURL   string
 	prometheusToken string
-	metricsEndpoint string
+	MetricsEndpoint string
 	timeout         time.Duration
 	Metadata        BenchmarkMetadata
 	alerting        bool
 	ocpConfig       embed.FS
-	ocpMetaAgent    ocpmetadata.Metadata
+	OcpMetaAgent    ocpmetadata.Metadata
 	profileType     string
 	restConfig      *rest.Config
 }
@@ -99,9 +99,9 @@ func NewWorkloadHelper(envVars map[string]string, alerting bool, profileType str
 	return WorkloadHelper{
 		envVars:         envVars,
 		alerting:        alerting,
-		metricsEndpoint: metricsEndpoint,
+		MetricsEndpoint: metricsEndpoint,
 		ocpConfig:       ocpConfig,
-		ocpMetaAgent:    ocpMetadata,
+		OcpMetaAgent:    ocpMetadata,
 		timeout:         timeout,
 		restConfig:      restConfig,
 		profileType:     profileType,
@@ -113,15 +113,15 @@ var indexer *indexers.Indexer
 // SetKubeBurnerFlags configures the required environment variables and flags for kube-burner
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	var err error
-	if wh.metricsEndpoint == "" {
-		prometheusURL, prometheusToken, err := wh.ocpMetaAgent.GetPrometheus()
+	if wh.MetricsEndpoint == "" {
+		prometheusURL, prometheusToken, err := wh.OcpMetaAgent.GetPrometheus()
 		if err != nil {
 			log.Fatal("Error obtaining Prometheus information: ", err.Error())
 		}
 		wh.prometheusURL = prometheusURL
 		wh.prometheusToken = prometheusToken
 	}
-	wh.envVars["INGRESS_DOMAIN"], err = wh.ocpMetaAgent.GetDefaultIngressDomain()
+	wh.envVars["INGRESS_DOMAIN"], err = wh.OcpMetaAgent.GetDefaultIngressDomain()
 	if err != nil {
 		log.Fatal("Error obtaining default ingress domain: ", err.Error())
 	}
@@ -132,7 +132,7 @@ func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 
 func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 	var err error
-	wh.Metadata.ClusterMetadata, err = wh.ocpMetaAgent.GetClusterMetadata()
+	wh.Metadata.ClusterMetadata, err = wh.OcpMetaAgent.GetClusterMetadata()
 	if err != nil {
 		return err
 	}
@@ -146,19 +146,6 @@ func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 	}
 	wh.Metadata.Timestamp = time.Now().UTC()
 	return nil
-}
-
-func (wh *WorkloadHelper) indexMetadata() {
-	log.Info("Indexing cluster metadata document")
-	wh.Metadata.EndDate = time.Now().UTC()
-	msg, err := (*indexer).Index([]interface{}{wh.Metadata}, indexers.IndexingOpts{
-		MetricName: wh.Metadata.MetricName,
-	})
-	if err != nil {
-		log.Error(err.Error())
-	} else {
-		log.Info(msg)
-	}
 }
 
 func (wh *WorkloadHelper) run(workload, metricsProfile string) {
@@ -204,9 +191,9 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		configSpec.EmbedFS = wh.ocpConfig
 		configSpec.EmbedFSDir = path.Join(ocpCfgDir, workload)
 	}
-	if wh.metricsEndpoint != "" {
+	if wh.MetricsEndpoint != "" {
 		embedConfig = false
-		metrics.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
+		metrics.DecodeMetricsEndpoint(wh.MetricsEndpoint, &metricsEndpoints)
 	} else {
 		regularProfile := prometheus.MetricEndpoint{
 			Endpoint:     wh.prometheusURL,
@@ -268,7 +255,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	refreshIndexer(indexerConfig)
 	wh.Metadata.Passed = rc == 0
 	if indexerConfig.Type != "" {
-		wh.indexMetadata()
+		IndexMetadata(indexer, wh.Metadata)
 	}
 	log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
 	os.Exit(rc)
@@ -304,6 +291,20 @@ func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error
 		return err
 	}
 	return nil
+}
+
+// IndexMetadata indexes metadata using given indexer.
+func IndexMetadata(indexer *indexers.Indexer, metadata BenchmarkMetadata) {
+	log.Info("Indexing cluster metadata document")
+	metadata.EndDate = time.Now().UTC()
+	msg, err := (*indexer).Index([]interface{}{metadata}, indexers.IndexingOpts{
+		MetricName: metadata.MetricName,
+	})
+	if err != nil {
+		log.Error(err.Error())
+	} else {
+		log.Info(msg)
+	}
 }
 
 // refreshIndexer updates indexer as we have a reference object propagating in code.
