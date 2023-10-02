@@ -223,6 +223,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		case regular:
 			metricsEndpoints = append(metricsEndpoints, regularProfile)
 		case reporting:
+			reportingProfile.AlertProfile = alertsProfile
 			metricsEndpoints = append(metricsEndpoints, reportingProfile)
 			for i := range configSpec.GlobalConfig.Measurements {
 				configSpec.GlobalConfig.Measurements[i].PodLatencyMetrics = types.Quantiles
