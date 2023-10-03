@@ -8,3 +8,8 @@
 - query: prometheus_build_info
   metricName: prometheusBuildInfo
   instant: true
+
+- query: prometheus_build_info
+  metricName: prometheusBuildInfo
+  instant: true
+  instantJobStart: true

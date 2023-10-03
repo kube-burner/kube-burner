@@ -21,6 +21,8 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 )
 
+type InstantTimestamp string
+
 type Auth struct {
 	Username      string
 	Password      string
@@ -49,9 +51,10 @@ type Job struct {
 
 // metricDefinition describes what metrics kube-burner collects
 type metricDefinition struct {
-	Query      string `yaml:"query"`
-	MetricName string `yaml:"metricName"`
-	Instant    bool   `yaml:"instant"`
+	Query           string `yaml:"query"`
+	MetricName      string `yaml:"metricName"`
+	Instant         bool   `yaml:"instant"`
+	InstantJobStart bool   `yaml:"instantJobStart"`
 }
 
 // MetricEndpoint describes prometheus endpoint to scrape

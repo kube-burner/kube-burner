@@ -16,12 +16,17 @@ The metrics profile file has the following structure:
 
 The `query` field holds the Prometheus expression to evaluate, and `metricName` controls the value that kube-burner will set on the `metricName` field. This is useful to identify metrics from a specific query. More information is available in the [metric format section](#metric-format).
 
-In addition to range queries, kube-burner has the ability perform instant queries by adding the field `instant` to the desired metric. This kind of query is especially useful to get only one sample of a *static* metric, such as a component version or the number of nodes of the cluster.
+In addition to range queries, kube-burner has the ability perform instant queries by adding the field `instant` to the desired metric. This kind of query is especially useful to get only one datapoint of a certain expression, such as a component version or the number of nodes of the cluster. By default this datapoint is taken using the ending timestamp of the job, but it's possible to get fetch it using the first timestamp of the job by enabling the flag `instantJobStart`.
 
 ```yaml
-- query: kube_node_role
-  metricName: nodeRoles
+- query: sum(node_cpu_seconds_total{mode!="idle"})
+  metricName: endingCPUSeconds
   instant: true
+
+- query: sum(node_cpu_seconds_total{mode!="idle"})
+  metricName: initialCPUSeconds
+  instant: true
+  instantJobStart: true
 ```
 
 ## Metric format
@@ -64,7 +69,6 @@ The collected metrics have the following shape:
 Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query`, `metricName` and `jobName`.
 !!! info
     These extra fields are especially useful at the time of identifying and representing the collected metrics.
-
 
 ## Using the elapsed variable
 

@@ -57,12 +57,13 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
-	start := p.JobList[0].Start
-	end := p.JobList[len(p.JobList)-1].End
-	elapsed := int(end.Sub(start).Seconds())
+	var instantTimestamp time.Time
 	var err error
 	var v model.Value
 	var renderedQuery bytes.Buffer
+	start := p.JobList[0].Start
+	end := p.JobList[len(p.JobList)-1].End
+	elapsed := int(end.Sub(start).Seconds())
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
 	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
@@ -77,7 +78,12 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 		renderedQuery.Reset()
 		if md.Instant {
 			log.Debugf("Instant query: %s", query)
-			if v, err = p.Client.Query(query, end); err != nil {
+			if md.InstantJobStart {
+				instantTimestamp = start
+			} else {
+				instantTimestamp = end
+			}
+			if v, err = p.Client.Query(query, instantTimestamp); err != nil {
 				log.Warnf("Error found with query %s: %s", query, err)
 				continue
 			}
