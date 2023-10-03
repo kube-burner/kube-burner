@@ -24,42 +24,39 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type timings struct {
+	Timestamp   time.Time `json:"timestamp"`
+	EndTimstamp time.Time `json:"endTimestamp"`
+	ElapsedTime float64   `json:"endDate"`
+}
+
 type jobSummary struct {
-	Timestamp           time.Time              `json:"timestamp"`
-	EndTimestamp        time.Time              `json:"endTimestamp"`
-	UUID                string                 `json:"uuid"`
-	MetricName          string                 `json:"metricName"`
-	ElapsedTime         float64                `json:"elapsedTime"`
-	CleanupTimestamp    time.Time              `json:"cleanupTimestamp"`
-	CleanupEndTimestamp time.Time              `json:"cleanupEndTimestamp"`
-	JobConfig           config.Job             `json:"jobConfig"`
-	Metadata            map[string]interface{} `json:"metadata"`
-	Version             string                 `json:"version"`
+	timings
+	UUID       string                 `json:"uuid"`
+	MetricName string                 `json:"metricName"`
+	JobConfig  config.Job             `json:"jobConfig"`
+	Metadata   map[string]interface{} `json:"metadata"`
+	Version    string                 `json:"version"`
 }
 
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexJobSummaryInfo(indexer *indexers.Indexer, uuid string, job Executor, cleanupStart, cleanupEnd time.Time, metadata map[string]interface{}) {
-	elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
+func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, jobTimings timings, jobConfig config.Job, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
-			UUID:                uuid,
-			ElapsedTime:         elapsedTime,
-			JobConfig:           job.Job,
-			MetricName:          jobSummaryMetric,
-			Timestamp:           job.Start,
-			EndTimestamp:        job.End,
-			CleanupTimestamp:    cleanupStart,
-			CleanupEndTimestamp: cleanupEnd,
-			Metadata:            metadata,
-			Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
+			UUID:       uuid,
+			JobConfig:  jobConfig,
+			MetricName: jobSummaryMetric,
+			Metadata:   metadata,
+			Version:    fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
+			timings:    jobTimings,
 		},
 	}
 	log.Infof("Indexing metric %s", jobSummaryMetric)
 	log.Debugf("Indexing [%d] documents", len(metadataInfo))
 	indexingOpts := indexers.IndexingOpts{
-		MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, job.Job.Name),
+		MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, jobConfig.Name),
 	}
 	resp, err := (*indexer).Index(metadataInfo, indexingOpts)
 	if err != nil {

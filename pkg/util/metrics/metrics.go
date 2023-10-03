@@ -114,7 +114,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 				Name:  metricsScraperConfig.JobName,
 			},
 			}
-			ScrapeMetrics(p, indexer)
+			p.ScrapeJobsMetrics(indexer)
 			if indexerConfig.Type == indexers.LocalIndexer && indexerConfig.CreateTarball {
 				CreateTarball(indexerConfig)
 			}

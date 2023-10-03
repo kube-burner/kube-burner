@@ -1,6 +1,7 @@
 ---
 global:
   gc: {{.GC}}
+  gcMetrics: {{.GC_METRICS}}
   indexerConfig:
     esServers: ["{{.ES_SERVER}}"]
     insecureSkipVerify: true
