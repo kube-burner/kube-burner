@@ -35,9 +35,9 @@ teardown_file() {
 }
 
 @test "node-density-heavy with indexing" {
-  run kube-burner ocp node-density-heavy --pods-per-node=75 --uuid=abcd --local-indexing
+  run kube-burner ocp node-density-heavy --pods-per-node=75 --uuid=abcd --local-indexing --gc-metrics=true
   [ "$status" -eq 0 ]
-  run check_file_list collected-metrics-abcd/etcdVersion.json collected-metrics-abcd/clusterMetadata.json collected-metrics-abcd/jobSummary-node-density-heavy.json collected-metrics-abcd/podLatencyMeasurement-node-density-heavy.json collected-metrics-abcd/podLatencyQuantilesMeasurement-node-density-heavy.json
+  run check_file_list collected-metrics-abcd/etcdVersion.json collected-metrics-abcd/clusterMetadata.json collected-metrics-abcd/jobSummary-node-density-heavy.json collected-metrics-abcd/jobSummary-garbage-collection.json collected-metrics-abcd/podLatencyMeasurement-node-density-heavy.json collected-metrics-abcd/podLatencyQuantilesMeasurement-node-density-heavy.json
   [ "$status" -eq 0 ]
 }
 
@@ -60,10 +60,10 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "cluster-density-v2 with reporting" {
-  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=false --reporting ${COMMON_FLAGS} 
+@test "cluster-density-v2 with profile-type=both" {
+  run kube-burner ocp cluster-density-v2 --iterations=5 --churn=false --profile-type=both ${COMMON_FLAGS}
   [ "$status" -eq 0 ]
-  run check_metric_value cpu-kubelet clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
+  run check_metric_value cpu-kubelet clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement etcdVersion
   [ "$status" -eq 0 ]
 }
 
@@ -77,6 +77,16 @@ teardown_file() {
 @test "cluster-density timeout check" {
   run kube-burner ocp cluster-density --iterations=1 --churn-duration=5m --timeout=1s
   [ "$status" -eq 2 ]
+}
+
+@test "index locally with cluster prometheus" {
+  run kube-burner ocp index --uuid="${UUID}" --metrics-profile metrics-profile.yaml
+  [ "$status" -eq 0 ]
+}
+
+@test "index with metrics-endpoints and sending metrics to ES" {
+  run kube-burner ocp index --uuid="${UUID}" --metrics-endpoint metrics-endpoints.yaml --metrics-profile metrics-profile.yaml --es-server=https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443 --es-index=ripsaw-kube-burner
+  [ "$status" -eq 0 ]
 }
 
 @test "networkpolicy-multitenant" {

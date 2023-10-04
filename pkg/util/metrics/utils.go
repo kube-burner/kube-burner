@@ -17,9 +17,7 @@ package metrics
 import (
 	"bytes"
 	"io"
-	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -58,18 +56,5 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 	yamlDec.KnownFields(true)
 	if err := yamlDec.Decode(&metricsEndpoints); err != nil {
 		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpoint, err)
-	}
-}
-
-// Scrapes prometheus metrics
-func ScrapeMetrics(p *prometheus.Prometheus, indexer *indexers.Indexer) {
-	log.Infof("Scraping %v Profile: %v Start: %v End: %v",
-		p.Endpoint,
-		p.ConfigSpec.GlobalConfig.MetricsProfile,
-		p.JobList[0].Start.Format(time.RFC3339),
-		p.JobList[len(p.JobList)-1].End.Format(time.RFC3339))
-	log.Infof("Indexing metrics with UUID %s", p.UUID)
-	if err := p.ScrapeJobsMetrics(indexer); err != nil {
-		log.Error(err)
 	}
 }

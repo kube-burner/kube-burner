@@ -45,6 +45,14 @@ const (
 	reportProfile         = "metrics-report.yml"
 )
 
+type ProfileType string
+
+const (
+	regular   ProfileType = "regular"
+	reporting ProfileType = "reporting"
+	both      ProfileType = "both"
+)
+
 type BenchmarkMetadata struct {
 	ocpmetadata.ClusterMetadata
 	UUID            string                 `json:"uuid"`
@@ -60,20 +68,20 @@ type WorkloadHelper struct {
 	envVars         map[string]string
 	prometheusURL   string
 	prometheusToken string
-	metricsEndpoint string
+	MetricsEndpoint string
 	timeout         time.Duration
 	Metadata        BenchmarkMetadata
 	alerting        bool
 	ocpConfig       embed.FS
-	ocpMetaAgent    ocpmetadata.Metadata
-	reporting       bool
+	OcpMetaAgent    ocpmetadata.Metadata
+	profileType     string
 	restConfig      *rest.Config
 }
 
 var configSpec config.Spec
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting, reporting bool, ocpConfig embed.FS, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
+func NewWorkloadHelper(envVars map[string]string, alerting bool, profileType string, ocpConfig embed.FS, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
@@ -91,12 +99,12 @@ func NewWorkloadHelper(envVars map[string]string, alerting, reporting bool, ocpC
 	return WorkloadHelper{
 		envVars:         envVars,
 		alerting:        alerting,
-		reporting:       reporting,
-		metricsEndpoint: metricsEndpoint,
+		MetricsEndpoint: metricsEndpoint,
 		ocpConfig:       ocpConfig,
-		ocpMetaAgent:    ocpMetadata,
+		OcpMetaAgent:    ocpMetadata,
 		timeout:         timeout,
 		restConfig:      restConfig,
+		profileType:     profileType,
 	}
 }
 
@@ -105,15 +113,15 @@ var indexer *indexers.Indexer
 // SetKubeBurnerFlags configures the required environment variables and flags for kube-burner
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	var err error
-	if wh.metricsEndpoint == "" {
-		prometheusURL, prometheusToken, err := wh.ocpMetaAgent.GetPrometheus()
+	if wh.MetricsEndpoint == "" {
+		prometheusURL, prometheusToken, err := wh.OcpMetaAgent.GetPrometheus()
 		if err != nil {
 			log.Fatal("Error obtaining Prometheus information: ", err.Error())
 		}
 		wh.prometheusURL = prometheusURL
 		wh.prometheusToken = prometheusToken
 	}
-	wh.envVars["INGRESS_DOMAIN"], err = wh.ocpMetaAgent.GetDefaultIngressDomain()
+	wh.envVars["INGRESS_DOMAIN"], err = wh.OcpMetaAgent.GetDefaultIngressDomain()
 	if err != nil {
 		log.Fatal("Error obtaining default ingress domain: ", err.Error())
 	}
@@ -124,7 +132,7 @@ func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 
 func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 	var err error
-	wh.Metadata.ClusterMetadata, err = wh.ocpMetaAgent.GetClusterMetadata()
+	wh.Metadata.ClusterMetadata, err = wh.OcpMetaAgent.GetClusterMetadata()
 	if err != nil {
 		return err
 	}
@@ -138,19 +146,6 @@ func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 	}
 	wh.Metadata.Timestamp = time.Now().UTC()
 	return nil
-}
-
-func (wh *WorkloadHelper) indexMetadata() {
-	log.Info("Indexing cluster metadata document")
-	wh.Metadata.EndDate = time.Now().UTC()
-	msg, err := (*indexer).Index([]interface{}{wh.Metadata}, indexers.IndexingOpts{
-		MetricName: wh.Metadata.MetricName,
-	})
-	if err != nil {
-		log.Error(err.Error())
-	} else {
-		log.Info(msg)
-	}
 }
 
 func (wh *WorkloadHelper) run(workload, metricsProfile string) {
@@ -196,23 +191,43 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		configSpec.EmbedFS = wh.ocpConfig
 		configSpec.EmbedFSDir = path.Join(ocpCfgDir, workload)
 	}
-	if wh.metricsEndpoint != "" {
-		embedConfig = false
-		metrics.DecodeMetricsEndpoint(wh.metricsEndpoint, &metricsEndpoints)
-	} else {
-		// When benchmark reporting is enabled we hardcode metricsProfile
-		if wh.reporting {
-			metricsProfile = reportProfile
-			for i := range configSpec.GlobalConfig.Measurements {
-				configSpec.GlobalConfig.Measurements[i].PodLatencyMetrics = types.Quantiles
-			}
+	indexerConfig := configSpec.GlobalConfig.IndexerConfig
+	if indexerConfig.Type != "" {
+		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
+		indexer, err = indexers.NewIndexer(indexerConfig)
+		if err != nil {
+			log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
 		}
-		metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
+	}
+	if wh.MetricsEndpoint != "" {
+		embedConfig = false
+		metrics.DecodeMetricsEndpoint(wh.MetricsEndpoint, &metricsEndpoints)
+	} else {
+		regularProfile := prometheus.MetricEndpoint{
 			Endpoint:     wh.prometheusURL,
 			AlertProfile: alertsProfile,
 			Profile:      metricsProfile,
 			Token:        wh.prometheusToken,
-		})
+		}
+		reportingProfile := prometheus.MetricEndpoint{
+			Endpoint: wh.prometheusURL,
+			Profile:  reportProfile,
+			Token:    wh.prometheusToken,
+		}
+		switch ProfileType(wh.profileType) {
+		case regular:
+			metricsEndpoints = append(metricsEndpoints, regularProfile)
+		case reporting:
+			reportingProfile.AlertProfile = alertsProfile
+			metricsEndpoints = append(metricsEndpoints, reportingProfile)
+			for i := range configSpec.GlobalConfig.Measurements {
+				configSpec.GlobalConfig.Measurements[i].PodLatencyMetrics = types.Quantiles
+			}
+		case both:
+			metricsEndpoints = append(metricsEndpoints, regularProfile, reportingProfile)
+		default:
+			log.Fatalf("Metrics profile type not supported: %v", wh.profileType)
+		}
 	}
 	for _, metricsEndpoint := range metricsEndpoints {
 		// Updating the prometheus endpoint actually being used in spec.
@@ -237,18 +252,14 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		alertMs = append(alertMs, alertM)
 		alertM = nil
 	}
-	configSpec.GlobalConfig.GCMetrics = (wh.envVars["GC_METRICS"] == "true")
-	indexerConfig := configSpec.GlobalConfig.IndexerConfig
-	refreshIndexer(indexerConfig)
 	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.timeout, metadata)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)
 	}
-	refreshIndexer(indexerConfig)
 	wh.Metadata.Passed = rc == 0
 	if indexerConfig.Type != "" {
-		wh.indexMetadata()
+		IndexMetadata(indexer, wh.Metadata)
 	}
 	log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
 	os.Exit(rc)
@@ -286,14 +297,16 @@ func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error
 	return nil
 }
 
-// refreshIndexer updates indexer as we have a reference object propagating in code.
-func refreshIndexer(indexerConfig indexers.IndexerConfig) {
-	var err error
-	if indexerConfig.Type != "" {
-		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
-		indexer, err = indexers.NewIndexer(indexerConfig)
-		if err != nil {
-			log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
-		}
+// IndexMetadata indexes metadata using given indexer.
+func IndexMetadata(indexer *indexers.Indexer, metadata BenchmarkMetadata) {
+	log.Info("Indexing cluster metadata document")
+	metadata.EndDate = time.Now().UTC()
+	msg, err := (*indexer).Index([]interface{}{metadata}, indexers.IndexingOpts{
+		MetricName: metadata.MetricName,
+	})
+	if err != nil {
+		log.Error(err.Error())
+	} else {
+		log.Info(msg)
 	}
 }

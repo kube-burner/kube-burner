@@ -59,13 +59,18 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	start := p.JobList[0].Start
 	end := p.JobList[len(p.JobList)-1].End
+	log.Infof("🔍 Scraping %v Profile: %v Start: %v End: %v",
+		p.Endpoint,
+		p.ConfigSpec.GlobalConfig.MetricsProfile,
+		start.Format(time.RFC3339),
+		end.Format(time.RFC3339))
+	log.Infof("Indexing metrics with UUID %s", p.UUID)
 	elapsed := int(end.Sub(start).Seconds())
 	var err error
 	var v model.Value
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
-	log.Infof("🔍 Scraping prometheus metrics for benchmark from %s to %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
 	for _, md := range p.MetricProfile {
 		var datapoints []interface{}
 		t, _ := template.New("").Parse(md.Query)
@@ -115,11 +120,13 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 func (p *Prometheus) findJob(timestamp time.Time) config.Job {
 	var jobConfig config.Job
 	for _, prometheusJob := range p.JobList {
-		if timestamp.Before(prometheusJob.End) || timestamp.Equal(prometheusJob.End) {
+		if (prometheusJob.Start.Equal(timestamp) || prometheusJob.Start.Before(timestamp)) &&
+			(prometheusJob.End.Equal(timestamp) || prometheusJob.End.After(timestamp)) {
 			jobConfig = prometheusJob.JobConfig
-			if jobConfig.Name == "" {
+			if jobConfig.Name == "" { // Needed for index subcommand
 				jobConfig.Name = prometheusJob.Name
 			}
+			break
 		}
 	}
 	return jobConfig

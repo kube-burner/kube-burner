@@ -40,6 +40,7 @@ type ScraperConfig struct {
 	JobName         string
 	ActionIndex     bool
 	UserMetaData    string
+	OcpMetaData     map[string]interface{}
 }
 
 // ScraperResponse holds parsed data related to scraper and target indexer
