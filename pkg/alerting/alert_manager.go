@@ -43,27 +43,29 @@ const (
 )
 
 // alertProfile expression list
-type alertProfile []struct {
+type alertDefinition struct {
 	// PromQL expression to evaluate
 	Expr string `yaml:"expr"`
 	// Informative comment reported when the alarm is triggered
 	Description string `yaml:"description"`
 	// Alert Severity
 	Severity severityLevel `yaml:"severity"`
+	// Evaluate this expresion for the given duration in order fire an alert
+	For time.Duration `yaml:"for"`
 }
 
-// alert definition
+// alert document definition
 type alert struct {
-	Timestamp   time.Time `json:"timestamp"`
-	UUID        string    `json:"uuid"`
-	Severity    string    `json:"severity"`
-	Description string    `json:"description"`
-	MetricName  string    `json:"metricName"`
+	Timestamp   time.Time     `json:"timestamp"`
+	UUID        string        `json:"uuid"`
+	Severity    severityLevel `json:"severity"`
+	Description string        `json:"description"`
+	MetricName  string        `json:"metricName"`
 }
 
 // AlertManager configuration
 type AlertManager struct {
-	alertProfile alertProfile
+	alertProfile []alertDefinition
 	prometheus   *prometheus.Prometheus
 	indexer      *indexers.Indexer
 	uuid         string
@@ -122,8 +124,8 @@ func (a *AlertManager) Evaluate(start, end time.Time) error {
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
-	for _, alert := range a.alertProfile {
-		t, _ := template.New("").Parse(alert.Expr)
+	for _, alertDef := range a.alertProfile {
+		t, _ := template.New("").Parse(alertDef.Expr)
 		t.Execute(&renderedQuery, vars)
 		expr := renderedQuery.String()
 		renderedQuery.Reset()
@@ -133,13 +135,26 @@ func (a *AlertManager) Evaluate(start, end time.Time) error {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, alert.Description, alert.Severity)
+		alertSet, err := a.parseMatrix(v, alertDef)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)
 		}
-		for _, alertSet := range alertData {
-			alertSet.UUID = a.uuid
+		for _, alert := range alertSet {
+			msg := fmt.Sprintf("alert at %v: '%s'", alert.Timestamp.Format(time.RFC3339), alert.Description)
+			switch alert.Severity {
+			case sevWarn:
+				log.Warnf("🚨 %s", msg)
+			case sevError:
+				errs = append(errs, fmt.Errorf(msg))
+				log.Errorf("🚨 %s", msg)
+			case sevCritical:
+				log.Fatalf("🚨 %s", msg)
+			default:
+				log.Infof("🚨 %s", msg)
+			}
+		}
+		for _, alertSet := range alertSet {
 			alertList = append(alertList, alertSet)
 		}
 	}
@@ -158,13 +173,13 @@ func (a *AlertManager) validateTemplates() error {
 	return nil
 }
 
-func parseMatrix(value model.Value, description string, severity severityLevel) ([]alert, error) {
+func (a *AlertManager) parseMatrix(value model.Value, alertDef alertDefinition) ([]alert, error) {
 	var renderedDesc bytes.Buffer
 	var templateData descriptionTemplate
+	var tsList []time.Time
 	// The same query can fire multiple alerts, so we have to return an array of them
 	var alertSet []alert
-	errs := []error{}
-	t, _ := template.New("").Parse(strings.Join(append(baseTemplate, description), ""))
+	t, _ := template.New("").Parse(strings.Join(append(baseTemplate, alertDef.Description), ""))
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return alertSet, fmt.Errorf("unsupported result format: %s", value.Type().String())
@@ -175,38 +190,26 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 			templateData.Labels[string(k)] = string(v)
 		}
 		for _, val := range v.Values {
+			tsList = append(tsList, val.Timestamp.Time())
 			renderedDesc.Reset()
 			// Take 3 decimals
 			templateData.Value = math.Round(float64(val.Value)*1000) / 1000
 			if err := t.Execute(&renderedDesc, templateData); err != nil {
-				msg := fmt.Errorf("alert rendering error: %s", err)
-				log.Error(msg.Error())
-				errs = append(errs, err)
+				return alertSet, fmt.Errorf("alert rendering error: %s", err)
 			}
-			msg := fmt.Sprintf("alert at %v: '%s'", val.Timestamp.Time().UTC().Format(time.RFC3339), renderedDesc.String())
 			alertSet = append(alertSet, alert{
 				Timestamp:   val.Timestamp.Time().UTC(),
-				Severity:    string(severity),
+				Severity:    alertDef.Severity,
 				Description: renderedDesc.String(),
 				MetricName:  alertMetricName,
+				UUID:        a.uuid,
 			})
-			switch severity {
-			case sevWarn:
-				log.Warnf("🚨 %s", msg)
-			case sevError:
-				errs = append(errs, fmt.Errorf(msg))
-			case sevCritical:
-				log.Fatalf("🚨 %s", msg)
-			default:
-				log.Infof("🚨 %s", msg)
-			}
-			break
 		}
 	}
-	return alertSet, utilerrors.NewAggregate(errs)
+	return alertSet, nil
 }
 
-func (a *AlertManager) index(alertSet []interface{}) {
+func (a *AlertManager) index(alertSet []any) {
 	log.Info("Indexing alerts")
 	log.Debugf("Indexing [%d] documents", len(alertSet))
 	resp, err := (*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})

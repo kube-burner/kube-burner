@@ -304,6 +304,7 @@ func alertCmd() *cobra.Command {
 	var url, alertProfile, username, password, uuid, token string
 	var esServer, esIndex, metricsDirectory string
 	var start, end int64
+	var rc int
 	var skipTLSVerify bool
 	var alertM *alerting.AlertManager
 	var prometheusStep time.Duration
@@ -312,6 +313,10 @@ func alertCmd() *cobra.Command {
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
+		PostRun: func(cmd *cobra.Command, args []string) {
+			log.Info("👋 Exiting kube-burner ", uuid)
+			os.Exit(rc)
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
@@ -349,11 +354,9 @@ func alertCmd() *cobra.Command {
 			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p, false); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
-
 			err = alertM.Evaluate(startTime, endTime)
-			log.Info("👋 Exiting kube-burner ", uuid)
 			if err != nil {
-				os.Exit(1)
+				rc = 1
 			}
 		},
 	}
