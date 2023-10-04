@@ -95,7 +95,7 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 			IndexMetadata(scraperOutput.Indexer, *metadata)
 		},
 	}
-	cmd.Flags().StringVar(&metricsProfile, "metrics-profile", "metrics.yml", "Metrics profile file")
+	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file")
 	cmd.Flags().StringVar(&metricsDirectory, "metrics-directory", "collected-metrics", "Directory to dump the metrics files in, when using default local indexing")
 	cmd.Flags().DurationVar(&prometheusStep, "step", 30*time.Second, "Prometheus step size")
 	cmd.Flags().Int64Var(&start, "start", time.Now().Unix()-3600, "Epoch start time")
