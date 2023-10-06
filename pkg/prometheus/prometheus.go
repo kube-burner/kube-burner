@@ -75,7 +75,6 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 		jobEnd := eachJob.End
 		log.Info("Scraping metrics for job: ", eachJob.JobConfig.Name)
 		for _, md := range p.MetricProfile {
-			var datapoints []interface{}
 			requiresInstant := false
 			t, _ := template.New("").Parse(md.Query)
 			if err := t.Execute(&renderedQuery, vars); err != nil {
@@ -85,12 +84,12 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 			query := renderedQuery.String()
 			renderedQuery.Reset()
 			if md.Instant {
-				datapoints = p.runInstantQuery(query, md.MetricName, jobEnd, eachJob.JobConfig)
+				docsToIndex[md.MetricName+"-start"] = append(docsToIndex[md.MetricName+"-start"], p.runInstantQuery(query, md.MetricName+"-start", jobStart, eachJob.JobConfig)...)
+				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob.JobConfig)...)
 			} else {
 				requiresInstant = ((jobEnd.Sub(jobStart).Milliseconds())%(p.Step.Milliseconds()) != 0)
-				datapoints = p.runRangeQuery(query, md.MetricName, jobStart, jobEnd, eachJob.JobConfig)
+				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runRangeQuery(query, md.MetricName, jobStart, jobEnd, eachJob.JobConfig)...)
 			}
-			docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], datapoints...)
 			if requiresInstant {
 				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob.JobConfig)...)
 			}
