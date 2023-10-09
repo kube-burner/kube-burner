@@ -20,6 +20,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -29,7 +30,8 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner/types"
 )
 
-func (ex *Executor) waitForObjects(ns string) {
+func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
+	limiter.Wait(context.TODO())
 	for _, obj := range ex.objects {
 		if obj.Wait {
 			if obj.WaitOptions.ForCondition != "" {

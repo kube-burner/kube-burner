@@ -102,15 +102,22 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			var waitListNamespaces []string
 			if job.QPS == 0 || job.Burst == 0 {
 				log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
+				job.QPS = rest.DefaultQPS
+				job.Burst = rest.DefaultBurst
 			} else {
 				log.Infof("QPS: %v", job.QPS)
 				log.Infof("Burst: %v", job.Burst)
 			}
 			ClientSet, restConfig, err = config.GetClientSet(job.QPS, job.Burst)
-			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
+			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
+			waitClientSet, waitRestConfig, err = config.GetClientSet(float32(int(job.QPS)*len(job.Objects)), job.Burst*len(job.Objects))
+			if err != nil {
+				log.Fatalf("Error creating clientSet: %s", err)
+			}
+			waitDynamicClient = dynamic.NewForConfigOrDie(waitRestConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			if job.PreLoadImages && job.JobType == config.CreationJob {
 				if err = preLoadImages(job); err != nil {
@@ -311,7 +318,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				executor.waitForObjects(ns)
+				executor.waitForObjects(ns, rate.NewLimiter(rate.Limit(waitRestConfig.QPS), waitRestConfig.Burst))
 				<-sem
 				wg.Done()
 			}(ns)
