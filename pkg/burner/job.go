@@ -306,7 +306,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 		executor := executorMap[executorUUID]
 		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
+		sem := make(chan int, int(waitRestConfig.QPS))
 		for _, ns := range namespaces {
 			sem <- 1
 			wg.Add(1)

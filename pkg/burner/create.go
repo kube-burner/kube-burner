@@ -44,7 +44,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 	var err error
 	var f io.Reader
 	mapper := newRESTMapper()
-	waitClientSet, waitRestConfig, err = config.GetClientSet(jobConfig.QPS*2, jobConfig.Burst*2)
+	waitClientSet, waitRestConfig, err = config.GetClientSet(float32(int(jobConfig.QPS)*len(jobConfig.Objects)), jobConfig.Burst*len(jobConfig.Objects))
 	if err != nil {
 		log.Fatalf("Error creating wait clientSet: %s", err.Error())
 	}
@@ -163,7 +163,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	if ex.WaitWhenFinished {
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
+		sem := make(chan int, int(waitRestConfig.QPS))
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)

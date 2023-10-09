@@ -17,7 +17,6 @@ package burner
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -31,53 +30,47 @@ import (
 )
 
 func (ex *Executor) waitForObjects(ns string) {
-	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
 		if obj.Wait {
-			wg.Add(1)
 			if obj.WaitOptions.ForCondition != "" {
 				if !obj.Namespaced {
 					ns = ""
 				}
-				go waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, &wg)
+				waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout)
 			} else {
 				switch obj.kind {
 				case "Deployment":
-					go waitForDeployments(ns, ex.MaxWaitTimeout, &wg)
+					waitForDeployments(ns, ex.MaxWaitTimeout)
 				case "ReplicaSet":
-					go waitForRS(ns, ex.MaxWaitTimeout, &wg)
+					waitForRS(ns, ex.MaxWaitTimeout)
 				case "ReplicationController":
-					go waitForRC(ns, ex.MaxWaitTimeout, &wg)
+					waitForRC(ns, ex.MaxWaitTimeout)
 				case "StatefulSet":
-					go waitForStatefulSet(ns, ex.MaxWaitTimeout, &wg)
+					waitForStatefulSet(ns, ex.MaxWaitTimeout)
 				case "DaemonSet":
-					go waitForDS(ns, ex.MaxWaitTimeout, &wg)
+					waitForDS(ns, ex.MaxWaitTimeout)
 				case "Pod":
-					go waitForPod(ns, ex.MaxWaitTimeout, &wg)
+					waitForPod(ns, ex.MaxWaitTimeout)
 				case "Build", "BuildConfig":
-					go waitForBuild(ns, ex.MaxWaitTimeout, obj.Replicas, &wg)
+					waitForBuild(ns, ex.MaxWaitTimeout, obj.Replicas)
 				case "VirtualMachine":
-					go waitForVM(ns, ex.MaxWaitTimeout, &wg)
+					waitForVM(ns, ex.MaxWaitTimeout)
 				case "VirtualMachineInstance":
-					go waitForVMI(ns, ex.MaxWaitTimeout, &wg)
+					waitForVMI(ns, ex.MaxWaitTimeout)
 				case "VirtualMachineInstanceReplicaSet":
-					go waitForVMIRS(ns, ex.MaxWaitTimeout, &wg)
+					waitForVMIRS(ns, ex.MaxWaitTimeout)
 				case "Job":
-					go waitForJob(ns, ex.MaxWaitTimeout, &wg)
+					waitForJob(ns, ex.MaxWaitTimeout)
 				case "PersistentVolumeClaim":
-					go waitForPVC(ns, ex.MaxWaitTimeout, &wg)
-				default:
-					wg.Done()
+					waitForPVC(ns, ex.MaxWaitTimeout)
 				}
 			}
 		}
 	}
-	wg.Wait()
 	log.Infof("Actions in namespace %v completed", ns)
 }
 
-func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForDeployments(ns string, maxWaitTimeout time.Duration) {
 	// TODO handle errors such as timeouts
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		deps, err := waitClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
@@ -94,8 +87,7 @@ func waitForDeployments(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGr
 	})
 }
 
-func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForRS(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		rss, err := waitClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -111,8 +103,7 @@ func waitForRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForStatefulSet(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		stss, err := waitClientSet.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -128,8 +119,7 @@ func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGr
 	})
 }
 
-func waitForPVC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForPVC(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		pvc, err := waitClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Bound"})
 		if err != nil {
@@ -139,8 +129,7 @@ func waitForPVC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForRC(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		rcs, err := waitClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -156,8 +145,7 @@ func waitForRC(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForDS(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		dss, err := waitClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -173,8 +161,7 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForPod(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		pods, err := waitClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
 		if err != nil {
@@ -184,8 +171,7 @@ func waitForPod(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	})
 }
 
-func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int) {
 	buildStatus := []string{"New", "Pending", "Running"}
 	var build types.UnstructuredContent
 	gvr := schema.GroupVersionResource{
@@ -219,8 +205,7 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int, wg *syn
 	})
 }
 
-func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForJob(ns string, maxWaitTimeout time.Duration) {
 	gvr := schema.GroupVersionResource{
 		Group:    "batch",
 		Version:  "v1",
@@ -229,9 +214,7 @@ func waitForJob(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	verifyCondition(gvr, ns, "Complete", maxWaitTimeout)
 }
 
-func waitForCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration,
-	wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration) {
 	verifyCondition(gvr, ns, condition, maxWaitTimeout)
 }
 
@@ -271,8 +254,7 @@ func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxW
 	})
 }
 
-func waitForVM(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForVM(ns string, maxWaitTimeout time.Duration) {
 	vmGVR := schema.GroupVersionResource{
 		Group:    types.KubevirtGroup,
 		Version:  types.KubevirtAPIVersion,
@@ -281,8 +263,7 @@ func waitForVM(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	verifyCondition(vmGVR, ns, "Ready", maxWaitTimeout)
 }
 
-func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForVMI(ns string, maxWaitTimeout time.Duration) {
 	vmiGVR := schema.GroupVersionResource{
 		Group:    types.KubevirtGroup,
 		Version:  types.KubevirtAPIVersion,
@@ -291,8 +272,7 @@ func waitForVMI(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
 	verifyCondition(vmiGVR, ns, "Ready", maxWaitTimeout)
 }
 
-func waitForVMIRS(ns string, maxWaitTimeout time.Duration, wg *sync.WaitGroup) {
-	defer wg.Done()
+func waitForVMIRS(ns string, maxWaitTimeout time.Duration) {
 	var rs types.UnstructuredContent
 	vmiGVRRS := schema.GroupVersionResource{
 		Group:    types.KubevirtGroup,
