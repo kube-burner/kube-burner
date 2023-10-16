@@ -56,7 +56,7 @@
   instant: true
 
 - query: max(max_over_time(topk(1, sum(container_memory_rss{name!="", namespace="openshift-kube-controller-manager"}) by (pod))[{{.elapsed}}:]))
-  metricName: maxmemory-kube-controller-manager
+  metricName: max-memory-kube-controller-manager
   instant: true
 
 - query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-kube-apiserver"}[2m])) by (pod))[{{.elapsed}}:]))
