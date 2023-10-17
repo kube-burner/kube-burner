@@ -48,7 +48,7 @@ func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])
 		},
 	}
-	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", time.Minute, "Pod ready timeout threshold")
+	cmd.Flags().DurationVar(&podReadyThreshold, "pod-ready-threshold", 2*time.Minute, "Pod ready timeout threshold")
 	cmd.Flags().IntVar(&iterations, "iterations", 0, fmt.Sprintf("%v iterations", variant))
 	cmd.Flags().BoolVar(&churn, "churn", true, "Enable churning")
 	cmd.Flags().DurationVar(&churnDuration, "churn-duration", 1*time.Hour, "Churn duration")
