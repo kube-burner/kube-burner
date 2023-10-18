@@ -114,6 +114,7 @@ func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 		}
 		wh.Metadata.UserMetadata = userMetadataContent
 	}
+	wh.Metadata.UUID = wh.UUID
 	wh.Metadata.Timestamp = time.Now().UTC()
 	return nil
 }
