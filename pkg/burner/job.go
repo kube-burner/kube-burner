@@ -220,7 +220,11 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					EndTimstamp: job.End,
 					ElapsedTime: elapsedTime,
 				}
-				indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
+				if job.JobConfig.SkipIndexing {
+					log.Infof("Skipping job summary indexing in job: %s", job.JobConfig.Name)
+				} else {
+					indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
+				}
 			}
 		}
 		for idx, prometheusClient := range prometheusClients {
