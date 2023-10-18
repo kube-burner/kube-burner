@@ -11,4 +11,5 @@ var MetricsProfileMap = map[string]string{
 	"networkpolicy-multitenant":      "metrics.yml",
 	"networkpolicy-matchlabels":      "metrics.yml",
 	"networkpolicy-matchexpressions": "metrics.yml",
+	"pvc-density":                    "metrics.yml",
 }
