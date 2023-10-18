@@ -100,6 +100,7 @@ func openShiftCmd() *cobra.Command {
 		workloads.NewNodeDensityHeavy(&wh),
 		workloads.NewNodeDensityCNI(&wh),
 		workloads.NewIndex(&wh.MetricsEndpoint, &wh.Metadata, &wh.OcpMetaAgent),
+		workloads.NewPVCDensity(&wh),
 	)
 	return ocpCmd
 }
