@@ -38,7 +38,7 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 		Long:         "If no other indexer is specified, local indexer is used by default",
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
-			uuid, _ = cmd.Flags().GetString("uuid")
+			uuid, _ = cmd.InheritedFlags().GetString("uuid")
 		},
 		PostRun: func(cmd *cobra.Command, args []string) {
 			log.Info("👋 Exiting kube-burner ", uuid)
@@ -58,6 +58,7 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 			}
 			esServer, _ := cmd.Flags().GetString("es-server")
 			esIndex, _ := cmd.Flags().GetString("es-index")
+			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
@@ -87,7 +88,7 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 				Token:           prometheusToken,
 				StartTime:       start,
 				EndTime:         end,
-				JobName:         jobName + "-" + uuid,
+				JobName:         jobName,
 				ActionIndex:     true,
 				UserMetaData:    userMetadata,
 				OcpMetaData:     ocpMetadata,
