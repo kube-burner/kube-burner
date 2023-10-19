@@ -113,7 +113,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
-			waitClientSet, waitRestConfig, err = config.GetClientSet(float32(int(job.QPS)*len(job.Objects)), job.Burst*len(job.Objects))
+			waitClientSet, waitRestConfig, err = config.GetClientSet(job.QPS, job.Burst)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
