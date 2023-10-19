@@ -56,9 +56,10 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			DecodeMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, &metricsEndpoints)
 		} else {
 			metricsEndpoints = append(metricsEndpoints, prometheus.MetricEndpoint{
-				Endpoint: metricsScraperConfig.URL,
-				Token:    metricsScraperConfig.Token,
-				Profile:  metricsScraperConfig.MetricsProfile,
+				Endpoint:     metricsScraperConfig.URL,
+				Token:        metricsScraperConfig.Token,
+				Profile:      metricsScraperConfig.MetricsProfile,
+				AlertProfile: metricsScraperConfig.AlertProfile,
 			})
 		}
 	}
@@ -79,7 +80,6 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 				log.Fatal(err)
 			}
 		}
-		updateParamIfEmpty(&metricsEndpoint.AlertProfile, metricsScraperConfig.AlertProfile)
 		if metricsEndpoint.AlertProfile != "" {
 			if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.ConfigSpec.GlobalConfig.UUID, indexer, p, false); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
