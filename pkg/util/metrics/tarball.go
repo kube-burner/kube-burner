@@ -29,8 +29,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func CreateTarball(indexerConfig indexers.IndexerConfig) error {
-	tarball, err := os.Create(fmt.Sprintf(indexerConfig.TarballName))
+func CreateTarball(indexerConfig indexers.IndexerConfig, tarballName string) error {
+	tarball, err := os.Create(tarballName)
 	if err != nil {
 		return fmt.Errorf("Could not create tarball file: %v", err)
 	}
