@@ -69,12 +69,9 @@ const (
 )
 
 var ClientSet *kubernetes.Clientset
-var waitClientSet *kubernetes.Clientset
 var DynamicClient dynamic.Interface
-var waitDynamicClient dynamic.Interface
 var discoveryClient *discovery.DiscoveryClient
 var restConfig *rest.Config
-var waitRestConfig *rest.Config
 var embedFS embed.FS
 var embedFSDir string
 
@@ -113,11 +110,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
-			waitClientSet, waitRestConfig, err = config.GetClientSet(job.QPS, job.Burst)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
-			waitDynamicClient = dynamic.NewForConfigOrDie(waitRestConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			if job.PreLoadImages && job.JobType == config.CreationJob {
 				if err = preLoadImages(job); err != nil {
@@ -313,12 +308,12 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 		executor := executorMap[executorUUID]
 		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(waitRestConfig.QPS))
+		sem := make(chan int, int(restConfig.QPS))
 		for _, ns := range namespaces {
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				executor.waitForObjects(ns, rate.NewLimiter(rate.Limit(waitRestConfig.QPS), waitRestConfig.Burst))
+				executor.waitForObjects(ns, rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst))
 				<-sem
 				wg.Done()
 			}(ns)

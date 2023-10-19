@@ -99,7 +99,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
-	waitLimiter := rate.NewLimiter(rate.Limit(waitRestConfig.QPS), waitRestConfig.Burst)
+	waitLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
 		"kube-burner-uuid":  ex.uuid,
@@ -162,7 +162,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	if ex.WaitWhenFinished {
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(waitRestConfig.QPS))
+		sem := make(chan int, int(restConfig.QPS))
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)

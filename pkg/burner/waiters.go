@@ -75,7 +75,7 @@ func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
 func waitForDeployments(ns string, maxWaitTimeout time.Duration) {
 	// TODO handle errors such as timeouts
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		deps, err := waitClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
+		deps, err := ClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -91,7 +91,7 @@ func waitForDeployments(ns string, maxWaitTimeout time.Duration) {
 
 func waitForRS(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		rss, err := waitClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
+		rss, err := ClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -107,7 +107,7 @@ func waitForRS(ns string, maxWaitTimeout time.Duration) {
 
 func waitForStatefulSet(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		stss, err := waitClientSet.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{})
+		stss, err := ClientSet.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -123,7 +123,7 @@ func waitForStatefulSet(ns string, maxWaitTimeout time.Duration) {
 
 func waitForPVC(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		pvc, err := waitClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Bound"})
+		pvc, err := ClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Bound"})
 		if err != nil {
 			return false, err
 		}
@@ -133,7 +133,7 @@ func waitForPVC(ns string, maxWaitTimeout time.Duration) {
 
 func waitForRC(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		rcs, err := waitClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
+		rcs, err := ClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -149,7 +149,7 @@ func waitForRC(ns string, maxWaitTimeout time.Duration) {
 
 func waitForDS(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		dss, err := waitClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
+		dss, err := ClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -165,7 +165,7 @@ func waitForDS(ns string, maxWaitTimeout time.Duration) {
 
 func waitForPod(ns string, maxWaitTimeout time.Duration) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		pods, err := waitClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
+		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
 		if err != nil {
 			return false, err
 		}
@@ -182,7 +182,7 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, expected int) {
 		Resource: types.OpenShiftBuildResource,
 	}
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		builds, err := waitDynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
+		builds, err := DynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -225,9 +225,9 @@ func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxW
 	wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
 		if ns != "" {
-			objs, err = waitDynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
+			objs, err = DynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		} else {
-			objs, err = waitDynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
+			objs, err = DynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 		}
 		if err != nil {
 			return false, err
@@ -282,7 +282,7 @@ func waitForVMIRS(ns string, maxWaitTimeout time.Duration) {
 		Resource: types.VirtualMachineInstanceReplicaSetResource,
 	}
 	wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		objs, err := waitDynamicClient.Resource(vmiGVRRS).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
+		objs, err := DynamicClient.Resource(vmiGVRRS).Namespace(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Debugf("VMIRS error %v", err)
 			return false, err
