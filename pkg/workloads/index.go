@@ -109,7 +109,7 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 					rc = 1
 				}
 			}
-			if tarballName != "" {
+			if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer && tarballName != "" {
 				if err := metrics.CreateTarball(configSpec.GlobalConfig.IndexerConfig, tarballName); err != nil {
 					log.Fatal(err)
 				}
@@ -123,7 +123,7 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 	cmd.Flags().Int64Var(&end, "end", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVar(&jobName, "job-name", "kube-burner-ocp-indexing", "Indexing job name")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
-	cmd.Flags().StringVar(&tarballName, "tarball-name", "", "Dump collected metrics into a tarball with the given name")
+	cmd.Flags().StringVar(&tarballName, "tarball-name", "", "Dump collected metrics into a tarball with the given name, requires local indexing")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
