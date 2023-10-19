@@ -43,7 +43,6 @@ type Prometheus struct {
 type Job struct {
 	Start     time.Time
 	End       time.Time
-	Name      string
 	JobConfig config.Job
 }
 
