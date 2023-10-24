@@ -167,7 +167,8 @@ With the help of [networkpolicy](https://kubernetes.io/docs/concepts/services-ne
 
 ## Index
 
-Just like the traditional kube-burner, ocp wrapper also has an indexing functionality which is exposed as `index` subcommand. 
+Just like the traditional kube-burner, ocp wrapper also has an indexing functionality which is exposed as `index` subcommand.
+
 ```console
 $ kube-burner ocp index --help
 If no other indexer is specified, local indexer is used by default
@@ -185,12 +186,15 @@ Flags:
       --user-metadata string       User provided metadata file, in YAML format
   -h, --help                       help for index
 ```
+
 Please refer to [indexing](observability/indexing.md) section for better understanding on the functionality.
 
 ## Reporting mode
+
 This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml)
 
 ## Metrics-profile type
+
 By specifying `--profile-type`, kube-burner can use two different metrics profiles when scraping metrics from prometheus. By default is configured with `both`, meaning that it will use the regular metrics profiles bound to the workload in question and the reporting metrics profile.
 
 While when using the regular profiles ([metrics-aggregated](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-aggregated.yml) or [metrics](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics.yml)), kube-burner scrapes and indexes metrics timeseries, the reporting one is a very useful profile to reduce the number of documents sent to the configured indexer. Thanks to the combination of aggregations and instant queries for prometheus metrics, and 4 summaries for pod latency measurements, only a few documents will be indexed per benchmark. This flag makes possible to specify one or both of these profiles indistinctly.
