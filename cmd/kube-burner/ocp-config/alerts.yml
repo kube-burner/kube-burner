@@ -36,7 +36,7 @@
 
 - expr: up{namespace=~"openshift-etcd"} == 0
   description: "{{$labels.namespace}}/{{$labels.pod}} down"
-  severity: error
+  severity: warning
 
 - expr: up{namespace=~"openshift-.*(kube-controller-manager|scheduler|controller-manager|sdn|ovn-kubernetes|dns)"} == 0
   description: "{{$labels.namespace}}/{{$labels.pod}} down"
@@ -58,4 +58,4 @@
 # Prometheus alerts
 - expr: ALERTS{severity="critical", alertstate="firing"} > 0
   description: Critical prometheus alert. {{$labels.alertname}}
-  severity: warning
+  severity: error
