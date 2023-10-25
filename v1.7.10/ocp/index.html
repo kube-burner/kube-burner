@@ -1040,7 +1040,7 @@ This wrapper is hosted under the <code>kube-burner ocp</code> subcommand that cu
 <li>Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods which <em>don't</em> have some other randomly-selected label. This translates to 10 networkpolicies/namespace</li>
 </ul>
 <h2 id="index">Index<a class="headerlink" href="#index" title="Permanent link">&para;</a></h2>
-<p>Just like the traditional kube-burner, ocp wrapper also has an indexing functionality which is exposed as <code>index</code> subcommand. 
+<p>Just like the traditional kube-burner, ocp wrapper also has an indexing functionality which is exposed as <code>index</code> subcommand.</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>kube-burner<span class="w"> </span>ocp<span class="w"> </span>index<span class="w"> </span>--help
 <span class="go">If no other indexer is specified, local indexer is used by default</span>
 
@@ -1057,7 +1057,7 @@ This wrapper is hosted under the <code>kube-burner ocp</code> subcommand that cu
 <span class="go">      --user-metadata string       User provided metadata file, in YAML format</span>
 <span class="go">  -h, --help                       help for index</span>
 </code></pre></div>
-Please refer to <a href="../observability/indexing/">indexing</a> section for better understanding on the functionality.</p>
+<p>Please refer to <a href="../observability/indexing/">indexing</a> section for better understanding on the functionality.</p>
 <h2 id="reporting-mode">Reporting mode<a class="headerlink" href="#reporting-mode" title="Permanent link">&para;</a></h2>
 <p>This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in <a href="https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml">metrics-report.yml</a></p>
 <h2 id="metrics-profile-type">Metrics-profile type<a class="headerlink" href="#metrics-profile-type" title="Permanent link">&para;</a></h2>
