@@ -24,13 +24,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Updates parameter in place with new value if its is empty
-func updateParamIfEmpty(oldValue *string, newValue string) {
-	if *oldValue == "" {
-		*oldValue = newValue
-	}
-}
-
 // Performs the validity check of metrics endpoint and prometheus url
 func validateMetricsEndpoint(metricsEndpoint string, prometheusURL string) {
 	if (metricsEndpoint != "" && prometheusURL != "") || (metricsEndpoint == "" && prometheusURL == "") {
