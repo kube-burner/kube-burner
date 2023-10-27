@@ -231,9 +231,6 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	}
 	for _, metricsEndpoint := range metricsEndpoints {
 		// Updating the prometheus endpoint actually being used in spec.
-		configSpec.GlobalConfig.PrometheusURL = metricsEndpoint.Endpoint
-		configSpec.GlobalConfig.MetricsProfile = metricsEndpoint.Profile
-		configSpec.GlobalConfig.AlertProfile = metricsEndpoint.AlertProfile
 		auth := prometheus.Auth{
 			Token:         metricsEndpoint.Token,
 			SkipTLSVerify: true,
@@ -242,8 +239,12 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if wh.alerting && configSpec.GlobalConfig.AlertProfile != "" {
-			alertM, err = alerting.NewAlertManager(configSpec.GlobalConfig.AlertProfile, wh.Metadata.UUID, indexer, p, embedConfig)
+		p.ReadProfile(metricsEndpoint.Profile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if wh.alerting && metricsEndpoint.AlertProfile != "" {
+			alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, wh.Metadata.UUID, indexer, p, embedConfig)
 			if err != nil {
 				log.Fatal(err)
 			}

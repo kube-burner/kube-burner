@@ -240,7 +240,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			if globalConfig.IndexerConfig.Type != "" {
 				prometheusClient.ScrapeJobsMetrics(indexer)
 				if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
-					metrics.CreateTarball(globalConfig.IndexerConfig)
+					metrics.CreateTarball(globalConfig.IndexerConfig, globalConfig.IndexerConfig.TarballName)
 				}
 			}
 		}

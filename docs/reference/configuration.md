@@ -21,10 +21,6 @@ In this section is described global job configuration, it holds the following pa
 | `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/latest/measurements)                            | List          | []          |
 | `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/latest/observability/indexing)                 | Object        | {}           |
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 15s         |
-| `prometheusURL`    | Prometheus URL endpoint, flag has precedence                                                             | String        | ""         |
-| `bearerToken`      | Bearer token to access the Prometheus endpoint                                                           | String        | ""         |
-| `metricsProfile`   | Path to the metrics profile configuration file                                                           | String         | ""         |
-| `metricsEndpoint`  | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String     | "" |
 | `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
 | `GCMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
 | `GCTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |

@@ -35,18 +35,14 @@ type ScraperConfig struct {
 	URL             string
 	Token           string
 	Username        string
-	StartTime       int64
-	EndTime         int64
-	JobName         string
-	ActionIndex     bool
 	UserMetaData    string
-	OcpMetaData     map[string]interface{}
+	RawMetadata     map[string]interface{}
 }
 
 // ScraperResponse holds parsed data related to scraper and target indexer
 type Scraper struct {
-	PrometheusClients   []*prometheus.Prometheus
-	AlertMs             []*alerting.AlertManager
-	Indexer             *indexers.Indexer
-	UserMetadataContent map[string]interface{}
+	PrometheusClients []*prometheus.Prometheus
+	AlertMs           []*alerting.AlertManager
+	Indexer           *indexers.Indexer
+	Metadata          map[string]interface{}
 }
