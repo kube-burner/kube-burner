@@ -144,11 +144,10 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		}
 		for objectIndex, obj := range ex.objects {
 			labels := map[string]string{
-				"kube-burner-uuid":      ex.uuid,
-				"kube-burner-job":       ex.Name,
-				"kube-burner-index":     strconv.Itoa(objectIndex),
-				"kube-burner-runid":     ex.runid,
-				"kube-burner-namespace": ns,
+				"kube-burner-uuid":  ex.uuid,
+				"kube-burner-job":   ex.Name,
+				"kube-burner-index": strconv.Itoa(objectIndex),
+				"kube-burner-runid": ex.runid,
 			}
 			ex.objects[objectIndex].labelSelector = labels
 			ex.replicaHandler(labels, obj, ns, i, &wg)
@@ -177,9 +176,8 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 				ns = ex.generateNamespace(i)
 				if namespacesWaited[ns] {
 					continue
-				} else {
-					namespacesWaited[ns] = true
 				}
+				namespacesWaited[ns] = true
 			}
 			sem <- 1
 			wg.Add(1)
@@ -329,7 +327,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
 		// Cleanup namespaces based on the labels we added
-		CleanupNamespaceResourcesUsingGVR(ctx, ex.objects, namespacesToDelete, true)
+		CleanupNamespaceResourcesUsingGVR(ctx, ex.objects, namespacesToDelete, ex.Name)
 		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"}, true)
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted

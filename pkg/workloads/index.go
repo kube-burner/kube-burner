@@ -28,7 +28,7 @@ import (
 )
 
 // NewIndex orchestrates indexing for ocp wrapper
-func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent *ocpmetadata.Metadata) *cobra.Command {
+func NewIndex(metricsEndpoint *string, ocpMetaAgent *ocpmetadata.Metadata) *cobra.Command {
 	var metricsProfile, jobName string
 	var start, end int64
 	var userMetadata, metricsDirectory string
