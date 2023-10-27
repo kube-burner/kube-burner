@@ -99,7 +99,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
-	waitLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
+	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
 		"kube-burner-uuid":  ex.uuid,
@@ -148,7 +148,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns, waitLimiter)
+				ex.waitForObjects(ns, waitRateLimiter)
 				namespacesWaited[ns] = true
 			}
 		}
@@ -175,7 +175,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				ex.waitForObjects(ns, waitLimiter)
+				ex.waitForObjects(ns, waitRateLimiter)
 				<-sem
 				wg.Done()
 			}(ns)
