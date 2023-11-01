@@ -159,9 +159,8 @@ func waitForDeleteNamespaces(ctx context.Context, l metav1.ListOptions) {
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			log.Fatalf("Timeout cleaning up namespaces: %v", err)
-		} else {
-			log.Errorf("Error cleaning up namespaces: %v", err)
 		}
+		log.Errorf("Error cleaning up namespaces: %v", err)
 	}
 }
 
@@ -181,8 +180,7 @@ func waitForDeleteNonNamespacedResources(ctx context.Context, resourceInterface 
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			log.Fatalf("Timeout cleaning up non-namespaced resources: %v", err)
-		} else {
-			log.Errorf("Error cleaning up non-namespaced resources: %v", err)
 		}
+		log.Errorf("Error cleaning up non-namespaced resources: %v", err)
 	}
 }

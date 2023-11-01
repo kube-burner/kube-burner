@@ -233,6 +233,7 @@ func indexCmd() *cobra.Command {
 				Username:        username,
 				UserMetaData:    userMetadata,
 			})
+			docsToIndex := make(map[string][]interface{})
 			for _, prometheusClients := range metricsScraper.PrometheusClients {
 				prometheusJob := prometheus.Job{
 					Start: time.Unix(start, 0),
@@ -242,10 +243,12 @@ func indexCmd() *cobra.Command {
 					},
 				}
 				prometheusClients.JobList = append(prometheusClients.JobList, prometheusJob)
-				if err := prometheusClients.ScrapeJobsMetrics(metricsScraper.Indexer); err != nil {
+				if err := prometheusClients.ScrapeJobsMetrics(docsToIndex); err != nil {
 					log.Fatal(err)
 				}
 			}
+			log.Infof("Indexing metrics with UUID %s", uuid)
+			metrics.IndexDatapoints(docsToIndex, configSpec.GlobalConfig.IndexerConfig.Type, metricsScraper.Indexer)
 			if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer && tarballName != "" {
 				if err := metrics.CreateTarball(configSpec.GlobalConfig.IndexerConfig, tarballName); err != nil {
 					log.Fatal(err)

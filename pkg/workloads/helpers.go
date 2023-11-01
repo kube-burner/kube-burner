@@ -214,6 +214,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			Profile:  reportProfile,
 			Token:    wh.prometheusToken,
 		}
+		log.Info("Profile: ", wh.profileType)
 		switch ProfileType(wh.profileType) {
 		case regular:
 			metricsEndpoints = append(metricsEndpoints, regularProfile)

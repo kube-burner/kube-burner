@@ -169,9 +169,8 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 				ns = ex.generateNamespace(i)
 				if namespacesWaited[ns] {
 					continue
-				} else {
-					namespacesWaited[ns] = true
 				}
+				namespacesWaited[ns] = true
 			}
 			sem <- 1
 			wg.Add(1)
