@@ -47,14 +47,14 @@ func init() {
 
 func (p *pprof) setConfig(cfg types.Measurement) error {
 	p.config = cfg
-	if err := p.validateConfig(); err != nil {
-		return err
-	}
 	return nil
 }
 
-func (p *pprof) start(measurementWg *sync.WaitGroup) {
+func (p *pprof) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	if err := p.validateConfig(); err != nil {
+		return err
+	}
 	var wg sync.WaitGroup
 	err := os.MkdirAll(p.config.PProfDirectory, 0744)
 	if err != nil {
@@ -79,6 +79,7 @@ func (p *pprof) start(measurementWg *sync.WaitGroup) {
 			}
 		}
 	}()
+	return nil
 }
 
 func getPods(target types.PProftarget) []corev1.Pod {

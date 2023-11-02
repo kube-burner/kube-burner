@@ -67,7 +67,9 @@ type podLatency struct {
 }
 
 func init() {
-	measurementMap["podLatency"] = &podLatency{}
+	measurementMap["podLatency"] = &podLatency{
+		metrics: make(map[string]podMetric),
+	}
 }
 
 func (p *podLatency) handleCreatePod(obj interface{}) {
@@ -121,19 +123,33 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 }
 
 func (p *podLatency) setConfig(cfg types.Measurement) error {
+	var metricFound bool
+	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
 	p.config = cfg
-	if err := p.validateConfig(); err != nil {
-		return err
+	for _, th := range p.config.LatencyThresholds {
+		if th.ConditionType == string(corev1.ContainersReady) || th.ConditionType == string(corev1.PodInitialized) || th.ConditionType == string(corev1.PodReady) || th.ConditionType == string(corev1.PodScheduled) {
+			for _, lm := range latencyMetrics {
+				if th.Metric == lm {
+					metricFound = true
+					break
+				}
+			}
+			if !metricFound {
+				return fmt.Errorf("unsupported metric %s in podLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
+			}
+		} else {
+			return fmt.Errorf("unsupported pod condition type in podLatency measurement: %s", th.ConditionType)
+		}
 	}
 	return nil
 }
 
-// start starts podLatency measurement
-func (p *podLatency) start(measurementWg *sync.WaitGroup) {
+// start podLatency measurement
+func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	if factory.jobConfig.JobType == config.DeletionJob {
 		log.Info("Pod latency measurement not compatible with delete jobs, skipping")
-		return
+		return nil
 	}
 	p.metrics = make(map[string]podMetric)
 	log.Infof("Creating Pod latency watcher for %s", factory.jobConfig.Name)
@@ -143,8 +159,9 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 		"pods",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", globalCfg.RUNID)
 		},
+		nil,
 	)
 	p.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreatePod,
@@ -153,8 +170,9 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 		},
 	})
 	if err := p.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Pod Latency measurement error: %s", err)
+		return fmt.Errorf("Pod Latency measurement error: %s", err)
 	}
+	return nil
 }
 
 // collects pod measurements triggered in the past

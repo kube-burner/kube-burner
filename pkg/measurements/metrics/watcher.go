@@ -28,11 +28,11 @@ const informerTimeout = time.Minute
 type Watcher struct {
 	name        string
 	stopChannel chan struct{}
-	Informer    cache.SharedInformer
+	Informer    cache.SharedIndexInformer
 }
 
 // NewWatcher return a new ListWatcher of the specified resource and namespace
-func NewWatcher(restClient *rest.RESTClient, name string, resource string, namespace string, optionsModifier func(options *metav1.ListOptions)) *Watcher {
+func NewWatcher(restClient *rest.RESTClient, name string, resource string, namespace string, optionsModifier func(options *metav1.ListOptions), indexers cache.Indexers) *Watcher {
 	lw := cache.NewFilteredListWatchFromClient(
 		restClient,
 		resource,
@@ -42,7 +42,7 @@ func NewWatcher(restClient *rest.RESTClient, name string, resource string, names
 	return &Watcher{
 		name:        name,
 		stopChannel: make(chan struct{}),
-		Informer:    cache.NewSharedInformer(lw, nil, 0),
+		Informer:    cache.NewSharedIndexInformer(lw, nil, 0, indexers),
 	}
 }
 
