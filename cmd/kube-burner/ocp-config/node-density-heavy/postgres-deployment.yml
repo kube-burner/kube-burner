@@ -7,7 +7,15 @@ spec:
     metadata:
       labels:
         name: postgres-{{.Replica}}-{{.Iteration}}
+        app: postgres
     spec:
+      topologySpreadConstraints:
+      - maxSkew: 1 
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway 
+        labelSelector: 
+          matchLabels:
+            app: postgres
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
