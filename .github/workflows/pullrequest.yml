@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - master
+      - release-*
   pull_request_target:
     branches:
       - master
       - main
+      - release-*
 
 jobs:
   linters:
