@@ -263,10 +263,18 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 				log.Fatalf("Authorization error creating %s/%s: %s", obj.GetKind(), obj.GetName(), err)
 				return true, err
 			} else if kerrors.IsAlreadyExists(err) {
-				log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
+				if ns != "" {
+					log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
+				} else {
+					log.Errorf("%s/%s already exists", obj.GetKind(), obj.GetName())
+				}
 				return true, nil
 			} else if err != nil {
-				log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
+				if ns != "" {
+					log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
+				} else {
+					log.Errorf("Error creating object %s/%s: %s", obj.GetKind(), obj.GetName(), err)
+				}
 			}
 			log.Error("Retrying object creation")
 			return false, nil
