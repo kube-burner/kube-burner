@@ -169,8 +169,12 @@ func (p *podLatency) stop() error {
 		err = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
 	}
 	if globalCfg.IndexerConfig.Type != "" {
-		log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
-		p.index()
+		if factory.jobConfig.SkipIndexing {
+			log.Infof("Skipping pod latency data indexing in job")
+		} else {
+			log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
+			p.index()
+		}
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
