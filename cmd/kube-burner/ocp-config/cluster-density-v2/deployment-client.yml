@@ -6,13 +6,20 @@ spec:
   replicas: {{.podReplicas}}
   selector:
     matchLabels:
-      app: client-{{.Replica}}
+      name: client-{{.Replica}}
   template:
     metadata:
       labels:
-        app: client-{{.Replica}}
-        name: client
+        name: client-{{.Replica}}
+        app: client
     spec:
+      topologySpreadConstraints:
+      - maxSkew: 1 
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway 
+        labelSelector: 
+          matchLabels:
+            app: client
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

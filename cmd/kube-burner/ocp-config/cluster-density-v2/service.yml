@@ -5,7 +5,7 @@ metadata:
   name: cluster-density-{{.Replica}}
 spec:
   selector:
-    name: nginx
+    app: nginx
   ports:
   - name: http
     protocol: TCP
