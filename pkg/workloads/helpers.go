@@ -33,7 +33,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -45,43 +44,10 @@ const (
 	reportProfile         = "metrics-report.yml"
 )
 
-type ProfileType string
-
-const (
-	regular   ProfileType = "regular"
-	reporting ProfileType = "reporting"
-	both      ProfileType = "both"
-)
-
-type BenchmarkMetadata struct {
-	ocpmetadata.ClusterMetadata
-	UUID            string                 `json:"uuid"`
-	Benchmark       string                 `json:"benchmark"`
-	Timestamp       time.Time              `json:"timestamp"`
-	EndDate         time.Time              `json:"endDate"`
-	Passed          bool                   `json:"passed"`
-	ExecutionErrors string                 `json:"executionErrors"`
-	UserMetadata    map[string]interface{} `json:"metadata,omitempty"`
-}
-
-type WorkloadHelper struct {
-	envVars         map[string]string
-	prometheusURL   string
-	prometheusToken string
-	MetricsEndpoint string
-	timeout         time.Duration
-	Metadata        BenchmarkMetadata
-	alerting        bool
-	ocpConfig       embed.FS
-	OcpMetaAgent    ocpmetadata.Metadata
-	profileType     string
-	restConfig      *rest.Config
-}
-
 var configSpec config.Spec
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(envVars map[string]string, alerting bool, profileType string, ocpConfig embed.FS, timeout time.Duration, metricsEndpoint string) WorkloadHelper {
+func NewWorkloadHelper(config Config, ocpConfig embed.FS) WorkloadHelper {
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
@@ -97,14 +63,10 @@ func NewWorkloadHelper(envVars map[string]string, alerting bool, profileType str
 		log.Fatal(err.Error())
 	}
 	return WorkloadHelper{
-		envVars:         envVars,
-		alerting:        alerting,
-		MetricsEndpoint: metricsEndpoint,
-		ocpConfig:       ocpConfig,
-		OcpMetaAgent:    ocpMetadata,
-		timeout:         timeout,
-		restConfig:      restConfig,
-		profileType:     profileType,
+		Config:       config,
+		ocpConfig:    ocpConfig,
+		OcpMetaAgent: ocpMetadata,
+		restConfig:   restConfig,
 	}
 }
 
@@ -114,18 +76,26 @@ var indexer *indexers.Indexer
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	var err error
 	if wh.MetricsEndpoint == "" {
-		prometheusURL, prometheusToken, err := wh.OcpMetaAgent.GetPrometheus()
+		wh.prometheusURL, wh.prometheusToken, err = wh.OcpMetaAgent.GetPrometheus()
 		if err != nil {
 			log.Fatal("Error obtaining Prometheus information: ", err.Error())
 		}
-		wh.prometheusURL = prometheusURL
-		wh.prometheusToken = prometheusToken
 	}
-	wh.envVars["INGRESS_DOMAIN"], err = wh.OcpMetaAgent.GetDefaultIngressDomain()
+	ingressDomain, err := wh.OcpMetaAgent.GetDefaultIngressDomain()
 	if err != nil {
 		log.Fatal("Error obtaining default ingress domain: ", err.Error())
 	}
-	for k, v := range wh.envVars {
+	envVars := map[string]string{
+		"ES_SERVER":      wh.EsServer,
+		"ES_INDEX":       wh.Esindex,
+		"QPS":            fmt.Sprintf("%d", wh.QPS),
+		"BURST":          fmt.Sprintf("%d", wh.Burst),
+		"INGRESS_DOMAIN": ingressDomain,
+		"GC":             fmt.Sprintf("%v", wh.Gc),
+		"GC_METRICS":     fmt.Sprintf("%v", wh.GcMetrics),
+		"INDEXING_TYPE":  string(wh.Indexer),
+	}
+	for k, v := range envVars {
 		os.Setenv(k, v)
 	}
 }
@@ -144,6 +114,7 @@ func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 		}
 		wh.Metadata.UserMetadata = userMetadataContent
 	}
+	wh.Metadata.UUID = wh.UUID
 	wh.Metadata.Timestamp = time.Now().UTC()
 	return nil
 }
@@ -183,7 +154,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 		}
 	}
-	configSpec, err = config.Parse(wh.Metadata.UUID, f)
+	configSpec, err = config.Parse(wh.UUID, f)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -214,7 +185,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			Profile:  reportProfile,
 			Token:    wh.prometheusToken,
 		}
-		switch ProfileType(wh.profileType) {
+		switch ProfileType(wh.ProfileType) {
 		case regular:
 			metricsEndpoints = append(metricsEndpoints, regularProfile)
 		case reporting:
@@ -226,7 +197,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		case both:
 			metricsEndpoints = append(metricsEndpoints, regularProfile, reportingProfile)
 		default:
-			log.Fatalf("Metrics profile type not supported: %v", wh.profileType)
+			log.Fatalf("Metrics profile type not supported: %v", wh.ProfileType)
 		}
 	}
 	for _, metricsEndpoint := range metricsEndpoints {
@@ -243,7 +214,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if wh.alerting && metricsEndpoint.AlertProfile != "" {
+		if wh.Alerting && metricsEndpoint.AlertProfile != "" {
 			alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, wh.Metadata.UUID, indexer, p, embedConfig)
 			if err != nil {
 				log.Fatal(err)
@@ -253,7 +224,8 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		alertMs = append(alertMs, alertM)
 		alertM = nil
 	}
-	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.timeout, metadata)
+	configSpec.GlobalConfig.GCMetrics = wh.GcMetrics
+	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.Timeout, metadata)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)
@@ -262,7 +234,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	if indexerConfig.Type != "" {
 		IndexMetadata(indexer, wh.Metadata)
 	}
-	log.Info("👋 Exiting kube-burner ", wh.Metadata.UUID)
+	log.Info("👋 Exiting kube-burner ", wh.UUID)
 	os.Exit(rc)
 }
 
