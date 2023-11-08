@@ -1,1 +1,24 @@
-[{"version": "v1.7.10", "title": "v1.7.10", "aliases": ["latest"]}, {"version": "v1.7.9", "title": "v1.7.9", "aliases": []}, {"version": "v1.7.8", "title": "v1.7.8", "aliases": []}]
+[
+  {
+    "version": "v1.7.11",
+    "title": "v1.7.11",
+    "aliases": [
+      "latest"
+    ]
+  },
+  {
+    "version": "v1.7.10",
+    "title": "v1.7.10",
+    "aliases": []
+  },
+  {
+    "version": "v1.7.9",
+    "title": "v1.7.9",
+    "aliases": []
+  },
+  {
+    "version": "v1.7.8",
+    "title": "v1.7.8",
+    "aliases": []
+  }
+]
