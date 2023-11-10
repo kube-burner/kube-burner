@@ -36,21 +36,17 @@ import (
 func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
-		Step:       step,
-		UUID:       configSpec.GlobalConfig.UUID,
-		ConfigSpec: configSpec,
-		Endpoint:   url,
-		metadata:   metadata,
+		Step:        step,
+		UUID:        configSpec.GlobalConfig.UUID,
+		ConfigSpec:  configSpec,
+		Endpoint:    url,
+		metadata:    metadata,
+		embedConfig: embedConfig,
 	}
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
 	p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
 	if err != nil {
 		return &p, err
-	}
-	if configSpec.GlobalConfig.MetricsProfile != "" {
-		if err := p.readProfile(configSpec.GlobalConfig.MetricsProfile, embedConfig); err != nil {
-			return &p, fmt.Errorf("metrics-profile: %v", err.Error())
-		}
 	}
 	return &p, nil
 }
@@ -61,7 +57,7 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	end := p.JobList[len(p.JobList)-1].End
 	log.Infof("🔍 Scraping %v Profile: %v Start: %v End: %v",
 		p.Endpoint,
-		p.ConfigSpec.GlobalConfig.MetricsProfile,
+		p.profileName,
 		start.Format(time.RFC3339),
 		end.Format(time.RFC3339))
 	log.Infof("Indexing metrics with UUID %s", p.UUID)
@@ -71,6 +67,10 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
 	docsToIndex := make(map[string][]interface{})
 	for _, eachJob := range p.JobList {
+		if eachJob.JobConfig.SkipIndexing {
+			log.Infof("Skipping indexing in job: %v", eachJob.JobConfig.Name)
+			continue
+		}
 		jobStart := eachJob.Start
 		jobEnd := eachJob.End
 		log.Info("Scraping metrics for job: ", eachJob.JobConfig.Name)
@@ -140,15 +140,16 @@ func (p *Prometheus) parseMatrix(metricName, query string, jobConfig config.Job,
 }
 
 // ReadProfile reads, parses and validates metric profile configuration
-func (p *Prometheus) readProfile(metricsProfile string, embedConfig bool) error {
+func (p *Prometheus) ReadProfile(metricsProfile string) error {
 	var f io.Reader
 	var err error
-	if embedConfig {
+	if p.embedConfig {
 		metricsProfile = path.Join(path.Dir(p.ConfigSpec.EmbedFSDir), metricsProfile)
 		f, err = util.ReadEmbedConfig(p.ConfigSpec.EmbedFS, metricsProfile)
 	} else {
 		f, err = util.ReadConfig(metricsProfile)
 	}
+	p.profileName = metricsProfile
 	if err != nil {
 		return fmt.Errorf("error reading metrics profile %s: %s", metricsProfile, err)
 	}

@@ -28,7 +28,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -93,7 +92,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 }
 
 func (p *podLatency) handleUpdatePod(obj interface{}) {
-	pod := obj.(*v1.Pod)
+	pod := obj.(*corev1.Pod)
 	p.metricLock.Lock()
 	defer p.metricLock.Unlock()
 	if pm, exists := p.metrics[string(pod.UID)]; exists && pm.podReady.IsZero() {
@@ -169,8 +168,12 @@ func (p *podLatency) stop() error {
 		err = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
 	}
 	if globalCfg.IndexerConfig.Type != "" {
-		log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
-		p.index()
+		if factory.jobConfig.SkipIndexing {
+			log.Infof("Skipping pod latency data indexing in job: %s", factory.jobConfig.Name)
+		} else {
+			log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
+			p.index()
+		}
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
@@ -186,6 +189,7 @@ func (p *podLatency) stop() error {
 
 // index sends metrics to the configured indexer
 func (p *podLatency) index() {
+	log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
@@ -197,7 +201,7 @@ func (p *podLatency) index() {
 		indexingOpts := indexers.IndexingOpts{
 			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
 		}
-		log.Debugf("Indexing [%d] documents", len(data))
+		log.Debugf("Indexing [%d] documents: %s", len(data), metricName)
 		resp, err := (*factory.indexer).Index(data, indexingOpts)
 		if err != nil {
 			log.Error(err.Error())
@@ -323,7 +327,7 @@ func (p *podLatency) validateConfig() error {
 
 // validatePod validates a pod based on job type and returns its timestamp for latency calculation.
 // It returns a timestamp and a boolean value indicating validation details.
-func validatePod(jobType config.JobType, pod *v1.Pod) (time.Time, bool) {
+func validatePod(jobType config.JobType, pod *corev1.Pod) (time.Time, bool) {
 	if jobType == config.CreationJob {
 		runid, exists := pod.Labels["kube-burner-runid"]
 		if exists && runid == globalCfg.RUNID {

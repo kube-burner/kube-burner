@@ -15,11 +15,13 @@
 package workloads
 
 import (
-	"encoding/json"
+	"os"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -32,29 +34,23 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 	var userMetadata, metricsDirectory string
 	var prometheusStep time.Duration
 	var uuid string
+	var rc int
+	var prometheusURL, prometheusToken string
+	var tarballName string
 	cmd := &cobra.Command{
 		Use:          "index",
 		Short:        "Runs index sub-command",
 		Long:         "If no other indexer is specified, local indexer is used by default",
 		SilenceUsage: true,
-		PreRun: func(cmd *cobra.Command, args []string) {
-			uuid, _ = cmd.InheritedFlags().GetString("uuid")
-		},
 		PostRun: func(cmd *cobra.Command, args []string) {
 			log.Info("👋 Exiting kube-burner ", uuid)
+			os.Exit(rc)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			uuid, _ = cmd.Flags().GetString("uuid")
 			clusterMetadata, err := ocpMetaAgent.GetClusterMetadata()
 			if err != nil {
 				log.Fatal("Error obtaining clusterMetadata: ", err.Error())
-			}
-			ocpMetadata := make(map[string]interface{})
-			jsonData, err := json.Marshal(clusterMetadata)
-			if err != nil {
-				log.Fatal("Error getting clusterMetadata json: ", err.Error())
-			}
-			if err := json.Unmarshal(jsonData, &ocpMetadata); err != nil {
-				log.Fatal("Errar unmarshalling clusterMetadata: ", err.Error())
 			}
 			esServer, _ := cmd.Flags().GetString("es-server")
 			esIndex, _ := cmd.Flags().GetString("es-index")
@@ -74,11 +70,22 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 					MetricsDirectory: metricsDirectory,
 				}
 			}
-			prometheusURL, prometheusToken, err := ocpMetaAgent.GetPrometheus()
-			if err != nil {
-				log.Fatal("Error obtaining prometheus information from cluster: ", err.Error())
+			// When metricsEndpoint is specified, don't fetch any prometheus token
+			if *metricsEndpoint == "" {
+				prometheusURL, prometheusToken, err = ocpMetaAgent.GetPrometheus()
+				if err != nil {
+					log.Fatal("Error obtaining prometheus information from cluster: ", err.Error())
+				}
 			}
-			scraperOutput := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+			metadata := map[string]interface{}{
+				"platform":        clusterMetadata.Platform,
+				"ocpVersion":      clusterMetadata.OCPVersion,
+				"ocpMajorVersion": clusterMetadata.OCPMajorVersion,
+				"k8sVersion":      clusterMetadata.K8SVersion,
+				"totalNodes":      clusterMetadata.TotalNodes,
+				"sdnType":         clusterMetadata.SDNType,
+			}
+			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      configSpec,
 				PrometheusStep:  prometheusStep,
 				MetricsEndpoint: *metricsEndpoint,
@@ -86,14 +93,27 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 				SkipTLSVerify:   true,
 				URL:             prometheusURL,
 				Token:           prometheusToken,
-				StartTime:       start,
-				EndTime:         end,
-				JobName:         jobName,
-				ActionIndex:     true,
 				UserMetaData:    userMetadata,
-				OcpMetaData:     ocpMetadata,
+				RawMetadata:     metadata,
 			})
-			IndexMetadata(scraperOutput.Indexer, *metadata)
+			for _, prometheusClients := range metricsScraper.PrometheusClients {
+				prometheusJob := prometheus.Job{
+					Start: time.Unix(start, 0),
+					End:   time.Unix(end, 0),
+					JobConfig: config.Job{
+						Name: jobName,
+					},
+				}
+				prometheusClients.JobList = append(prometheusClients.JobList, prometheusJob)
+				if prometheusClients.ScrapeJobsMetrics(metricsScraper.Indexer) != nil {
+					rc = 1
+				}
+			}
+			if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer && tarballName != "" {
+				if err := metrics.CreateTarball(configSpec.GlobalConfig.IndexerConfig, tarballName); err != nil {
+					log.Fatal(err)
+				}
+			}
 		},
 	}
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file")
@@ -103,6 +123,7 @@ func NewIndex(metricsEndpoint *string, metadata *BenchmarkMetadata, ocpMetaAgent
 	cmd.Flags().Int64Var(&end, "end", time.Now().Unix(), "Epoch end time")
 	cmd.Flags().StringVar(&jobName, "job-name", "kube-burner-ocp-indexing", "Indexing job name")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
+	cmd.Flags().StringVar(&tarballName, "tarball-name", "", "Dump collected metrics into a tarball with the given name, requires local indexing")
 	cmd.Flags().SortFlags = false
 	return cmd
 }

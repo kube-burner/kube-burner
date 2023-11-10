@@ -17,9 +17,7 @@ package main
 import (
 	"embed"
 	_ "embed"
-	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -38,44 +36,35 @@ func openShiftCmd() *cobra.Command {
 		Short: "OpenShift wrapper",
 		Long:  `This subcommand is meant to be used against OpenShift clusters and serve as a shortcut to trigger well-known workloads`,
 	}
+	var workloadConfig workloads.Config
 	var wh workloads.WorkloadHelper
-	var indexingType indexers.IndexerType
-	esServer := ocpCmd.PersistentFlags().String("es-server", "", "Elastic Search endpoint")
+	ocpCmd.PersistentFlags().StringVar(&workloadConfig.EsServer, "es-server", "", "Elastic Search endpoint")
+	ocpCmd.PersistentFlags().StringVar(&workloadConfig.Esindex, "es-index", "", "Elastic Search index")
 	localIndexing := ocpCmd.PersistentFlags().Bool("local-indexing", false, "Enable local indexing")
-	esIndex := ocpCmd.PersistentFlags().String("es-index", "", "Elastic Search index")
-	metricsEndpoint := ocpCmd.PersistentFlags().String("metrics-endpoint", "", "YAML file with a list of metric endpoints")
-	alerting := ocpCmd.PersistentFlags().Bool("alerting", true, "Enable alerting")
-	uuid := ocpCmd.PersistentFlags().String("uuid", uid.NewV4().String(), "Benchmark UUID")
-	timeout := ocpCmd.PersistentFlags().Duration("timeout", 4*time.Hour, "Benchmark timeout")
-	qps := ocpCmd.PersistentFlags().Int("qps", 20, "QPS")
-	burst := ocpCmd.PersistentFlags().Int("burst", 20, "Burst")
-	gc := ocpCmd.PersistentFlags().Bool("gc", true, "Garbage collect created namespaces")
-	gcMetrics := ocpCmd.PersistentFlags().Bool("gc-metrics", false, "Collect metrics during garbage collection")
+	ocpCmd.PersistentFlags().StringVar(&workloadConfig.MetricsEndpoint, "metrics-endpoint", "", "YAML file with a list of metric endpoints")
+	ocpCmd.PersistentFlags().BoolVar(&workloadConfig.Alerting, "alerting", true, "Enable alerting")
+	ocpCmd.PersistentFlags().StringVar(&workloadConfig.UUID, "uuid", uid.NewV4().String(), "Benchmark UUID")
+	ocpCmd.PersistentFlags().DurationVar(&workloadConfig.Timeout, "timeout", 4*time.Hour, "Benchmark timeout")
+	ocpCmd.PersistentFlags().IntVar(&workloadConfig.QPS, "qps", 20, "QPS")
+	ocpCmd.PersistentFlags().IntVar(&workloadConfig.Burst, "burst", 20, "Burst")
+	ocpCmd.PersistentFlags().BoolVar(&workloadConfig.Gc, "gc", true, "Garbage collect created namespaces")
+	ocpCmd.PersistentFlags().BoolVar(&workloadConfig.GcMetrics, "gc-metrics", false, "Collect metrics during garbage collection")
 	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
 	extract := ocpCmd.PersistentFlags().Bool("extract", false, "Extract workload in the current directory")
-	profileType := ocpCmd.PersistentFlags().String("profile-type", "both", "Metrics profile to use, supported options are: regular, reporting or both")
+	ocpCmd.PersistentFlags().StringVar(&workloadConfig.ProfileType, "profile-type", "both", "Metrics profile to use, supported options are: regular, reporting or both")
+	ocpCmd.PersistentFlags().BoolVar(&workloadConfig.Reporting, "reporting", false, "Enable benchmark report indexing")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.MarkFlagsMutuallyExclusive("es-server", "local-indexing")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
-		if *esServer != "" || *localIndexing {
-			if *esServer != "" {
-				indexingType = indexers.ElasticIndexer
+		if workloadConfig.EsServer != "" || *localIndexing {
+			if workloadConfig.EsServer != "" {
+				workloadConfig.Indexer = indexers.ElasticIndexer
 			} else {
-				indexingType = indexers.LocalIndexer
+				workloadConfig.Indexer = indexers.LocalIndexer
 			}
 		}
-		envVars := map[string]string{
-			"ES_SERVER":     strings.TrimSuffix(*esServer, "/"),
-			"ES_INDEX":      *esIndex,
-			"QPS":           fmt.Sprintf("%d", *qps),
-			"BURST":         fmt.Sprintf("%d", *burst),
-			"GC":            fmt.Sprintf("%v", *gc),
-			"GC_METRICS":    fmt.Sprintf("%v", *gcMetrics),
-			"INDEXING_TYPE": string(indexingType),
-		}
-		wh = workloads.NewWorkloadHelper(envVars, *alerting, *profileType, ocpConfig, *timeout, *metricsEndpoint)
-		wh.Metadata.UUID = *uuid
+		wh = workloads.NewWorkloadHelper(workloadConfig, ocpConfig)
 		if *extract {
 			if err := wh.ExtractWorkload(cmd.Name(), workloads.MetricsProfileMap[cmd.Name()]); err != nil {
 				log.Fatal(err)

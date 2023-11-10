@@ -21,10 +21,6 @@ In this section is described global job configuration, it holds the following pa
 | `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/latest/measurements)                            | List          | []          |
 | `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/latest/observability/indexing)                 | Object        | {}           |
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 15s         |
-| `prometheusURL`    | Prometheus URL endpoint, flag has precedence                                                             | String        | ""         |
-| `bearerToken`      | Bearer token to access the Prometheus endpoint                                                           | String        | ""         |
-| `metricsProfile`   | Path to the metrics profile configuration file                                                           | String         | ""         |
-| `metricsEndpoint`  | Path to the metrics endpoint configuration file containing a list of target endpoints, flag has precedence |  String     | "" |
 | `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
 | `GCMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
 | `GCTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
@@ -62,6 +58,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `objects`              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | []      |
 | `verifyObjects`        | Verify object count after running each job                                       | Boolean | true    |
 | `errorOnVerify`        | Set RC to 1 when objects verification fails                                      | Boolean | true    |
+| `skipIndexing`         | Skip metric indexing on this job                                                 | Boolean | false   |
 | `preLoadImages`        | Kube-burner will create a DS before triggering the job to pull all the images of the job   | true    |
 | `preLoadPeriod`        | How long to wait for the preload daemonset                                       | Duration| 1m     |
 | `preloadNodeLabels`    | Add node selector labels for the resources created in preload stage              | Object  | {} |
