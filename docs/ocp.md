@@ -11,7 +11,6 @@ Usage:
   kube-burner ocp [command]
 
 Available Commands:
-  cluster-density    Runs cluster-density workload
   cluster-density-ms Runs cluster-density-ms workload
   cluster-density-v2 Runs cluster-density-v2 workload
   index              Runs index sub-command
@@ -46,6 +45,13 @@ Use "kube-burner ocp [command] --help" for more information about a command.
 
 ## Usage
 
+Some of the benefits the OCP wrapper provides are:
+
+- Simplified execution of the supported workloads. (Only some flags are required)
+- Indexes OpenShift metadata along with the Benchmark result. This document can be found with the following query: `uuid: <benchmkark-uuid> AND metricName.keyword: "clusterMetadata"`
+- Prevents modifying configuration files to tweak some of the parameters of the workloads.
+- Discovers the Prometheus URL and authentication token, so the user does not have to perform those operations before using them.
+
 In order to trigger one of the supported workloads using this subcommand, you must run kube-burner using the subcommand `ocp`. The workloads are embedded in the kube-burner binary:
 
 Running node-density with 100 pods per node
@@ -54,45 +60,29 @@ Running node-density with 100 pods per node
 kube-burner ocp node-density --pods-per-node=100
 ```
 
-Running cluster-density with multiple endpoints support
-
-```console
-kube-burner ocp cluster-density --iterations=1 --churn-duration=2m0s --es-index kube-burner --es-server https://www.esurl.com:443 --metrics-endpoint metrics-endpoints.yaml
-```
-
 With the command above, the wrapper will calculate the required number of pods to deploy across all worker nodes of the cluster.
 
-This wrapper provides the following benefits among others:
+## Multiple endpoints support
 
-- Provides a simplified execution of the supported workloads.
-- Indexes OpenShift metadata along with the Benchmark result. This document can be found with the following query: `uuid: <benchmkark-uuid> AND metricName.keyword: "clusterMetadata"`
-- Prevents modifying configuration files to tweak some of the parameters of the workloads.
-- Discovers the Prometheus URL and authentication token, so the user does not have to perform those operations before using them.
+The flag `--metrics-endpoint` can be used to interact with multiple Prometheus endpoints
+For example:
+
+```console
+kube-burner ocp cluster-density-v2 --iterations=1 --churn-duration=2m0s --es-index kube-burner --es-server https://www.esurl.com:443 --metrics-endpoint metrics-endpoints.yaml
+```
 
 ## Cluster density workloads
 
-This workload family is a control-plane density focused workload that that creates different objects across the cluster. There are 3 different variants [cluster-density](#cluster-density), [cluster-density-v2](#cluster-density-v2), and [cluster-density-ms](#cluster-density-ms).
+This workload family is a control-plane density focused workload that that creates different objects across the cluster. There are 2 different variants [cluster-density-v2](#cluster-density-v2) and [cluster-density-ms](#cluster-density-ms).
 
 Each iteration of these create a new namespace, the three support similar configuration flags. Check them out from the subcommand help.
 
 !!! Info
     Workload churning of 1h is enabled by default in the `cluster-density` workloads; you can disable it by passing `--churn=false` to the workload subcommand.
 
-### cluster-density
-
-Each iteration of **cluster-density** creates the following objects in each of the created namespaces:
-
-- 1 image stream.
-- 1 build. The OpenShift Container Platform (OCP) internal container registry must be set up previously because the resulting container image will be pushed there.
-- 5 deployments with two pod replicas (pause) mounting 4 secrets, 4 config maps, and 1 downward API volume each.
-- 5 services, each one pointing to the TCP/8080 and TCP/8443 ports of one of the previous deployments.
-- 1 edge route pointing to the to first service.
-- 10 secrets containing a 2048-character random string.
-- 10 config maps containing a 2048-character random string.
-
 ### cluster-density-v2
 
-Very similar to [cluster-density](#cluster-density), but with some key differences provided by network policies and improved readiness probes, that leads to a heavier load in the cluster's CNI plugin. Each iteration creates the following objects in each of the created namespaces:
+Each iteration creates the following objects in each of the created namespaces:
 
 - 1 image stream.
 - 1 build. The OCP internal container registry must be set-up previously because the resulting container image will be pushed there.

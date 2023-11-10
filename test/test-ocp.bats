@@ -41,50 +41,43 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "cluster-density with user metadata, indexing and churning" {
-  run kube-burner ocp cluster-density --iterations=2 --churn-duration=1m --churn-delay=5s ${COMMON_FLAGS} --user-metadata=user-metadata.yml
-  [ "$status" -eq 0 ]
-  run check_metric_value etcdVersion clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
-  [ "$status" -eq 0 ]
-}
-
-@test "cluster-density" {
-  run kube-burner ocp cluster-density --iterations=2 --churn=false --uuid=${UUID}
-  [ "$status" -eq 0 ]
-}
-
-@test "cluster-density-ms for multiple endpoints case with indexing" {
+@test "cluster-density-ms: metrics-endpoint=true; es-indexing=true" {
   run kube-burner ocp cluster-density-ms --iterations=1 --churn=false --metrics-endpoint metrics-endpoints.yaml ${COMMON_FLAGS}
   [ "$status" -eq 0 ]
   run check_metric_value clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
   [ "$status" -eq 0 ]
 }
 
-@test "cluster-density-v2 with profile-type=both" {
-  run kube-burner ocp cluster-density-v2 --iterations=5 --churn=false --profile-type=both ${COMMON_FLAGS}
+@test "cluster-density-v2: profile-type=both; user-metadata=true; es-indexing=true; churning=true" {
+  run kube-burner ocp cluster-density-v2 --iterations=5 --churn-duration=1m --churn-delay=5s --profile-type=both ${COMMON_FLAGS} --user-metadata=user-metadata.yml
   [ "$status" -eq 0 ]
   run check_metric_value cpu-kubelet clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement etcdVersion
   [ "$status" -eq 0 ]
 }
 
-@test "node-density-cni with gc=false and alerting=false" {
+@test "cluster-density-v2: indexing=false; churning=false" {
+  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=false --uuid=${UUID}
+  [ "$status" -eq 0 ]
+}
+
+@test "node-density-cni: gc=false; alerting=false" {
   # Disable gc and avoid metric indexing
   run kube-burner ocp node-density-cni --pods-per-node=75 --gc=false --uuid=${UUID} --alerting=false
   oc delete ns -l kube-burner-uuid=${UUID}
   trap - ERR
 }
 
-@test "cluster-density timeout check" {
-  run kube-burner ocp cluster-density --iterations=1 --churn-duration=5m --timeout=1s
+@test "cluster-density-v2 timeout check" {
+  run kube-burner ocp cluster-density-v2 --iterations=1 --churn-duration=5m --timeout=1s
   [ "$status" -eq 2 ]
 }
 
-@test "index locally with cluster prometheus" {
+@test "index: local-indexing=true" {
   run kube-burner ocp index --uuid="${UUID}" --metrics-profile metrics-profile.yaml
   [ "$status" -eq 0 ]
 }
 
-@test "index with metrics-endpoints and sending metrics to ES" {
+@test "index: metrics-endpoints=true; es-indexing=true" {
   run kube-burner ocp index --uuid="${UUID}" --metrics-endpoint metrics-endpoints.yaml --metrics-profile metrics-profile.yaml --es-server=https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443 --es-index=ripsaw-kube-burner
   [ "$status" -eq 0 ]
 }
