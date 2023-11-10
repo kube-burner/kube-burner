@@ -28,6 +28,7 @@ func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 	var iterations, churnPercent int
 	var churn bool
 	var churnDelay, churnDuration time.Duration
+	var churnDeletionStrategy string
 	cmd := &cobra.Command{
 		Use:   variant,
 		Short: fmt.Sprintf("Runs %v workload", variant),
@@ -41,8 +42,10 @@ func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 			os.Setenv("CHURN_DURATION", fmt.Sprintf("%v", churnDuration))
 			os.Setenv("CHURN_DELAY", fmt.Sprintf("%v", churnDelay))
 			os.Setenv("CHURN_PERCENT", fmt.Sprint(churnPercent))
+			os.Setenv("CHURN_DELETION_STRATEGY", churnDeletionStrategy)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(churnDeletionStrategy)
 			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])
 		},
 	}
@@ -51,6 +54,7 @@ func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 	cmd.Flags().DurationVar(&churnDuration, "churn-duration", 1*time.Hour, "Churn duration")
 	cmd.Flags().DurationVar(&churnDelay, "churn-delay", 2*time.Minute, "Time to wait between each churn")
 	cmd.Flags().IntVar(&churnPercent, "churn-percent", 10, "Percentage of job iterations that kube-burner will churn each round")
+	cmd.Flags().StringVar(&churnDeletionStrategy, "churn-deletion-strategy", "default", "Churn deletion strategy to use")
 	cmd.MarkFlagRequired("iterations")
 	return cmd
 }

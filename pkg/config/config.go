@@ -89,6 +89,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnPercent:           10,
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
+		ChurnDeletionStrategy:  "default",
 	}
 
 	if err := unmarshal(&raw); err != nil {

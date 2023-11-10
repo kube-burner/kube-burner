@@ -66,6 +66,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `churnPercent`         | Percentage of the jobIterations to churn each period                             | Integer | 10 |
 | `churnDuration`        | Length of time that the job is churned for                                       | Duration| 1h |
 | `churnDelay`           | Length of time to wait between each churn period                                 | Duration| 5m |
+| `churnDeletionStrategy` | Churn deletion strategy to apply. Either "default" or "gvr" (i.e new logic) | String | default
 
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
