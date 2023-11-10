@@ -38,7 +38,7 @@ func NewNetworkPolicy(wh *WorkloadHelper, variant string) *cobra.Command {
 			os.Setenv("CHURN_DURATION", fmt.Sprintf("%v", churnDuration))
 			os.Setenv("CHURN_DELAY", fmt.Sprintf("%v", churnDelay))
 			os.Setenv("CHURN_PERCENT", fmt.Sprint(churnPercent))
-			os.Setenv("CHURN_DELETION_STRATEGY", fmt.Sprintf(churnDeletionStrategy))
+			os.Setenv("CHURN_DELETION_STRATEGY", churnDeletionStrategy)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])

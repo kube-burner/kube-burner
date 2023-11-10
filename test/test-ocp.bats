@@ -67,15 +67,8 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "cluster-density-v2 with default churn deletion strategy" {
-  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=true --churn-duration=1m --churn-delay=10s ${COMMON_FLAGS}
-  [ "$status" -eq 0 ]
-  run check_metric_value etcdVersion clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
-  [ "$status" -eq 0 ]
-}
-
 @test "cluster-density-v2 with gvr churn deletion strategy" {
-  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=true --churn-duration=1m --churn-delay=10s --churn-strategy=gvr ${COMMON_FLAGS}
+  run kube-burner ocp cluster-density-v2 --iterations=2 --churn=true --churn-duration=1m --churn-delay=10s --churn-deletion-strategy=gvr ${COMMON_FLAGS}
   [ "$status" -eq 0 ]
   run check_metric_value etcdVersion clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
   [ "$status" -eq 0 ]

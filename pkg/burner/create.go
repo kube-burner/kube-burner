@@ -334,7 +334,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
 		// Cleanup namespaces based on the labels we added
-		if (ex.ChurnDeletionStrategy == "gvr") {
+		if ex.ChurnDeletionStrategy == "gvr" {
 			CleanupNamespaceResourcesUsingGVR(ctx, ex.objects, namespacesToDelete, ex.Name)
 		}
 		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"}, true)
