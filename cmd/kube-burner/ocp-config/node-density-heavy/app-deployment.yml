@@ -7,7 +7,15 @@ spec:
     metadata:
       labels:
         name: perfapp-{{.Replica}}-{{.Iteration}}
+        app: perfapp
     spec:
+      topologySpreadConstraints:
+      - maxSkew: 1 
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway 
+        labelSelector: 
+          matchLabels:
+            app: perfapp
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

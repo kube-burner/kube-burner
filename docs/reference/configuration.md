@@ -58,6 +58,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `objects`              | List of objects the job will create. Detailed on the [objects section](#objects) | List    | []      |
 | `verifyObjects`        | Verify object count after running each job                                       | Boolean | true    |
 | `errorOnVerify`        | Set RC to 1 when objects verification fails                                      | Boolean | true    |
+| `skipIndexing`         | Skip metric indexing on this job                                                 | Boolean | false   |
 | `preLoadImages`        | Kube-burner will create a DS before triggering the job to pull all the images of the job   | true    |
 | `preLoadPeriod`        | How long to wait for the preload daemonset                                       | Duration| 1m     |
 | `preloadNodeLabels`    | Add node selector labels for the resources created in preload stage              | Object  | {} |

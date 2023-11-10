@@ -7,7 +7,15 @@ spec:
     metadata:
       labels:
         name: webserver-{{.Replica}}-{{.Iteration}}
+        app: webserver
     spec:
+      topologySpreadConstraints:
+      - maxSkew: 1 
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway 
+        labelSelector: 
+          matchLabels:
+            app: webserver
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

@@ -150,6 +150,8 @@ type Job struct {
 	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
 	// Churn deletion strategy
 	ChurnDeletionStrategy string `yaml:"churnDeletionStrategy" json:"churnDeletionStrategy,omitempty"`
+	// Skip this job from indexing
+	SkipIndexing bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 }
 
 type WaitOptions struct {

@@ -7,7 +7,15 @@ spec:
     metadata:
       labels:
         name: curl-{{.Replica}}-{{.Iteration}}
+        app: curl
     spec:
+      topologySpreadConstraints:
+      - maxSkew: 1 
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway 
+        labelSelector: 
+          matchLabels:
+            app: curl
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

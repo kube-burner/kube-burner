@@ -12,6 +12,7 @@ global:
 jobs:
   - name: create-bindings
     namespace: networkpolicy-multitenant
+    skipIndexing: true
     jobIterations: 1
     objects:
       - objectTemplate: ../clusterrole.yml
