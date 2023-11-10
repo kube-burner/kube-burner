@@ -64,6 +64,10 @@ func (p *Prometheus) ScrapeJobsMetrics(docsToIndex map[string][]interface{}) err
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
 	for _, eachJob := range p.JobList {
+		if eachJob.JobConfig.SkipIndexing {
+			log.Infof("Skipping indexing in job: %v", eachJob.JobConfig.Name)
+			continue
+		}
 		jobStart := eachJob.Start
 		jobEnd := eachJob.End
 		log.Info("Scraping metrics for job: ", eachJob.JobConfig.Name)

@@ -29,6 +29,7 @@ import (
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,18 +38,15 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
 )
 
 func setupCreateJob(jobConfig config.Job) Executor {
 	var err error
 	var f io.Reader
 	mapper := newRESTMapper()
-	waitClientSet, waitRestConfig, err = config.GetClientSet(jobConfig.QPS*2, jobConfig.Burst*2)
 	if err != nil {
 		log.Fatalf("Error creating wait clientSet: %s", err.Error())
 	}
-	waitDynamicClient = dynamic.NewForConfigOrDie(waitRestConfig)
 	log.Debugf("Preparing create job: %s", jobConfig.Name)
 	ex := Executor{}
 	for _, o := range jobConfig.Objects {
@@ -101,6 +99,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
 		"kube-burner-uuid":  ex.uuid,
@@ -149,7 +148,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns)
+				ex.waitForObjects(ns, waitRateLimiter)
 				namespacesWaited[ns] = true
 			}
 		}
@@ -163,7 +162,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	if ex.WaitWhenFinished {
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
+		sem := make(chan int, int(restConfig.QPS))
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
@@ -175,7 +174,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				ex.waitForObjects(ns)
+				ex.waitForObjects(ns, waitRateLimiter)
 				<-sem
 				wg.Done()
 			}(ns)
@@ -263,10 +262,18 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 				log.Fatalf("Authorization error creating %s/%s: %s", obj.GetKind(), obj.GetName(), err)
 				return true, err
 			} else if kerrors.IsAlreadyExists(err) {
-				log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
+				if ns != "" {
+					log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
+				} else {
+					log.Errorf("%s/%s already exists", obj.GetKind(), obj.GetName())
+				}
 				return true, nil
 			} else if err != nil {
-				log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
+				if ns != "" {
+					log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
+				} else {
+					log.Errorf("Error creating object %s/%s: %s", obj.GetKind(), obj.GetName(), err)
+				}
 			}
 			log.Error("Retrying object creation")
 			return false, nil
