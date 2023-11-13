@@ -32,12 +32,12 @@ type Watcher struct {
 }
 
 // NewWatcher return a new ListWatcher of the specified resource and namespace
-func NewWatcher(restClient *rest.RESTClient, name string, resource string, namespace string) *Watcher {
+func NewWatcher(restClient *rest.RESTClient, name string, resource string, namespace string, optionsModifier func(options *metav1.ListOptions)) *Watcher {
 	lw := cache.NewFilteredListWatchFromClient(
 		restClient,
 		resource,
 		namespace,
-		func(options *metav1.ListOptions) {},
+		optionsModifier,
 	)
 	return &Watcher{
 		name:        name,

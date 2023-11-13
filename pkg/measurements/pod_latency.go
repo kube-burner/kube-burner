@@ -28,6 +28,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -75,18 +76,15 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 	p.metricLock.Lock()
 	defer p.metricLock.Unlock()
 	if _, exists := p.metrics[string(pod.UID)]; !exists {
-		timestamp, isValid := validatePod(factory.jobConfig.JobType, pod)
-		if isValid {
-			p.metrics[string(pod.UID)] = podMetric{
-				Timestamp:  timestamp,
-				Namespace:  pod.Namespace,
-				Name:       pod.Name,
-				MetricName: podLatencyMeasurement,
-				UUID:       globalCfg.UUID,
-				JobConfig:  *factory.jobConfig,
-				JobName:    factory.jobConfig.Name,
-				Metadata:   factory.metadata,
-			}
+		p.metrics[string(pod.UID)] = podMetric{
+			Timestamp:  pod.CreationTimestamp.Time.UTC(),
+			Namespace:  pod.Namespace,
+			Name:       pod.Name,
+			MetricName: podLatencyMeasurement,
+			UUID:       globalCfg.UUID,
+			JobConfig:  *factory.jobConfig,
+			JobName:    factory.jobConfig.Name,
+			Metadata:   factory.metadata,
 		}
 	}
 }
@@ -135,6 +133,10 @@ func (p *podLatency) setConfig(cfg types.Measurement) error {
 // start starts podLatency measurement
 func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
+	if factory.jobConfig.JobType == config.DeletionJob {
+		log.Info("Pod latency measurement not compatible with delete jobs, skipping")
+		return
+	}
 	p.metrics = make(map[string]podMetric)
 	log.Infof("Creating Pod latency watcher for %s", factory.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
@@ -142,6 +144,9 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 		"podWatcher",
 		"pods",
 		corev1.NamespaceAll,
+		func(options *metav1.ListOptions) {
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+		},
 	)
 	p.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreatePod,
@@ -156,6 +161,9 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 
 // Stop stops podLatency measurement
 func (p *podLatency) stop() error {
+	if factory.jobConfig.JobType == config.DeletionJob {
+		return nil
+	}
 	var err error
 	p.watcher.StopWatcher()
 	errorRate := p.normalizeMetrics()
@@ -323,17 +331,4 @@ func (p *podLatency) validateConfig() error {
 		}
 	}
 	return nil
-}
-
-// validatePod validates a pod based on job type and returns its timestamp for latency calculation.
-// It returns a timestamp and a boolean value indicating validation details.
-func validatePod(jobType config.JobType, pod *corev1.Pod) (time.Time, bool) {
-	if jobType == config.CreationJob {
-		runid, exists := pod.Labels["kube-burner-runid"]
-		if exists && runid == globalCfg.RUNID {
-			return pod.CreationTimestamp.Time.UTC(), true
-		}
-		return pod.CreationTimestamp.Time.UTC(), false
-	}
-	return pod.Status.StartTime.Time.UTC(), true
 }
