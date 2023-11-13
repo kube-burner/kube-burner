@@ -14,7 +14,6 @@ nav:
 - OpenShift Wrapper: ocp.md
 - Contributing:
   - contributing/index.md
-  - Contributing: contributing/index.md
   - GitHub Workflows:
     - contributing/pullrequest.md
     - contributing/release.md
