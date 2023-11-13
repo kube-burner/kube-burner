@@ -40,6 +40,7 @@ type measurementFactory struct {
 type measurement interface {
 	start(*sync.WaitGroup)
 	stop() error
+	collect(*sync.WaitGroup)
 	setConfig(types.Measurement) error
 }
 
@@ -96,6 +97,15 @@ func Start() {
 	for _, measurement := range factory.createFuncs {
 		wg.Add(1)
 		go measurement.start(&wg)
+	}
+	wg.Wait()
+}
+
+func Collect() {
+	var wg sync.WaitGroup
+	for _, measurement := range factory.createFuncs {
+		wg.Add(1)
+		go measurement.collect(&wg)
 	}
 	wg.Wait()
 }
