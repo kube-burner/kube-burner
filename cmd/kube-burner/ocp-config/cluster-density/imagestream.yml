@@ -1,5 +1,0 @@
----
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  name: cluster-density-{{.Replica}}
