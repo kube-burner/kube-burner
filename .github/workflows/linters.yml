@@ -1,21 +1,13 @@
-# pullrequest.yml
-name: Pull Request Workflow
+name: Linters
 on:
-  push:
-    branches:
-      - master
-  pull_request_target:
-    branches:
-      - master
-      - main
-
+  workflow_call:
 jobs:
   linters:
     runs-on: ubuntu-latest
     steps:
 
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1
         ref: ${{ github.event.pull_request.head.sha }}
@@ -26,11 +18,3 @@ jobs:
 
     - name: Run pre-commit hooks
       run: pre-commit run --all-files
-
-  build:
-    uses: ./.github/workflows/builders.yml
-    needs: linters
-  tests:
-    needs: build
-    uses: ./.github/workflows/test-k8s.yml
-    secrets: inherit
