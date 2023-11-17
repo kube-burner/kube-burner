@@ -139,6 +139,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					log.Infof("Churn duration: %v", job.ChurnDuration)
 					log.Infof("Churn percent: %v", job.ChurnPercent)
 					log.Infof("Churn delay: %v", job.ChurnDelay)
+					log.Infof("Churn deletion strategy: %v", job.ChurnDeletionStrategy)
 				}
 				job.RunCreateJob(0, job.JobIterations, &waitListNamespaces)
 				// If object verification is enabled
