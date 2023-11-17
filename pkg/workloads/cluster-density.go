@@ -47,7 +47,6 @@ func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 			os.Setenv("POD_READY_THRESHOLD", fmt.Sprintf("%v", podReadyThreshold))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(churnDeletionStrategy)
 			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])
 		},
 	}
