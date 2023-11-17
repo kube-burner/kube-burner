@@ -12,7 +12,6 @@ jobs:
 
   build:
     uses: ./.github/workflows/builders.yml
-    needs: lint
 
   tests:
     needs: build
