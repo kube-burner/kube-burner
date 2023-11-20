@@ -94,7 +94,12 @@ func deployAssets() error {
 func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 	// TODO Magic annotation to skip service
 	svc := obj.(*corev1.Service)
-	log.Debugf("New service created: %v/%v", svc.Namespace, svc.Name)
+	if annotation, ok := svc.Annotations["kube-burner.io/service-latency"]; ok {
+		if annotation == "false" {
+			log.Debug("Annotation found, discarting service %v/%v", svc.Namespace, svc.Name)
+		}
+	}
+	log.Debugf("Handling service: %v/%v", svc.Namespace, svc.Name)
 	go func(svc *corev1.Service) {
 		var ips []string
 		var port int32
