@@ -21,11 +21,11 @@ The **test-k8s** job performs the following steps:
 
 For testing OCP, we use a real OCP
 
-The **ocp-wrapper** job performs similar steps to the "test-k8s" job but with additional OpenShift-specific configurations and secrets.
+The **ocp-wrapper** job performs similar steps to the "test-k8s" job but with additional OpenShift specific configurations and secrets.
 
 #### Kube-burner tests executed
 
 The kube-burner tests executed on each environment can be found on following files included in the folder `/test/`
 
-- K8s: `test/test-k8s.bats`
-- OCP: `test/test-ocp.bats`
+- `test/test-k8s.bats`
+- `test/test-ocp.bats`

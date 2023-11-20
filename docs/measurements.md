@@ -2,11 +2,7 @@
 
 Kube-burner allows you to get further metrics using other mechanisms or data sources, such as the Kubernetes API. These mechanisms are called measurements.
 
-Measurements are enabled in the measurements section of the configuration file. This section contains a list of measurements with their options.
-'kube-burner' supports the following measurements so far:
-
-!!! Warning
-    `podLatency`, as any other measurement, is only captured during a benchmark runtime. It does not work with the `index` subcommand of kube-burner
+Measurements are enabled in the `measurements` object of the configuration file. This object contains a list of measurements with their options.
 
 ## Pod latency
 
@@ -17,7 +13,9 @@ Collects latencies from the different pod startup phases, these **latency metric
   - name: podLatency
 ```
 
-This measurement sends its metrics to a configured indexer. The metrics collected are pod latency histograms (`podLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`). It is possible to skip indexing the `podLatencyMeasurement` metric by configuring the field `podLatencyMetrics` of this measurement to `quantiles`.
+### Metrics
+
+The metrics collected are pod latency timeeries (`podLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`). It's possible to skip indexing the `podLatencyMeasurement` metric by configuring the field `podLatencyMetrics` of this measurement to `quantiles`.
 
 One document, such as the following, is indexed per each pod created by the workload that enters in `Running` condition during the workload:
 
@@ -33,8 +31,14 @@ One document, such as the following, is indexed per each pod created by the work
   "uuid": "c40b4346-7af7-4c63-9ab4-aae7ccdd0616",
   "namespace": "kubelet-density",
   "podName": "kubelet-density-13",
+<<<<<<< HEAD
   "jobConfig": {},
   "nodeName": "worker-001"
+=======
+  "jobName": "kube-burner-job",
+  "nodeName": "worker-001",
+  "jobConfig": {"config": "params"},
+>>>>>>> 733d90c0 (Update docs)
 }
 ```
 
@@ -53,7 +57,9 @@ Pod latency quantile sample:
   "avg": 2876.3,
   "timestamp": "2020-11-15T22:26:51.553221077+01:00",
   "metricName": "podLatencyQuantilesMeasurement",
-  "jobConfig": {}
+  "jobConfig": {
+    "config": "params"
+  }
 },
 {
   "quantileName": "PodScheduled",
@@ -65,7 +71,9 @@ Pod latency quantile sample:
   "avg": 5.38,
   "timestamp": "2020-11-15T22:26:51.553225151+01:00",
   "metricName": "podLatencyQuantilesMeasurement",
-  "jobConfig": {}
+  "jobConfig": {
+    "config": "params"
+  }
 }
 ```
 
@@ -115,8 +123,10 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
 
 ### Measure subcommand CLI example
-Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
-```
+
+This subcommand can be used to fetch pod latency metrics from pods that were created in the past.
+
+```shell
 kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2 
 time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
 time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
@@ -133,6 +143,101 @@ time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Ready 50th: 9000
 time="2023-11-19 17:46:08" level=info msg="Pod latencies error rate was: 0.00" file="pod_latency.go:236"
 time="2023-11-19 17:46:08" level=info msg="👋 Exiting kube-burner vchalla" file="kube-burner.go:209"
 ```
+
+## Service latency
+
+Calculates the time taken the services to serve requests once their endpoints are ready. This measurement works as follows.
+
+```mermaid
+graph LR
+    A[Service created] --> C{active endpoints?}
+    C -->|No| C
+    C -->|Yes| D[Save timestamp]
+    D --> G{TCP connectivity?}
+    G-->|Yes| F(Generate metric)
+    G -->|No| G
+```
+
+Where the service latency is the time elapsed since the service has at least one endpoint ready till the connectivity is verified.
+
+The connectivity check is done through a pod running in the `kube-burner-service-latency` namespace, kube-burner connects to this pod and uses `netcat` to verify connectivity.
+
+This measure is enabled with:
+
+```yaml
+  measurements:
+  - name: podLatency
+    svcTimeout: 5s
+```
+
+Where `svcTimeout` defines the maximum amount of time for a service to be ready, when this timeout is fired, the metric from that service is **discarded**.
+
+!!! warning "Considerations"
+    - Only TCP is supported
+    - Supported services are `ClusterIP`, `NodePort` and `LoadBalancer`
+    - kube-burner starts checking service connectivity when its endpoints object has at least one address.
+    - Make sure the endpoints of the service are correct and reachable
+    - When the service is `NodePort`, the connectivity check is done against the node where the connectivity check pods runs.
+    - By default all services created by the benchmark are tracked by this measurement, it's possible to discard service objects from tracking by annotating them with `kube-burner.io/service-latency=false`
+
+### Metrics
+
+The metrics collected are pod latency timeseries (`svcLatencyMeasurement`) and another document that holds a summary with the different service latency quantiles (`svcLatencyQuantilesMeasurement`). It is possible to skip indexing the `svcLatencyMeasurement` metric by configuring the field `svcLatencyMetrics` of this measurement to `quantiles`. Metric documents have the following structure:
+
+```json
+  {
+    "timestamp": "2023-11-19T00:41:51Z",
+    "ready": 1631880721,
+    "metricName": "svcLatencyMeasurement",
+    "jobConfig": {
+      "config": "params"
+    },
+    "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
+    "namespace": "cluster-density-v2-2",
+    "service": "cluster-density-1",
+    "type": "ClusterIP"
+  }
+```
+
+!!! note
+    When type is `LoadBalancer`, it includes an extra field `ipAssigned`, that reports the IP assignation latency of the service.
+
+And the quantiles document has the structure:
+
+```json
+{
+    "quantileName": "Ready",
+    "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
+    "P99": 1867593282,
+    "P95": 1856488440,
+    "P50": 1723817691,
+    "max": 1868307027,
+    "avg": 1722308938,
+    "timestamp": "2023-11-19T00:42:26.663991359Z",
+    "metricName": "svcLatencyQuantilesMeasurement",
+    "jobName": "cluster-density-v2",
+    "jobConfig": {
+      "config": "params"
+    }
+},
+{
+    "quantileName": "LoadBalancer",
+    "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
+    "P99": 1467593282,
+    "P95": 1356488440,
+    "P50": 1323817691,
+    "max": 2168307027,
+    "avg": 1822308938,
+    "timestamp": "2023-11-19T00:42:26.663991359Z",
+    "metricName": "svcLatencyQuantilesMeasurement",
+    "jobName": "cluster-density-v2",
+    "jobConfig": {
+      "config": "params"
+    }
+}
+```
+
+When there're `LoadBalancer` services, an extra document with `quantileName` as `LoadBalancer` is also generated as shown above.
 
 ## pprof collection
 
