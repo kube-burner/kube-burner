@@ -96,7 +96,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 	svc := obj.(*corev1.Service)
 	if annotation, ok := svc.Annotations["kube-burner.io/service-latency"]; ok {
 		if annotation == "false" {
-			log.Debug("Annotation found, discarting service %v/%v", svc.Namespace, svc.Name)
+			log.Debugf("Annotation found, discarting service %v/%v", svc.Namespace, svc.Name)
 		}
 	}
 	log.Debugf("Handling service: %v/%v", svc.Namespace, svc.Name)
@@ -213,10 +213,10 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 	s.svcLister = lcorev1.NewServiceLister(s.svcWatcher.Informer.GetIndexer())
 	s.epLister = lcorev1.NewEndpointsLister(s.epwatcher.Informer.GetIndexer())
 	if err := s.svcWatcher.StartAndCacheSync(); err != nil {
-		return fmt.Errorf("Service Latency measurement error: %s", err)
+		log.Errorf("Service Latency measurement error: %s", err)
 	}
 	if err := s.epwatcher.StartAndCacheSync(); err != nil {
-		return fmt.Errorf("Service Latency measurement error: %s", err)
+		log.Errorf("Service Latency measurement error: %s", err)
 	}
 	return nil
 }

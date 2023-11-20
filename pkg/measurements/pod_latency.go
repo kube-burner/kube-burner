@@ -170,7 +170,7 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 		},
 	})
 	if err := p.watcher.StartAndCacheSync(); err != nil {
-		return fmt.Errorf("Pod Latency measurement error: %s", err)
+		log.Errorf("Pod Latency measurement error: %s", err)
 	}
 	return nil
 }
@@ -357,25 +357,4 @@ func (p *podLatency) calcQuantiles() {
 	for podCondition, latencies := range quantileMap {
 		p.latencyQuantiles = append(p.latencyQuantiles, calcSummary(string(podCondition), latencies))
 	}
-}
-
-func (p *podLatency) validateConfig() error {
-	var metricFound bool
-	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
-	for _, th := range p.config.LatencyThresholds {
-		if th.ConditionType == string(corev1.ContainersReady) || th.ConditionType == string(corev1.PodInitialized) || th.ConditionType == string(corev1.PodReady) || th.ConditionType == string(corev1.PodScheduled) {
-			for _, lm := range latencyMetrics {
-				if th.Metric == lm {
-					metricFound = true
-					break
-				}
-			}
-			if !metricFound {
-				return fmt.Errorf("unsupported metric %s in podLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
-			}
-		} else {
-			return fmt.Errorf("unsupported pod condition type in podLatency measurement: %s", th.ConditionType)
-		}
-	}
-	return nil
 }
