@@ -127,6 +127,7 @@ var SvcLatencyChecker = &corev1.Pod{
 					Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 					RunAsNonRoot:             pointer.Bool(true),
 					SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+					RunAsUser:                pointer.Int64(1000),
 				},
 			},
 		},
