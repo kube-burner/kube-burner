@@ -1,0 +1,14 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{.JobName}}-{{.Replica}}-{{.Iteration}}
+spec:
+  selector:
+    app: nginx-server-{{.Replica}}-{{.Iteration}}
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP

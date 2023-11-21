@@ -1,25 +1,17 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: client-{{.Replica}}
+  name: http-client-{{.Replica}}-{{.Iteration}}
 spec:
   replicas: {{.podReplicas}}
   selector:
     matchLabels:
-      name: client-{{.Replica}}
+      app: http-client-{{.Replica}}-{{.Iteration}}
   template:
     metadata:
       labels:
-        name: client-{{.Replica}}
-        app: client
+        app: http-client-{{.Replica}}-{{.Iteration}}
     spec:
-      topologySpreadConstraints:
-      - maxSkew: 1 
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway 
-        labelSelector: 
-          matchLabels:
-            app: client
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -37,7 +29,7 @@ spec:
         command: ["sleep", "inf"]
         resources:
           requests:
-            memory: "10Mi"
+            memory: "5Mi"
             cpu: "10m"
         imagePullPolicy: IfNotPresent
         securityContext:
@@ -48,26 +40,10 @@ spec:
             - "/bin/sh"
             - "-c"
             - "curl --fail -sS ${SERVICE_ENDPOINT} -o /dev/null && curl --fail -sSk ${ROUTE_ENDPOINT} -o /dev/null"
-          periodSeconds: 10
+          periodSeconds: 30
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 6
         volumeMounts:
-        - name: secret-1
-          mountPath: /secret1
-        - name: secret-2
-          mountPath: /secret2
-        - name: secret-3
-          mountPath: /secret3
-        - name: secret-4
-          mountPath: /secret4
-        - name: configmap-1
-          mountPath: /configmap1
-        - name: configmap-2
-          mountPath: /configmap2
-        - name: configmap-3
-          mountPath: /configmap3
-        - name: configmap-4
-          mountPath: /configmap4
         - name: podinfo
           mountPath: /etc/podlabels
         env:
@@ -80,34 +56,10 @@ spec:
         - name: ENVVAR4
           value: "{{randAlphaNum 250}}"
         - name: ROUTE_ENDPOINT
-          value: "https://cluster-density-{{.Replica}}-cluster-density-v2-{{.Iteration}}.{{ .ingressDomain }}/256.html"
+          value: "https://{{.JobName}}-{{.Replica}}-{{.Iteration}}-{{.Namespace}}.{{.ingressDomain}}/2048.html"
         - name: SERVICE_ENDPOINT
-          value: "http://cluster-density-{{randInt 1 6}}/256.html"
+          value: "http://{{.JobName}}-{{.Replica}}-{{.Iteration}}/8192.html"
       volumes:
-      - name: secret-1
-        secret:
-          secretName: {{.JobName}}-1
-      - name: secret-2
-        secret:
-          secretName: {{.JobName}}-2
-      - name: secret-3
-        secret:
-          secretName: {{.JobName}}-3
-      - name: secret-4
-        secret:
-          secretName: {{.JobName}}-4
-      - name: configmap-1
-        configMap:
-          name: {{.JobName}}-1
-      - name: configmap-2
-        configMap:
-          name: {{.JobName}}-2
-      - name: configmap-3
-        configMap:
-          name: {{.JobName}}-3
-      - name: configmap-4
-        configMap:
-          name: {{.JobName}}-4
       - name: podinfo
         downwardAPI:
           items:

@@ -211,6 +211,7 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 			var newObject = new(unstructured.Unstructured)
 			templateData := map[string]interface{}{
 				jobName:      ex.Name,
+				namespace:    ns,
 				jobIteration: iteration,
 				jobUUID:      ex.uuid,
 				replica:      r,

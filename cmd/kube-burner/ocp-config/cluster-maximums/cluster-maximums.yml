@@ -1,0 +1,136 @@
+# Meant to be run on a 24 node cluster with max-pods per node configured to 2000
+# Fills with pods the worker nodes. Creates 1 routes and service per 8 pods
+global:
+  gc: {{.GC}}
+  indexerConfig:
+    esServers: ["{{.ES_SERVER}}"]
+    insecureSkipVerify: true
+    defaultIndex: {{.ES_INDEX}}
+    type: {{.INDEXING_TYPE}}
+jobs:
+  - name: pods-per-node
+    namespace: pods-per-node
+    jobIterations: {{.JOB_ITERATIONS}}
+    qps: {{.QPS}}
+    burst: {{.BURST}}
+    namespacedIterations: true
+    iterationsPerNamespace: 50
+    waitWhenFinished: true
+    preLoadImages: true
+    preLoadPeriod: 15s
+    jobPause: 2m
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+      - objectTemplate: deployment-server.yml   # TODO: Consider using different client/server applications. Use apache benchmark
+        replicas: 1
+        inputVars:
+          podReplicas: 2
+      - objectTemplate: deployment-client.yml
+        replicas: 1
+        inputVars:
+            podReplicas: 2
+            ingressDomain: {{.INGRESS_DOMAIN}}
+      - objectTemplate: service.yml
+        replicas: 1
+      - objectTemplate: route.yml
+        replicas: 1
+
+  - name: remove-max-pods-per-node
+    qps: 1
+    burst: 2
+    jobType: delete
+    jobPause: 2m
+    objects:
+      - kind: Namespace
+        labelSelector: {kube-burner-job: pods-per-node}
+
+# Would test 10k namespaces, 10k routes, 10k service, 20k pods and 30k network policies
+  - name: max-namespaces
+    namespace: max-namespaces
+    jobIterations: {{.NAMESPACES}}
+    qps: {{.QPS}}
+    burst: {{.BURST}}
+    namespacedIterations: true
+    waitWhenFinished: true
+    preLoadImages: false                   # We don't need to preload since this job is reusing images previously used
+    jobPause: 2m
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+      - objectTemplate: deployment-server.yml
+        replicas: 1
+        inputVars:
+          podReplicas: 1
+      - objectTemplate: deployment-client.yml
+        replicas: 1
+        inputVars:
+          podReplicas: 1
+          ingressDomain: {{.INGRESS_DOMAIN}}
+      - objectTemplate: service.yml
+        replicas: 1
+      - objectTemplate: route.yml
+        replicas: 1
+      - objectTemplate: np-deny-all.yml
+        replicas: 1
+      - objectTemplate: np-allow-from-clients.yml
+        replicas: 1
+      - objectTemplate: np-allow-from-ingress.yml
+        replicas: 1
+
+  - name: remove-max-namespaces
+    qps: 5
+    burst: 5
+    jobType: delete
+    jobPause: 2m
+    objects:
+      - kind: Namespace
+        labelSelector: {kube-burner-job: max-namespaces}
+
+# 5k backends per service: Five times -> 5k server pods + 1 client pods + 1 route + 3 network policies
+  - name: max-backends
+    namespace: max-backends
+    jobIterations: 5
+    qps: {{.QPS}}
+    burst: {{.BURST}}
+    namespacedIterations: true
+    waitWhenFinished: true
+    preLoadImages: false             # We don't need to preload since this job is reusing images previously used
+    jobPause: 2m
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+      - objectTemplate: deployment-server.yml
+        replicas: 1
+        inputVars:
+          podReplicas: {{.BACKENDS}}
+      - objectTemplate: deployment-client.yml
+        replicas: 1
+        inputVars:
+          podReplicas: 1
+          ingressDomain: {{.INGRESS_DOMAIN}}
+      - objectTemplate: service.yml
+        replicas: 1
+      - objectTemplate: route.yml
+        replicas: 1
+      - objectTemplate: np-deny-all.yml
+        replicas: 1
+      - objectTemplate: np-allow-from-clients.yml
+        replicas: 1
+      - objectTemplate: np-allow-from-ingress.yml
+        replicas: 1
+
+  - name: remove-max-backends
+    jobType: delete
+    objects:
+      - kind: Namespace
+        labelSelector: {kube-burner-job: max-backends}

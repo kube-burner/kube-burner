@@ -1,0 +1,11 @@
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: {{.JobName}}-{{.Replica}}-{{.Iteration}}
+spec:
+  to:
+    kind: Service
+    name: {{.JobName}}-{{.Replica}}-{{.Iteration}}
+  tls:
+    termination: edge

@@ -15,6 +15,7 @@ var MetricsProfileMap = map[string]string{
 	"cluster-density-ms":             "metrics-aggregated.yml",
 	"cluster-density-v2":             "metrics-aggregated.yml",
 	"crd-scale":                      "metrics-aggregated.yml",
+	"cluster-maximums":               "metrics-aggregated.yml",
 	"node-density":                   "metrics.yml",
 	"node-density-heavy":             "metrics.yml",
 	"node-density-cni":               "metrics.yml",

@@ -64,6 +64,7 @@ const (
 	replica              = "Replica"
 	jobIteration         = "Iteration"
 	jobUUID              = "UUID"
+	namespace            = "Namespace"
 	rcTimeout            = 2
 	garbageCollectionJob = "garbage-collection"
 )

@@ -102,6 +102,7 @@ func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 
 func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 	var err error
+	log.Info("Gathering cluster metadata")
 	wh.Metadata.ClusterMetadata, err = wh.OcpMetaAgent.GetClusterMetadata()
 	if err != nil {
 		return err
