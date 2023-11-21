@@ -10,6 +10,7 @@ import (
 )
 
 type ProfileType string
+type clusterType string
 
 var MetricsProfileMap = map[string]string{
 	"cluster-density-ms":             "metrics-aggregated.yml",
@@ -28,12 +29,14 @@ const (
 	regular   ProfileType = "regular"
 	reporting ProfileType = "reporting"
 	both      ProfileType = "both"
+	OCP       clusterType = "ocp"
+	K8S       clusterType = "k8s"
 )
 
 type Config struct {
 	UUID            string
 	EsServer        string
-	Esindex         string
+	EsIndex         string
 	QPS             int
 	Burst           int
 	Gc              bool
@@ -44,6 +47,8 @@ type Config struct {
 	Timeout         time.Duration
 	MetricsEndpoint string
 	ProfileType     string
+	PrometheusURL   string
+	PrometheusToken string
 }
 
 type BenchmarkMetadata struct {
@@ -59,10 +64,11 @@ type BenchmarkMetadata struct {
 
 type WorkloadHelper struct {
 	Config
-	prometheusURL   string
-	prometheusToken string
-	Metadata        BenchmarkMetadata
-	ocpConfig       embed.FS
-	OcpMetaAgent    ocpmetadata.Metadata
-	restConfig      *rest.Config
+	configDir      string
+	Metadata       BenchmarkMetadata
+	workloadConfig embed.FS
+	restConfig     *rest.Config
+	OcpMetaAgent   ocpmetadata.Metadata
+	shortMetadata  map[string]interface{}
+	ClusterType    clusterType
 }

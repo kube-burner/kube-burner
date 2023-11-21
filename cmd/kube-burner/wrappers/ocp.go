@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package wrappers
 
 import (
 	"embed"
@@ -27,10 +27,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed ocp-config/*
-var ocpConfig embed.FS
+//go:embed wrappers-config/*
+var wrappersConfig embed.FS
 
-func openShiftCmd() *cobra.Command {
+func OpenShiftCmd() *cobra.Command {
 	ocpCmd := &cobra.Command{
 		Use:   "ocp",
 		Short: "OpenShift wrapper",
@@ -39,7 +39,7 @@ func openShiftCmd() *cobra.Command {
 	var workloadConfig workloads.Config
 	var wh workloads.WorkloadHelper
 	ocpCmd.PersistentFlags().StringVar(&workloadConfig.EsServer, "es-server", "", "Elastic Search endpoint")
-	ocpCmd.PersistentFlags().StringVar(&workloadConfig.Esindex, "es-index", "", "Elastic Search index")
+	ocpCmd.PersistentFlags().StringVar(&workloadConfig.EsIndex, "es-index", "", "Elastic Search index")
 	localIndexing := ocpCmd.PersistentFlags().Bool("local-indexing", false, "Enable local indexing")
 	ocpCmd.PersistentFlags().StringVar(&workloadConfig.MetricsEndpoint, "metrics-endpoint", "", "YAML file with a list of metric endpoints")
 	ocpCmd.PersistentFlags().BoolVar(&workloadConfig.Alerting, "alerting", true, "Enable alerting")
@@ -56,7 +56,7 @@ func openShiftCmd() *cobra.Command {
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.MarkFlagsMutuallyExclusive("es-server", "local-indexing")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		rootCmd.PersistentPreRun(cmd, args)
+		cmd.Root().PersistentPreRun(cmd, args)
 		if workloadConfig.EsServer != "" || *localIndexing {
 			if workloadConfig.EsServer != "" {
 				workloadConfig.Indexer = indexers.ElasticIndexer
@@ -64,7 +64,7 @@ func openShiftCmd() *cobra.Command {
 				workloadConfig.Indexer = indexers.LocalIndexer
 			}
 		}
-		wh = workloads.NewWorkloadHelper(workloadConfig, ocpConfig)
+		wh = workloads.NewWorkloadHelper(workloadConfig, wrappersConfig, workloads.OCP)
 		if *extract {
 			if err := wh.ExtractWorkload(cmd.Name(), workloads.MetricsProfileMap[cmd.Name()]); err != nil {
 				log.Fatal(err)
@@ -75,7 +75,6 @@ func openShiftCmd() *cobra.Command {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		wh.SetKubeBurnerFlags()
 	}
 	ocpCmd.AddCommand(
 		workloads.NewClusterDensity(&wh, "cluster-density"),

@@ -26,6 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/cloud-bulldozer/go-commons/version"
+	"github.com/cloud-bulldozer/kube-burner/cmd/kube-burner/wrappers"
 	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
@@ -400,7 +401,8 @@ func main() {
 		indexCmd(),
 		alertCmd(),
 		importCmd(),
-		openShiftCmd(),
+		wrappers.OpenShiftCmd(),
+		wrappers.K8SCmd(),
 	)
 	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {

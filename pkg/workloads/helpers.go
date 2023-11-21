@@ -45,9 +45,11 @@ const (
 )
 
 var configSpec config.Spec
+var indexer *indexers.Indexer
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(config Config, ocpConfig embed.FS) WorkloadHelper {
+func NewWorkloadHelper(config Config, workloadConfig embed.FS, clType clusterType) WorkloadHelper {
+	var ocpMetadata ocpmetadata.Metadata
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
@@ -58,80 +60,86 @@ func NewWorkloadHelper(config Config, ocpConfig embed.FS) WorkloadHelper {
 	if err != nil {
 		log.Fatal(err)
 	}
-	ocpMetadata, err := ocpmetadata.NewMetadata(restConfig)
+	// Some of the ocpmetadata methods should work with vanilla k8s
+	ocpMetadata, err = ocpmetadata.NewMetadata(restConfig)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	return WorkloadHelper{
-		Config:       config,
-		ocpConfig:    ocpConfig,
-		OcpMetaAgent: ocpMetadata,
-		restConfig:   restConfig,
+		Config:         config,
+		workloadConfig: workloadConfig,
+		OcpMetaAgent:   ocpMetadata,
+		restConfig:     restConfig,
+		configDir:      "wrappers-config",
+		ClusterType:    clType,
 	}
 }
 
-var indexer *indexers.Indexer
-
-// SetKubeBurnerFlags configures the required environment variables and flags for kube-burner
-func (wh *WorkloadHelper) SetKubeBurnerFlags() {
+// Gathers metadata from the configured cluster type
+func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 	var err error
-	if wh.MetricsEndpoint == "" {
-		wh.prometheusURL, wh.prometheusToken, err = wh.OcpMetaAgent.GetPrometheus()
+	envVars := map[string]string{
+		"ES_SERVER":     wh.EsServer,
+		"ES_INDEX":      wh.EsIndex,
+		"QPS":           fmt.Sprintf("%d", wh.QPS),
+		"BURST":         fmt.Sprintf("%d", wh.Burst),
+		"GC":            fmt.Sprintf("%v", wh.Gc),
+		"GC_METRICS":    fmt.Sprintf("%v", wh.GcMetrics),
+		"INDEXING_TYPE": string(wh.Indexer),
+	}
+	wh.Metadata.ClusterMetadata, err = wh.OcpMetaAgent.GetClusterMetadata()
+	if err != nil {
+		log.Fatalf("Error obtaining cluster metadata: %v", err)
+	}
+	switch wh.ClusterType {
+	case OCP:
+		wh.shortMetadata = map[string]interface{}{
+			"platform":        wh.Metadata.Platform,
+			"ocpVersion":      wh.Metadata.OCPVersion,
+			"ocpMajorVersion": wh.Metadata.OCPMajorVersion,
+			"k8sVersion":      wh.Metadata.K8SVersion,
+			"totalNodes":      wh.Metadata.TotalNodes,
+			"sdnType":         wh.Metadata.SDNType,
+		}
+		envVars["INGRESS_DOMAIN"], err = wh.OcpMetaAgent.GetDefaultIngressDomain()
 		if err != nil {
-			log.Fatal("Error obtaining Prometheus information: ", err.Error())
+			log.Fatal("Error obtaining default ingress domain: ", err.Error())
+		}
+		if wh.MetricsEndpoint == "" {
+			wh.PrometheusURL, wh.PrometheusToken, err = wh.OcpMetaAgent.GetPrometheus()
+			if err != nil {
+				log.Fatal("Error obtaining Prometheus information: ", err.Error())
+			}
+		}
+	case K8S:
+		if err != nil {
+			log.Fatalf("Error obtaining cluster metadata: %v", err)
+		}
+		wh.shortMetadata = map[string]interface{}{
+			"k8sVersion": wh.Metadata.K8SVersion,
+			"totalNodes": wh.Metadata.TotalNodes,
 		}
 	}
-	ingressDomain, err := wh.OcpMetaAgent.GetDefaultIngressDomain()
-	if err != nil {
-		log.Fatal("Error obtaining default ingress domain: ", err.Error())
+	if userMetadata != "" {
+		wh.Metadata.UserMetadata, err = util.ReadUserMetadata(userMetadata)
+		if err != nil {
+			log.Fatalf("Error reading provided user metadata: %v", err)
+		}
 	}
-	envVars := map[string]string{
-		"ES_SERVER":      wh.EsServer,
-		"ES_INDEX":       wh.Esindex,
-		"QPS":            fmt.Sprintf("%d", wh.QPS),
-		"BURST":          fmt.Sprintf("%d", wh.Burst),
-		"INGRESS_DOMAIN": ingressDomain,
-		"GC":             fmt.Sprintf("%v", wh.Gc),
-		"GC_METRICS":     fmt.Sprintf("%v", wh.GcMetrics),
-		"INDEXING_TYPE":  string(wh.Indexer),
+	wh.Metadata.MetricName = clusterMetadataMetric
+	wh.Metadata.UUID = wh.UUID
+	wh.Metadata.Timestamp = time.Now().UTC()
+	// Combine provided userMetadata with the regular OCP metadata
+	for k, v := range wh.Metadata.UserMetadata {
+		wh.shortMetadata[k] = v
 	}
 	for k, v := range envVars {
 		os.Setenv(k, v)
 	}
-}
-
-func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
-	var err error
-	wh.Metadata.ClusterMetadata, err = wh.OcpMetaAgent.GetClusterMetadata()
-	if err != nil {
-		return err
-	}
-	wh.Metadata.MetricName = clusterMetadataMetric
-	if userMetadata != "" {
-		userMetadataContent, err := util.ReadUserMetadata(userMetadata)
-		if err != nil {
-			log.Fatalf("Error reading provided user metadata: %v", err)
-		}
-		wh.Metadata.UserMetadata = userMetadataContent
-	}
-	wh.Metadata.UUID = wh.UUID
-	wh.Metadata.Timestamp = time.Now().UTC()
 	return nil
 }
 
 func (wh *WorkloadHelper) run(workload, metricsProfile string) {
-	metadata := map[string]interface{}{
-		"platform":        wh.Metadata.Platform,
-		"ocpVersion":      wh.Metadata.OCPVersion,
-		"ocpMajorVersion": wh.Metadata.OCPMajorVersion,
-		"k8sVersion":      wh.Metadata.K8SVersion,
-		"totalNodes":      wh.Metadata.TotalNodes,
-		"sdnType":         wh.Metadata.SDNType,
-	}
-	// Combine provided userMetadata with the regular OCP metadata
-	for k, v := range wh.Metadata.UserMetadata {
-		metadata[k] = v
-	}
 	var f io.Reader
 	var rc int
 	var err error
@@ -142,7 +150,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	var embedConfig bool
 	configFile := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(configFile); err != nil {
-		f, err = util.ReadEmbedConfig(wh.ocpConfig, path.Join(ocpCfgDir, workload, configFile))
+		f, err = util.ReadEmbedConfig(wh.workloadConfig, path.Join(wh.configDir, workload, configFile))
 		embedConfig = true
 		if err != nil {
 			log.Fatalf("Error reading configuration file: %v", err.Error())
@@ -159,8 +167,8 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		log.Fatal(err)
 	}
 	if embedConfig {
-		configSpec.EmbedFS = wh.ocpConfig
-		configSpec.EmbedFSDir = path.Join(ocpCfgDir, workload)
+		configSpec.EmbedFS = wh.workloadConfig
+		configSpec.EmbedFSDir = path.Join(wh.configDir, workload)
 	}
 	indexerConfig := configSpec.GlobalConfig.IndexerConfig
 	if indexerConfig.Type != "" {
@@ -173,17 +181,17 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	if wh.MetricsEndpoint != "" {
 		embedConfig = false
 		metrics.DecodeMetricsEndpoint(wh.MetricsEndpoint, &metricsEndpoints)
-	} else {
+	} else if wh.PrometheusURL != "" {
 		regularProfile := prometheus.MetricEndpoint{
-			Endpoint:     wh.prometheusURL,
+			Endpoint:     wh.PrometheusURL,
 			AlertProfile: alertsProfile,
 			Profile:      metricsProfile,
-			Token:        wh.prometheusToken,
+			Token:        wh.PrometheusToken,
 		}
 		reportingProfile := prometheus.MetricEndpoint{
-			Endpoint: wh.prometheusURL,
+			Endpoint: wh.PrometheusURL,
 			Profile:  reportProfile,
-			Token:    wh.prometheusToken,
+			Token:    wh.PrometheusToken,
 		}
 		switch ProfileType(wh.ProfileType) {
 		case regular:
@@ -206,7 +214,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			Token:         metricsEndpoint.Token,
 			SkipTLSVerify: true,
 		}
-		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, metadata, embedConfig)
+		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, wh.shortMetadata, embedConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -225,7 +233,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		alertM = nil
 	}
 	configSpec.GlobalConfig.GCMetrics = wh.GcMetrics
-	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.Timeout, metadata)
+	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.Timeout, wh.shortMetadata)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)
@@ -240,30 +248,30 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 
 // ExtractWorkload extracts the given workload and metrics profile to the current diretory
 func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error {
-	dirContent, err := wh.ocpConfig.ReadDir(path.Join(ocpCfgDir, workload))
+	dirContent, err := wh.workloadConfig.ReadDir(path.Join(wh.configDir, workload))
 	if err != nil {
 		return err
 	}
-	workloadContent, _ := wh.ocpConfig.ReadFile(ocpCfgDir)
+	workloadContent, _ := wh.workloadConfig.ReadFile(wh.configDir)
 	if err = util.CreateFile(fmt.Sprintf("%v.yml", workload), workloadContent); err != nil {
 		return err
 	}
 	for _, f := range dirContent {
-		fileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, workload, f.Name()))
+		fileContent, _ := wh.workloadConfig.ReadFile(path.Join(wh.configDir, workload, f.Name()))
 		err := util.CreateFile(f.Name(), fileContent)
 		if err != nil {
 			return err
 		}
 	}
-	metricsProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, metricsProfile))
+	metricsProfileContent, _ := wh.workloadConfig.ReadFile(path.Join(wh.configDir, metricsProfile))
 	if err = util.CreateFile(metricsProfile, metricsProfileContent); err != nil {
 		return err
 	}
-	reportProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, reportProfile))
+	reportProfileContent, _ := wh.workloadConfig.ReadFile(path.Join(wh.configDir, reportProfile))
 	if err = util.CreateFile(reportProfile, reportProfileContent); err != nil {
 		return err
 	}
-	alertsProfileContent, _ := wh.ocpConfig.ReadFile(path.Join(ocpCfgDir, alertsProfile))
+	alertsProfileContent, _ := wh.workloadConfig.ReadFile(path.Join(wh.configDir, alertsProfile))
 	if err = util.CreateFile(alertsProfile, alertsProfileContent); err != nil {
 		return err
 	}
