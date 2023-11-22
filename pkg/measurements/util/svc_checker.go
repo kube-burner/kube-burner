@@ -23,7 +23,7 @@ type SvcLatencyChecker struct {
 }
 
 func NewSvcLatencyChecker(clientSet kubernetes.Clientset, restConfig rest.Config) (SvcLatencyChecker, error) {
-	pod, err := clientSet.CoreV1().Pods(types.SvcLatencyNs.Name).Get(context.TODO(), types.SvcLatencyCheckerName, metav1.GetOptions{})
+	pod, err := clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyCheckerName, metav1.GetOptions{})
 	if err != nil {
 		return SvcLatencyChecker{}, err
 	}

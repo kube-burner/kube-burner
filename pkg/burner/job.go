@@ -31,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
@@ -330,7 +331,7 @@ func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector 
 	if wg != nil {
 		defer wg.Done()
 	}
-	CleanupNamespaces(ctx, labelSelector)
+	util.CleanupNamespaces(ctx, ClientSet, labelSelector)
 	for _, obj := range jobExecutor.objects {
 		jobExecutor.limiter.Wait(ctx)
 		if !obj.Namespaced {

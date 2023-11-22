@@ -57,11 +57,10 @@ func preLoadImages(job Executor) error {
 	}
 	log.Infof("Pre-load: Sleeping for %v", job.PreLoadPeriod)
 	time.Sleep(job.PreLoadPeriod)
-	log.Infof("Pre-load: Deleting namespace %s", preLoadNs)
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	CleanupNamespaces(ctx, "kube-burner-preload=true")
+	util.CleanupNamespaces(ctx, ClientSet, "kube-burner-preload=true")
 	return nil
 }
 
@@ -105,7 +104,7 @@ func createDSs(imageList []string, namespaceLabels map[string]string, namespaceA
 	for annotation, value := range namespaceAnnotations {
 		nsAnnotations[annotation] = value
 	}
-	if err := createNamespace(preLoadNs, nsLabels, nsAnnotations); err != nil {
+	if err := util.CreateNamespace(ClientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
 		log.Fatal(err)
 	}
 	dsName := "preload"

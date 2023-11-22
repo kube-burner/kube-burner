@@ -118,7 +118,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	}
 	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
-		if err = createNamespace(ns, nsLabels, nsAnnotations); err != nil {
+		if err = util.CreateNamespace(ClientSet, ns, nsAnnotations, nsLabels); err != nil {
 			log.Fatal(err.Error())
 		}
 		*waitListNamespaces = append(*waitListNamespaces, ns)
@@ -137,7 +137,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
-				if err = createNamespace(ns, nsLabels, nsAnnotations); err != nil {
+				if err = util.CreateNamespace(ClientSet, ns, nsAnnotations, nsLabels); err != nil {
 					log.Error(err.Error())
 					continue
 				}
@@ -272,7 +272,7 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
-	RetryWithExponentialBackOff(func() (bool, error) {
+	util.RetryWithExponentialBackOff(func() (bool, error) {
 		// When the object has a namespace already specified, use it
 		if objNs := obj.GetNamespace(); objNs != "" {
 			ns = objNs
@@ -368,7 +368,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		if ex.ChurnDeletionStrategy == "gvr" {
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		}
-		CleanupNamespaces(ctx, "churndelete=delete")
+		util.CleanupNamespaces(ctx, ClientSet, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart, &[]string{})

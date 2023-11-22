@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,7 +88,7 @@ func (ex *Executor) Verify() bool {
 			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.Name, objectIndex),
 			Limit:         objectLimit,
 		}
-		err := RetryWithExponentialBackOff(func() (done bool, err error) {
+		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
 			replicas = 0
 			for {
 				objList, err = DynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)

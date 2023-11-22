@@ -96,24 +96,15 @@ type PProftarget struct {
 	Key string `yaml:"key"`
 }
 
-var SvcLatencyNs = &corev1.Namespace{
-	ObjectMeta: metav1.ObjectMeta{
-		Name: "kube-burner-service-latency",
-		Labels: map[string]string{
-			"pod-security.kubernetes.io/warn":                "privileged",
-			"pod-security.kubernetes.io/audit":               "privileged",
-			"pod-security.kubernetes.io/enforce":             "privileged",
-			"security.openshift.io/scc.podSecurityLabelSync": "false",
-		},
-	},
-}
-
-const SvcLatencyCheckerName = "svc-checker"
+const (
+	SvcLatencyNs          = "kube-burner-service-latency"
+	SvcLatencyCheckerName = "svc-checker"
+)
 
 var SvcLatencyChecker = &corev1.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      SvcLatencyCheckerName,
-		Namespace: SvcLatencyNs.Name,
+		Namespace: SvcLatencyNs,
 	},
 	Spec: corev1.PodSpec{
 		Containers: []corev1.Container{

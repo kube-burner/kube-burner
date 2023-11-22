@@ -94,7 +94,7 @@ func (ex *Executor) RunPatchJob() {
 		}
 
 		// Try to find the list of resources by GroupVersionResource.
-		err := RetryWithExponentialBackOff(func() (done bool, err error) {
+		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
 			itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 			if err != nil {
 				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)

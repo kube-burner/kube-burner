@@ -25,6 +25,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
+	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -72,16 +73,11 @@ func init() {
 }
 
 func deployAssets() error {
-	_, err := factory.clientSet.CoreV1().Namespaces().Create(context.TODO(), types.SvcLatencyNs, metav1.CreateOptions{})
-	if err != nil {
-		if errors.IsAlreadyExists(err) {
-			log.Warn(err)
-		} else {
-			return err
-		}
+	var err error
+	if err = kutil.CreateNamespace(factory.clientSet, types.SvcLatencyNs, nil, nil); err != nil {
+		log.Fatal(err)
 	}
-	_, err = factory.clientSet.CoreV1().Pods(types.SvcLatencyNs.Name).Create(context.TODO(), types.SvcLatencyChecker, metav1.CreateOptions{})
-	if err != nil {
+	if _, err = factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Create(context.TODO(), types.SvcLatencyChecker, metav1.CreateOptions{}); err != nil {
 		if errors.IsAlreadyExists(err) {
 			log.Warn(err)
 		} else {
@@ -224,8 +220,11 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 func (s *serviceLatency) stop() error {
 	s.svcWatcher.StopWatcher()
 	s.epwatcher.StopWatcher()
-	// TODO wait for namespace to be deleted
-	factory.clientSet.CoreV1().Namespaces().Delete(context.TODO(), types.SvcLatencyNs.Name, metav1.DeleteOptions{})
+	// 5 minutes should be more than enough to cleanup this namespace
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	kutil.CleanupNamespaces(ctx, factory.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
+	factory.clientSet.CoreV1().Namespaces().Delete(context.TODO(), types.SvcLatencyNs, metav1.DeleteOptions{})
 	s.normalizeMetrics()
 	if globalCfg.IndexerConfig.Type != "" {
 		if factory.jobConfig.SkipIndexing {

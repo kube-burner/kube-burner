@@ -123,10 +123,8 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
 
 ### Measure subcommand CLI example
-
-This subcommand can be used to fetch pod latency metrics from pods that were created in the past.
-
-```shell
+Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
+```
 kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2 
 time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
 time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
