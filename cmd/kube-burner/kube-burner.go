@@ -30,6 +30,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 
@@ -197,8 +198,7 @@ func measureCmd() *cobra.Command {
 	var uuid string
 	var rawNamespaces string
 	var selector string
-	var configFile string
-	var jobName string
+	var jobName, esServer, esIndex, metricsDirectory string
 	var userMetadata string
 	var indexer *indexers.Indexer
 	metadata := make(map[string]interface{})
@@ -210,24 +210,34 @@ func measureCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			f, err := util.ReadConfig(configFile)
-			if err != nil {
-				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
+			var err error
+			configSpec := config.Spec{
+				GlobalConfig: config.GlobalConfig{
+					UUID: uuid,
+					Measurements: []types.Measurement{
+						types.Measurement{
+							Name: "podLatency",
+						},
+					},
+				},
 			}
-			configSpec, err := config.Parse(configFile, f)
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			if len(configSpec.Jobs) > 0 {
-				log.Fatal("No jobs are allowed in a measure subcommand config file")
-			}
-			if configSpec.GlobalConfig.IndexerConfig.Type != "" {
-				indexerConfig := configSpec.GlobalConfig.IndexerConfig
-				log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
-				indexer, err = indexers.NewIndexer(indexerConfig)
-				if err != nil {
-					log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
+			if esServer != "" && esIndex != "" {
+				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+					Type:    indexers.ElasticIndexer,
+					Servers: []string{esServer},
+					Index:   esIndex,
 				}
+			} else {
+				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+					Type:             indexers.LocalIndexer,
+					MetricsDirectory: metricsDirectory,
+				}
+			}
+			indexerConfig := configSpec.GlobalConfig.IndexerConfig
+			log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
+			indexer, err = indexers.NewIndexer(indexerConfig)
+			if err != nil {
+				log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
 			}
 			if userMetadata != "" {
 				metadata, err = util.ReadUserMetadata(userMetadata)
@@ -244,7 +254,6 @@ func measureCmd() *cobra.Command {
 			for _, req := range labelRequirements {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
-			log.Infof("%v", namespaceLabels)
 			measurements.NewMeasurementFactory(configSpec, indexer, metadata)
 			measurements.SetJobConfig(&config.Job{
 				Name:            jobName,
@@ -257,9 +266,11 @@ func measureCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Measurement UUID")
+	cmd.Flags().StringVar(&metricsDirectory, "metrics-directory", "collected-metrics", "Directory to dump the metrics files in, when using default local indexing")
+	cmd.Flags().StringVar(&esServer, "es-server", "", "Elastic Search endpoint")
+	cmd.Flags().StringVar(&esIndex, "es-index", "", "Elastic Search index")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "config.yml", "Config file path or URL")
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-measure", "Measure job name")
 	cmd.Flags().StringVarP(&rawNamespaces, "namespaces", "n", corev1.NamespaceAll, "comma-separated list of namespaces")
 	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")

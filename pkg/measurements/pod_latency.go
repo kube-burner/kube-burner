@@ -223,6 +223,8 @@ func (p *podLatency) stop() error {
 	if errorRate > 10.00 {
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")
 		return fmt.Errorf("Something is wrong with system under test. Pod latencies error rate was: %.2f", errorRate)
+	} else if errorRate > 0 {
+		log.Infof("Pod latencies error rate was: %.2f", errorRate)
 	}
 	p.calcQuantiles()
 	if len(p.config.LatencyThresholds) > 0 {
@@ -238,9 +240,6 @@ func (p *podLatency) stop() error {
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
-	}
-	if len(p.latencyQuantiles) > 0 {
-		log.Infof("Pod latencies error rate was: %.2f", errorRate)
 	}
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
