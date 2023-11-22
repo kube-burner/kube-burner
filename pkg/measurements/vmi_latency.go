@@ -365,6 +365,10 @@ func setConfigDefaults(config *rest.Config) {
 	config.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: codecs}
 }
 
+func (p *vmiLatency) collect(measurementWg *sync.WaitGroup) {
+	defer measurementWg.Done()
+}
+
 // Stop stops vmiLatency measurement
 func (p *vmiLatency) stop() error {
 	p.vmWatcher.StopWatcher()

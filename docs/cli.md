@@ -7,7 +7,7 @@ given rate. The actions taken by this tool are highly customizable and their ava
 $ kube-burner help
 Kube-burner 🔥
 
-Tool aimed at stressing a Kubernetes cluster by creating or deleting lots of objects.
+Tool aimed at stressing a kubernetes cluster by creating or deleting lots of objects.
 
 Usage:
   kube-burner [command]
@@ -20,11 +20,13 @@ Available Commands:
   import       Import metrics tarball
   index        Index kube-burner metrics
   init         Launch benchmark
+  measure      Take measurements for a given set of resources without running workload
+  ocp          OpenShift wrapper
   version      Print the version number of kube-burner
 
 Flags:
-  -h, --help   help for kube-burner
-  --log-level string   Allowed values: debug, info, warn, error, fatal (default "info")
+  -h, --help               help for kube-burner
+      --log-level string   Allowed values: debug, info, warn, error, fatal (default "info")
 
 Use "kube-burner [command] --help" for more information about a command.
 ```
@@ -90,6 +92,16 @@ This subcommand can be used to collect and index the metrics from a given time r
 
 - `start`: Epoch start time. Defaults to one hour before the current time.
 - `end`: Epoch end time. Defaults to the current time.
+
+## Measure
+This subcommand can be used to collect measurements for a given set of resources which were part of a workload ran in past and are still present on the cluster (i.e only supports podLatency as of today).
+We can specify a list of namespaces and selector labels as input.
+
+- `namespaces`: comma-separated list of namespaces provided as a string input. This is optional, by default all namespaces are considered.
+- `selector`: comma-separated list of selector labels in the format key1=value1,key2=value2. This is optional, by default no labels will be used for filtering.
+
+!!! Note
+    This subcommand should only be used to fetch measurements of a workload ran in the past. Also those resources should be active on the cluster. For present cases, please refer to the alternate options in this tool.
 
 ## Check alerts
 
