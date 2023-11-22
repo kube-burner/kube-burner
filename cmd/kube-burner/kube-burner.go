@@ -215,7 +215,7 @@ func measureCmd() *cobra.Command {
 				GlobalConfig: config.GlobalConfig{
 					UUID: uuid,
 					Measurements: []types.Measurement{
-						types.Measurement{
+						{
 							Name: "podLatency",
 						},
 					},
