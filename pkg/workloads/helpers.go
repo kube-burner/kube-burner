@@ -75,25 +75,20 @@ var indexer *indexers.Indexer
 // SetKubeBurnerFlags configures the required environment variables and flags for kube-burner
 func (wh *WorkloadHelper) SetKubeBurnerFlags() {
 	var err error
-	if wh.MetricsEndpoint == "" {
+	if (wh.Config.Indexing || wh.Config.Alerting) && wh.MetricsEndpoint == "" {
 		wh.prometheusURL, wh.prometheusToken, err = wh.OcpMetaAgent.GetPrometheus()
 		if err != nil {
 			log.Fatal("Error obtaining Prometheus information: ", err.Error())
 		}
 	}
-	ingressDomain, err := wh.OcpMetaAgent.GetDefaultIngressDomain()
-	if err != nil {
-		log.Fatal("Error obtaining default ingress domain: ", err.Error())
-	}
 	envVars := map[string]string{
-		"ES_SERVER":      wh.EsServer,
-		"ES_INDEX":       wh.Esindex,
-		"QPS":            fmt.Sprintf("%d", wh.QPS),
-		"BURST":          fmt.Sprintf("%d", wh.Burst),
-		"INGRESS_DOMAIN": ingressDomain,
-		"GC":             fmt.Sprintf("%v", wh.Gc),
-		"GC_METRICS":     fmt.Sprintf("%v", wh.GcMetrics),
-		"INDEXING_TYPE":  string(wh.Indexer),
+		"ES_SERVER":     wh.EsServer,
+		"ES_INDEX":      wh.Esindex,
+		"QPS":           fmt.Sprintf("%d", wh.QPS),
+		"BURST":         fmt.Sprintf("%d", wh.Burst),
+		"GC":            fmt.Sprintf("%v", wh.Gc),
+		"GC_METRICS":    fmt.Sprintf("%v", wh.GcMetrics),
+		"INDEXING_TYPE": string(wh.Indexer),
 	}
 	for k, v := range envVars {
 		os.Setenv(k, v)
@@ -162,76 +157,76 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		configSpec.EmbedFS = wh.ocpConfig
 		configSpec.EmbedFSDir = path.Join(ocpCfgDir, workload)
 	}
-	indexerConfig := configSpec.GlobalConfig.IndexerConfig
-	if indexerConfig.Type != "" {
+	if wh.Config.Indexing {
+		indexerConfig := configSpec.GlobalConfig.IndexerConfig
 		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 		indexer, err = indexers.NewIndexer(indexerConfig)
 		if err != nil {
 			log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
 		}
-	}
-	if wh.MetricsEndpoint != "" {
-		embedConfig = false
-		metrics.DecodeMetricsEndpoint(wh.MetricsEndpoint, &metricsEndpoints)
-	} else {
-		regularProfile := prometheus.MetricEndpoint{
-			Endpoint:     wh.prometheusURL,
-			AlertProfile: alertsProfile,
-			Profile:      metricsProfile,
-			Token:        wh.prometheusToken,
-		}
-		reportingProfile := prometheus.MetricEndpoint{
-			Endpoint: wh.prometheusURL,
-			Profile:  reportProfile,
-			Token:    wh.prometheusToken,
-		}
-		switch ProfileType(wh.ProfileType) {
-		case regular:
-			metricsEndpoints = append(metricsEndpoints, regularProfile)
-		case reporting:
-			reportingProfile.AlertProfile = alertsProfile
-			metricsEndpoints = append(metricsEndpoints, reportingProfile)
-			for i := range configSpec.GlobalConfig.Measurements {
-				configSpec.GlobalConfig.Measurements[i].PodLatencyMetrics = types.Quantiles
+		if wh.MetricsEndpoint != "" {
+			embedConfig = false
+			metrics.DecodeMetricsEndpoint(wh.MetricsEndpoint, &metricsEndpoints)
+		} else {
+			regularProfile := prometheus.MetricEndpoint{
+				Endpoint:     wh.prometheusURL,
+				AlertProfile: alertsProfile,
+				Profile:      metricsProfile,
+				Token:        wh.prometheusToken,
 			}
-		case both:
-			metricsEndpoints = append(metricsEndpoints, regularProfile, reportingProfile)
-		default:
-			log.Fatalf("Metrics profile type not supported: %v", wh.ProfileType)
+			reportingProfile := prometheus.MetricEndpoint{
+				Endpoint: wh.prometheusURL,
+				Profile:  reportProfile,
+				Token:    wh.prometheusToken,
+			}
+			switch ProfileType(wh.ProfileType) {
+			case regular:
+				metricsEndpoints = append(metricsEndpoints, regularProfile)
+			case reporting:
+				reportingProfile.AlertProfile = alertsProfile
+				metricsEndpoints = append(metricsEndpoints, reportingProfile)
+				for i := range configSpec.GlobalConfig.Measurements {
+					configSpec.GlobalConfig.Measurements[i].PodLatencyMetrics = types.Quantiles
+				}
+			case both:
+				metricsEndpoints = append(metricsEndpoints, regularProfile, reportingProfile)
+			default:
+				log.Fatalf("Metrics profile type not supported: %v", wh.ProfileType)
+			}
 		}
-	}
-	for _, metricsEndpoint := range metricsEndpoints {
-		// Updating the prometheus endpoint actually being used in spec.
-		auth := prometheus.Auth{
-			Token:         metricsEndpoint.Token,
-			SkipTLSVerify: true,
-		}
-		p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, metadata, embedConfig)
-		if err != nil {
-			log.Fatal(err)
-		}
-		p.ReadProfile(metricsEndpoint.Profile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if wh.Alerting && metricsEndpoint.AlertProfile != "" {
-			alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, wh.Metadata.UUID, indexer, p, embedConfig)
+		for _, metricsEndpoint := range metricsEndpoints {
+			// Updating the prometheus endpoint actually being used in spec.
+			auth := prometheus.Auth{
+				Token:         metricsEndpoint.Token,
+				SkipTLSVerify: true,
+			}
+			p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, metadata, embedConfig)
 			if err != nil {
 				log.Fatal(err)
 			}
+			p.ReadProfile(metricsEndpoint.Profile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if wh.Alerting && metricsEndpoint.AlertProfile != "" {
+				alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, wh.Metadata.UUID, indexer, p, embedConfig)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+			prometheusClients = append(prometheusClients, p)
+			alertMs = append(alertMs, alertM)
+			alertM = nil
 		}
-		prometheusClients = append(prometheusClients, p)
-		alertMs = append(alertMs, alertM)
-		alertM = nil
+		configSpec.GlobalConfig.GCMetrics = wh.GcMetrics
 	}
-	configSpec.GlobalConfig.GCMetrics = wh.GcMetrics
 	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.Timeout, metadata)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)
 	}
 	wh.Metadata.Passed = rc == 0
-	if indexerConfig.Type != "" {
+	if wh.Indexing {
 		IndexMetadata(indexer, wh.Metadata)
 	}
 	log.Info("👋 Exiting kube-burner ", wh.UUID)
