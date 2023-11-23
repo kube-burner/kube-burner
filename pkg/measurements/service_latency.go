@@ -75,7 +75,7 @@ func init() {
 func deployAssets() error {
 	var err error
 	if err = kutil.CreateNamespace(factory.clientSet, types.SvcLatencyNs, nil, nil); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if _, err = factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Create(context.TODO(), types.SvcLatencyChecker, metav1.CreateOptions{}); err != nil {
 		if errors.IsAlreadyExists(err) {
@@ -84,7 +84,17 @@ func deployAssets() error {
 			return err
 		}
 	}
-	return nil
+	err = wait.PollUntilContextCancel(context.TODO(), 200*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+		pod, err := factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyChecker.Name, metav1.GetOptions{})
+		if err != nil {
+			return true, err
+		}
+		if pod.Status.Phase != corev1.PodRunning {
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }
 
 func (s *serviceLatency) handleCreateSvc(obj interface{}) {
@@ -201,8 +211,7 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 		"epWatcher",
 		"endpoints",
 		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-		},
+		func(options *metav1.ListOptions) {},
 		cache.Indexers{},
 	)
 	// Use an endpoints lister to reduce and optimize API interactions in waitForEndpoints

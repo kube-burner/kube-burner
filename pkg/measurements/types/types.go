@@ -109,7 +109,7 @@ var SvcLatencyChecker = &corev1.Pod{
 	Spec: corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
-				Image:           "quay.io/rsevilla/fedora-nc:latest",
+				Image:           "quay.io/cloud-bulldozer/fedora-nc:latest",
 				Command:         []string{"sleep", "inf"},
 				Name:            SvcLatencyCheckerName,
 				ImagePullPolicy: corev1.PullAlways,
