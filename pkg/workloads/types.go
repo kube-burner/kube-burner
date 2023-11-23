@@ -22,6 +22,7 @@ var MetricsProfileMap = map[string]string{
 	"networkpolicy-matchlabels":      "metrics.yml",
 	"networkpolicy-matchexpressions": "metrics.yml",
 	"pvc-density":                    "metrics.yml",
+	"web-burner":                     "metrics.yml",
 }
 
 const (

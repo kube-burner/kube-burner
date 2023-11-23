@@ -1,0 +1,27 @@
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sriov-net-{{ .Iteration }}
+spec:
+  config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "internal-net",
+      "plugins": [
+        {
+          "type": "macvlan",
+          "master": "{{.bridge}}",
+          "mode": "bridge",
+          "ipam": {
+            "type": "static"
+          }
+        },
+        {
+          "capabilities": {
+            "mac": true,
+            "ips": true
+          },
+          "type": "tuning"
+        }
+      ]
+    }
