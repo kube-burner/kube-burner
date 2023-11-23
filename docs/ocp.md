@@ -11,15 +11,18 @@ Usage:
   kube-burner ocp [command]
 
 Available Commands:
-  cluster-density-ms Runs cluster-density-ms workload
-  cluster-density-v2 Runs cluster-density-v2 workload
-  index              Runs index sub-command
-  node-density       Runs node-density workload
-  node-density-cni   Runs node-density-cni workload
-  node-density-heavy Runs node-density-heavy workload
-  networkpolicy-multitenant Runs networkpolicy-multitenant workload
-  networkpolicy-matchlabels Runs networkpolicy-matchlabels workload
+  cluster-density                Runs cluster-density workload
+  cluster-density-ms             Runs cluster-density-ms workload
+  cluster-density-v2             Runs cluster-density-v2 workload
+  crd-scale                      Runs crd-scale workload
+  index                          Runs index sub-command
   networkpolicy-matchexpressions Runs networkpolicy-matchexpressions workload
+  networkpolicy-matchlabels      Runs networkpolicy-matchlabels workload
+  networkpolicy-multitenant      Runs networkpolicy-multitenant workload
+  node-density                   Runs node-density workload
+  node-density-cni               Runs node-density-cni workload
+  node-density-heavy             Runs node-density-heavy workload
+  pvc-density                    Runs pvc-density workload
 
 Flags:
       --alerting                  Enable alerting (default true)
@@ -28,14 +31,16 @@ Flags:
       --es-server string          Elastic Search endpoint
       --extract                   Extract workload in the current directory
       --gc                        Garbage collect created namespaces (default true)
+      --gc-metrics                Collect metrics during garbage collection
   -h, --help                      help for ocp
       --local-indexing            Enable local indexing
       --metrics-endpoint string   YAML file with a list of metric endpoints
-      --qps int                   QPS (default 20)
       --profile-type string       Metrics profile to use, supported options are: regular, reporting or both (default "both")
+      --qps int                   QPS (default 20)
       --timeout duration          Benchmark timeout (default 4h0m0s)
       --user-metadata string      User provided metadata file, in YAML format
-      --uuid string               Benchmark UUID (default "e082ae4b-0ff2-4c38-ba07-7481ec487e8d")
+      --uuid string               Benchmark UUID (default "9e14107b-3d15-4904-843b-eac6d23ebd40")
+
 
 Global Flags:
       --log-level string   Allowed values: debug, info, warn, error, fatal (default "info")
@@ -179,15 +184,13 @@ Flags:
 
 Please refer to [indexing](observability/indexing.md) section for better understanding on the functionality.
 
-## Reporting mode
-
-This feature is very useful to avoid sending thousands of documents to the configured indexer, as only a few documents will be indexed per benchmark. The metrics profile used by this feature is defined in [metrics-report.yml](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-report.yml)
-
 ## Metrics-profile type
 
 By specifying `--profile-type`, kube-burner can use two different metrics profiles when scraping metrics from prometheus. By default is configured with `both`, meaning that it will use the regular metrics profiles bound to the workload in question and the reporting metrics profile.
 
-While when using the regular profiles ([metrics-aggregated](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-aggregated.yml) or [metrics](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics.yml)), kube-burner scrapes and indexes metrics timeseries, the reporting one is a very useful profile to reduce the number of documents sent to the configured indexer. Thanks to the combination of aggregations and instant queries for prometheus metrics, and 4 summaries for pod latency measurements, only a few documents will be indexed per benchmark. This flag makes possible to specify one or both of these profiles indistinctly.
+When using the regular profiles ([metrics-aggregated](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-aggregated.yml) or [metrics](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics.yml)), kube-burner scrapes and indexes metrics timeseries.
+
+The reporting profile is very useful to reduce the number of documents sent to the configured indexer. Thanks to the combination of aggregations and instant queries for prometheus metrics, and 4 summaries for latency measurements, only a few documents will be indexed per benchmark. This flag makes possible to specify one or both of these profiles indistinctly.
 
 ## Customizing workloads
 
