@@ -77,7 +77,6 @@ func openShiftCmd() *cobra.Command {
 		wh.SetKubeBurnerFlags()
 	}
 	ocpCmd.AddCommand(
-		workloads.NewClusterDensity(&wh, "cluster-density"),
 		workloads.NewClusterDensity(&wh, "cluster-density-v2"),
 		workloads.NewClusterDensity(&wh, "cluster-density-ms"),
 		workloads.NewCrdScale(&wh),
