@@ -14,7 +14,6 @@ type ProfileType string
 var MetricsProfileMap = map[string]string{
 	"cluster-density-ms":             "metrics-aggregated.yml",
 	"cluster-density-v2":             "metrics-aggregated.yml",
-	"cluster-density":                "metrics-aggregated.yml",
 	"crd-scale":                      "metrics-aggregated.yml",
 	"node-density":                   "metrics.yml",
 	"node-density-heavy":             "metrics.yml",
@@ -41,7 +40,6 @@ type Config struct {
 	GcMetrics       bool
 	Indexer         indexers.IndexerType
 	Alerting        bool
-	Reporting       bool
 	Timeout         time.Duration
 	MetricsEndpoint string
 	ProfileType     string

@@ -15,6 +15,7 @@
 package measurements
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -29,6 +30,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -159,13 +161,64 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 	}
 }
 
+// collects pod measurements triggered in the past
+func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
+	defer measurementWg.Done()
+	var pods []corev1.Pod
+	labelSelector := labels.SelectorFromSet(factory.jobConfig.NamespaceLabels)
+	options := metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
+	}
+	namespaces := strings.Split(factory.jobConfig.Namespace, ",")
+	for _, namespace := range namespaces {
+		podList, err := factory.clientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
+		if err != nil {
+			log.Errorf("error listing pods in namespace %s: %v", namespace, err)
+		}
+		pods = append(pods, podList.Items...)
+	}
+	p.metrics = make(map[string]podMetric)
+	for _, pod := range pods {
+		var scheduled, initialized, containersReady, podReady time.Time
+		for _, c := range pod.Status.Conditions {
+			switch c.Type {
+			case corev1.PodScheduled:
+				scheduled = c.LastTransitionTime.Time.UTC()
+			case corev1.PodInitialized:
+				initialized = c.LastTransitionTime.Time.UTC()
+			case corev1.ContainersReady:
+				containersReady = c.LastTransitionTime.Time.UTC()
+			case corev1.PodReady:
+				podReady = c.LastTransitionTime.Time.UTC()
+			}
+		}
+		p.metrics[string(pod.UID)] = podMetric{
+			Timestamp:       pod.Status.StartTime.Time.UTC(),
+			Namespace:       pod.Namespace,
+			Name:            pod.Name,
+			MetricName:      podLatencyMeasurement,
+			NodeName:        pod.Spec.NodeName,
+			UUID:            globalCfg.UUID,
+			JobConfig:       *factory.jobConfig,
+			JobName:         factory.jobConfig.Name,
+			Metadata:        factory.metadata,
+			scheduled:       scheduled,
+			initialized:     initialized,
+			containersReady: containersReady,
+			podReady:        podReady,
+		}
+	}
+}
+
 // Stop stops podLatency measurement
 func (p *podLatency) stop() error {
 	if factory.jobConfig.JobType == config.DeletionJob {
 		return nil
 	}
 	var err error
-	p.watcher.StopWatcher()
+	if p.watcher != nil {
+		p.watcher.StopWatcher()
+	}
 	errorRate := p.normalizeMetrics()
 	if errorRate > 10.00 {
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")
@@ -179,7 +232,6 @@ func (p *podLatency) stop() error {
 		if factory.jobConfig.SkipIndexing {
 			log.Infof("Skipping pod latency data indexing in job: %s", factory.jobConfig.Name)
 		} else {
-			log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
 			p.index()
 		}
 	}

@@ -89,6 +89,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnPercent:           10,
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
+		ChurnDeletionStrategy:  "default",
 	}
 
 	if err := unmarshal(&raw); err != nil {
@@ -122,9 +123,6 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&configSpec); err != nil {
 		return configSpec, fmt.Errorf("error decoding configuration file: %s", err)
-	}
-	if len(configSpec.Jobs) <= 0 {
-		return configSpec, fmt.Errorf("no jobs found in the configuration file")
 	}
 	if err := jobIsDuped(); err != nil {
 		return configSpec, err

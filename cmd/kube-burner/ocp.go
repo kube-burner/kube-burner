@@ -52,7 +52,6 @@ func openShiftCmd() *cobra.Command {
 	userMetadata := ocpCmd.PersistentFlags().String("user-metadata", "", "User provided metadata file, in YAML format")
 	extract := ocpCmd.PersistentFlags().Bool("extract", false, "Extract workload in the current directory")
 	ocpCmd.PersistentFlags().StringVar(&workloadConfig.ProfileType, "profile-type", "both", "Metrics profile to use, supported options are: regular, reporting or both")
-	ocpCmd.PersistentFlags().BoolVar(&workloadConfig.Reporting, "reporting", false, "Enable benchmark report indexing")
 	ocpCmd.MarkFlagsRequiredTogether("es-server", "es-index")
 	ocpCmd.MarkFlagsMutuallyExclusive("es-server", "local-indexing")
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
@@ -78,7 +77,6 @@ func openShiftCmd() *cobra.Command {
 		wh.SetKubeBurnerFlags()
 	}
 	ocpCmd.AddCommand(
-		workloads.NewClusterDensity(&wh, "cluster-density"),
 		workloads.NewClusterDensity(&wh, "cluster-density-v2"),
 		workloads.NewClusterDensity(&wh, "cluster-density-ms"),
 		workloads.NewCrdScale(&wh),
@@ -88,7 +86,7 @@ func openShiftCmd() *cobra.Command {
 		workloads.NewNodeDensity(&wh),
 		workloads.NewNodeDensityHeavy(&wh),
 		workloads.NewNodeDensityCNI(&wh),
-		workloads.NewIndex(&wh.MetricsEndpoint, &wh.Metadata, &wh.OcpMetaAgent),
+		workloads.NewIndex(&wh.MetricsEndpoint, &wh.OcpMetaAgent),
 		workloads.NewPVCDensity(&wh),
 	)
 	return ocpCmd
