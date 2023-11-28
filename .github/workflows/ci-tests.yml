@@ -1,0 +1,19 @@
+name: CI tests
+on:
+  workflow_call:
+  pull_request_target:
+    branches:
+      - master
+      - main
+
+jobs:
+  lint:
+    uses: ./.github/workflows/linters.yml
+
+  build:
+    uses: ./.github/workflows/builders.yml
+
+  tests:
+    needs: build
+    uses: ./.github/workflows/test-k8s.yml
+    secrets: inherit
