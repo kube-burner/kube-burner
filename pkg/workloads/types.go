@@ -40,6 +40,7 @@ type Config struct {
 	GcMetrics       bool
 	Indexer         indexers.IndexerType
 	Alerting        bool
+	Indexing        bool
 	Timeout         time.Duration
 	MetricsEndpoint string
 	ProfileType     string

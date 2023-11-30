@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -45,6 +46,11 @@ func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 			os.Setenv("CHURN_PERCENT", fmt.Sprint(churnPercent))
 			os.Setenv("CHURN_DELETION_STRATEGY", churnDeletionStrategy)
 			os.Setenv("POD_READY_THRESHOLD", fmt.Sprintf("%v", podReadyThreshold))
+			ingressDomain, err := wh.OcpMetaAgent.GetDefaultIngressDomain()
+			if err != nil {
+				log.Fatal("Error obtaining default ingress domain: ", err.Error())
+			}
+			os.Setenv("INGRESS_DOMAIN", ingressDomain)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			wh.run(cmd.Name(), MetricsProfileMap[cmd.Name()])

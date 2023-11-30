@@ -57,6 +57,7 @@ func openShiftCmd() *cobra.Command {
 	ocpCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		rootCmd.PersistentPreRun(cmd, args)
 		if workloadConfig.EsServer != "" || *localIndexing {
+			workloadConfig.Indexing = true
 			if workloadConfig.EsServer != "" {
 				workloadConfig.Indexer = indexers.ElasticIndexer
 			} else {
