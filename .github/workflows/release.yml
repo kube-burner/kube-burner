@@ -4,12 +4,19 @@ on:
     tags:
       - "*" # triggers only if push new tag version
 jobs:
+  ci-tests:
+    uses: ./.github/workflows/ci-tests.yml
+    secrets: inherit
+
   release-build:
     uses: ./.github/workflows/gorelease.yml
+    needs: ci-tests
 
   image-upload:
     uses: ./.github/workflows/image-upload.yml
+    needs: ci-tests
     secrets: inherit
 
   deploy-docs:
     uses: ./.github/workflows/docs.yml
+    needs: ci-tests

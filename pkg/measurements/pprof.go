@@ -179,6 +179,10 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 	wg.Wait()
 }
 
+func (p *pprof) collect(measurementWg *sync.WaitGroup) {
+	defer measurementWg.Done()
+}
+
 func (p *pprof) stop() error {
 	p.stopChannel <- true
 	return nil

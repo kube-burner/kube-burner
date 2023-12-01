@@ -28,6 +28,7 @@ jobs:
     churnDuration: {{.CHURN_DURATION}}
     churnPercent: {{.CHURN_PERCENT}}
     churnDelay: {{.CHURN_DELAY}}
+    churnDeletionStrategy: {{.CHURN_DELETION_STRATEGY}}
     namespaceLabels:
       security.openshift.io/scc.podSecurityLabelSync: false
       pod-security.kubernetes.io/enforce: privileged

@@ -28,6 +28,7 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
@@ -286,6 +287,10 @@ func (p *vmiLatency) setConfig(cfg types.Measurement) error {
 
 // Start starts vmiLatency measurement
 func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
+	if factory.jobConfig.JobType == config.DeletionJob {
+		log.Info("VMI latency measurement not compatible with delete jobs, skipping")
+		return
+	}
 	defer measurementWg.Done()
 	p.metrics = make(map[string]*vmiMetric)
 
@@ -296,6 +301,9 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"vmWatcher",
 		"virtualmachines",
 		corev1.NamespaceAll,
+		func(options *metav1.ListOptions) {
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+		},
 	)
 	p.vmWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVM,
@@ -313,6 +321,9 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"vmiWatcher",
 		"virtualmachineinstances",
 		corev1.NamespaceAll,
+		func(options *metav1.ListOptions) {
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+		},
 	)
 	p.vmiWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVMI,
@@ -330,6 +341,9 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"podWatcher",
 		"pods",
 		corev1.NamespaceAll,
+		func(options *metav1.ListOptions) {
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+		},
 	)
 	p.vmiPodWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVMIPod,
@@ -365,8 +379,15 @@ func setConfigDefaults(config *rest.Config) {
 	config.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: codecs}
 }
 
+func (p *vmiLatency) collect(measurementWg *sync.WaitGroup) {
+	defer measurementWg.Done()
+}
+
 // Stop stops vmiLatency measurement
 func (p *vmiLatency) stop() error {
+	if factory.jobConfig.JobType == config.DeletionJob {
+		return nil
+	}
 	p.vmWatcher.StopWatcher()
 	p.vmiWatcher.StopWatcher()
 	p.vmiPodWatcher.StopWatcher()

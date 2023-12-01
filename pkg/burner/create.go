@@ -142,7 +142,14 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			}
 		}
 		for objectIndex, obj := range ex.objects {
-			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
+			labels := map[string]string{
+				"kube-burner-uuid":  ex.uuid,
+				"kube-burner-job":   ex.Name,
+				"kube-burner-index": strconv.Itoa(objectIndex),
+				"kube-burner-runid": ex.runid,
+			}
+			ex.objects[objectIndex].labelSelector = labels
+			ex.replicaHandler(labels, obj, ns, i, &wg)
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
@@ -195,19 +202,13 @@ func (ex *Executor) generateNamespace(iteration int) string {
 	return fmt.Sprintf("%s-%d", ex.Namespace, nsIndex)
 }
 
-func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
+func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
 	for r := 1; r <= obj.Replicas; r++ {
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
 			var newObject = new(unstructured.Unstructured)
-			labels := map[string]string{
-				"kube-burner-uuid":  ex.uuid,
-				"kube-burner-job":   ex.Name,
-				"kube-burner-index": strconv.Itoa(objectIndex),
-				"kube-burner-runid": ex.runid,
-			}
 			templateData := map[string]interface{}{
 				jobName:      ex.Name,
 				jobIteration: iteration,
@@ -314,6 +315,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 			numToChurn = ex.JobIterations
 		}
 		var namespacesPatched = make(map[string]bool)
+		var namespacesToDelete []string
 		// delete numToChurn namespaces starting at randStart
 		for i := randStart; i < numToChurn+randStart; i++ {
 			ns := ex.generateNamespace(i)
@@ -326,11 +328,15 @@ func (ex *Executor) RunCreateJobWithChurn() {
 				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
 			}
 			namespacesPatched[ns] = true
+			namespacesToDelete = append(namespacesToDelete, ns)
 		}
 		// 1 hour timeout to delete namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
-		// Delete namespaces based on the label we added
+		// Cleanup namespaces based on the labels we added
+		if ex.ChurnDeletionStrategy == "gvr" {
+			CleanupNamespaceResourcesUsingGVR(ctx, ex.objects, namespacesToDelete, ex.Name)
+		}
 		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"}, true)
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
