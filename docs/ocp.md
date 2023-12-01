@@ -11,7 +11,6 @@ Usage:
   kube-burner ocp [command]
 
 Available Commands:
-  cluster-density                Runs cluster-density workload
   cluster-density-ms             Runs cluster-density-ms workload
   cluster-density-v2             Runs cluster-density-v2 workload
   crd-scale                      Runs crd-scale workload
