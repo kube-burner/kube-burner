@@ -253,6 +253,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 	var uns *unstructured.Unstructured
 	var err error
 	RetryWithExponentialBackOff(func() (bool, error) {
+		// When the object has a namespace already specified, we use it
+		if objNs := obj.GetNamespace(); objNs != "" {
+			ns = objNs
+		}
 		if ns != "" {
 			uns, err = DynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		} else {
