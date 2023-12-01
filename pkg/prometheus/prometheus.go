@@ -23,7 +23,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/go-commons/prometheus"
 	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	"github.com/cloud-bulldozer/kube-burner/pkg/util"
@@ -52,7 +51,7 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 }
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
-func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
+func (p *Prometheus) ScrapeJobsMetrics(docsToIndex map[string][]interface{}) error {
 	start := p.JobList[0].Start
 	end := p.JobList[len(p.JobList)-1].End
 	log.Infof("🔍 Scraping %v Profile: %v Start: %v End: %v",
@@ -60,12 +59,10 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 		p.profileName,
 		start.Format(time.RFC3339),
 		end.Format(time.RFC3339))
-	log.Infof("Indexing metrics with UUID %s", p.UUID)
 	elapsed := int(end.Sub(start).Seconds())
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
-	docsToIndex := make(map[string][]interface{})
 	for _, eachJob := range p.JobList {
 		if eachJob.JobConfig.SkipIndexing {
 			log.Infof("Skipping indexing in job: %v", eachJob.JobConfig.Name)
@@ -92,19 +89,6 @@ func (p *Prometheus) ScrapeJobsMetrics(indexer *indexers.Indexer) error {
 			}
 			if requiresInstant {
 				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob.JobConfig)...)
-			}
-		}
-	}
-	for metricName, docs := range docsToIndex {
-		indexerConfig := p.ConfigSpec.GlobalConfig.IndexerConfig
-		if indexerConfig.Type != "" {
-			log.Infof("Indexing metric %s", metricName)
-			log.Debugf("Indexing [%d] documents", len(docs))
-			resp, err := (*indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
-			if err != nil {
-				log.Error(err.Error())
-			} else {
-				log.Info(resp)
 			}
 		}
 	}

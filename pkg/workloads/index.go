@@ -96,6 +96,7 @@ func NewIndex(metricsEndpoint *string, ocpMetaAgent *ocpmetadata.Metadata) *cobr
 				UserMetaData:    userMetadata,
 				RawMetadata:     metadata,
 			})
+			docsToIndex := make(map[string][]interface{})
 			for _, prometheusClients := range metricsScraper.PrometheusClients {
 				prometheusJob := prometheus.Job{
 					Start: time.Unix(start, 0),
@@ -105,10 +106,12 @@ func NewIndex(metricsEndpoint *string, ocpMetaAgent *ocpmetadata.Metadata) *cobr
 					},
 				}
 				prometheusClients.JobList = append(prometheusClients.JobList, prometheusJob)
-				if prometheusClients.ScrapeJobsMetrics(metricsScraper.Indexer) != nil {
+				if prometheusClients.ScrapeJobsMetrics(docsToIndex) != nil {
 					rc = 1
 				}
 			}
+			log.Infof("Indexing metrics with UUID %s", uuid)
+			metrics.IndexDatapoints(docsToIndex, configSpec.GlobalConfig.IndexerConfig.Type, metricsScraper.Indexer)
 			if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer && tarballName != "" {
 				if err := metrics.CreateTarball(configSpec.GlobalConfig.IndexerConfig, tarballName); err != nil {
 					log.Fatal(err)
