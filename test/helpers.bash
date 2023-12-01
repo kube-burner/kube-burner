@@ -1,4 +1,4 @@
-u!/bin/bash
+#!/bin/bash
 # vi: ft=bash
 # shellcheck disable=SC2086
 
@@ -33,16 +33,20 @@ check_ns() {
   fi
 }
 
+check_destroyed_ns() {
+  echo "Checking namespace \"${1}\" has been destroyed"
+  if [[ $(kubectl get ns -l "${1}" -o name | wc -l) != 0 ]]; then
+    echo "Namespaces labeled with \"${1}\" not destroyed"
+    return 1
+  fi
+}
+
 check_destroyed_pods() {
   echo "Checking pods have been destroyed in namespace ${1}"
   if [[ $(kubectl get pod -n "${1}" -l "${2}" -o name | wc -l) != 0 ]]; then
     echo "Pods in namespace ${1} not destroyed"
     return 1
   fi
-}
-
-check_destroyed_obj() {
-  echo "Checking object ${$2} is destroyed in namespace ${1}"
 }
 
 check_running_pods() {

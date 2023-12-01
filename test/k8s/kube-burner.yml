@@ -1,7 +1,7 @@
 ---
 
 global:
-  GC: {{env .GC}}
+  gc: {{env .GC}}
   measurements:
   - name: podLatency
 
