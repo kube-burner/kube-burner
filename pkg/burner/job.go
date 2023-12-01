@@ -34,7 +34,6 @@ import (
 	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
@@ -49,6 +48,7 @@ type object struct {
 	labelSelector map[string]string
 	patchType     string
 	kind          string
+	namespace     string
 	config.Object
 }
 
@@ -56,9 +56,10 @@ type object struct {
 type Executor struct {
 	objects []object
 	config.Job
-	uuid    string
-	runid   string
-	limiter *rate.Limiter
+	uuid       string
+	runid      string
+	limiter    *rate.Limiter
+	nsRequired bool
 }
 
 const (
@@ -91,6 +92,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	globalConfig := configSpec.GlobalConfig
 	globalWaitMap := make(map[string][]string)
 	executorMap := make(map[string]Executor)
+	uuidLabelSelector := fmt.Sprintf("kube-burner-uuid=%v", uuid)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
@@ -112,9 +114,6 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				log.Fatalf("Error creating clientSet: %s", err)
 			}
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
-			if err != nil {
-				log.Fatalf("Error creating clientSet: %s", err)
-			}
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			if job.PreLoadImages && job.JobType == config.CreationJob {
 				if err = preLoadImages(job); err != nil {
@@ -133,8 +132,14 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				if job.Cleanup {
 					ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 					defer cancel()
-					CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-job=%s", job.Name)}, true)
+					labelSelector := fmt.Sprintf("kube-burner-job=%s", job.Name)
+					CleanupNamespaces(ctx, labelSelector, true)
 					CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
+					for _, obj := range job.objects {
+						if obj.namespace != "" {
+							CleanupNamespaceResourcesUsingGVR(ctx, []object{obj}, []string{obj.namespace}, labelSelector)
+						}
+					}
 				}
 				if job.Churn {
 					log.Info("Churning enabled")
@@ -212,8 +217,15 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				cleanupStart := time.Now().UTC()
 				ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 				defer cancel()
-				CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
+				CleanupNamespaces(ctx, uuidLabelSelector, true)
 				CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
+				for _, job := range jobList {
+					for _, obj := range job.objects {
+						if obj.namespace != "" {
+							CleanupNamespaceResourcesUsingGVR(ctx, []object{obj}, []string{obj.namespace}, uuidLabelSelector)
+						}
+					}
+				}
 				// We add an extra dummy job to prometheusJobList to index metrics from this stage
 				cleanupEnd := time.Now().UTC()
 				prometheusJobList = append(prometheusJobList, prometheus.Job{
@@ -224,8 +236,15 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					},
 				})
 			} else {
-				go CleanupNonNamespacedResourcesUsingGVR(context.TODO(), jobList, true)
-				go CleanupNamespaces(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, false)
+				go CleanupNonNamespacedResourcesUsingGVR(context.TODO(), jobList, false)
+				go CleanupNamespaces(context.TODO(), uuidLabelSelector, false)
+				for _, job := range jobList {
+					for _, obj := range job.objects {
+						if obj.namespace != "" {
+							go CleanupNamespaceResourcesUsingGVR(context.TODO(), []object{obj}, []string{obj.namespace}, uuidLabelSelector)
+						}
+					}
+				}
 			}
 		}
 		if globalConfig.IndexerConfig.Type != "" {
@@ -233,9 +252,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				// elapsedTime is recalculated for every job of the list
 				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
 				jobTimings := timings{
-					Timestamp:   job.Start,
-					EndTimstamp: job.End,
-					ElapsedTime: elapsedTime,
+					Timestamp:    job.Start,
+					EndTimestamp: job.End,
+					ElapsedTime:  elapsedTime,
 				}
 				if job.JobConfig.SkipIndexing {
 					log.Infof("Skipping job summary indexing in job: %s", job.JobConfig.Name)
@@ -281,8 +300,15 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 		defer cancel()
 		log.Info("Garbage collecting remaining namespaces")
-		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%v", uuid)}, true)
+		CleanupNamespaces(ctx, fmt.Sprintf("kube-burner-uuid=%v", uuid), true)
 		CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
+		for _, job := range jobList {
+			for _, obj := range job.objects {
+				if obj.namespace != "" {
+					CleanupNamespaceResourcesUsingGVR(context.TODO(), []object{obj}, []string{obj.namespace}, fmt.Sprintf("kube-burner-uuid=%v", uuid))
+				}
+			}
+		}
 	}
 	return rc, utilerrors.NewAggregate(errs)
 }

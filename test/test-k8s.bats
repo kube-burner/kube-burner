@@ -10,6 +10,7 @@ setup_file() {
   export JOB_ITERATIONS=5
   export QPS=2
   export BURST=2
+  export GC=false
   setup-kind
   setup-prometheus
 }
@@ -30,9 +31,12 @@ teardown_file() {
   podman rm -f prometheus
 }
 
-@test "kube-burner init: no indexing" {
+@test "kube-burner init: no indexing, GC=true" {
+  export GC=true
   run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   [ "$status" -eq 0 ]
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
 @test "kube-burner init: indexing only pod latency metrics" {
@@ -44,7 +48,7 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
-@test "kube-burner init: indexing, pod latency metrics and alerting" {
+@test "kube-burner init: indexing, pod latency metrics and alerting and GC" {
   export INDEXING_TYPE=local
   run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
   [ "$status" -eq 0 ]

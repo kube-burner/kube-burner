@@ -39,7 +39,6 @@ import (
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -174,7 +173,6 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%s", uuid)}
 			clientSet, restConfig, err := config.GetClientSet(0, 0)
 			if err != nil {
 				log.Fatalf("Error creating clientSet: %s", err)
@@ -183,8 +181,9 @@ func destroyCmd() *cobra.Command {
 			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			burner.CleanupNamespaces(ctx, listOptions, true)
-			burner.CleanupNonNamespacedResources(ctx, listOptions, true)
+			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
+			burner.CleanupNamespaces(ctx, labelSelector, true)
+			burner.CleanupNonNamespacedResources(ctx, labelSelector, true)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")

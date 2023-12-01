@@ -1,0 +1,12 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  labels:
+    app: pause
+  name: pod-{{.Iteration}}-{{.Replica}}
+  namespace: default
+spec:
+  containers:
+  - image: gcr.io/google_containers/pause:3.1
+    name: pause
+    imagePullPolicy: IfNotPresent

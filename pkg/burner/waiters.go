@@ -32,6 +32,9 @@ import (
 
 func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
 	for _, obj := range ex.objects {
+		if obj.namespace != "" {
+			ns = obj.namespace
+		}
 		if !obj.Wait {
 			continue
 		}

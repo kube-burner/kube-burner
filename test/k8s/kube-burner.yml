@@ -1,6 +1,7 @@
 ---
 
 global:
+  GC: {{env .GC}}
   measurements:
   - name: podLatency
 
@@ -38,3 +39,6 @@ jobs:
       replicas: 1
       inputVars:
         containerImage: gcr.io/google_containers/pause-amd64:3.0
+
+    - objectTemplate: objectTemplates/pod.yml
+      replicas: 1

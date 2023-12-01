@@ -25,9 +25,9 @@ import (
 )
 
 type timings struct {
-	Timestamp   time.Time `json:"timestamp"`
-	EndTimstamp time.Time `json:"endTimestamp"`
-	ElapsedTime float64   `json:"elapsedTime"`
+	Timestamp    time.Time `json:"timestamp"`
+	EndTimestamp time.Time `json:"endTimestamp"`
+	ElapsedTime  float64   `json:"elapsedTime"`
 }
 
 type jobSummary struct {
