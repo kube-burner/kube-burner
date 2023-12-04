@@ -22,6 +22,9 @@ Available Commands:
   node-density-cni               Runs node-density-cni workload
   node-density-heavy             Runs node-density-heavy workload
   pvc-density                    Runs pvc-density workload
+  web-burner-cluster-density     Runs web-burner-cluster-density workload
+  web-burner-init                Runs web-burner-init workload
+  web-burner-node-density        Runs web-burner-node-density workload
 
 Flags:
       --alerting                  Enable alerting (default true)
@@ -158,6 +161,39 @@ With the help of [networkpolicy](https://kubernetes.io/docs/concepts/services-ne
 - Each pod with 2 labels and each label shared is by 5 pods
 - Default deny networkpolicy is applied first
 - Then for each unique label in a namespace we have a networkpolicy with that label as a podSelector which allows traffic from pods which *don't* have some other randomly-selected label. This translates to 10 networkpolicies/namespace
+
+## Web-burner workloads
+This workload is meant to emulate some telco specific workloads. Before running *web-burner-node-density* or *web-burner-cluster-density* load the environment with *web-burner-init* first (without the garbage collection flag: `--gc=false`).
+
+Pre-requisites:
+ - At least two worker nodes
+ - At least one of the worker nodes must have the `node-role.kubernetes.io/worker-spk` label
+
+### web-burner-init
+
+- 35 (macvlan/sriov) networks for 35 lb namespace
+- 35 lb-ns
+  - 1 frr config map, 4 emulated lb pods on each namespace
+-  35 app-ns
+	- 1 emulated lb pod on each namespace for bfd session
+
+### web-burner-node-density
+- 35 app-ns
+  - 3 app pods and services on each namespace
+- 35 normal-ns
+	- 1 service with 60 normal pod endpoints on each namespace
+
+### web-burner-cluster-density
+- 20 normal-ns
+	- 30 configmaps, 38 secrets, 38 normal pods and services, 5 deployments with 2 replica pods on each namespace
+- 35 served-ns
+  - 3 app pods on each namespace
+- 2 app-served-ns
+	- 1 service(15 ports) with 84 pod endpoints, 1 service(15 ports) with 56 pod endpoints, 1 service(15 ports) with 25 pod endpoints
+	- 3 service(15 ports each) with 24 pod endpoints, 3 service(15 ports each) with 14 pod endpoints
+	- 6 service(15 ports each) with 12 pod endpoints, 6 service(15 ports each) with 10 pod endpoints, 6 service(15 ports each) with 9 pod endpoints
+	- 12 service(15 ports each) with 8 pod endpoints, 12 service(15 ports each) with 6 pod endpoints, 12 service(15 ports each) with 5 pod endpoints
+	- 29 service(15 ports each) with 4 pod endpoints, 29 service(15 ports each) with 6 pod endpoints
 
 ## Index
 
