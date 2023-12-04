@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../media/logo/kube-burner-logo-mini.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.8">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.14">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.4b4a2bd9.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.fad675c6.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.356b1318.min.css">
@@ -262,6 +262,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href=".." class="md-nav__link">
         
@@ -278,6 +279,7 @@
     
       
       
+  
   
   
   
@@ -300,6 +302,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../reference/configuration/" class="md-nav__link">
         
@@ -319,6 +322,7 @@
   
   
     
+  
   
   
     <li class="md-nav__item md-nav__item--active">
@@ -367,7 +371,9 @@
       
         <li class="md-nav__item">
   <a href="#pod-latency" class="md-nav__link">
-    Pod latency
+    <span class="md-ellipsis">
+      Pod latency
+    </span>
   </a>
   
     <nav class="md-nav" aria-label="Pod latency">
@@ -375,7 +381,18 @@
         
           <li class="md-nav__item">
   <a href="#pod-latency-thresholds" class="md-nav__link">
-    Pod latency thresholds
+    <span class="md-ellipsis">
+      Pod latency thresholds
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measure-subcommand-cli-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Measure subcommand CLI example
+    </span>
   </a>
   
 </li>
@@ -387,7 +404,9 @@
       
         <li class="md-nav__item">
   <a href="#pprof-collection" class="md-nav__link">
-    pprof collection
+    <span class="md-ellipsis">
+      pprof collection
+    </span>
   </a>
   
 </li>
@@ -402,6 +421,7 @@
     
       
       
+  
   
   
   
@@ -467,6 +487,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../observability/" class="md-nav__link">
         
@@ -484,6 +505,7 @@
             
               
                 
+  
   
   
   
@@ -507,6 +529,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../observability/indexing/" class="md-nav__link">
         
@@ -524,6 +547,7 @@
             
               
                 
+  
   
   
   
@@ -554,6 +578,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../ocp/" class="md-nav__link">
         
@@ -570,6 +595,7 @@
     
       
       
+  
   
   
   
@@ -629,6 +655,7 @@
   
   
   
+  
     
     
       
@@ -671,6 +698,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../contributing/pullrequest/" class="md-nav__link">
         
@@ -688,6 +716,7 @@
             
               
                 
+  
   
   
   
@@ -716,6 +745,7 @@
             
               
                 
+  
   
   
   
@@ -854,6 +884,24 @@
 <span class="go">WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured threshold: 2000ms</span>
 </code></pre></div>
 <p>In case of not meeting any of the configured thresholds, like the example above, <strong>kube-burner return code will be 1</strong>.</p>
+<h3 id="measure-subcommand-cli-example">Measure subcommand CLI example<a class="headerlink" href="#measure-subcommand-cli-example" title="Permanent link">&para;</a></h3>
+<p>Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
+<div class="highlight"><pre><span></span><code>kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2 
+time=&quot;2023-11-19 17:46:05&quot; level=info msg=&quot;📁 Creating indexer: elastic&quot; file=&quot;kube-burner.go:226&quot;
+time=&quot;2023-11-19 17:46:05&quot; level=info msg=&quot;map[kube-burner-job:cluster-density-v2]&quot; file=&quot;kube-burner.go:247&quot;
+time=&quot;2023-11-19 17:46:05&quot; level=info msg=&quot;📈 Registered measurement: podLatency&quot; file=&quot;factory.go:85&quot;
+time=&quot;2023-11-19 17:46:06&quot; level=info msg=&quot;Stopping measurement: podLatency&quot; file=&quot;factory.go:118&quot;
+time=&quot;2023-11-19 17:46:06&quot; level=info msg=&quot;Evaluating latency thresholds&quot; file=&quot;metrics.go:60&quot;
+time=&quot;2023-11-19 17:46:06&quot; level=info msg=&quot;Indexing pod latency data for job: kube-burner-measure&quot; file=&quot;pod_latency.go:245&quot;
+time=&quot;2023-11-19 17:46:07&quot; level=info msg=&quot;Indexing finished in 417ms: created=4&quot; file=&quot;pod_latency.go:262&quot;
+time=&quot;2023-11-19 17:46:08&quot; level=info msg=&quot;Indexing finished in 1.32s: created=50&quot; file=&quot;pod_latency.go:262&quot;
+time=&quot;2023-11-19 17:46:08&quot; level=info msg=&quot;kube-burner-measure: PodScheduled 50th: 0 99th: 0 max: 0 avg: 0&quot; file=&quot;pod_latency.go:233&quot;
+time=&quot;2023-11-19 17:46:08&quot; level=info msg=&quot;kube-burner-measure: ContainersReady 50th: 9000 99th: 18000 max: 18000 avg: 10680&quot; file=&quot;pod_latency.go:233&quot;
+time=&quot;2023-11-19 17:46:08&quot; level=info msg=&quot;kube-burner-measure: Initialized 50th: 0 99th: 0 max: 0 avg: 0&quot; file=&quot;pod_latency.go:233&quot;
+time=&quot;2023-11-19 17:46:08&quot; level=info msg=&quot;kube-burner-measure: Ready 50th: 9000 99th: 18000 max: 18000 avg: 10680&quot; file=&quot;pod_latency.go:233&quot;
+time=&quot;2023-11-19 17:46:08&quot; level=info msg=&quot;Pod latencies error rate was: 0.00&quot; file=&quot;pod_latency.go:236&quot;
+time=&quot;2023-11-19 17:46:08&quot; level=info msg=&quot;👋 Exiting kube-burner vchalla&quot; file=&quot;kube-burner.go:209&quot;
+</code></pre></div></p>
 <h2 id="pprof-collection">pprof collection<a class="headerlink" href="#pprof-collection" title="Permanent link">&para;</a></h2>
 <p>This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with <code>labelSelector</code> and running in <code>namespace</code>. This measurement uses an implementation similar to <code>kubectl exec</code>, and as soon as it connects to one pod it executes the command <code>curl &lt;pprofURL&gt;</code> to get the pprof data. pprof files are collected in a regular basis configured by the parameter <code>pprofInterval</code>, the collected pprof files are downloaded from the pods to the local directory configured by the parameter <code>pprofDirectory</code> which by default is <code>pprof</code>.</p>
 <p>As some components require authentication to get profiling information, <code>kube-burner</code> provides two different modalities to address it:</p>
@@ -981,7 +1029,7 @@
     <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"limit": 3, "provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.81fa17fe.min.js"></script>
+      <script src="../assets/javascripts/bundle.cd18aaf1.min.js"></script>
       
     
   </body>

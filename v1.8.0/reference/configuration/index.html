@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../../media/logo/kube-burner-logo-mini.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.8">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.14">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.4b4a2bd9.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.fad675c6.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.356b1318.min.css">
@@ -262,6 +262,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../.." class="md-nav__link">
         
@@ -278,6 +279,7 @@
     
       
       
+  
   
   
   
@@ -300,6 +302,7 @@
   
   
     
+  
   
   
     <li class="md-nav__item md-nav__item--active">
@@ -348,21 +351,27 @@
       
         <li class="md-nav__item">
   <a href="#global" class="md-nav__link">
-    Global
+    <span class="md-ellipsis">
+      Global
+    </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#jobs" class="md-nav__link">
-    Jobs
+    <span class="md-ellipsis">
+      Jobs
+    </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#objects" class="md-nav__link">
-    Objects
+    <span class="md-ellipsis">
+      Objects
+    </span>
   </a>
   
     <nav class="md-nav" aria-label="Objects">
@@ -370,14 +379,18 @@
         
           <li class="md-nav__item">
   <a href="#wait-options" class="md-nav__link">
-    Wait Options
+    <span class="md-ellipsis">
+      Wait Options
+    </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
   <a href="#default-labels" class="md-nav__link">
-    Default labels
+    <span class="md-ellipsis">
+      Default labels
+    </span>
   </a>
   
 </li>
@@ -389,7 +402,9 @@
       
         <li class="md-nav__item">
   <a href="#job-types" class="md-nav__link">
-    Job types
+    <span class="md-ellipsis">
+      Job types
+    </span>
   </a>
   
     <nav class="md-nav" aria-label="Job types">
@@ -397,21 +412,27 @@
         
           <li class="md-nav__item">
   <a href="#create" class="md-nav__link">
-    Create
+    <span class="md-ellipsis">
+      Create
+    </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
   <a href="#delete" class="md-nav__link">
-    Delete
+    <span class="md-ellipsis">
+      Delete
+    </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
   <a href="#patch" class="md-nav__link">
-    Patch
+    <span class="md-ellipsis">
+      Patch
+    </span>
   </a>
   
 </li>
@@ -423,21 +444,27 @@
       
         <li class="md-nav__item">
   <a href="#churning-jobs" class="md-nav__link">
-    Churning Jobs
+    <span class="md-ellipsis">
+      Churning Jobs
+    </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#injected-variables" class="md-nav__link">
-    Injected variables
+    <span class="md-ellipsis">
+      Injected variables
+    </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#template-functions" class="md-nav__link">
-    Template functions
+    <span class="md-ellipsis">
+      Template functions
+    </span>
   </a>
   
 </li>
@@ -452,6 +479,7 @@
     
       
       
+  
   
   
   
@@ -471,6 +499,7 @@
     
       
       
+  
   
   
   
@@ -536,6 +565,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../../observability/" class="md-nav__link">
         
@@ -553,6 +583,7 @@
             
               
                 
+  
   
   
   
@@ -576,6 +607,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../../observability/indexing/" class="md-nav__link">
         
@@ -593,6 +625,7 @@
             
               
                 
+  
   
   
   
@@ -623,6 +656,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../../ocp/" class="md-nav__link">
         
@@ -639,6 +673,7 @@
     
       
       
+  
   
   
   
@@ -698,6 +733,7 @@
   
   
   
+  
     
     
       
@@ -740,6 +776,7 @@
   
   
   
+  
     <li class="md-nav__item">
       <a href="../../contributing/pullrequest/" class="md-nav__link">
         
@@ -757,6 +794,7 @@
             
               
                 
+  
   
   
   
@@ -785,6 +823,7 @@
             
               
                 
+  
   
   
   
@@ -1069,6 +1108,12 @@
 <td>Length of time to wait between each churn period</td>
 <td>Duration</td>
 <td>5m</td>
+</tr>
+<tr>
+<td><code>churnDeletionStrategy</code></td>
+<td>Churn deletion strategy to apply. Either "default" or "gvr" (i.e new logic)</td>
+<td>String</td>
+<td>default</td>
 </tr>
 </tbody>
 </table>
@@ -1389,7 +1434,7 @@ next randomly chosen set. This cycle continues until the churn duration has pass
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy"], "search": "../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"limit": 3, "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.81fa17fe.min.js"></script>
+      <script src="../../assets/javascripts/bundle.cd18aaf1.min.js"></script>
       
     
   </body>
