@@ -15,10 +15,12 @@
 package burner
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"errors"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"sync"
 	"time"
@@ -161,6 +163,18 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				job.RunDeleteJob()
 			case config.PatchJob:
 				job.RunPatchJob()
+			}
+			if job.BeforeCleanup != "" {
+				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
+				cmd := exec.Command("/bin/sh", job.BeforeCleanup)
+				var outb, errb bytes.Buffer
+				cmd.Stdout = &outb
+				cmd.Stderr = &errb
+				err := cmd.Run()
+				if err != nil {
+					log.Infof("BeforeCleanup failed: %v", err)
+				}
+				log.Infof("BeforeCleanup out: %v, err: %v", outb.String(), errb.String())
 			}
 			if job.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
