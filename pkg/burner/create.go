@@ -274,7 +274,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 					log.Errorf("%s/%s already exists", obj.GetKind(), obj.GetName())
 				}
 				return true, nil
-			} else if err != nil {
+			} else if kerrors.IsNotFound(err) {
+				log.Errorf("Error creating object %s/%s: %v", obj.GetKind(), obj.GetName(), err.Error())
+				return true, nil
+			} else {
 				if ns != "" {
 					log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
 				} else {
