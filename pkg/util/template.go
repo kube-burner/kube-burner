@@ -17,12 +17,14 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"net/netip"
 	"os"
 	"strings"
 	"text/template"
 
 	sprig "github.com/Masterminds/sprig/v3"
 	log "github.com/sirupsen/logrus"
+	"gonum.org/v1/gonum/stat/combin"
 )
 
 type templateOption string
@@ -35,7 +37,13 @@ const (
 // RenderTemplate renders a go-template
 func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
 	var rendered bytes.Buffer
-	t, err := template.New("").Option(string(options)).Funcs(sprig.GenericFuncMap()).Parse(string(original))
+	funcMap := sprig.GenericFuncMap()
+	funcMap["Binomial"] = combin.Binomial
+	funcMap["IndexToCombination"] = combin.IndexToCombination
+	funcMap["GetSubnet24"] = func(subnetIdx int) string {
+		return netip.AddrFrom4([4]byte{byte(subnetIdx>>16 + 1), byte(subnetIdx >> 8), byte(subnetIdx), 0}).String() + "/24"
+	}
+	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
 		return nil, fmt.Errorf("parsing error: %s", err)
 	}
