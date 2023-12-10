@@ -204,7 +204,14 @@ func (ex *Executor) generateNamespace(iteration int) string {
 
 func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
+
 	for r := 1; r <= obj.Replicas; r++ {
+		// make a copy of the copiedLabels map
+		copiedLabels := make(map[string]string)
+		for k, v := range labels {
+			copiedLabels[k] = v
+		}
+
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
@@ -225,11 +232,13 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 			}
 			// Re-decode rendered object
 			yamlToUnstructured(renderedObj, newObject)
+
 			for k, v := range newObject.GetLabels() {
-				labels[k] = v
+				copiedLabels[k] = v
 			}
-			newObject.SetLabels(labels)
-			setMetadataLabels(newObject, labels)
+			newObject.SetLabels(copiedLabels)
+			setMetadataLabels(newObject, copiedLabels)
+
 			json.Marshal(newObject.Object)
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
