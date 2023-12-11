@@ -15,6 +15,7 @@
 package measurements
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -24,16 +25,18 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	lcorev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 const (
@@ -66,6 +69,12 @@ type svcMetric struct {
 	ServiceType       corev1.ServiceType `json:"type"`
 }
 
+type SvcLatencyChecker struct {
+	pod        *corev1.Pod
+	clientSet  kubernetes.Clientset
+	restConfig rest.Config
+}
+
 func init() {
 	measurementMap["serviceLatency"] = &serviceLatency{
 		metrics: map[string]svcMetric{},
@@ -77,7 +86,7 @@ func deployAssets() error {
 	if err = kutil.CreateNamespace(factory.clientSet, types.SvcLatencyNs, nil, nil); err != nil {
 		return err
 	}
-	if _, err = factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Create(context.TODO(), types.SvcLatencyChecker, metav1.CreateOptions{}); err != nil {
+	if _, err = factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Create(context.TODO(), types.SvcLatencyCheckerPod, metav1.CreateOptions{}); err != nil {
 		if errors.IsAlreadyExists(err) {
 			log.Warn(err)
 		} else {
@@ -85,7 +94,7 @@ func deployAssets() error {
 		}
 	}
 	err = wait.PollUntilContextCancel(context.TODO(), 200*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-		pod, err := factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyChecker.Name, metav1.GetOptions{})
+		pod, err := factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyCheckerPod.Name, metav1.GetOptions{})
 		if err != nil {
 			return true, err
 		}
@@ -102,7 +111,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 	svc := obj.(*corev1.Service)
 	if annotation, ok := svc.Annotations["kube-burner.io/service-latency"]; ok {
 		if annotation == "false" {
-			log.Debugf("Annotation found, discarting service %v/%v", svc.Namespace, svc.Name)
+			log.Debugf("Annotation found, discarding service %v/%v", svc.Namespace, svc.Name)
 		}
 	}
 	log.Debugf("Handling service: %v/%v", svc.Namespace, svc.Name)
@@ -123,7 +132,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 		}
 		endpointsReadyTs := time.Now().UTC()
 		log.Debugf("Endpoints %v/%v ready", svc.Namespace, svc.Name)
-		svcLatencyChecker, err := util.NewSvcLatencyChecker(*factory.clientSet, *factory.restConfig)
+		svcLatencyChecker, err := newSvcLatencyChecker(*factory.clientSet, *factory.restConfig)
 		if err != nil {
 			log.Error(err)
 		}
@@ -134,7 +143,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 					ips = svc.Spec.ClusterIPs
 					port = specPort.Port
 				case corev1.ServiceTypeNodePort:
-					ips = []string{svcLatencyChecker.Pod.Status.HostIP}
+					ips = []string{svcLatencyChecker.pod.Status.HostIP}
 					port = specPort.NodePort
 				case corev1.ServiceTypeLoadBalancer:
 					for _, ingress := range svc.Status.LoadBalancer.Ingress {
@@ -150,7 +159,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 					return
 				}
 				for _, ip := range ips {
-					err = svcLatencyChecker.Ping(ip, port, s.config.ServiceTimeout)
+					err = svcLatencyChecker.ping(ip, port, s.config.ServiceTimeout)
 					if err != nil {
 						log.Error(err)
 						return
@@ -330,4 +339,55 @@ func (s *serviceLatency) waitForIngress(svc *corev1.Service) error {
 
 func (s *serviceLatency) collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
+}
+
+func newSvcLatencyChecker(clientSet kubernetes.Clientset, restConfig rest.Config) (SvcLatencyChecker, error) {
+	pod, err := clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyCheckerName, metav1.GetOptions{})
+	if err != nil {
+		return SvcLatencyChecker{}, err
+	}
+	return SvcLatencyChecker{
+		pod:        pod,
+		clientSet:  clientSet,
+		restConfig: restConfig,
+	}, nil
+}
+
+func (lc *SvcLatencyChecker) ping(address string, port int32, timeout time.Duration) error {
+	var stdout, stderr bytes.Buffer
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	// We use 50ms precision thanks to sleep 0.1
+	cmd := []string{"bash", "-c", fmt.Sprintf("while true; do nc -w 0.1s -z %s %d && break; sleep 0.05; done", address, port)}
+	req := lc.clientSet.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(lc.pod.Name).
+		Namespace(lc.pod.Namespace).
+		SubResource("exec")
+	req.VersionedParams(&corev1.PodExecOptions{
+		Container: types.SvcLatencyCheckerName,
+		Stdin:     false,
+		Stdout:    true,
+		Stderr:    true,
+		Command:   cmd,
+		TTY:       false,
+	}, scheme.ParameterCodec)
+	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+		exec, err := remotecommand.NewSPDYExecutor(&lc.restConfig, "POST", req.URL())
+		if err != nil {
+			return false, err
+		}
+		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+			Stdout: &stdout,
+			Stderr: &stderr,
+		})
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("timeout waiting for endpoint %s:%d to be ready", address, port)
+	}
+	return err
 }

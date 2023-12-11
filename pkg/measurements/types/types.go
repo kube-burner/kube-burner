@@ -101,7 +101,7 @@ const (
 	SvcLatencyCheckerName = "svc-checker"
 )
 
-var SvcLatencyChecker = &corev1.Pod{
+var SvcLatencyCheckerPod = &corev1.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      SvcLatencyCheckerName,
 		Namespace: SvcLatencyNs,
