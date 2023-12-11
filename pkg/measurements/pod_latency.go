@@ -17,8 +17,6 @@ package measurements
 import (
 	"context"
 	"fmt"
-	"math"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -51,7 +49,6 @@ type podMetric struct {
 	podReady               time.Time
 	PodReadyLatency        int         `json:"podReadyLatency"`
 	MetricName             string      `json:"metricName"`
-	JobName                string      `json:"jobName"`
 	JobConfig              config.Job  `json:"jobConfig"`
 	UUID                   string      `json:"uuid"`
 	Namespace              string      `json:"namespace"`
@@ -85,7 +82,6 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 			MetricName: podLatencyMeasurement,
 			UUID:       globalCfg.UUID,
 			JobConfig:  *factory.jobConfig,
-			JobName:    factory.jobConfig.Name,
 			Metadata:   factory.metadata,
 		}
 	}
@@ -200,7 +196,6 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			NodeName:        pod.Spec.NodeName,
 			UUID:            globalCfg.UUID,
 			JobConfig:       *factory.jobConfig,
-			JobName:         factory.jobConfig.Name,
 			Metadata:        factory.metadata,
 			scheduled:       scheduled,
 			initialized:     initialized,
@@ -326,41 +321,23 @@ func (p *podLatency) normalizeMetrics() float64 {
 }
 
 func (p *podLatency) calcQuantiles() {
-	quantiles := []float64{0.5, 0.95, 0.99}
-	quantileMap := map[corev1.PodConditionType][]int{}
-	jc := factory.jobConfig
-	jc.Objects = nil
+	quantileMap := map[corev1.PodConditionType][]float64{}
 	for _, normLatency := range p.normLatencies {
-		quantileMap[corev1.PodScheduled] = append(quantileMap[corev1.PodScheduled], normLatency.(podMetric).SchedulingLatency)
-		quantileMap[corev1.ContainersReady] = append(quantileMap[corev1.ContainersReady], normLatency.(podMetric).ContainersReadyLatency)
-		quantileMap[corev1.PodInitialized] = append(quantileMap[corev1.PodInitialized], normLatency.(podMetric).InitializedLatency)
-		quantileMap[corev1.PodReady] = append(quantileMap[corev1.PodReady], normLatency.(podMetric).PodReadyLatency)
+		quantileMap[corev1.PodScheduled] = append(quantileMap[corev1.PodScheduled], float64(normLatency.(podMetric).SchedulingLatency))
+		quantileMap[corev1.ContainersReady] = append(quantileMap[corev1.ContainersReady], float64(normLatency.(podMetric).ContainersReadyLatency))
+		quantileMap[corev1.PodInitialized] = append(quantileMap[corev1.PodInitialized], float64(normLatency.(podMetric).InitializedLatency))
+		quantileMap[corev1.PodReady] = append(quantileMap[corev1.PodReady], float64(normLatency.(podMetric).PodReadyLatency))
 	}
-	for quantileName, v := range quantileMap {
-		podQ := metrics.LatencyQuantiles{
-			QuantileName: string(quantileName),
-			UUID:         globalCfg.UUID,
-			Timestamp:    time.Now().UTC(),
-			JobName:      factory.jobConfig.Name,
-			JobConfig:    *jc,
-			MetricName:   podLatencyQuantilesMeasurement,
-			Metadata:     factory.metadata,
-		}
-		sort.Ints(v)
-		length := len(v)
-		if length > 1 {
-			for _, quantile := range quantiles {
-				qValue := v[int(math.Ceil(float64(length)*quantile))-1]
-				podQ.SetQuantile(quantile, qValue)
-			}
-			podQ.Max = v[length-1]
-		}
-		sum := 0
-		for _, n := range v {
-			sum += n
-		}
-		podQ.Avg = int(math.Round(float64(sum) / float64(length)))
-		p.latencyQuantiles = append(p.latencyQuantiles, podQ)
+	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
+		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
+		latencySummary.UUID = globalCfg.UUID
+		latencySummary.JobConfig = *factory.jobConfig
+		latencySummary.Metadata = factory.metadata
+		latencySummary.MetricName = podLatencyQuantilesMeasurement
+		return latencySummary
+	}
+	for podCondition, latencies := range quantileMap {
+		p.latencyQuantiles = append(p.latencyQuantiles, calcSummary(string(podCondition), latencies))
 	}
 }
 

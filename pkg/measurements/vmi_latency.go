@@ -16,8 +16,6 @@ package measurements
 
 import (
 	"fmt"
-	"math"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -74,7 +72,6 @@ type vmiMetric struct {
 	VMReadyLatency int `json:"vmReadyLatency"`
 
 	MetricName string      `json:"metricName"`
-	JobName    string      `json:"jobName"`
 	JobConfig  config.Job  `json:"jobConfig"`
 	Metadata   interface{} `json:"metadata,omitempty"`
 	UUID       string      `json:"uuid"`
@@ -110,7 +107,6 @@ func (p *vmiLatency) handleCreateVM(obj interface{}) {
 				Name:       vm.Name,
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
-				JobName:    factory.jobConfig.Name,
 				JobConfig:  *factory.jobConfig,
 				Metadata:   factory.metadata,
 			}
@@ -155,7 +151,6 @@ func (p *vmiLatency) handleCreateVMI(obj interface{}) {
 				Name:       vmi.Name,
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
-				JobName:    factory.jobConfig.Name,
 			}
 		}
 	}
@@ -451,48 +446,34 @@ func (p *vmiLatency) normalizeMetrics() {
 }
 
 func (p *vmiLatency) calcQuantiles() {
-	quantiles := []float64{0.5, 0.95, 0.99}
-	quantileMap := map[string][]int{}
+	quantileMap := map[string][]float64{}
 	for _, normLatency := range p.normLatencies {
 		if !normLatency.(*vmiMetric).vmReady.IsZero() {
-			quantileMap["VM"+string(kvv1.VirtualMachineReady)] = append(quantileMap["VM"+string(kvv1.VirtualMachineReady)], normLatency.(*vmiMetric).VMReadyLatency)
-			quantileMap["VMICreated"] = append(quantileMap["VMICreated"], normLatency.(*vmiMetric).VMICreatedLatency)
+			quantileMap["VM"+string(kvv1.VirtualMachineReady)] = append(quantileMap["VM"+string(kvv1.VirtualMachineReady)], float64(normLatency.(*vmiMetric).VMReadyLatency))
+			quantileMap["VMICreated"] = append(quantileMap["VMICreated"], float64(normLatency.(*vmiMetric).VMICreatedLatency))
 		}
 
-		quantileMap["VMI"+string(kvv1.Pending)] = append(quantileMap["VMI"+string(kvv1.Pending)], normLatency.(*vmiMetric).VMIPendingLatency)
-		quantileMap["VMI"+string(kvv1.Scheduling)] = append(quantileMap["VMI"+string(kvv1.Scheduling)], normLatency.(*vmiMetric).VMISchedulingLatency)
-		quantileMap["VMI"+string(kvv1.Scheduled)] = append(quantileMap["VMI"+string(kvv1.Scheduled)], normLatency.(*vmiMetric).VMIScheduledLatency)
-		quantileMap["VMI"+string(kvv1.VirtualMachineInstanceReady)] = append(quantileMap["VMI"+string(kvv1.VirtualMachineInstanceReady)], normLatency.(*vmiMetric).VMIReadyLatency)
+		quantileMap["VMI"+string(kvv1.Pending)] = append(quantileMap["VMI"+string(kvv1.Pending)], float64(normLatency.(*vmiMetric).VMIPendingLatency))
+		quantileMap["VMI"+string(kvv1.Scheduling)] = append(quantileMap["VMI"+string(kvv1.Scheduling)], float64(normLatency.(*vmiMetric).VMISchedulingLatency))
+		quantileMap["VMI"+string(kvv1.Scheduled)] = append(quantileMap["VMI"+string(kvv1.Scheduled)], float64(normLatency.(*vmiMetric).VMIScheduledLatency))
+		quantileMap["VMI"+string(kvv1.VirtualMachineInstanceReady)] = append(quantileMap["VMI"+string(kvv1.VirtualMachineInstanceReady)], float64(normLatency.(*vmiMetric).VMIReadyLatency))
+		quantileMap["PodCreated"] = append(quantileMap["PodCreated"], float64(normLatency.(*vmiMetric).PodCreatedLatency))
+		quantileMap[string(corev1.PodScheduled)] = append(quantileMap[string(corev1.PodScheduled)], float64(normLatency.(*vmiMetric).PodScheduledLatency))
+		quantileMap["Pod"+string(corev1.PodInitialized)] = append(quantileMap["Pod"+string(corev1.PodInitialized)], float64(normLatency.(*vmiMetric).PodInitializedLatency))
+		quantileMap["Pod"+string(corev1.ContainersReady)] = append(quantileMap["Pod"+string(corev1.ContainersReady)], float64(normLatency.(*vmiMetric).PodContainersReadyLatency))
+		quantileMap["Pod"+string(corev1.PodReady)] = append(quantileMap["Pod"+string(corev1.PodReady)], float64(normLatency.(*vmiMetric).PodReadyLatency))
 
-		quantileMap["PodCreated"] = append(quantileMap["PodCreated"], normLatency.(*vmiMetric).PodCreatedLatency)
-		quantileMap[string(corev1.PodScheduled)] = append(quantileMap[string(corev1.PodScheduled)], normLatency.(*vmiMetric).PodScheduledLatency)
-		quantileMap["Pod"+string(corev1.PodInitialized)] = append(quantileMap["Pod"+string(corev1.PodInitialized)], normLatency.(*vmiMetric).PodInitializedLatency)
-		quantileMap["Pod"+string(corev1.ContainersReady)] = append(quantileMap["Pod"+string(corev1.ContainersReady)], normLatency.(*vmiMetric).PodContainersReadyLatency)
-		quantileMap["Pod"+string(corev1.PodReady)] = append(quantileMap["Pod"+string(corev1.PodReady)], normLatency.(*vmiMetric).PodReadyLatency)
 	}
-	for quantileName, v := range quantileMap {
-		quantile := metrics.LatencyQuantiles{
-			QuantileName: quantileName,
-			UUID:         globalCfg.UUID,
-			Timestamp:    time.Now().UTC(),
-			JobName:      factory.jobConfig.Name,
-			MetricName:   vmiLatencyQuantilesMeasurement,
-		}
-		sort.Ints(v)
-		length := len(v)
-		if length > 1 {
-			for _, q := range quantiles {
-				qValue := v[int(math.Ceil(float64(length)*q))-1]
-				quantile.SetQuantile(q, qValue)
-			}
-			quantile.Max = v[length-1]
-		}
-		sum := 0
-		for _, n := range v {
-			sum += n
-		}
-		quantile.Avg = int(math.Round(float64(sum) / float64(length)))
-		p.latencyQuantiles = append(p.latencyQuantiles, quantile)
+	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
+		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
+		latencySummary.UUID = globalCfg.UUID
+		latencySummary.JobConfig = *factory.jobConfig
+		latencySummary.Metadata = factory.metadata
+		latencySummary.MetricName = podLatencyQuantilesMeasurement
+		return latencySummary
+	}
+	for podCondition, latencies := range quantileMap {
+		p.latencyQuantiles = append(p.latencyQuantiles, calcSummary(podCondition, latencies))
 	}
 }
 
