@@ -88,7 +88,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			namespace:  uns.GetNamespace(),
 		}
 		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-		// Job requires namespaces when one of the objects is namespaces and does not have any namespace specified
+		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
 		if obj.Namespaced && obj.namespace == "" {
 			ex.nsRequired = true
 		}

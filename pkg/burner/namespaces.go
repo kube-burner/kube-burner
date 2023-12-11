@@ -16,7 +16,6 @@ package burner
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -137,22 +136,15 @@ func CleanupNonNamespacedResources(ctx context.Context, labelSelector string, cl
 }
 
 // Cleanup non-namespaced resources using executor list
-func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, executorList []Executor, cleanupWait bool) {
-	log.Info("Deleting non-namespace resources specific to this benchmark")
-	for _, executor := range executorList {
-		for _, object := range executor.objects {
-			if !object.Namespaced {
-				resourceInterface := DynamicClient.Resource(object.gvr)
-				labelSelector := fmt.Sprintf("kube-burner-job=%s", executor.Name)
-				resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-				if err != nil {
-					log.Debugf("Unable to list resources for object: %v error: %v. Hence skipping it", object.Object, err)
-					continue
-				}
-				deleteNonNamespacedResources(ctx, resources, resourceInterface, labelSelector, cleanupWait)
-			}
-		}
+func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, object object, labelSelector string, cleanupWait bool) {
+	log.Info("Deleting non-namespace %v with selector %v", object.kind, labelSelector)
+	resourceInterface := DynamicClient.Resource(object.gvr)
+	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		log.Debugf("Unable to list resources for object: %v error: %v. Hence skipping it", object.Object, err)
+		return
 	}
+	deleteNonNamespacedResources(ctx, resources, resourceInterface, labelSelector, cleanupWait)
 }
 
 func deleteNonNamespacedResources(ctx context.Context, resources *unstructured.UnstructuredList, resourceInterface dynamic.NamespaceableResourceInterface,

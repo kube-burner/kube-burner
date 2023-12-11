@@ -132,12 +132,14 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				if job.Cleanup {
 					ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 					defer cancel()
-					labelSelector := fmt.Sprintf("kube-burner-job=%s", job.Name)
-					CleanupNamespaces(ctx, labelSelector, true)
-					CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
+					jobSelector := fmt.Sprintf("kube-burner-job=%s", job.Name)
+					CleanupNamespaces(ctx, jobSelector, true)
 					for _, obj := range job.objects {
+						if !obj.Namespaced {
+							CleanupNonNamespacedResourcesUsingGVR(ctx, obj, jobSelector, true)
+						}
 						if obj.namespace != "" {
-							CleanupNamespaceResourcesUsingGVR(ctx, []object{obj}, []string{obj.namespace}, labelSelector)
+							CleanupNamespaceResourcesUsingGVR(ctx, []object{obj}, []string{obj.namespace}, jobSelector)
 						}
 					}
 				}
@@ -218,9 +220,11 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 				defer cancel()
 				CleanupNamespaces(ctx, uuidLabelSelector, true)
-				CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
 				for _, job := range jobList {
 					for _, obj := range job.objects {
+						if !obj.Namespaced {
+							CleanupNonNamespacedResourcesUsingGVR(ctx, obj, uuidLabelSelector, true)
+						}
 						if obj.namespace != "" {
 							CleanupNamespaceResourcesUsingGVR(ctx, []object{obj}, []string{obj.namespace}, uuidLabelSelector)
 						}
@@ -236,10 +240,12 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					},
 				})
 			} else {
-				go CleanupNonNamespacedResourcesUsingGVR(context.TODO(), jobList, false)
 				go CleanupNamespaces(context.TODO(), uuidLabelSelector, false)
 				for _, job := range jobList {
 					for _, obj := range job.objects {
+						if !obj.Namespaced {
+							go CleanupNonNamespacedResourcesUsingGVR(context.TODO(), obj, uuidLabelSelector, false)
+						}
 						if obj.namespace != "" {
 							go CleanupNamespaceResourcesUsingGVR(context.TODO(), []object{obj}, []string{obj.namespace}, uuidLabelSelector)
 						}
@@ -294,18 +300,20 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		errs = append(errs, err)
 		rc = rcTimeout
 	}
-	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation run in background, so we have to ensure there's no garbage left
+	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
 	if globalConfig.GC && !globalConfig.GCMetrics {
 		// Use timeout/4 to garbage collect namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 		defer cancel()
 		log.Info("Garbage collecting remaining namespaces")
-		CleanupNamespaces(ctx, fmt.Sprintf("kube-burner-uuid=%v", uuid), true)
-		CleanupNonNamespacedResourcesUsingGVR(ctx, jobList, true)
+		CleanupNamespaces(ctx, uuidLabelSelector, true)
 		for _, job := range jobList {
 			for _, obj := range job.objects {
+				if !obj.Namespaced {
+					CleanupNonNamespacedResourcesUsingGVR(ctx, obj, uuidLabelSelector, true)
+				}
 				if obj.namespace != "" {
-					CleanupNamespaceResourcesUsingGVR(context.TODO(), []object{obj}, []string{obj.namespace}, fmt.Sprintf("kube-burner-uuid=%v", uuid))
+					CleanupNamespaceResourcesUsingGVR(context.TODO(), []object{obj}, []string{obj.namespace}, uuidLabelSelector)
 				}
 			}
 		}
