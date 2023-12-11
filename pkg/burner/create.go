@@ -206,7 +206,7 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 	var wg sync.WaitGroup
 
 	for r := 1; r <= obj.Replicas; r++ {
-		// make a copy of the copiedLabels map
+		// make a copy of the labels map for each goroutine to prevent panic from concurrent read and write
 		copiedLabels := make(map[string]string)
 		for k, v := range labels {
 			copiedLabels[k] = v
