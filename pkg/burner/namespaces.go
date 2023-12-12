@@ -137,7 +137,7 @@ func CleanupNonNamespacedResources(ctx context.Context, labelSelector string, cl
 
 // Cleanup non-namespaced resources using executor list
 func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, object object, labelSelector string, cleanupWait bool) {
-	log.Info("Deleting non-namespace %v with selector %v", object.kind, labelSelector)
+	log.Infof("Deleting non-namespace %v with selector %v", object.kind, labelSelector)
 	resourceInterface := DynamicClient.Resource(object.gvr)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
