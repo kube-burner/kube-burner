@@ -29,7 +29,6 @@ import (
 // Cleanup resources specific to kube-burner with in a given list of namespaces
 func CleanupNamespacesUsingGVR(ctx context.Context, ex Executor, namespacesToDelete []string) {
 	for _, namespace := range namespacesToDelete {
-		log.Infof("Deleting resources in namespace %s", namespace)
 		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
 		for _, obj := range ex.objects {
 			CleanupNamespaceResourcesUsingGVR(ctx, obj, namespace, labelSelector)

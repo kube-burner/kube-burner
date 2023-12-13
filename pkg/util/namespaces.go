@@ -1,3 +1,17 @@
+// Copyright 2023 The Kube-burner Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package util
 
 import (
@@ -102,7 +116,7 @@ func CleanupNonNamespacedResources(ctx context.Context, clientSet *kubernetes.Cl
 				})
 				resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 				if err != nil {
-					log.Debugf("Unable to list resource: %s error: %v. Hence skipping it", resource.Name, err)
+					log.Debugf("Unable to list resource %s: %v", resource.Name, err)
 					continue
 				}
 				DeleteNonNamespacedResources(ctx, resources, resourceInterface)
@@ -117,7 +131,7 @@ func DeleteNonNamespacedResources(ctx context.Context, resources *unstructured.U
 			go func(item unstructured.Unstructured) {
 				err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
 				if err != nil {
-					log.Errorf("Error deleting non-namespaced resources: %v", err)
+					log.Errorf("Error deleting %v/%v: %v", item.GetKind(), item.GetName(), err)
 				}
 			}(item)
 		}
