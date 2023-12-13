@@ -77,7 +77,7 @@ teardown_file() {
 
 @test "kube-burner index: local-indexing=true" {
   run_cmd kube-burner index --uuid="${UUID}" -u http://localhost:9090 -m metrics-profile.yaml
-  check_file_list collected-metrics/top2PrometheusCPU collected-metrics/prometheusRSS.json
+  check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/prometheusRSS.json
 }
 
 @test "kube-burner index: metrics-endpoint=true; os-indexing=true" {

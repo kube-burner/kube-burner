@@ -122,10 +122,13 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 	}
 }
 
-func (p *podLatency) setConfig(cfg types.Measurement) error {
+func (p *podLatency) setConfig(cfg types.Measurement) {
+	p.config = cfg
+}
+
+func (p *podLatency) validateConfig() error {
 	var metricFound bool
 	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
-	p.config = cfg
 	for _, th := range p.config.LatencyThresholds {
 		if th.ConditionType == string(corev1.ContainersReady) || th.ConditionType == string(corev1.PodInitialized) || th.ConditionType == string(corev1.PodReady) || th.ConditionType == string(corev1.PodScheduled) {
 			for _, lm := range latencyMetrics {

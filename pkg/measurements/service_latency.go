@@ -93,7 +93,7 @@ func deployAssets() error {
 			return err
 		}
 	}
-	err = wait.PollUntilContextCancel(context.TODO(), 200*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+	err = wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		pod, err := factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyCheckerPod.Name, metav1.GetOptions{})
 		if err != nil {
 			return true, err
@@ -186,10 +186,13 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 	}(svc)
 }
 
-func (s *serviceLatency) setConfig(cfg types.Measurement) error {
+func (s *serviceLatency) setConfig(cfg types.Measurement) {
 	s.config = cfg
+}
+
+func (s *serviceLatency) validateConfig() error {
 	if s.config.ServiceTimeout == 0 {
-		log.Fatal("svcTimeout not set in service latency measurement")
+		return fmt.Errorf("svcTimeout not set in service latency measurement")
 	}
 	return nil
 }
@@ -308,7 +311,7 @@ func (s *serviceLatency) index() {
 }
 
 func (s *serviceLatency) waitForEndpoints(svc *corev1.Service) error {
-	err := wait.PollUntilContextCancel(context.TODO(), 50*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		endpoints, err := s.epLister.Endpoints(svc.Namespace).Get(svc.Name)
 		if err != nil {
 			return false, nil
@@ -357,8 +360,8 @@ func (lc *SvcLatencyChecker) ping(address string, port int32, timeout time.Durat
 	var stdout, stderr bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	// We use 50ms precision thanks to sleep 0.1
-	cmd := []string{"bash", "-c", fmt.Sprintf("while true; do nc -w 0.1s -z %s %d && break; sleep 0.05; done", address, port)}
+	// We use 50ms precision thanks to sleep 0.05
+	cmd := []string{"bash", "-c", fmt.Sprintf("while true; do nc -w 0.05s -z %s %d && break; sleep 0.05; done", address, port)}
 	req := lc.clientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(lc.pod.Name).

@@ -45,16 +45,12 @@ func init() {
 	measurementMap["pprof"] = &pprof{}
 }
 
-func (p *pprof) setConfig(cfg types.Measurement) error {
+func (p *pprof) setConfig(cfg types.Measurement) {
 	p.config = cfg
-	return nil
 }
 
 func (p *pprof) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	if err := p.validateConfig(); err != nil {
-		return err
-	}
 	var wg sync.WaitGroup
 	err := os.MkdirAll(p.config.PProfDirectory, 0744)
 	if err != nil {

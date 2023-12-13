@@ -272,12 +272,8 @@ func (p *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 	p.mu.Unlock()
 }
 
-func (p *vmiLatency) setConfig(cfg types.Measurement) error {
+func (p *vmiLatency) setConfig(cfg types.Measurement) {
 	p.config = cfg
-	if err := p.validateConfig(); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Start starts vmiLatency measurement
