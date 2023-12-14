@@ -347,7 +347,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		defer cancel()
 		// Cleanup namespaces based on the labels we added
 		if ex.ChurnDeletionStrategy == "gvr" {
-			CleanupNamespaceResourcesUsingGVR(ctx, ex.objects, namespacesToDelete, ex.Name)
+			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		}
 		CleanupNamespaces(ctx, "churndelete=delete", true)
 		log.Info("Re-creating deleted objects")
