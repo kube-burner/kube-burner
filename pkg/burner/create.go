@@ -17,7 +17,6 @@ package burner
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -239,7 +238,6 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 			newObject.SetLabels(copiedLabels)
 			setMetadataLabels(newObject, copiedLabels)
 
-			json.Marshal(newObject.Object)
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
 			// wait for ready, etc. Without this wait group, running for example,
