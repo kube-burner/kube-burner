@@ -90,6 +90,7 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex Executor, namespacesToDel
 func CleanupNamespaceResourcesUsingGVR(ctx context.Context, obj object, namespace string, labelSelector string) {
 	resourceInterface := DynamicClient.Resource(obj.gvr).Namespace(namespace)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	log.Infof("Deleting %ss labeled with %s in %s", obj.kind, labelSelector, namespace)
 	if err != nil {
 		log.Errorf("Unable to list %vs in %v: %v", obj.kind, namespace, err)
 		return
