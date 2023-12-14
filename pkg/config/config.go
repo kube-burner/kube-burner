@@ -111,7 +111,7 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
 	}
-	renderedCfg, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
+	renderedCfg, err := util.RenderTemplate("", cfg, util.EnvToMap(), util.MissingKeyError)
 	if err != nil {
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}

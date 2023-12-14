@@ -226,7 +226,7 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 				templateData[k] = v
 			}
 			ex.limiter.Wait(context.TODO())
-			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
+			renderedObj, err := util.RenderTemplate("", obj.objectSpec, templateData, util.MissingKeyError)
 			if err != nil {
 				log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 			}

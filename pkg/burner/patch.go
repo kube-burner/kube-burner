@@ -86,34 +86,38 @@ func (ex *Executor) RunPatchJob() {
 	var itemList *unstructured.UnstructuredList
 	log.Infof("Running patch job %s", ex.Name)
 	var wg sync.WaitGroup
-	for _, obj := range ex.objects {
+	for i := 0; i < ex.JobIterations; i++ {
+		log.Infof("Running patch job iteration %d", i)
 
-		labelSelector := labels.Set(obj.labelSelector).String()
-		listOptions := metav1.ListOptions{
-			LabelSelector: labelSelector,
-		}
+		for _, obj := range ex.objects {
 
-		// Try to find the list of resources by GroupVersionResource.
-		err := RetryWithExponentialBackOff(func() (done bool, err error) {
-			itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
-			if err != nil {
-				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
-				return false, nil
+			labelSelector := labels.Set(obj.labelSelector).String()
+			listOptions := metav1.ListOptions{
+				LabelSelector: labelSelector,
 			}
-			return true, nil
-		}, 1*time.Second, 3, 0, ex.MaxWaitTimeout)
-		if err != nil {
-			continue
-		}
-		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
-		for i := 0; i < ex.JobIterations; i++ {
+
+			// Try to find the list of resources by GroupVersionResource.
+			err := RetryWithExponentialBackOff(func() (done bool, err error) {
+				itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+				if err != nil {
+					log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
+					return false, nil
+				}
+				return true, nil
+			}, 1*time.Second, 3, 0, ex.MaxWaitTimeout)
+			if err != nil {
+				continue
+			}
+			log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
 			for _, item := range itemList.Items {
+				ex.limiter.Wait(context.TODO())
 				wg.Add(1)
 				go ex.patchHandler(obj, item, i, &wg)
 			}
 		}
+		log.Infof("Waiting for iteration %d to finish", i)
+		wg.Wait()
 	}
-	wg.Wait()
 }
 
 func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructured,
@@ -140,7 +144,9 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 		for k, v := range obj.InputVars {
 			templateData[k] = v
 		}
-		renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
+		// ObjectTemplate is path to file
+		memoizationKey := obj.ObjectTemplate
+		renderedObj, err := util.RenderTemplate(memoizationKey, obj.objectSpec, templateData, util.MissingKeyError)
 		if err != nil {
 			log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 		}
@@ -162,7 +168,6 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 	ns := originalItem.GetNamespace()
 	log.Debugf("Patching %s/%s in namespace %s", originalItem.GetKind(),
 		originalItem.GetName(), ns)
-	ex.limiter.Wait(context.TODO())
 
 	var uns *unstructured.Unstructured
 	var err error

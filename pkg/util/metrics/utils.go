@@ -42,7 +42,7 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 	if err != nil {
 		log.Fatalf("Error reading configuration file %s: %s", metricsEndpoint, err)
 	}
-	renderedME, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
+	renderedME, err := util.RenderTemplate("", cfg, util.EnvToMap(), util.MissingKeyError)
 	if err != nil {
 		log.Fatalf("Template error in %s: %s", metricsEndpoint, err)
 	}

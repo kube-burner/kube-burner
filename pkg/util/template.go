@@ -17,14 +17,15 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"gonum.org/v1/gonum/stat/combin"
 	"net/netip"
 	"os"
 	"strings"
+	"sync"
 	"text/template"
 
 	sprig "github.com/Masterminds/sprig/v3"
 	log "github.com/sirupsen/logrus"
-	"gonum.org/v1/gonum/stat/combin"
 )
 
 type templateOption string
@@ -34,20 +35,42 @@ const (
 	MissingKeyZero  templateOption = "missingkey=zero"
 )
 
-// RenderTemplate renders a go-template
-func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
-	var rendered bytes.Buffer
-	funcMap := sprig.GenericFuncMap()
+var templatesByFile = make(map[string]*template.Template)
+
+var funcMap = sprig.GenericFuncMap()
+var templLock = &sync.Mutex{}
+
+func init() {
 	funcMap["Binomial"] = combin.Binomial
 	funcMap["IndexToCombination"] = combin.IndexToCombination
 	funcMap["GetSubnet24"] = func(subnetIdx int) string {
 		return netip.AddrFrom4([4]byte{byte(subnetIdx>>16 + 1), byte(subnetIdx >> 8), byte(subnetIdx), 0}).String() + "/24"
 	}
-	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
-	if err != nil {
-		return nil, fmt.Errorf("parsing error: %s", err)
+}
+
+// RenderTemplate renders a go-template
+func RenderTemplate(memoKey string, original []byte, inputData interface{}, options templateOption) ([]byte, error) {
+	var t *template.Template
+	templLock.Lock()
+	t, ok := templatesByFile[memoKey]
+	templLock.Unlock()
+	if !ok {
+		parsed, err := template.New("").
+			Option(string(options)).
+			Funcs(funcMap).
+			Parse(string(original))
+		if err != nil {
+			return nil, fmt.Errorf("parsing error: %s", err)
+		}
+		t = parsed
+		if memoKey != "" {
+			templLock.Lock()
+			templatesByFile[memoKey] = t
+			templLock.Unlock()
+		}
 	}
-	err = t.Execute(&rendered, inputData)
+	var rendered bytes.Buffer
+	err := t.Execute(&rendered, inputData)
 	if err != nil {
 		return nil, fmt.Errorf("rendering error: %s", err)
 	}
