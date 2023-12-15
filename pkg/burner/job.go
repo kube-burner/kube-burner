@@ -84,6 +84,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var rc int
 	var prometheusJobList []prometheus.Job
 	var jobList []Executor
+	var gcWg sync.WaitGroup
 	embedFS = configSpec.EmbedFS
 	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
@@ -129,9 +130,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			switch job.JobType {
 			case config.CreationJob:
 				if job.Cleanup {
-					ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
-					defer cancel()
-					garbageCollectJob(ctx, job, fmt.Sprintf("kube-burner-job=%s", job.Name))
+					// No timeout for initial job cleanup
+					garbageCollectJob(context.TODO(), job, fmt.Sprintf("kube-burner-job=%s", job.Name), nil)
 				}
 				if job.Churn {
 					log.Info("Churning enabled")
@@ -204,14 +204,16 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
-			// If gcMetrics is enabled, garbage collection must be blocker
+			ctx, _ := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+			for _, job := range jobList {
+				gcWg.Add(1)
+				go garbageCollectJob(ctx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
+			}
+			cleanupStart := time.Now().UTC()
 			if globalConfig.GCMetrics {
-				cleanupStart := time.Now().UTC()
-				ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
-				defer cancel()
-				for _, job := range jobList {
-					garbageCollectJob(ctx, job, fmt.Sprintf("kube-burner-job=%s", job.Name))
-				}
+				// If gcMetrics is enabled, garbage collection must be blocker
+				log.Info("Garbage collection metrics on, waiting for GC")
+				gcWg.Wait()
 				// We add an extra dummy job to prometheusJobList to index metrics from this stage
 				cleanupEnd := time.Now().UTC()
 				prometheusJobList = append(prometheusJobList, prometheus.Job{
@@ -221,10 +223,6 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 						Name: garbageCollectionJob,
 					},
 				})
-			} else {
-				for _, job := range jobList {
-					go garbageCollectJob(context.TODO(), job, fmt.Sprintf("kube-burner-job=%s", job.Name))
-				}
 			}
 		}
 		if globalConfig.IndexerConfig.Type != "" {
@@ -261,8 +259,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				}
 			}
 		}
-		log.Infof("Indexing metrics with UUID %s", uuid)
-		metrics.IndexDatapoints(docsToIndex, globalConfig.IndexerConfig.Type, indexer)
+		if indexer != nil {
+			log.Infof("Indexing metrics with UUID %s", uuid)
+			metrics.IndexDatapoints(docsToIndex, indexer)
+		}
 		log.Infof("Finished execution with UUID: %s", uuid)
 		res <- innerRC
 	}()
@@ -276,13 +276,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	}
 	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
 	if globalConfig.GC && !globalConfig.GCMetrics {
-		// Use timeout/4 to garbage collect namespaces
-		ctx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
-		defer cancel()
 		log.Info("Garbage collecting jobs")
-		for _, job := range jobList {
-			garbageCollectJob(ctx, job, fmt.Sprintf("kube-burner-job=%s", job.Name))
-		}
+		gcWg.Wait()
 	}
 	return rc, utilerrors.NewAggregate(errs)
 }
@@ -344,7 +339,10 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 	}
 }
 
-func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector string) {
+func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector string, wg *sync.WaitGroup) {
+	if wg != nil {
+		defer wg.Done()
+	}
 	CleanupNamespaces(ctx, labelSelector, true)
 	for _, obj := range jobExecutor.objects {
 		jobExecutor.limiter.Wait(ctx)

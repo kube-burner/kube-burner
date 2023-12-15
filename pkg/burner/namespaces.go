@@ -58,7 +58,11 @@ func createNamespace(namespaceName string, nsLabels map[string]string) error {
 
 // CleanupNamespaces deletes namespaces with the given selector
 func CleanupNamespaces(ctx context.Context, labelSelector string, cleanupWait bool) {
-	ns, _ := ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	ns, err := ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		log.Errorf("Error cleaning up namespaces: %v", err.Error())
+		return
+	}
 	if len(ns.Items) > 0 {
 		log.Infof("Deleting namespaces with label %s", labelSelector)
 		for _, ns := range ns.Items {

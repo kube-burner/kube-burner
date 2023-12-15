@@ -323,7 +323,7 @@ func indexCmd() *cobra.Command {
 				}
 			}
 			log.Infof("Indexing metrics with UUID %s", uuid)
-			metrics.IndexDatapoints(docsToIndex, configSpec.GlobalConfig.IndexerConfig.Type, metricsScraper.Indexer)
+			metrics.IndexDatapoints(docsToIndex, metricsScraper.Indexer)
 			if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer && tarballName != "" {
 				if err := metrics.CreateTarball(configSpec.GlobalConfig.IndexerConfig, tarballName); err != nil {
 					log.Fatal(err)

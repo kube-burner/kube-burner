@@ -54,17 +54,14 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 }
 
 // Indexes datapoints to a specified indexer.
-func IndexDatapoints(docsToIndex map[string][]interface{}, indexerType indexers.IndexerType, indexer *indexers.Indexer) {
+func IndexDatapoints(docsToIndex map[string][]interface{}, indexer *indexers.Indexer) {
 	for metricName, docs := range docsToIndex {
-		if indexerType != "" {
-			log.Infof("Indexing metric %s", metricName)
-			log.Debugf("Indexing [%d] documents", len(docs))
-			resp, err := (*indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
-			if err != nil {
-				log.Error(err.Error())
-			} else {
-				log.Info(resp)
-			}
+		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
+		resp, err := (*indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
+		if err != nil {
+			log.Error(err.Error())
+		} else {
+			log.Info(resp)
 		}
 	}
 }
