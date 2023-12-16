@@ -182,7 +182,7 @@ func destroyCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
-			burner.CleanupNamespaces(ctx, labelSelector, true)
+			burner.CleanupNamespaces(ctx, labelSelector)
 			burner.CleanupNonNamespacedResources(ctx, labelSelector)
 		},
 	}

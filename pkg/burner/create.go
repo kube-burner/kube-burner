@@ -349,7 +349,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		if ex.ChurnDeletionStrategy == "gvr" {
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		}
-		CleanupNamespaces(ctx, "churndelete=delete", true)
+		CleanupNamespaces(ctx, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart, &[]string{})

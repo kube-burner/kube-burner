@@ -204,10 +204,11 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
-			ctx, _ := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+			//nolint:govet
+			gcCtx, _ := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 			for _, job := range jobList {
 				gcWg.Add(1)
-				go garbageCollectJob(ctx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
+				go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
 			}
 			cleanupStart := time.Now().UTC()
 			if globalConfig.GCMetrics {
@@ -343,7 +344,7 @@ func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector 
 	if wg != nil {
 		defer wg.Done()
 	}
-	CleanupNamespaces(ctx, labelSelector, true)
+	CleanupNamespaces(ctx, labelSelector)
 	for _, obj := range jobExecutor.objects {
 		jobExecutor.limiter.Wait(ctx)
 		if !obj.Namespaced {
