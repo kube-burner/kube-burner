@@ -84,12 +84,13 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			objectSpec: t,
 			kind:       gvk.Kind,
 			Object:     o,
-		}
-		// If any of the objects is namespaced, we configure the job to create namepaces
-		if o.Namespaced {
-			ex.NamespacedIterations = true
+			namespace:  uns.GetNamespace(),
 		}
 		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
+		if obj.Namespaced && obj.namespace == "" {
+			ex.nsRequired = true
+		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
@@ -111,7 +112,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	for label, value := range ex.NamespaceLabels {
 		nsLabels[label] = value
 	}
-	if !ex.NamespacedIterations {
+	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
 		if err = createNamespace(ns, nsLabels); err != nil {
 			log.Fatal(err.Error())
@@ -129,7 +130,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			percent++
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
-		if ex.NamespacedIterations {
+		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
 				if err = createNamespace(ns, nsLabels); err != nil {
@@ -170,7 +171,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(restConfig.QPS))
 		for i := iterationStart; i < iterationEnd; i++ {
-			if ex.NamespacedIterations {
+			if ex.nsRequired && ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
 				if namespacesWaited[ns] {
 					continue
@@ -260,6 +261,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 	var uns *unstructured.Unstructured
 	var err error
 	RetryWithExponentialBackOff(func() (bool, error) {
+		// When the object has a namespace already specified, use it
+		if objNs := obj.GetNamespace(); objNs != "" {
+			ns = objNs
+		}
 		if ns != "" {
 			uns, err = DynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		} else {
@@ -276,7 +281,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 					log.Errorf("%s/%s already exists", obj.GetKind(), obj.GetName())
 				}
 				return true, nil
-			} else if err != nil {
+			} else if kerrors.IsNotFound(err) {
+				log.Errorf("Error creating object %s/%s: %v", obj.GetKind(), obj.GetName(), err.Error())
+				return true, nil
+			} else {
 				if ns != "" {
 					log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
 				} else {
@@ -297,6 +305,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 
 // RunCreateJobWithChurn executes a churn creation job
 func (ex *Executor) RunCreateJobWithChurn() {
+	if !ex.nsRequired {
+		log.Info("No namespaces were created in this job, skipping churning stage")
+		return
+	}
 	var err error
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.ChurnPercent*ex.JobIterations/100), 1))
@@ -342,9 +354,9 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		defer cancel()
 		// Cleanup namespaces based on the labels we added
 		if ex.ChurnDeletionStrategy == "gvr" {
-			CleanupNamespaceResourcesUsingGVR(ctx, ex.objects, namespacesToDelete, ex.Name)
+			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		}
-		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"}, true)
+		CleanupNamespaces(ctx, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(randStart, numToChurn+randStart, &[]string{})

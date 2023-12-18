@@ -30,9 +30,12 @@ teardown_file() {
   podman rm -f prometheus
 }
 
-@test "kube-burner init: no indexing" {
+@test "kube-burner init: no indexing, GC=true" {
+  export GC=true
   run kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   [ "$status" -eq 0 ]
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
 @test "kube-burner init: indexing only pod latency metrics" {

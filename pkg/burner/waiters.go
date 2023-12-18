@@ -31,41 +31,47 @@ import (
 )
 
 func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
+	waitNs := ns
 	for _, obj := range ex.objects {
 		if !obj.Wait {
 			continue
 		}
+		// When the object has defined its own namespace, we use it
+		// TODO objects with a fixed namespace doesn't need to be waited on a per iteration basis
+		if obj.namespace != "" {
+			waitNs = obj.namespace
+		}
 		if obj.WaitOptions.ForCondition != "" {
 			if !obj.Namespaced {
-				ns = ""
+				waitNs = ""
 			}
-			waitForCondition(obj.gvr, ns, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, limiter)
+			waitForCondition(obj.gvr, waitNs, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, limiter)
 		} else {
 			switch obj.kind {
 			case "Deployment":
-				waitForDeployments(ns, ex.MaxWaitTimeout, limiter)
+				waitForDeployments(waitNs, ex.MaxWaitTimeout, limiter)
 			case "ReplicaSet":
-				waitForRS(ns, ex.MaxWaitTimeout, limiter)
+				waitForRS(waitNs, ex.MaxWaitTimeout, limiter)
 			case "ReplicationController":
-				waitForRC(ns, ex.MaxWaitTimeout, limiter)
+				waitForRC(waitNs, ex.MaxWaitTimeout, limiter)
 			case "StatefulSet":
-				waitForStatefulSet(ns, ex.MaxWaitTimeout, limiter)
+				waitForStatefulSet(waitNs, ex.MaxWaitTimeout, limiter)
 			case "DaemonSet":
-				waitForDS(ns, ex.MaxWaitTimeout, limiter)
+				waitForDS(waitNs, ex.MaxWaitTimeout, limiter)
 			case "Pod":
-				waitForPod(ns, ex.MaxWaitTimeout, limiter)
+				waitForPod(waitNs, ex.MaxWaitTimeout, limiter)
 			case "Build", "BuildConfig":
-				waitForBuild(ns, ex.MaxWaitTimeout, obj.Replicas, limiter)
+				waitForBuild(waitNs, ex.MaxWaitTimeout, obj.Replicas, limiter)
 			case "VirtualMachine":
-				waitForVM(ns, ex.MaxWaitTimeout, limiter)
+				waitForVM(waitNs, ex.MaxWaitTimeout, limiter)
 			case "VirtualMachineInstance":
-				waitForVMI(ns, ex.MaxWaitTimeout, limiter)
+				waitForVMI(waitNs, ex.MaxWaitTimeout, limiter)
 			case "VirtualMachineInstanceReplicaSet":
-				waitForVMIRS(ns, ex.MaxWaitTimeout, limiter)
+				waitForVMIRS(waitNs, ex.MaxWaitTimeout, limiter)
 			case "Job":
-				waitForJob(ns, ex.MaxWaitTimeout, limiter)
+				waitForJob(waitNs, ex.MaxWaitTimeout, limiter)
 			case "PersistentVolumeClaim":
-				waitForPVC(ns, ex.MaxWaitTimeout, limiter)
+				waitForPVC(waitNs, ex.MaxWaitTimeout, limiter)
 			}
 		}
 	}

@@ -19,10 +19,3 @@ spec:
         - infinity
         image: {{.containerImage}}
         name: ci-app
-        readinessProbe:
-        exec:
-          command:
-          - cat
-          - /etc/hosts
-        initialDelaySeconds: 3
-        periodSeconds: 5

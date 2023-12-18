@@ -28,7 +28,7 @@ setup-prometheus() {
 check_ns() {
   echo "Checking the number of namespaces labeled with \"${1}\" is \"${2}\""
   if [[ $(kubectl get ns -l "${1}" -o name | wc -l) != "${2}" ]]; then
-    echo "Number of namespaces labeled with \"${1}\" less than expected"
+    echo "Number of namespaces labeled with ${1} less than expected"
     return 1
   fi
 }
@@ -37,6 +37,14 @@ check_destroyed_ns() {
   echo "Checking namespace \"${1}\" has been destroyed"
   if [[ $(kubectl get ns -l "${1}" -o name | wc -l) != 0 ]]; then
     echo "Namespaces labeled with \"${1}\" not destroyed"
+    return 1
+  fi
+}
+
+check_destroyed_pods() {
+  echo "Checking pods have been destroyed in namespace ${1}"
+  if [[ $(kubectl get pod -n "${1}" -l "${2}" -o name | wc -l) != 0 ]]; then
+    echo "Pods in namespace ${1} not destroyed"
     return 1
   fi
 }
@@ -50,9 +58,17 @@ check_running_pods() {
     running_pods=$((running_pods + pods))
   done
   if [[ "${running_pods}" != "${2}" ]]; then
-    echo "Running pods in namespaces labeled with \"${1}\" different from expected"
+    echo "Running pods in namespaces labeled with ${1} different from expected"
     return 1
   fi
+}
+
+check_running_pods_in_ns() {
+    running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced | grep -c Running)
+    if [[ "${running_pods}" != "${2}" ]]; then
+      echo "Running pods in namespace $1 different from expected. Expected=${2}, observed=${running_pods}"
+      return 1
+    fi
 }
 
 check_files() {
@@ -107,6 +123,8 @@ test_init_checks() {
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 6
   rc=$((rc + $?))
   check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 6
+  rc=$((rc + $?))
+  check_running_pods_in_ns default 6
   rc=$((rc + $?))
   timeout 500 kube-burner init -c kube-burner-delete.yml --uuid "${UUID}" --log-level=debug
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"

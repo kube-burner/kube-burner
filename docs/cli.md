@@ -94,6 +94,7 @@ This subcommand can be used to collect and index the metrics from a given time r
 - `end`: Epoch end time. Defaults to the current time.
 
 ## Measure
+
 This subcommand can be used to collect measurements for a given set of resources which were part of a workload ran in past and are still present on the cluster (i.e only supports podLatency as of today).
 We can specify a list of namespaces and selector labels as input.
 

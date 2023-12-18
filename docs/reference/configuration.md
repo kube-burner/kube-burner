@@ -21,9 +21,9 @@ In this section is described global job configuration, it holds the following pa
 | `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/latest/measurements)                            | List          | []          |
 | `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/latest/observability/indexing)                 | Object        | {}           |
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 15s         |
-| `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
-| `GCMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
-| `GCTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
+| `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
+| `gcMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
+| `gcTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 | `waitWhenFinished` | Wait for all pods to be running when all jobs are completed                                             | Boolean        | false      |
 
 !!! note
@@ -68,7 +68,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `churnPercent`           | Percentage of the jobIterations to churn each period                                                                              | Integer  | 10      |
 | `churnDuration`          | Length of time that the job is churned for                                                                                        | Duration | 1h      |
 | `churnDelay`             | Length of time to wait between each churn period                                                                                  | Duration | 5m      |
-| `churnDeletionStrategy`  | Churn deletion strategy to apply. Either "default" or "gvr" (i.e new logic)                                                       | String   | default |
+| `churnDeletionStrategy`  | Churn deletion strategy to apply, "default" or "gvr" (where `default` churns namespaces and `gvr` churns objects within namespaces)                                                      | String   | default |
 
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
@@ -121,7 +121,7 @@ Configured by the parameter `jobType`, kube-burner supports three types of jobs 
 
 ### Create
 
-The default `jobType` is __create__. Which basically creates objects listed in the `objects` parameter as described in the [objects section](#objects).
+The default `jobType` is __create__. Creates objects listed in the `objects` list as described in the [objects section](#objects). The amount of objects created is configured by `jobIterations`, `replicas`. If the object is namespaced and has an empty `.metadata.namespace` field, `kube-burner` creates a new namespace with the name `namespace-<iteration>`, and creates the defined amount of objects in it.
 
 ### Delete
 
