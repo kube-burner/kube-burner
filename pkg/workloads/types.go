@@ -9,32 +9,18 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type ProfileType string
-
-var MetricsProfileMap = map[string]string{
-	"cluster-density-ms":             "metrics-aggregated.yml",
-	"cluster-density-v2":             "metrics-aggregated.yml",
-	"crd-scale":                      "metrics-aggregated.yml",
-	"node-density":                   "metrics.yml",
-	"node-density-heavy":             "metrics.yml",
-	"node-density-cni":               "metrics.yml",
-	"networkpolicy-multitenant":      "metrics.yml",
-	"networkpolicy-matchlabels":      "metrics.yml",
-	"networkpolicy-matchexpressions": "metrics.yml",
-	"pvc-density":                    "metrics.yml",
-	"web-burner":                     "metrics.yml",
-}
+type clusterType string
 
 const (
-	regular   ProfileType = "regular"
-	reporting ProfileType = "reporting"
-	both      ProfileType = "both"
+	OCP       clusterType = "ocp"
+	K8S       clusterType = "k8s"
+	configDir             = "config"
 )
 
 type Config struct {
 	UUID            string
 	EsServer        string
-	Esindex         string
+	EsIndex         string
 	QPS             int
 	Burst           int
 	Gc              bool
@@ -44,7 +30,8 @@ type Config struct {
 	Indexing        bool
 	Timeout         time.Duration
 	MetricsEndpoint string
-	ProfileType     string
+	UserMetadata    string
+	ConfigDir       string
 }
 
 type BenchmarkMetadata struct {
@@ -63,7 +50,9 @@ type WorkloadHelper struct {
 	prometheusURL   string
 	prometheusToken string
 	Metadata        BenchmarkMetadata
-	ocpConfig       embed.FS
-	OcpMetaAgent    ocpmetadata.Metadata
-	restConfig      *rest.Config
+	embedConfig     embed.FS
+	MetadataAgent   ocpmetadata.Metadata
+	RestConfig      *rest.Config
+	metricsMetadata map[string]interface{}
+	clusterType     clusterType
 }

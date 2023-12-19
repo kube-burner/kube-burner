@@ -245,7 +245,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		docsToIndex := make(map[string][]interface{})
 		for idx, prometheusClient := range prometheusClients {
 			// If alertManager is configured
-			if alertMs[idx] != nil {
+			if len(alertMs) >= idx+1 {
 				if err := alertMs[idx].Evaluate(prometheusJobList[0].Start, prometheusJobList[len(jobList)-1].End); err != nil {
 					errs = append(errs, err)
 					innerRC = 1
