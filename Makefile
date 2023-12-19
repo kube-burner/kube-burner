@@ -74,10 +74,7 @@ manifest-build:
 		$(ENGINE) manifest add $(CONTAINER_NAME) $(CONTAINER_NAME)-$${arch}; \
 	done
 
-test: test-k8s test-ocp
+test: test-k8s
 
 test-k8s:
 	cd test && bats -F pretty -T --print-output-on-failure test-k8s.bats
-
-test-ocp:
-	cd test && bats -F pretty -T --print-output-on-failure test-ocp.bats

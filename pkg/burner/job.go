@@ -177,7 +177,6 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
 				time.Sleep(job.JobPause)
 			}
-
 			currentJob.End = time.Now().UTC()
 			executedJobs = append(executedJobs, currentJob)
 			// We stop and index measurements per job
@@ -233,25 +232,22 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
 			}
 		}
-		if len(prometheusClients) > 0 {
-			for idx, prometheusClient := range prometheusClients {
-				// If alertManager is configured
-				if alertMs[idx] != nil {
-					if err := alertMs[idx].Evaluate(executedJobs[0].Start, executedJobs[len(jobList)-1].End); err != nil {
-						errs = append(errs, err)
-						innerRC = 1
-					}
-				}
-				prometheusClient.JobList = executedJobs
-				// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-				if indexer != nil {
-					prometheusClient.ScrapeJobsMetrics()
-				}
+		for _, alertM := range alertMs {
+			if err := alertM.Evaluate(executedJobs[0].Start, executedJobs[len(jobList)-1].End); err != nil {
+				errs = append(errs, err)
+				innerRC = 1
 			}
+		}
+		for _, prometheusClient := range prometheusClients {
+			prometheusClient.JobList = executedJobs
+			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 			if indexer != nil {
-				if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
-					metrics.CreateTarball(globalConfig.IndexerConfig, globalConfig.IndexerConfig.TarballName)
-				}
+				prometheusClient.ScrapeJobsMetrics()
+			}
+		}
+		if indexer != nil {
+			if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
+				metrics.CreateTarball(globalConfig.IndexerConfig, globalConfig.IndexerConfig.TarballName)
 			}
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)

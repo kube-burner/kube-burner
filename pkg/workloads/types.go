@@ -1,3 +1,17 @@
+// Copyright 2024 The Kube-burner Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package workloads
 
 import (
@@ -9,42 +23,15 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type ProfileType string
-
-var MetricsProfileMap = map[string]string{
-	"cluster-density-ms":             "metrics-aggregated.yml",
-	"cluster-density-v2":             "metrics-aggregated.yml",
-	"crd-scale":                      "metrics-aggregated.yml",
-	"node-density":                   "metrics.yml",
-	"node-density-heavy":             "metrics.yml",
-	"node-density-cni":               "metrics.yml",
-	"networkpolicy-multitenant":      "metrics.yml",
-	"networkpolicy-matchlabels":      "metrics.yml",
-	"networkpolicy-matchexpressions": "metrics.yml",
-	"pvc-density":                    "metrics.yml",
-	"web-burner":                     "metrics.yml",
-}
-
-const (
-	regular   ProfileType = "regular"
-	reporting ProfileType = "reporting"
-	both      ProfileType = "both"
-)
-
 type Config struct {
 	UUID            string
-	EsServer        string
-	Esindex         string
-	QPS             int
-	Burst           int
-	Gc              bool
-	GcMetrics       bool
 	Indexer         indexers.IndexerType
-	Alerting        bool
-	Indexing        bool
 	Timeout         time.Duration
 	MetricsEndpoint string
-	ProfileType     string
+	UserMetadata    string
+	ConfigDir       string
+	PrometheusURL   string
+	PrometheusToken string
 }
 
 type BenchmarkMetadata struct {
@@ -60,10 +47,9 @@ type BenchmarkMetadata struct {
 
 type WorkloadHelper struct {
 	Config
-	prometheusURL   string
-	prometheusToken string
 	Metadata        BenchmarkMetadata
-	ocpConfig       embed.FS
-	OcpMetaAgent    ocpmetadata.Metadata
-	restConfig      *rest.Config
+	embedConfig     embed.FS
+	MetadataAgent   ocpmetadata.Metadata
+	RestConfig      *rest.Config
+	MetricsMetadata map[string]interface{}
 }

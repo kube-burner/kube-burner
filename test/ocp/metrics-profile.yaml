@@ -1,9 +1,0 @@
-- query: process_resident_memory_bytes{job="prometheus"}
-  metricName: prometheusRSS
-
-- query: irate(process_cpu_seconds_total{job="prometheus"}[2m]) and on (job) topk(2,avg_over_time(process_cpu_seconds_total{job="prometheus"}[{{.elapsed}}:]))
-  metricName: top2PrometheusCPU
-
-- query: prometheus_build_info
-  metricName: prometheusBuildInfo
-  instant: true

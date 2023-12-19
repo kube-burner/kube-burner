@@ -18,14 +18,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/cloud-bulldozer/go-commons/version"
 	"github.com/kube-burner/kube-burner/pkg/alerting"
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
@@ -53,18 +50,8 @@ var rootCmd = &cobra.Command{
 	Long: `Kube-burner 🔥
 
 Tool aimed at stressing a kubernetes cluster by creating or deleting lots of objects.`,
-}
-
-// versionCmd represents the version command
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the version number of kube-burner",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Version:", version.Version)
-		fmt.Println("Git Commit:", version.GitCommit)
-		fmt.Println("Build Date:", version.BuildDate)
-		fmt.Println("Go Version:", version.GoVersion)
-		fmt.Println("OS/Arch:", version.OsArch)
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		util.ConfigureLogging(cmd)
 	},
 }
 
@@ -468,35 +455,16 @@ func alertCmd() *cobra.Command {
 
 // executes rootCmd
 func main() {
+	util.SetupCmd(rootCmd)
 	rootCmd.AddCommand(
-		versionCmd,
 		initCmd(),
 		measureCmd(),
 		destroyCmd(),
 		indexCmd(),
 		alertCmd(),
 		importCmd(),
-		openShiftCmd(),
+		completionCmd,
 	)
-	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		log.SetReportCaller(true)
-		formatter := &log.TextFormatter{
-			TimestampFormat: "2006-01-02 15:04:05",
-			FullTimestamp:   true,
-			DisableColors:   true,
-			CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
-				return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
-			},
-		}
-		log.SetFormatter(formatter)
-		lvl, err := log.ParseLevel(*logLevel)
-		if err != nil {
-			log.Fatalf("Unknown log level %s", *logLevel)
-		}
-		log.SetLevel(lvl)
-	}
-	rootCmd.AddCommand(completionCmd)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
