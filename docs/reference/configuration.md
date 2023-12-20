@@ -20,11 +20,11 @@ In this section is described global job configuration, it holds the following pa
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|--------------|
 | `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/latest/measurements)                            | List          | []          |
 | `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/latest/observability/indexing)                 | Object        | {}           |
-| `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 15s         |
+| `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 60s         |
 | `GC`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
 | `GCMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
-| `GCTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
-| `waitWhenFinished` | Wait for all pods to be running when all jobs are completed                                             | Boolean        | false      |
+| `GCTimeout`        | Garbage collection timeout                                                                               | Duration        | 1h   |
+| `waitWhenFinished` | Wait for all pods to be running when all jobs are completed                                              | Boolean        | false      |
 
 !!! note
     The precedence order to wait on resources is Global.waitWhenFinished > Job.waitWhenFinished > Job.podWait

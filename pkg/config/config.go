@@ -45,7 +45,7 @@ var configSpec = Spec{
 		GC:             false,
 		GCMetrics:      false,
 		GCTimeout:      1 * time.Hour,
-		RequestTimeout: 15 * time.Second,
+		RequestTimeout: 60 * time.Second,
 		Measurements:   []mtypes.Measurement{},
 		IndexerConfig: indexers.IndexerConfig{
 			InsecureSkipVerify: false,
