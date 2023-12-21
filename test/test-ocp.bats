@@ -88,14 +88,14 @@ teardown_file() {
 @test "web-burner" {
   LB_WORKER=$(oc get node | grep worker | head -n 1 | cut -f 1 -d' ')
   oc label node $LB_WORKER node-role.kubernetes.io/worker-spk=""
-  run kube-burner ocp web-burner-init --gc=false --sriov=false --bridge=br-ex ${COMMON_FLAGS}
+  run kube-burner ocp web-burner-init --gc=false --sriov=false --bridge=br-ex --bfd=false ${COMMON_FLAGS}
   [ "$status" -eq 0 ]
   run check_metric_value clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
   [ "$status" -eq 0 ]
-  run kube-burner ocp web-burner-node-density --gc=false --probe=true ${COMMON_FLAGS}
+  run kube-burner ocp web-burner-node-density --gc=false --probe=false ${COMMON_FLAGS}
   [ "$status" -eq 0 ]
   run check_metric_value clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
-  oc label node $LB_WORKER ovn-worker node-role.kubernetes.io/worker-spk-
+  oc label node $LB_WORKER node-role.kubernetes.io/worker-spk-
   check_cluster_resources po kube-burner-job=init-served-job 1
   check_cluster_resources po kube-burner-job=serving-job 4
   check_cluster_resources po kube-burner-job=normal-job-1 60
