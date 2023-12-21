@@ -1,6 +1,6 @@
 #!/bin/bash
 # vi: ft=bash
-# shellcheck disable=SC2086
+# shellcheck disable=SC2086,SC2068
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
 K8S_VERSION=${K8S_VERSION:-v1.27.0}
@@ -157,4 +157,9 @@ check_metric_value() {
       return 0
     fi
   done
+}
+
+run_cmd(){
+  echo "$@" 
+  ${@}
 }
