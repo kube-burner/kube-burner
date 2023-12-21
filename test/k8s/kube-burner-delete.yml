@@ -1,8 +1,6 @@
 ---
  
 global:
-  prometheusURL: http://localhost:9090
-  metricsProfile: metrics-profile.yaml
   measurements:
   - name: podLatency
 
@@ -40,7 +38,7 @@ jobs:
     waitForDeletion: true
     qps: 10
     burst: 20
-    jobPause: 1ms
+    jobPause: 10s
     objects:
 
     - kind: Deployment

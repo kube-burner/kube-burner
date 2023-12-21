@@ -126,7 +126,7 @@ test_init_checks() {
   rc=$((rc + $?))
   check_running_pods_in_ns default 6
   rc=$((rc + $?))
-  timeout 500 kube-burner init -c kube-burner-delete.yml --uuid "${UUID}" --log-level=debug
+  timeout 500 kube-burner init -c kube-burner-delete.yml --uuid "${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   rc=$((rc + $?))
   echo "Running kube-burner destroy"
