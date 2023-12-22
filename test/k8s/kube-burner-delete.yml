@@ -5,9 +5,10 @@ global:
   - name: podLatency
 
   indexerConfig:
-    type: elastic
-    esServers: ["https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443"]
-    defaultIndex: "kube-burner-ocp"
+    type: {{ .INDEXING_TYPE }}
+    metricsDirectory: {{ .METRICS_FOLDER }}
+    esServers: ["{{ .ES_SERVER }}"]
+    defaultIndex: {{ .ES_INDEX }}
 
 jobs:
   - name: not-namespaced
@@ -38,7 +39,7 @@ jobs:
     waitForDeletion: true
     qps: 10
     burst: 20
-    jobPause: 10s
+    jobPause: 5s
     objects:
 
     - kind: Deployment

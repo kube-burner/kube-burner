@@ -10,14 +10,18 @@ setup_file() {
   export JOB_ITERATIONS=5
   export QPS=2
   export BURST=2
+  export GC=true
+  export CHURN=false
   setup-kind
   setup-prometheus
 }
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  export TEMP_FOLDER; TEMP_FOLDER=$(mktemp -d)
   export INDEXING_TYPE=""
+  export ES_SERVER="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com"
+  export ES_INDEX="kube-burner"
+  export METRICS_FOLDER="metrics-${UUID}"
 }
 
 teardown() {
@@ -29,45 +33,66 @@ teardown_file() {
   podman rm -f prometheus
 }
 
-@test "kube-burner init: no indexing, GC=true" {
-  export GC=true
+@test "kube-burner init: churn=true" {
+  export CHURN=true
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
-@test "kube-burner init: indexing only pod latency metrics" {
-  export INDEXING_TYPE=local
-  export LATENCY=true
+@test "kube-burner init: gc=false" {
+  export GC=false
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
-  test_init_checks
+  check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 6
+  check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 12
+  check_running_pods_in_ns default 6
+  kube-burner destroy --uuid "${UUID}"
+  check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
-@test "kube-burner init: indexing, pod latency metrics and alerting" {
+@test "kube-burner init: local-indexing=true; pod-latency-metrics-indexing=true" {
   export INDEXING_TYPE=local
+  run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+}
+
+@test "kube-burner init: os-indexing=true; alerting=true"  {
+  export INDEXING_TYPE=opensearch
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
-  export LATENCY=true
-  export ALERTING=true
-  test_init_checks
+  check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement alert
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
-@test "kube-burner init: indexing and metrics-endpoint" {
-  export INDEXING_TYPE=local
-  export ALERTING=true
+@test "kube-burner init: os-indexing=true; metrics-endpoint=true" {
+  export INDEXING_TYPE=opensearch
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -e metrics-endpoints.yaml
-  test_init_checks
+  check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
-@test "kube-burner index: metrics-endpoint with single prometheus endpoint" {
+@test "kube-burner index: local-indexing=true" {
   run_cmd kube-burner index --uuid="${UUID}"  -u http://localhost:9090 -m metrics-profile.yaml
 }
 
-@test "kube-burner index: metrics-endpoint and sending metrics to ES" {
-  run_cmd kube-burner index --uuid="${UUID}" -e metrics-endpoints.yaml --es-server=https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com:443 --es-index=ripsaw-kube-burner
+@test "kube-burner index: metrics-endpoint=true; os-indexing=true" {
+  run_cmd kube-burner index --uuid="${UUID}" -e metrics-endpoints.yaml --es-server=${ES_SERVER} --es-index=${ES_INDEX}
 }
 
 @test "kube-burner init: crd" {
   kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/network-attachment-definition-client/master/artifacts/networks-crd.yaml
+  sleep 5s
   run_cmd kube-burner init -c kube-burner-crd.yml --uuid="${UUID}"
   kubectl delete -f objectTemplates/storageclass.yml
+}
+
+@test "kube-burner init: delete=true; os-indexing=true" {
+  export INDEXING_TYPE=opensearch
+  run_cmd kube-burner init -c kube-burner-delete.yml --uuid "${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
 }

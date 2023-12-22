@@ -39,11 +39,10 @@ jobs:
         bats-version: 1.9.0
 
     - name: Execute Tests
-      working-directory: test
       run: |
         export PATH=${PATH}:/tmp/
         chmod +x /tmp/kube-burner
-        bats -F pretty -T --print-output-on-failure test-k8s.bats
+        make test-k8s
       env:
         TERM: linux
         KIND_VERSION: v0.19.0
@@ -84,11 +83,10 @@ jobs:
         OPENSHIFT_PASSWORD: ${{ secrets.OPENSHIFT_PASSWORD }}
 
     - name: Execute Tests
-      working-directory: test
       run: |
         export PATH=${PATH}:/tmp/
         chmod +x /tmp/kube-burner
-        bats -F pretty -T --print-output-on-failure test-ocp.bats
+        make test-ocp
       env:
         TERM: linux
         OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}

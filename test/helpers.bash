@@ -65,33 +65,6 @@ check_running_pods_in_ns() {
     fi
 }
 
-check_files() {
-  rc=0
-  file_list="${TEMP_FOLDER}/top2PrometheusCPU.json ${TEMP_FOLDER}/prometheusRSS.json ${TEMP_FOLDER}/podLatencyMeasurement-namespaced.json ${TEMP_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json"
-  if [[ $LATENCY == "true" ]]; then
-    file_list="${TEMP_FOLDER}/podLatencyMeasurement-namespaced.json ${TEMP_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json"
-  fi
-  if [[ $ALERTING == "true" ]]; then
-    file_list=" ${TEMP_FOLDER}/alert.json"
-  fi
-  for f in ${file_list}; do
-    echo "Checking file ${f}"
-    if [[ ! -f $f ]]; then
-      echo "File ${f} not present"
-      rc=$((rc + 1))
-      continue
-    fi
-    if [[ $(jq .[0].metricName ${f}) == "" ]]; then
-      echo "Incorrect format in ${f}"
-      cat "${f}"
-    fi
-  done
-  if [[ ${rc} != 0 ]]; then
-    echo "Content of ${TEMP_FOLDER}:"
-    ls -l ${TEMP_FOLDER}
-  fi
-}
-
 check_file_list() {
   for f in "${@}"; do
     if [[ ! -f ${f} ]]; then
@@ -107,29 +80,6 @@ check_file_list() {
     fi
   done
   return 0
-}
-
-test_init_checks() {
-  rc=0
-  if [[ ${INDEXING_TYPE} == "local" ]]; then
-    check_files
-  fi
-  check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 6
-  rc=$((rc + $?))
-  check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 12
-  rc=$((rc + $?))
-  check_running_pods_in_ns default 6
-  rc=$((rc + $?))
-  timeout 500 kube-burner init -c kube-burner-delete.yml --uuid "${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
-  rc=$((rc + $?))
-  echo "Running kube-burner destroy"
-  kube-burner destroy --uuid "${UUID}"
-  check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}"
-  rc=$((rc + $?))
-  echo "Evaluating alerts"
-  kube-burner check-alerts -u http://localhost:9090 -a alert-profile.yaml --start "$(date -d '-2 minutes' +%s)"
-  return ${rc}
 }
 
 print_events() {

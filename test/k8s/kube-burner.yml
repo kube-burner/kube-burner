@@ -7,7 +7,9 @@ global:
 
   indexerConfig:
     type: {{ .INDEXING_TYPE }}
-    metricsDirectory: {{ .TEMP_FOLDER }}
+    metricsDirectory: {{ .METRICS_FOLDER }}
+    esServers: ["{{ .ES_SERVER }}"]
+    defaultIndex: {{ .ES_INDEX }}
 
 jobs:
   - name: namespaced
