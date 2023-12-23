@@ -82,7 +82,7 @@ var embedFSDir string
 func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
 	var err error
 	var rc int
-	var prometheusJobList []prometheus.Job
+	var executedJobs []prometheus.Job
 	var jobList []Executor
 	var gcWg sync.WaitGroup
 	embedFS = configSpec.EmbedFS
@@ -120,7 +120,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					log.Fatal(err.Error())
 				}
 			}
-			prometheusJob := prometheus.Job{
+			currentJob := prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
 			}
@@ -178,14 +178,11 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				time.Sleep(job.JobPause)
 			}
 
-			prometheusJob.End = time.Now().UTC()
-			// Don't append to Prometheus jobList when prometheus it's not initialized
-			if len(prometheusClients) > 0 {
-				prometheusJobList = append(prometheusJobList, prometheusJob)
-			}
+			currentJob.End = time.Now().UTC()
+			executedJobs = append(executedJobs, currentJob)
 			// We stop and index measurements per job
 			if !globalConfig.WaitWhenFinished {
-				elapsedTime := prometheusJob.End.Sub(prometheusJob.Start).Round(time.Second)
+				elapsedTime := currentJob.End.Sub(currentJob.Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 				if err = measurements.Stop(); err != nil {
 					errs = append(errs, err)
@@ -210,59 +207,55 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				gcWg.Add(1)
 				go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
 			}
-			cleanupStart := time.Now().UTC()
 			if globalConfig.GCMetrics {
-				// If gcMetrics is enabled, garbage collection must be blocker
+				cleanupStart := time.Now().UTC()
 				log.Info("Garbage collection metrics on, waiting for GC")
+				// If gcMetrics is enabled, garbage collection must be blocker
 				gcWg.Wait()
-				// We add an extra dummy job to prometheusJobList to index metrics from this stage
-				cleanupEnd := time.Now().UTC()
-				prometheusJobList = append(prometheusJobList, prometheus.Job{
+				// We add an extra dummy job to executedJobs to index metrics from this stage
+				executedJobs = append(executedJobs, prometheus.Job{
 					Start: cleanupStart,
-					End:   cleanupEnd,
+					End:   time.Now().UTC(),
 					JobConfig: config.Job{
 						Name: garbageCollectionJob,
 					},
 				})
 			}
 		}
-		if globalConfig.IndexerConfig.Type != "" {
-			for _, job := range prometheusJobList {
-				// elapsedTime is recalculated for every job of the list
-				elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
+		for _, job := range executedJobs {
+			// elapsedTime is recalculated for every job of the list
+			if indexer != nil && !job.JobConfig.SkipIndexing {
 				jobTimings := timings{
 					Timestamp:    job.Start,
 					EndTimestamp: job.End,
-					ElapsedTime:  elapsedTime,
+					ElapsedTime:  job.End.Sub(job.Start).Round(time.Second).Seconds(),
 				}
-				if job.JobConfig.SkipIndexing {
-					log.Infof("Skipping job summary indexing in job: %s", job.JobConfig.Name)
-				} else {
-					indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
-				}
+				indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
 			}
 		}
-		docsToIndex := make(map[string][]interface{})
-		for idx, prometheusClient := range prometheusClients {
-			// If alertManager is configured
-			if alertMs[idx] != nil {
-				if err := alertMs[idx].Evaluate(prometheusJobList[0].Start, prometheusJobList[len(jobList)-1].End); err != nil {
-					errs = append(errs, err)
-					innerRC = 1
+		if len(prometheusClients) > 0 {
+			docsToIndex := make(map[string][]interface{})
+			for idx, prometheusClient := range prometheusClients {
+				// If alertManager is configured
+				if alertMs[idx] != nil {
+					if err := alertMs[idx].Evaluate(executedJobs[0].Start, executedJobs[len(jobList)-1].End); err != nil {
+						errs = append(errs, err)
+						innerRC = 1
+					}
+				}
+				prometheusClient.JobList = executedJobs
+				// If prometheus is enabled query metrics from the start of the first job to the end of the last one
+				if indexer != nil {
+					prometheusClient.ScrapeJobsMetrics(docsToIndex)
 				}
 			}
-			prometheusClient.JobList = prometheusJobList
-			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-			if globalConfig.IndexerConfig.Type != "" {
-				prometheusClient.ScrapeJobsMetrics(docsToIndex)
+			if indexer != nil {
+				log.Infof("Indexing metrics with UUID %s", uuid)
+				metrics.IndexDatapoints(docsToIndex, indexer)
 				if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
 					metrics.CreateTarball(globalConfig.IndexerConfig, globalConfig.IndexerConfig.TarballName)
 				}
 			}
-		}
-		if indexer != nil {
-			log.Infof("Indexing metrics with UUID %s", uuid)
-			metrics.IndexDatapoints(docsToIndex, indexer)
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)
 		res <- innerRC
