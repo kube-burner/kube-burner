@@ -102,8 +102,8 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
-		"kube-burner-uuid":  ex.uuid,
-		"kube-burner-runid": ex.runid,
+		"kube-burner-uuid":  config.UUID,
+		"kube-burner-runid": config.RunID,
 	}
 	var wg sync.WaitGroup
 	var ns string
@@ -143,10 +143,10 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		}
 		for objectIndex, obj := range ex.objects {
 			labels := map[string]string{
-				"kube-burner-uuid":  ex.uuid,
+				"kube-burner-uuid":  config.UUID,
 				"kube-burner-job":   ex.Name,
 				"kube-burner-index": strconv.Itoa(objectIndex),
-				"kube-burner-runid": ex.runid,
+				"kube-burner-runid": config.RunID,
 			}
 			ex.objects[objectIndex].labelSelector = labels
 			ex.replicaHandler(labels, obj, ns, i, &wg)
@@ -219,7 +219,7 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 			templateData := map[string]interface{}{
 				jobName:      ex.Name,
 				jobIteration: iteration,
-				jobUUID:      ex.uuid,
+				jobUUID:      config.UUID,
 				replica:      r,
 			}
 			for k, v := range obj.InputVars {

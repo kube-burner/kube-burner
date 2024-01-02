@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/openshift/client-go/config/clientset/versioned"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -86,7 +87,7 @@ func (ex *Executor) Verify() bool {
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
 		listOptions := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.Name, objectIndex),
+			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-job=%s,kube-burner-index=%d", config.UUID, ex.Name, objectIndex),
 			Limit:         objectLimit,
 		}
 		err := RetryWithExponentialBackOff(func() (done bool, err error) {

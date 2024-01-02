@@ -54,7 +54,7 @@ func NewIndex(metricsEndpoint *string, ocpMetaAgent *ocpmetadata.Metadata) *cobr
 			}
 			esServer, _ := cmd.Flags().GetString("es-server")
 			esIndex, _ := cmd.Flags().GetString("es-index")
-			configSpec.GlobalConfig.UUID = uuid
+			config.UUID = uuid
 			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,

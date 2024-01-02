@@ -28,7 +28,6 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 
-	uid "github.com/satori/go.uuid"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -41,7 +40,6 @@ import (
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
-		RUNID:          uid.NewV4().String(),
 		GC:             false,
 		GCMetrics:      false,
 		GCTimeout:      1 * time.Hour,
@@ -106,7 +104,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Parse parses a configuration file
-func Parse(uuid string, f io.Reader) (Spec, error) {
+func Parse(f io.Reader) (Spec, error) {
 	cfg, err := io.ReadAll(f)
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
@@ -145,9 +143,8 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 			configSpec.Jobs[i].PreLoadImages = false
 		}
 	}
-	configSpec.GlobalConfig.UUID = uuid
 	if configSpec.GlobalConfig.IndexerConfig.MetricsDirectory == "collected-metrics" {
-		configSpec.GlobalConfig.IndexerConfig.MetricsDirectory += "-" + uuid
+		configSpec.GlobalConfig.IndexerConfig.MetricsDirectory += "-" + UUID
 	}
 	return configSpec, nil
 }

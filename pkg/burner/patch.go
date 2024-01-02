@@ -135,7 +135,7 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 		templateData := map[string]interface{}{
 			jobName:      ex.Name,
 			jobIteration: iteration,
-			jobUUID:      ex.uuid,
+			jobUUID:      config.UUID,
 		}
 		for k, v := range obj.InputVars {
 			templateData[k] = v

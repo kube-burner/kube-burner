@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/workloads"
 	uid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -43,8 +44,8 @@ func openShiftCmd() *cobra.Command {
 	localIndexing := ocpCmd.PersistentFlags().Bool("local-indexing", false, "Enable local indexing")
 	ocpCmd.PersistentFlags().StringVar(&workloadConfig.MetricsEndpoint, "metrics-endpoint", "", "YAML file with a list of metric endpoints")
 	ocpCmd.PersistentFlags().BoolVar(&workloadConfig.Alerting, "alerting", true, "Enable alerting")
-	ocpCmd.PersistentFlags().StringVar(&workloadConfig.UUID, "uuid", uid.NewV4().String(), "Benchmark UUID")
-	ocpCmd.PersistentFlags().DurationVar(&workloadConfig.Timeout, "timeout", 4*time.Hour, "Benchmark timeout")
+	ocpCmd.PersistentFlags().StringVar(&config.UUID, "uuid", uid.NewV4().String(), "Benchmark UUID")
+	ocpCmd.PersistentFlags().DurationVar(&config.BenchmarkTimeout, "timeout", 4*time.Hour, "Benchmark timeout")
 	ocpCmd.PersistentFlags().IntVar(&workloadConfig.QPS, "qps", 20, "QPS")
 	ocpCmd.PersistentFlags().IntVar(&workloadConfig.Burst, "burst", 20, "Burst")
 	ocpCmd.PersistentFlags().BoolVar(&workloadConfig.Gc, "gc", true, "Garbage collect created namespaces")

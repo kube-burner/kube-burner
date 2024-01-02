@@ -81,7 +81,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			}
 		}
 		if metricsEndpoint.AlertProfile != "" {
-			if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.ConfigSpec.GlobalConfig.UUID, indexer, p, false); err != nil {
+			if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, indexer, p, false); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 		}

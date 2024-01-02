@@ -109,7 +109,7 @@ func (p *vmiLatency) handleCreateVM(obj interface{}) {
 				Namespace:  vm.Namespace,
 				Name:       vm.Name,
 				MetricName: vmiLatencyMeasurement,
-				UUID:       globalCfg.UUID,
+				UUID:       config.UUID,
 				JobName:    factory.jobConfig.Name,
 				JobConfig:  *factory.jobConfig,
 				Metadata:   factory.metadata,
@@ -154,7 +154,7 @@ func (p *vmiLatency) handleCreateVMI(obj interface{}) {
 				Namespace:  vmi.Namespace,
 				Name:       vmi.Name,
 				MetricName: vmiLatencyMeasurement,
-				UUID:       globalCfg.UUID,
+				UUID:       config.UUID,
 				JobName:    factory.jobConfig.Name,
 			}
 		}
@@ -302,7 +302,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"virtualmachines",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", config.RunID)
 		},
 	)
 	p.vmWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -322,7 +322,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"virtualmachineinstances",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", config.RunID)
 		},
 	)
 	p.vmiWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -342,7 +342,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"pods",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", config.RunID)
 		},
 	)
 	p.vmiPodWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -473,7 +473,7 @@ func (p *vmiLatency) calcQuantiles() {
 	for quantileName, v := range quantileMap {
 		quantile := metrics.LatencyQuantiles{
 			QuantileName: quantileName,
-			UUID:         globalCfg.UUID,
+			UUID:         config.UUID,
 			Timestamp:    time.Now().UTC(),
 			JobName:      factory.jobConfig.Name,
 			MetricName:   vmiLatencyQuantilesMeasurement,
