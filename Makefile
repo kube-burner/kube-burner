@@ -73,3 +73,11 @@ manifest-build:
 	for arch in $(MANIFEST_ARCHS); do \
 		$(ENGINE) manifest add $(CONTAINER_NAME) $(CONTAINER_NAME)-$${arch}; \
 	done
+
+test: test-k8s test-ocp
+
+test-k8s:
+	cd test && bats -F pretty -T --print-output-on-failure test-k8s.bats
+
+test-ocp:
+	cd test && bats -F pretty -T --print-output-on-failure test-ocp.bats
