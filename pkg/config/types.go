@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
 )
 
 // JobType type of job

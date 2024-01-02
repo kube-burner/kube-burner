@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 
 	uid "github.com/satori/go.uuid"

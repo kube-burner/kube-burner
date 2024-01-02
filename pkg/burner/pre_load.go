@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

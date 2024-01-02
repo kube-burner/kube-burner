@@ -20,9 +20,9 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

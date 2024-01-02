@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
-	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
+	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

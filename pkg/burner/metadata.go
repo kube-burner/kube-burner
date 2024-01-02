@@ -20,7 +20,7 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/go-commons/version"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
 

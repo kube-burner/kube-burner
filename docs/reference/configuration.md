@@ -72,7 +72,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
-Examples of valid configuration files can be found in the [examples folder](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples).
+Examples of valid configuration files can be found in the [examples folder](https://github.com/kube-burner/kube-burner/tree/master/examples).
 
 ## Objects
 

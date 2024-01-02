@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/burner/types"
+	"github.com/kube-burner/kube-burner/pkg/burner/types"
 )
 
 func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {

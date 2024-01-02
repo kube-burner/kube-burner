@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

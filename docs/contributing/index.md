@@ -17,7 +17,7 @@ $ git push
 
 ## CI and Linting
 
-For running pre-commit checks on your code before comitting code and opening a PR, you can use the `pre-commit run` functionality.  See [CI docs](https://cloud-bulldozer.github.io/kube-burner/latest/contributing/pullrequest/#running-local-pre-commit) for more information on running pre-commits.
+For running pre-commit checks on your code before comitting code and opening a PR, you can use the `pre-commit run` functionality.  See [CI docs](https://kube-burner.github.io/kube-burner/latest/contributing/pullrequest/#running-local-pre-commit) for more information on running pre-commits.
 
 ## Building
 
@@ -30,5 +30,5 @@ To build kube-burner just execute `make build`, once finished the kube-burner bi
 $ make build
 building kube-burner 0.1.0
 GOPATH=/home/kube-burner/go
-CGO_ENABLED=0 go build -v -ldflags "-X github.com/cloud-bulldozer/kube-burner/version.GitCommit=d91c8cc35cb458a4b80a5050704a51c7c6e35076 -X github.com/cloud-bulldozer/kube-burner/version.BuildDate=2020-08-19-19:10:09 -X github.com/cloud-bulldozer/kube-burner/version.GitBranch=master" -o bin/kube-burner
+CGO_ENABLED=0 go build -v -ldflags "-X github.com/kube-burner/kube-burner/version.GitCommit=d91c8cc35cb458a4b80a5050704a51c7c6e35076 -X github.com/kube-burner/kube-burner/version.BuildDate=2020-08-19-19:10:09 -X github.com/kube-burner/kube-burner/version.GitBranch=master" -o bin/kube-burner
 ```

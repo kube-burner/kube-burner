@@ -16,9 +16,9 @@ package metrics
 
 import (
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
-	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/alerting"
+	"github.com/kube-burner/kube-burner/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 

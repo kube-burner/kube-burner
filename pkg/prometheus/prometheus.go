@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/prometheus"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
