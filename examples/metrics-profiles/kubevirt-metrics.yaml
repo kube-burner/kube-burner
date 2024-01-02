@@ -200,6 +200,10 @@
 - query: count(kube_service_info{}) > 0
   metricName: serviceCount
 
+- query: count(openshift_route_created{})
+  metricName: routeCount
+  instant: true
+
 - query: kube_node_role > 0
   metricName: nodeRoles
   instant: true
