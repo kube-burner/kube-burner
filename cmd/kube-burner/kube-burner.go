@@ -26,15 +26,15 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/cloud-bulldozer/go-commons/version"
-	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
-	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/measurements"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/pkg/alerting"
+	"github.com/kube-burner/kube-burner/pkg/burner"
+	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/measurements"
+	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/pkg/prometheus"
 
 	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"

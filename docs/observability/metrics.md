@@ -85,4 +85,4 @@ For example, the following expression gets the top 3 datapoints with the average
 !!! info
     Note that in the [time-range:] notation, the colon specifies to get the values for the given duration.
 
-Examples of metrics profiles can be found in the [examples directory](https://github.com/cloud-bulldozer/kube-burner/tree/master/examples/). There are also Elasticsearch based Grafana dashboards available in the same examples directory.
+Examples of metrics profiles can be found in the [examples directory](https://github.com/kube-burner/kube-burner/tree/master/examples/). There are also Elasticsearch based Grafana dashboards available in the same examples directory.

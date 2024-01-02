@@ -223,7 +223,7 @@ Please refer to [indexing](observability/indexing.md) section for better underst
 
 By specifying `--profile-type`, kube-burner can use two different metrics profiles when scraping metrics from prometheus. By default is configured with `both`, meaning that it will use the regular metrics profiles bound to the workload in question and the reporting metrics profile.
 
-When using the regular profiles ([metrics-aggregated](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-aggregated.yml) or [metrics](https://github.com/cloud-bulldozer/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics.yml)), kube-burner scrapes and indexes metrics timeseries.
+When using the regular profiles ([metrics-aggregated](https://github.com/kube-burner/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics-aggregated.yml) or [metrics](https://github.com/kube-burner/kube-burner/blob/master/cmd/kube-burner/ocp-config/metrics.yml)), kube-burner scrapes and indexes metrics timeseries.
 
 The reporting profile is very useful to reduce the number of documents sent to the configured indexer. Thanks to the combination of aggregations and instant queries for prometheus metrics, and 4 summaries for latency measurements, only a few documents will be indexed per benchmark. This flag makes possible to specify one or both of these profiles indistinctly.
 
@@ -255,7 +255,7 @@ type BenchmarkMetadata struct {
 }
 ```
 
-Where `ocpmetadata.ClusterMetadata` is an embed struct inherited from the [go-commons library](https://github.com/cloud-bulldozer/go-commons/blob/main/ocp-metadata/types.go), which has the following fields:
+Where `ocpmetadata.ClusterMetadata` is an embed struct inherited from the [go-commons library](https://github.com/kube-burner/go-commons/blob/main/ocp-metadata/types.go), which has the following fields:
 
 ```golang
 // Type to store cluster metadata

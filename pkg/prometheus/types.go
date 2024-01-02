@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/prometheus"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/config"
 )
 
 type Auth struct {
