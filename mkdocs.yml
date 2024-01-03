@@ -23,6 +23,11 @@ plugins:
   - search
   - include-markdown
 extra:
+  social:
+    - icon: fontawesome/brands/slack
+      link: https://slack.cncf.io
+    - icon: fontawesome/brands/github
+      link: https://github.com/kube-burner
   version:
     provider: mike
     limit: 3
@@ -31,6 +36,7 @@ extra_css:
 theme:
   version: latest
   name: material
+  custom_dir: docs/overrides
   font:
     text: Roboto
     code: Roboto Mono
@@ -49,8 +55,8 @@ theme:
       toggle:
         icon: material/weather-sunny
 
-  logo: media/logo/kube-burner-logo-mini.png
-  favicon: media/logo/kube-burner-logo-mini.png
+  logo: media/logos/kube-burner-logo-mini.png
+  favicon: media/logos/kube-burner-logo-mini.png
   features:
     - navigation.instant
     - navigation.tracking
@@ -100,3 +106,4 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+copyright: Copyright © 2024 The kube-burner Authors</br></br>
