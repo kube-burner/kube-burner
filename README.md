@@ -1,6 +1,5 @@
 <img src='./media/horizontal/kube-burner-horizontal-color.png' width='65%'>
 
-[![CI status](https://github.com/kube-burner/kube-burner/actions/workflows/ci-tests.yml/badge.svg?branch=main)](https://github.com/kube-burner/kube-burner/actions/workflows/ci-tests.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kube-burner/kube-burner)](https://goreportcard.com/report/github.com/kube-burner/kube-burner)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -16,6 +15,10 @@ Kube-burner is a Kubernetes performance and scale test orchestration toolset. It
 Kube-burner is a binary application written in golang that makes extensive usage of the official k8s client library, [client-go](https://github.com/kubernetes/client-go).
 
 ![Demo](docs/media/demo.gif)
+
+## Code of Conduct
+
+This project is for everyone. We ask that our users and contributors take a few minutes to review our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Documentation
 
