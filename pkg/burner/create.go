@@ -152,7 +152,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			if obj.RunOnce {
 				if i == 0 {
 					// this executes only once during the first iteration of an object
-					log.Infof("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
+					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
 					ex.replicaHandler(labels, obj, ns, i, &wg)
 				}
 			} else {
