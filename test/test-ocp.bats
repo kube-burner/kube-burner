@@ -19,9 +19,9 @@ setup() {
 }
 
 teardown() {
-  echo "Last bats run command: ${BATS_RUN_COMMAND} from $(pwd)"
-  oc label node -l node-role.kubernetes.io/worker-spk= node-role.kubernetes.io/worker-spk-
   oc delete ns -l kube-burner-uuid="${UUID}" --ignore-not-found
+  # web-burner workload specific
+  oc label node -l node-role.kubernetes.io/worker-spk= node-role.kubernetes.io/worker-spk-
   oc delete AdminPolicyBasedExternalRoute --all
 }
 
@@ -90,15 +90,10 @@ teardown_file() {
 
 @test "web-burner" {
   LB_WORKER=$(oc get node | grep worker | head -n 1 | cut -f 1 -d' ')
-  oc label node $LB_WORKER node-role.kubernetes.io/worker-spk="" --overwrite
-  run kube-burner ocp web-burner-init --gc=false --sriov=false --bridge=br-ex --bfd=false ${COMMON_FLAGS}
-  [ "$status" -eq 0 ]
-  run check_metric_value clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
-  [ "$status" -eq 0 ]
-  run kube-burner ocp web-burner-node-density --gc=false --probe=false ${COMMON_FLAGS}
-  [ "$status" -eq 0 ]
-  run check_metric_value clusterMetadata jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
-  check_cluster_resources po kube-burner-job=init-served-job 1
-  check_cluster_resources po kube-burner-job=serving-job 4
-  check_cluster_resources po kube-burner-job=normal-job-1 60
+  run_cmd oc label node $LB_WORKER node-role.kubernetes.io/worker-spk="" --overwrite
+  run_cmd kube-burner ocp web-burner-init --gc=false --sriov=false --bridge=br-ex --bfd=false --es-server="" --es-index="" --alerting=true --uuid=${UUID} --qps=5 --burst=5
+  run_cmd kube-burner ocp web-burner-node-density --gc=false --probe=false --es-server="" --es-index="" --alerting=true --uuid=${UUID} --qps=5 --burst=5
+  check_running_pods kube-burner-job=init-served-job 1
+  check_running_pods kube-burner-job=serving-job 4
+  check_running_pods kube-burner-job=normal-job-1 60
 }
