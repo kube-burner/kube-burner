@@ -56,8 +56,6 @@ type object struct {
 type Executor struct {
 	objects []object
 	config.Job
-	uuid       string
-	runid      string
 	limiter    *rate.Limiter
 	nsRequired bool
 }
@@ -79,7 +77,7 @@ var embedFS embed.FS
 var embedFSDir string
 
 //nolint:gocyclo
-func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
+func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, metadata map[string]interface{}) (int, error) {
 	var err error
 	var rc int
 	var prometheusJobList []prometheus.Job
@@ -89,15 +87,14 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
 	res := make(chan int, 1)
-	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
 	globalWaitMap := make(map[string][]string)
 	executorMap := make(map[string]Executor)
-	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
+	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, config.UUID)
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, indexer, metadata)
-		jobList = newExecutorList(configSpec, uuid, timeout)
+		jobList = newExecutorList(configSpec, config.BenchmarkTimeout)
 		// Iterate job list
 		for jobPosition, job := range jobList {
 			var waitListNamespaces []string
@@ -238,7 +235,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				if job.JobConfig.SkipIndexing {
 					log.Infof("Skipping job summary indexing in job: %s", job.JobConfig.Name)
 				} else {
-					indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
+					indexjobSummaryInfo(indexer, jobTimings, job.JobConfig, metadata)
 				}
 			}
 		}
@@ -261,16 +258,16 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			}
 		}
 		if indexer != nil {
-			log.Infof("Indexing metrics with UUID %s", uuid)
+			log.Infof("Indexing metrics with UUID %s", config.UUID)
 			metrics.IndexDatapoints(docsToIndex, indexer)
 		}
-		log.Infof("Finished execution with UUID: %s", uuid)
+		log.Infof("Finished execution with UUID: %s", config.UUID)
 		res <- innerRC
 	}()
 	select {
 	case rc = <-res:
-	case <-time.After(timeout):
-		err := fmt.Errorf("%v timeout reached", timeout)
+	case <-time.After(config.BenchmarkTimeout):
+		err := fmt.Errorf("%v timeout reached", config.BenchmarkTimeout)
 		log.Errorf(err.Error())
 		errs = append(errs, err)
 		rc = rcTimeout
@@ -284,7 +281,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration) []Executor {
+func newExecutorList(configSpec config.Spec, timeout time.Duration) []Executor {
 	var ex Executor
 	var executorList []Executor
 	_, restConfig, err := config.GetClientSet(100, 100) // Hardcoded QPS/Burst
@@ -312,8 +309,6 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 		// Limits the number of workers to QPS and Burst
 		ex.limiter = rate.NewLimiter(rate.Limit(job.QPS), job.Burst)
 		ex.Job = job
-		ex.uuid = uuid
-		ex.runid = configSpec.GlobalConfig.RUNID
 		executorList = append(executorList, ex)
 	}
 	return executorList

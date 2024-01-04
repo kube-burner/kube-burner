@@ -20,6 +20,7 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
+	uid "github.com/satori/go.uuid"
 )
 
 // JobType type of job
@@ -46,12 +47,17 @@ type Spec struct {
 	EmbedFSDir string
 }
 
+// UUID
+var UUID string
+
+// Benchmark RUNID
+var RunID = uid.NewV4().String()
+
+// Benchmark Timeout
+var BenchmarkTimeout time.Duration
+
 // GlobalConfig holds the global configuration
 type GlobalConfig struct {
-	// Benchmark UUID
-	UUID string
-	// Benchmark RUNID
-	RUNID string
 	// IndexerConfig contains a IndexerConfig definition
 	IndexerConfig indexers.IndexerConfig `yaml:"indexerConfig"`
 	// Measurements describes a list of measurements kube-burner

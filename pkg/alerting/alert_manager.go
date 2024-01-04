@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/prometheus/common/model"
@@ -66,7 +67,6 @@ type AlertManager struct {
 	alertProfile alertProfile
 	prometheus   *prometheus.Prometheus
 	indexer      *indexers.Indexer
-	uuid         string
 }
 
 var baseTemplate = []string{
@@ -80,11 +80,10 @@ type descriptionTemplate struct {
 }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(alertProfileCfg, uuid string, indexer *indexers.Indexer, prometheusClient *prometheus.Prometheus, embedConfig bool) (*AlertManager, error) {
+func NewAlertManager(alertProfileCfg string, indexer *indexers.Indexer, prometheusClient *prometheus.Prometheus, embedConfig bool) (*AlertManager, error) {
 	log.Infof("🔔 Initializing alert manager for prometheus: %v", prometheusClient.Endpoint)
 	a := AlertManager{
 		prometheus: prometheusClient,
-		uuid:       uuid,
 		indexer:    indexer,
 	}
 	if err := a.readProfile(alertProfileCfg, embedConfig); err != nil {
@@ -139,7 +138,7 @@ func (a *AlertManager) Evaluate(start, end time.Time) error {
 			errs = append(errs, err)
 		}
 		for _, alertSet := range alertData {
-			alertSet.UUID = a.uuid
+			alertSet.UUID = config.UUID
 			alertList = append(alertList, alertSet)
 		}
 	}

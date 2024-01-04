@@ -87,17 +87,16 @@ To configure your bash shell to load completions for each session execute:
 func initCmd() *cobra.Command {
 	var err error
 	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
-	var username, password, uuid, token, configMap, namespace, userMetadata string
+	var username, password, token, configMap, namespace, userMetadata string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
-	var timeout time.Duration
 	var rc int
 	var metricsScraper metrics.Scraper
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
 		PostRun: func(cmd *cobra.Command, args []string) {
-			log.Info("👋 Exiting kube-burner ", uuid)
+			log.Info("👋 Exiting kube-burner ", config.UUID)
 			os.Exit(rc)
 		},
 		Args: cobra.NoArgs,
@@ -110,11 +109,12 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
+
 			f, err := util.ReadConfig(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(uuid, f)
+			configSpec, err := config.Parse(f)
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
@@ -133,14 +133,14 @@ func initCmd() *cobra.Command {
 					UserMetaData:    userMetadata,
 				})
 			}
-			rc, err = burner.Run(configSpec, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.Metadata)
+			rc, err = burner.Run(configSpec, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, metricsScraper.Metadata)
 			if err != nil {
 				log.Errorf(err.Error())
 				os.Exit(rc)
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
+	cmd.Flags().StringVar(&config.UUID, "uuid", uid.NewV4().String(), "Benchmark UUID")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
@@ -150,7 +150,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
-	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
+	cmd.Flags().DurationVarP(&config.BenchmarkTimeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
@@ -213,7 +213,7 @@ func measureCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(configFile, f)
+			configSpec, err := config.Parse(f)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -283,7 +283,7 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			configSpec.GlobalConfig.UUID = uuid
+			config.UUID = uuid
 			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
@@ -407,7 +407,7 @@ func alertCmd() *cobra.Command {
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			configSpec.GlobalConfig.UUID = uuid
+			config.UUID = uuid
 			if esServer != "" && esIndex != "" {
 				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
@@ -440,7 +440,7 @@ func alertCmd() *cobra.Command {
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p, false); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, indexer, p, false); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(startTime, endTime)

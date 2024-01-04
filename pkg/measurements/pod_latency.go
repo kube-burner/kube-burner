@@ -83,7 +83,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 			Namespace:  pod.Namespace,
 			Name:       pod.Name,
 			MetricName: podLatencyMeasurement,
-			UUID:       globalCfg.UUID,
+			UUID:       config.UUID,
 			JobConfig:  *factory.jobConfig,
 			JobName:    factory.jobConfig.Name,
 			Metadata:   factory.metadata,
@@ -147,7 +147,7 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) {
 		"pods",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", config.RunID)
 		},
 	)
 	p.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -198,7 +198,7 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			Name:            pod.Name,
 			MetricName:      podLatencyMeasurement,
 			NodeName:        pod.Spec.NodeName,
-			UUID:            globalCfg.UUID,
+			UUID:            config.UUID,
 			JobConfig:       *factory.jobConfig,
 			JobName:         factory.jobConfig.Name,
 			Metadata:        factory.metadata,
@@ -339,7 +339,7 @@ func (p *podLatency) calcQuantiles() {
 	for quantileName, v := range quantileMap {
 		podQ := metrics.LatencyQuantiles{
 			QuantileName: string(quantileName),
-			UUID:         globalCfg.UUID,
+			UUID:         config.UUID,
 			Timestamp:    time.Now().UTC(),
 			JobName:      factory.jobConfig.Name,
 			JobConfig:    *jc,

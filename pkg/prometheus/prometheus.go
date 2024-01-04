@@ -36,7 +36,6 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 	var err error
 	p := Prometheus{
 		Step:        step,
-		UUID:        configSpec.GlobalConfig.UUID,
 		ConfigSpec:  configSpec,
 		Endpoint:    url,
 		metadata:    metadata,
@@ -157,7 +156,7 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 func (p *Prometheus) createMetric(query, metricName string, jobConfig config.Job, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
 	m := metric{
 		Labels:     make(map[string]string),
-		UUID:       p.UUID,
+		UUID:       config.UUID,
 		Query:      query,
 		MetricName: metricName,
 		JobConfig:  jobConfig,

@@ -35,7 +35,6 @@ type Prometheus struct {
 	profileName   string
 	MetricProfile []metricDefinition
 	Step          time.Duration
-	UUID          string
 	ConfigSpec    config.Spec
 	JobList       []Job
 	metadata      map[string]interface{}

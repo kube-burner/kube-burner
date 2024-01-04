@@ -42,10 +42,10 @@ type jobSummary struct {
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexjobSummaryInfo(indexer *indexers.Indexer, uuid string, jobTimings timings, jobConfig config.Job, metadata map[string]interface{}) {
+func indexjobSummaryInfo(indexer *indexers.Indexer, jobTimings timings, jobConfig config.Job, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
-			UUID:       uuid,
+			UUID:       config.UUID,
 			JobConfig:  jobConfig,
 			MetricName: jobSummaryMetric,
 			Metadata:   metadata,

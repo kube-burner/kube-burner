@@ -32,7 +32,6 @@ const (
 )
 
 type Config struct {
-	UUID            string
 	EsServer        string
 	Esindex         string
 	QPS             int
@@ -42,7 +41,6 @@ type Config struct {
 	Indexer         indexers.IndexerType
 	Alerting        bool
 	Indexing        bool
-	Timeout         time.Duration
 	MetricsEndpoint string
 	ProfileType     string
 }

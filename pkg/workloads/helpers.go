@@ -109,7 +109,7 @@ func (wh *WorkloadHelper) GatherMetadata(userMetadata string) error {
 		}
 		wh.Metadata.UserMetadata = userMetadataContent
 	}
-	wh.Metadata.UUID = wh.UUID
+	wh.Metadata.UUID = config.UUID
 	wh.Metadata.Timestamp = time.Now().UTC()
 	return nil
 }
@@ -149,7 +149,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 			log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 		}
 	}
-	configSpec, err = config.Parse(wh.UUID, f)
+	configSpec, err = config.Parse(f)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 				log.Fatal(err)
 			}
 			if wh.Alerting && metricsEndpoint.AlertProfile != "" {
-				alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, wh.Metadata.UUID, indexer, p, embedConfig)
+				alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, indexer, p, embedConfig)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -220,7 +220,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 		}
 		configSpec.GlobalConfig.GCMetrics = wh.GcMetrics
 	}
-	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, wh.Timeout, metadata)
+	rc, err = burner.Run(configSpec, prometheusClients, alertMs, indexer, metadata)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)
@@ -229,11 +229,11 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 	if wh.Indexing {
 		IndexMetadata(indexer, wh.Metadata)
 	}
-	log.Info("👋 Exiting kube-burner ", wh.UUID)
+	log.Info("👋 Exiting kube-burner ", config.UUID)
 	os.Exit(rc)
 }
 
-// ExtractWorkload extracts the given workload and metrics profile to the current diretory
+// ExtractWorkload extracts the given workload and metrics profile to the current directory
 func (wh *WorkloadHelper) ExtractWorkload(workload, metricsProfile string) error {
 	dirContent, err := wh.ocpConfig.ReadDir(path.Join(ocpCfgDir, workload))
 	if err != nil {
