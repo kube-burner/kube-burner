@@ -87,6 +87,7 @@ print_events() {
 }
 
 check_metric_value() {
+  sleep 3s # There's some delay on the documents to show up in OpenSearch
   for metric in "${@}"; do
     endpoint="${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${metric}"
     RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error')
