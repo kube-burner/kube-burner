@@ -22,6 +22,7 @@ teardown() {
   echo "Last bats run command: ${BATS_RUN_COMMAND} from $(pwd)"
   oc label node -l node-role.kubernetes.io/worker-spk= node-role.kubernetes.io/worker-spk-
   oc delete ns -l kube-burner-uuid="${UUID}" --ignore-not-found
+  oc delete AdminPolicyBasedExternalRoute --all
 }
 
 teardown_file() {
