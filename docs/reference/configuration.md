@@ -288,3 +288,30 @@ spec:
 ## Template functions
 
 In addition to the default [golang template semantics](https://golang.org/pkg/text/template/), kube-burner is compiled with the [sprig library](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.
+
+## RunOnce 
+
+All objects within the job will iteratively run based on the JobIteration number, 
+but there may be a situation if an object need to be created only once (ex. clusterrole), in such cases
+we can add an optional field as `runOnce` for that particular object to execute only once in the entire job.
+
+An example scenario as below template, a job iteration of 100 but create the clusterrole only once.
+
+```yaml
+jobs:
+- name: cluster-density
+  jobIterations: 100
+  namespacedIterations: true
+  namespace: cluster-density
+  objects:
+  - objectTemplate: clusterrole.yml
+    replicas: 1
+    runOnce: true
+
+  - objectTemplate: clusterrolebinding.yml
+    replicas: 1
+    runOnce: true
+
+  - objectTemplate: deployment.yml
+    replicas: 10
+```
