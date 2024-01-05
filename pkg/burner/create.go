@@ -149,7 +149,15 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 				"kube-burner-runid": ex.runid,
 			}
 			ex.objects[objectIndex].labelSelector = labels
-			ex.replicaHandler(labels, obj, ns, i, &wg)
+			if obj.RunOnce {
+				if i == 0 {
+					// this executes only once during the first iteration of an object
+					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
+					ex.replicaHandler(labels, obj, ns, i, &wg)
+				}
+			} else {
+				ex.replicaHandler(labels, obj, ns, i, &wg)
+			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
