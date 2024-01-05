@@ -86,7 +86,7 @@ Each object element supports the following parameters:
 | `inputVars`            | Map of arbitrary input variables to inject to the object template | Object  | -       |
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize [how to wait](#wait-options) for object to be ready     | Object  | {}       |
-| `runonce`              | Create or delete this object only once during the entire job    | Boolean | false   |
+| `runOnce`              | Create or delete this object only once during the entire job    | Boolean | false   |
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.

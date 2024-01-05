@@ -93,7 +93,7 @@ type Object struct {
 	// WaitOptions define custom behaviors when waiting for objects creation
 	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions,omitempty"`
 	// Run Once to create the object only once incase of multiple iterative jobs
-	RunOnce bool `yaml:"runonce" json:"runonce,omitempty"`
+	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
 }
 
 // Job defines a kube-burner job
