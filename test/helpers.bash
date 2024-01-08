@@ -105,6 +105,6 @@ check_metric_value() {
 }
 
 run_cmd(){
-  echo "$@" 
+  echo "$@"
   ${@}
 }

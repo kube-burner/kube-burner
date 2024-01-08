@@ -42,7 +42,7 @@ spec:
           - >-
              sysctl -w net.ipv4.ip_forward=1 &&
              cp /config/* /etc/frr/ &&
-             for i in {2..254}; do echo " peer $(kubectl get nodes -o jsonpath='{.items[0].metadata.annotations.k8s\.ovn\.org\/node-primary-ifaddr}' | cut -d '"' -f4- | sed 's/\.[^.]*$//').$i" >> /etc/frr/frr.conf; done &&
+             for i in $(kubectl get node --selector='!node-role.kubernetes.io/worker-spk'  -o jsonpath='{.items[*].status.addresses[0].address}'); do echo " peer $i" >> /etc/frr/frr.conf; done &&
              echo "  no shutdown" >> /etc/frr/frr.conf &&
              echo " !" >> /etc/frr/frr.conf &&
              echo "! subnets for each node" >> /etc/frr/frr.conf &&
