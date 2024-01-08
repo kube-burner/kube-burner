@@ -26,7 +26,7 @@ teardown() {
 }
 
 teardown_file() {
-  podman rm -f prometheus
+  $OCI_BIN rm -f prometheus
 }
 
 @test "node-density with indexing" {
