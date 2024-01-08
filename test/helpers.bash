@@ -4,6 +4,7 @@
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
 K8S_VERSION=${K8S_VERSION:-v1.27.0}
+OCI_BIN=${OCI_BIN:-podman}
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
@@ -21,7 +22,7 @@ destroy-kind() {
 
 setup-prometheus() {
   echo "Setting up prometheus instance"
-  podman run --rm -d --name prometheus --network=host docker.io/prom/prometheus:latest
+  $OCI_BIN run --rm -d --name prometheus --network=host docker.io/prom/prometheus:latest
   sleep 10
 }
 

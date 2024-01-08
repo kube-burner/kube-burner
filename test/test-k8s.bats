@@ -30,7 +30,7 @@ teardown() {
 
 teardown_file() {
   destroy-kind
-  podman rm -f prometheus
+  $OCI_BIN rm -f prometheus
 }
 
 @test "kube-burner init: churn=true" {
