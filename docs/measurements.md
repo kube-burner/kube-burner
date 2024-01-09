@@ -27,18 +27,11 @@ One document, such as the following, is indexed per each pod created by the work
   "containersReadyLatency": 2997,
   "podReadyLatency": 2997,
   "metricName": "podLatencyMeasurement",
-  "jobName": "kubelet-density",
   "uuid": "c40b4346-7af7-4c63-9ab4-aae7ccdd0616",
   "namespace": "kubelet-density",
   "podName": "kubelet-density-13",
-<<<<<<< HEAD
-  "jobConfig": {},
-  "nodeName": "worker-001"
-=======
-  "jobName": "kube-burner-job",
   "nodeName": "worker-001",
-  "jobConfig": {"config": "params"},
->>>>>>> 733d90c0 (Update docs)
+  "jobConfig": {"config": "params"}
 }
 ```
 
@@ -164,23 +157,25 @@ This measure is enabled with:
 
 ```yaml
   measurements:
-  - name: podLatency
+  - name: serviceLatency 
     svcTimeout: 5s
 ```
 
 Where `svcTimeout` defines the maximum amount of time for a service to be ready, when this timeout is fired, the metric from that service is **discarded**.
 
 !!! warning "Considerations"
-    - Only TCP is supported
-    - Supported services are `ClusterIP`, `NodePort` and `LoadBalancer`
+    - Only TCP is supported.
+    - Supported services are `ClusterIP`, `NodePort` and `LoadBalancer`.
     - kube-burner starts checking service connectivity when its endpoints object has at least one address.
-    - Make sure the endpoints of the service are correct and reachable
+    - Make sure the endpoints of the service are correct and reachable from the pod running in the `kube-burner-service-latency`.
     - When the service is `NodePort`, the connectivity check is done against the node where the connectivity check pods runs.
-    - By default all services created by the benchmark are tracked by this measurement, it's possible to discard service objects from tracking by annotating them with `kube-burner.io/service-latency=false`
+    - By default all services created by the benchmark are tracked by this measurement, it's possible to discard service objects from tracking by annotating them with `kube-burner.io/service-latency=false`.
+    - Keep in mind that When service is `LoadBalacer` type, the provider needs to setup the load balancer, which adds some extra delay.
+    - Endpoints are pinged one after another, this can create some delay when the number of endpoints of the service is big.
 
 ### Metrics
 
-The metrics collected are pod latency timeseries (`svcLatencyMeasurement`) and another document that holds a summary with the different service latency quantiles (`svcLatencyQuantilesMeasurement`). It is possible to skip indexing the `svcLatencyMeasurement` metric by configuring the field `svcLatencyMetrics` of this measurement to `quantiles`. Metric documents have the following structure:
+The metrics collected are service latency timeseries (`svcLatencyMeasurement`) and another document that holds a summary with the different service latency quantiles (`svcLatencyQuantilesMeasurement`). It is possible to skip indexing the `svcLatencyMeasurement` metric by configuring the field `svcLatencyMetrics` of this measurement to `quantiles`. Metric documents have the following structure:
 
 ```json
   {
@@ -213,7 +208,6 @@ And the quantiles document has the structure:
     "avg": 1722308938,
     "timestamp": "2023-11-19T00:42:26.663991359Z",
     "metricName": "svcLatencyQuantilesMeasurement",
-    "jobName": "cluster-density-v2",
     "jobConfig": {
       "config": "params"
     }
@@ -228,7 +222,6 @@ And the quantiles document has the structure:
     "avg": 1822308938,
     "timestamp": "2023-11-19T00:42:26.663991359Z",
     "metricName": "svcLatencyQuantilesMeasurement",
-    "jobName": "cluster-density-v2",
     "jobConfig": {
       "config": "params"
     }

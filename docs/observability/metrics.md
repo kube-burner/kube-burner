@@ -66,7 +66,7 @@ The collected metrics have the following shape:
 ]
 ```
 
-Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query`, `metricName` and `jobName`.
+Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query`, `metricName` and `jobConfig`.
 !!! info
     These extra fields are especially useful at the time of identifying and representing the collected metrics.
 
