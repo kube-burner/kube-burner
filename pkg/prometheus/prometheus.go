@@ -23,6 +23,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/go-commons/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
@@ -32,7 +33,7 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, indexer *indexers.Indexer, embedConfig bool) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:        step,
@@ -41,6 +42,7 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 		Endpoint:    url,
 		metadata:    metadata,
 		embedConfig: embedConfig,
+		indexer:     indexer,
 	}
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
 	p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
@@ -51,7 +53,8 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 }
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
-func (p *Prometheus) ScrapeJobsMetrics(docsToIndex map[string][]interface{}) error {
+func (p *Prometheus) ScrapeJobsMetrics() error {
+	docsToIndex := make(map[string][]interface{})
 	start := p.JobList[0].Start
 	end := p.JobList[len(p.JobList)-1].End
 	log.Infof("🔍 Scraping %v Profile: %v Start: %v End: %v",
@@ -92,6 +95,8 @@ func (p *Prometheus) ScrapeJobsMetrics(docsToIndex map[string][]interface{}) err
 			}
 		}
 	}
+	log.Infof("Indexing metrics with UUID %s", p.UUID)
+	p.indexDatapoints(docsToIndex)
 	return nil
 }
 
@@ -208,4 +213,17 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
 	}
 	return datapoints
+}
+
+// Indexes datapoints to a specified indexer.
+func (p *Prometheus) indexDatapoints(docsToIndex map[string][]interface{}) {
+	for metricName, docs := range docsToIndex {
+		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
+		resp, err := (*p.indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
+		if err != nil {
+			log.Error(err.Error())
+		} else {
+			log.Info(resp)
+		}
+	}
 }

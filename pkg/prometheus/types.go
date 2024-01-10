@@ -17,6 +17,7 @@ package prometheus
 import (
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/go-commons/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/config"
 )
@@ -40,6 +41,7 @@ type Prometheus struct {
 	JobList       []Job
 	metadata      map[string]interface{}
 	embedConfig   bool
+	indexer       *indexers.Indexer
 }
 
 type Job struct {

@@ -234,7 +234,6 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			}
 		}
 		if len(prometheusClients) > 0 {
-			docsToIndex := make(map[string][]interface{})
 			for idx, prometheusClient := range prometheusClients {
 				// If alertManager is configured
 				if alertMs[idx] != nil {
@@ -246,12 +245,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				prometheusClient.JobList = executedJobs
 				// If prometheus is enabled query metrics from the start of the first job to the end of the last one
 				if indexer != nil {
-					prometheusClient.ScrapeJobsMetrics(docsToIndex)
+					prometheusClient.ScrapeJobsMetrics()
 				}
 			}
 			if indexer != nil {
-				log.Infof("Indexing metrics with UUID %s", uuid)
-				metrics.IndexDatapoints(docsToIndex, indexer)
 				if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
 					metrics.CreateTarball(globalConfig.IndexerConfig, globalConfig.IndexerConfig.TarballName)
 				}

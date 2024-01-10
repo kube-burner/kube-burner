@@ -308,8 +308,7 @@ func indexCmd() *cobra.Command {
 				Username:        username,
 				UserMetaData:    userMetadata,
 			})
-			docsToIndex := make(map[string][]interface{})
-			for _, prometheusClients := range metricsScraper.PrometheusClients {
+			for _, prometheusClient := range metricsScraper.PrometheusClients {
 				prometheusJob := prometheus.Job{
 					Start: time.Unix(start, 0),
 					End:   time.Unix(end, 0),
@@ -317,13 +316,11 @@ func indexCmd() *cobra.Command {
 						Name: jobName,
 					},
 				}
-				prometheusClients.JobList = append(prometheusClients.JobList, prometheusJob)
-				if err := prometheusClients.ScrapeJobsMetrics(docsToIndex); err != nil {
+				prometheusClient.JobList = append(prometheusClient.JobList, prometheusJob)
+				if err := prometheusClient.ScrapeJobsMetrics(); err != nil {
 					log.Fatal(err)
 				}
 			}
-			log.Infof("Indexing metrics with UUID %s", uuid)
-			metrics.IndexDatapoints(docsToIndex, metricsScraper.Indexer)
 			if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer && tarballName != "" {
 				if err := metrics.CreateTarball(configSpec.GlobalConfig.IndexerConfig, tarballName); err != nil {
 					log.Fatal(err)
@@ -434,7 +431,7 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, map[string]interface{}{}, false)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, indexer, false)
 			if err != nil {
 				log.Fatal(err)
 			}
