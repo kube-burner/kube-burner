@@ -239,6 +239,7 @@ func measureCmd() *cobra.Command {
 				log.Fatalf("Invalid selector: %v", err)
 			}
 			namespaceLabels := make(map[string]string)
+			namespaceAnnotations := make(map[string]string)
 			labelRequirements, _ := labelSelector.Requirements()
 			for _, req := range labelRequirements {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
@@ -246,9 +247,10 @@ func measureCmd() *cobra.Command {
 			log.Infof("%v", namespaceLabels)
 			measurements.NewMeasurementFactory(configSpec, indexer, metadata)
 			measurements.SetJobConfig(&config.Job{
-				Name:            jobName,
-				Namespace:       rawNamespaces,
-				NamespaceLabels: namespaceLabels,
+				Name:                 jobName,
+				Namespace:            rawNamespaces,
+				NamespaceLabels:      namespaceLabels,
+				NamespaceAnnotations: namespaceAnnotations,
 			})
 			measurements.Collect()
 			if err = measurements.Stop(); err != nil {

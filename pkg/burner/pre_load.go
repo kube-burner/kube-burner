@@ -51,7 +51,7 @@ func preLoadImages(job Executor) error {
 		log.Infof("No images found to pre-load, continuing")
 		return nil
 	}
-	err = createDSs(imageList, job.NamespaceLabels, job.PreLoadNodeLabels)
+	err = createDSs(imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
@@ -94,14 +94,18 @@ func getJobImages(job Executor) ([]string, error) {
 	return imageList, nil
 }
 
-func createDSs(imageList []string, namespaceLabels map[string]string, nodeSelectorLabels map[string]string) error {
+func createDSs(imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
 	nsLabels := map[string]string{
 		"kube-burner-preload": "true",
 	}
+	nsAnnotations := make(map[string]string)
 	for label, value := range namespaceLabels {
 		nsLabels[label] = value
 	}
-	if err := createNamespace(preLoadNs, nsLabels); err != nil {
+	for annotation, value := range namespaceAnnotations {
+		nsAnnotations[annotation] = value
+	}
+	if err := createNamespace(preLoadNs, nsLabels, nsAnnotations); err != nil {
 		log.Fatal(err)
 	}
 	dsName := "preload"
