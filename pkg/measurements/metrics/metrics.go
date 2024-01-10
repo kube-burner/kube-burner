@@ -21,6 +21,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/montanaflynn/stats"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
@@ -36,21 +37,8 @@ type LatencyQuantiles struct {
 	Avg          int         `json:"avg"`
 	Timestamp    time.Time   `json:"timestamp"`
 	MetricName   string      `json:"metricName"`
-	JobName      string      `json:"jobName"`
 	JobConfig    config.Job  `json:"jobConfig"`
 	Metadata     interface{} `json:"metadata,omitempty"`
-}
-
-// SetQuantile adds quantile value
-func (plq *LatencyQuantiles) SetQuantile(quantile float64, qValue int) {
-	switch quantile {
-	case 0.5:
-		plq.P50 = qValue
-	case 0.95:
-		plq.P95 = qValue
-	case 0.99:
-		plq.P99 = qValue
-	}
 }
 
 // CheckThreshold checks latency thresholds
@@ -73,4 +61,22 @@ func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}
 		}
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+func NewLatencySummary(input []float64, name string) LatencyQuantiles {
+	latencyQuantiles := LatencyQuantiles{
+		QuantileName: name,
+		Timestamp:    time.Now().UTC(),
+	}
+	val, _ := stats.Percentile(input, 50)
+	latencyQuantiles.P50 = int(val)
+	val, _ = stats.Percentile(input, 95)
+	latencyQuantiles.P95 = int(val)
+	val, _ = stats.Percentile(input, 99)
+	latencyQuantiles.P99 = int(val)
+	val, _ = stats.Max(input)
+	latencyQuantiles.Max = int(val)
+	val, _ = stats.Mean(input)
+	latencyQuantiles.Avg = int(val)
+	return latencyQuantiles
 }

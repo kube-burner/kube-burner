@@ -33,7 +33,7 @@ One document, such as the following, is indexed per each pod created by the work
   "uuid": "c40b4346-7af7-4c63-9ab4-aae7ccdd0616",
   "namespace": "kubelet-density",
   "podName": "kubelet-density-13",
-  "jobName": "kube-burner-job",
+  "jobConfig": {},
   "nodeName": "worker-001"
 }
 ```
@@ -53,7 +53,7 @@ Pod latency quantile sample:
   "avg": 2876.3,
   "timestamp": "2020-11-15T22:26:51.553221077+01:00",
   "metricName": "podLatencyQuantilesMeasurement",
-  "jobName": "kubelet-density"
+  "jobConfig": {}
 },
 {
   "quantileName": "PodScheduled",
@@ -65,7 +65,7 @@ Pod latency quantile sample:
   "avg": 5.38,
   "timestamp": "2020-11-15T22:26:51.553225151+01:00",
   "metricName": "podLatencyQuantilesMeasurement",
-  "jobName": "kubelet-density"
+  "jobConfig": {}
 }
 ```
 
