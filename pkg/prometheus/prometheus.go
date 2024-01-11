@@ -95,7 +95,6 @@ func (p *Prometheus) ScrapeJobsMetrics() error {
 			}
 		}
 	}
-	log.Infof("Indexing metrics with UUID %s", p.UUID)
 	p.indexDatapoints(docsToIndex)
 	return nil
 }
