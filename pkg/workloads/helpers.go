@@ -200,7 +200,7 @@ func (wh *WorkloadHelper) run(workload, metricsProfile string) {
 				Token:         metricsEndpoint.Token,
 				SkipTLSVerify: true,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, metadata, embedConfig)
+			p, err := prometheus.NewPrometheusClient(configSpec, metricsEndpoint.Endpoint, auth, stepSize, metadata, indexer, embedConfig)
 			if err != nil {
 				log.Fatal(err)
 			}

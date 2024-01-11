@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -50,18 +49,5 @@ func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheu
 	yamlDec.KnownFields(true)
 	if err := yamlDec.Decode(&metricsEndpoints); err != nil {
 		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpoint, err)
-	}
-}
-
-// Indexes datapoints to a specified indexer.
-func IndexDatapoints(docsToIndex map[string][]interface{}, indexer *indexers.Indexer) {
-	for metricName, docs := range docsToIndex {
-		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
-		resp, err := (*indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			log.Info(resp)
-		}
 	}
 }

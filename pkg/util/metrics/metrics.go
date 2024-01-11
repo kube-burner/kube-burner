@@ -70,7 +70,7 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 			Token:         metricsEndpoint.Token,
 			SkipTLSVerify: metricsScraperConfig.SkipTLSVerify,
 		}
-		p, err := prometheus.NewPrometheusClient(metricsScraperConfig.ConfigSpec, metricsEndpoint.Endpoint, auth, metricsScraperConfig.PrometheusStep, metadata, false)
+		p, err := prometheus.NewPrometheusClient(metricsScraperConfig.ConfigSpec, metricsEndpoint.Endpoint, auth, metricsScraperConfig.PrometheusStep, metadata, indexer, false)
 		if err != nil {
 			log.Fatal(err)
 		}
