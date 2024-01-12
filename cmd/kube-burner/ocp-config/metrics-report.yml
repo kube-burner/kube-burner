@@ -16,6 +16,10 @@
   metricName: max-memory-kubelet
   instant: true
 
+- query: max_over_time(sum(process_resident_memory_bytes{service="kubelet",job="kubelet"} and on (node) kube_node_role{role="worker"})[{{.elapsed}}:])
+  metricName: max-memory-sum-kubelet
+  instant: true
+
 # Average of the CPU usage from all worker's CRI-O
 - query: avg(avg_over_time(irate(process_cpu_seconds_total{service="kubelet",job="crio"}[2m])[{{.elapsed}}:]) and on (node) kube_node_role{role="worker"})
   metricName: cpu-crio
@@ -29,6 +33,10 @@
 # Max of the memory usage from all worker's CRI-O
 - query: max(max_over_time(process_resident_memory_bytes{service="kubelet",job="crio"}[{{.elapsed}}:]) and on (node) kube_node_role{role="worker"})
   metricName: max-memory-crio
+  instant: true
+
+- query: max_over_time(sum(process_resident_memory_bytes{service="kubelet",job="crio"} and on (node) kube_node_role{role="worker"})[{{.elapsed}}:])
+  metricName: max-memory-sum-crio
   instant: true
 
 # Etcd
@@ -71,6 +79,10 @@
   metricName: max-memory-kube-apiserver
   instant: true
 
+- query: max_over_time(topk(3, sum(container_memory_rss{name!="", namespace="openshift-kube-apiserver"}))[{{.elapsed}}:])
+  metricName: max-memory-sum-kube-apiserver
+  instant: true
+
 - query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-apiserver"}[2m])) by (pod))[{{.elapsed}}:]))
   metricName: cpu-openshift-apiserver
   instant: true
@@ -83,8 +95,24 @@
   metricName: max-memory-openshift-apiserver
   instant: true
 
+- query: max_over_time(topk(3, sum(container_memory_rss{name!="", namespace="openshift-apiserver"}))[{{.elapsed}}:])
+  metricName: max-memory-sum-openshift-apiserver
+  instant: true
+
 - query: avg(avg_over_time(topk(3, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-etcd"}[2m])) by (pod))[{{.elapsed}}:]))
   metricName: cpu-etcd
+  instant: true
+
+- query: avg(avg_over_time(topk(3,sum(container_memory_rss{name!="", namespace="openshift-etcd"}) by (pod))[{{.elapsed}}:]))
+  metricName: memory-etcd
+  instant: true
+
+- query: max(max_over_time(topk(3,sum(container_memory_rss{name!="", namespace="openshift-etcd"}) by (pod))[{{.elapsed}}:]))
+  metricName: max-memory-etcd
+  instant: true
+
+- query: max_over_time(topk(3, sum(container_memory_rss{name!="", namespace="openshift-etcd"}))[{{.elapsed}}:])
+  metricName: max-memory-sum-etcd
   instant: true
 
 - query: avg(avg_over_time(topk(1, sum(irate(container_cpu_usage_seconds_total{name!="", namespace="openshift-controller-manager"}[2m])) by (pod))[{{.elapsed}}:]))
@@ -97,14 +125,6 @@
 
 - query: max(max_over_time(topk(1, sum(container_memory_rss{name!="", namespace="openshift-controller-manager"}) by (pod))[{{.elapsed}}:]))
   metricName: max-memory-openshift-controller-manager
-  instant: true
-
-- query: avg(avg_over_time(topk(3,sum(container_memory_rss{name!="", namespace="openshift-etcd"}) by (pod))[{{.elapsed}}:]))
-  metricName: memory-etcd
-  instant: true
-
-- query: max(max_over_time(topk(3,sum(container_memory_rss{name!="", namespace="openshift-etcd"}) by (pod))[{{.elapsed}}:]))
-  metricName: max-memory-etcd
   instant: true
 
  # multus
