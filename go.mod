@@ -5,10 +5,10 @@ go 1.19
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/cloud-bulldozer/go-commons v1.0.12
+	github.com/google/uuid v1.5.0
 	github.com/montanaflynn/stats v0.7.1
 	github.com/openshift/client-go v0.0.0-20230718165156-6014fb98e86a
 	github.com/prometheus/common v0.44.0
-	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	golang.org/x/time v0.1.0
@@ -37,7 +37,6 @@ require (
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
