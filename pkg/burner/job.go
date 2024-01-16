@@ -160,6 +160,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				job.RunDeleteJob()
 			case config.PatchJob:
 				job.RunPatchJob()
+			case config.ReadJob:
+				job.RunReadJob(0, job.JobIterations)
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
@@ -290,6 +292,8 @@ func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration)
 			ex = setupDeleteJob(job)
 		case config.PatchJob:
 			ex = setupPatchJob(job)
+		case config.ReadJob:
+			ex = setupReadJob(job)
 		default:
 			log.Fatalf("Unknown jobType: %s", job.JobType)
 		}

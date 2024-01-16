@@ -5,7 +5,7 @@
 
 Kube-burner is a Kubernetes performance and scale test orchestration toolset. It provides multi-faceted functionality, the most important of which are summarized below.
 
-- Create, delete, and patch Kubernetes resources at scale.
+- Create, delete, read, and patch Kubernetes resources at scale.
 - Prometheus metric collection and indexing.
 - Measurements.
 - Alerting.

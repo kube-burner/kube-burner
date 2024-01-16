@@ -96,3 +96,8 @@ teardown_file() {
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
 }
+
+@test "kube-burner init: read; os-indexing=true" {
+  export INDEXING_TYPE=opensearch
+  run_cmd kube-burner init -c kube-burner-read.yml --uuid "${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml
+}
