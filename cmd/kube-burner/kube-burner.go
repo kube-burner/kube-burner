@@ -36,7 +36,7 @@ import (
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 
-	uid "github.com/satori/go.uuid"
+	uid "github.com/google/uuid"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -140,7 +140,7 @@ func initCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", uid.NewString(), "Benchmark UUID")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
@@ -328,7 +328,7 @@ func indexCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", uid.NewString(), "Benchmark UUID")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
@@ -447,7 +447,7 @@ func alertCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", uid.NewString(), "Benchmark UUID")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")

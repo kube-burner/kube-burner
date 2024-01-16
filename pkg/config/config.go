@@ -28,7 +28,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 
-	uid "github.com/satori/go.uuid"
+	uid "github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -41,7 +41,7 @@ import (
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
-		RUNID:          uid.NewV4().String(),
+		RUNID:          uid.NewString(),
 		GC:             false,
 		GCMetrics:      false,
 		GCTimeout:      1 * time.Hour,
