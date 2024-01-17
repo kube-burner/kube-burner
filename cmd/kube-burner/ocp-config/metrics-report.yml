@@ -1,5 +1,12 @@
 ---
-# Kubelet & CRI-O
+# API server
+- query: avg_over_time(histogram_quantile(0.99, sum(irate(apiserver_request_duration_seconds_bucket{apiserver="kube-apiserver", verb=~"LIST|GET", subresource!~"log|exec|portforward|attach|proxy"}[2m])) by (le, resource, verb, scope))[{{.elapsed}}:]) > 0
+  metricName: avg-ro-apicalls-latency
+
+- query: avg_over_time(histogram_quantile(0.99, sum(irate(apiserver_request_duration_seconds_bucket{apiserver="kube-apiserver", verb=~"POST|PUT|DELETE|PATCH", subresource!~"log|exec|portforward|attach|proxy"}[2m])) by (le, resource, verb, scope))[{{.elapsed}}:]) > 0
+  metricName: avg-mutating-apicalls-latency
+
+  # Kubelet & CRI-O
 
 # Average of the CPU usage from all worker's kubelet
 - query: avg(avg_over_time(irate(process_cpu_seconds_total{service="kubelet",job="kubelet"}[2m])[{{.elapsed}}:]) and on (node) kube_node_role{role="worker"})
@@ -185,6 +192,10 @@
   metricName: max-memory-masters
   instant: true
 
+- query: max_over_time(sum((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="master"}, "instance", "$1", "node", "(.+)"))[{{.elapsed}}:])
+  metricName: max-memory-sum-masters
+  instant: true
+
 - query: avg(avg_over_time(sum(irate(node_cpu_seconds_total{mode!="idle", mode!="steal"}[2m]) and on (instance) label_replace(kube_node_role{role="worker"}, "instance", "$1", "node", "(.+)")) by (instance)[{{.elapsed}}:]))
   metricName: cpu-workers
   instant: true
@@ -197,6 +208,10 @@
   metricName: max-memory-workers
   instant: true
 
+- query: max_over_time(sum((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="worker"}, "instance", "$1", "node", "(.+)"))[{{.elapsed}}:])
+  metricName: max-memory-sum-workers
+  instant: true
+
 - query: avg(avg_over_time(sum(irate(node_cpu_seconds_total{mode!="idle", mode!="steal"}[2m]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)")) by (instance)[{{.elapsed}}:]))
   metricName: cpu-infra
   instant: true
@@ -207,6 +222,10 @@
 
 - query: max(max_over_time((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)[{{.elapsed}}:]) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)"))
   metricName: max-memory-infra
+  instant: true
+
+- query: max_over_time(sum((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) and on (instance) label_replace(kube_node_role{role="infra"}, "instance", "$1", "node", "(.+)"))[{{.elapsed}}:])
+  metricName: max-memory-sum-infra
   instant: true
 
 # Monitoring and ingress
