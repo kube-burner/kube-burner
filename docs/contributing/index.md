@@ -1,19 +1,8 @@
 # Contributing to kube-burner
 
 If you want to contribute to kube-burner, you can do so by submitting a Pull Request, Issue or starting a Discussion.
+You can also reach us out in the `#kube-burner` channel of the [kubernetes slack](https://kubernetes.slack.com/messages/kube-burner).
 
-## Making changes and opening a Pull Request
-
-For submitting a change upstream, please fork the repository and clone your forked repository.
-```bash
-$ git clone http://github.com/YOUR-USERNAME/kube-burner
-$ cd kube-burner
-$ git checkout -b <branch_name>
-$ make lint
-$ git add <changes>
-$ git commit -m -s "<Details of the Commit>"
-$ git push
-```
 
 ## CI and Linting
 
@@ -28,7 +17,8 @@ To build kube-burner just execute `make build`, once finished the kube-burner bi
 
 ```console
 $ make build
-building kube-burner 0.1.0
-GOPATH=/home/kube-burner/go
-CGO_ENABLED=0 go build -v -ldflags "-X github.com/kube-burner/kube-burner/version.GitCommit=d91c8cc35cb458a4b80a5050704a51c7c6e35076 -X github.com/kube-burner/kube-burner/version.BuildDate=2020-08-19-19:10:09 -X github.com/kube-burner/kube-burner/version.GitBranch=master" -o bin/kube-burner
+Building bin/amd64/kube-burner
+GOPATH=/home/rsevilla/go/
+GOARCH=amd64 CGO_ENABLED=0 go build -v -ldflags "-X github.com/cloud-bulldozer/go-commons/version.GitCommit=4c9c3f43db83adb053efc58220ddd696d1d19a35 -X github.com/cloud-bulldozer/go-commons/version.BuildDate=2024-01-10-21:24:20 -X github.com/cloud-bulldozer/go-commons/version.Version=main" -o bin/amd64/kube-burner ./cmd/kube-burner
+github.com/kube-burner/kube-burner/cmd/kube-burner
 ```
