@@ -29,9 +29,9 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func createNamespace(namespaceName string, nsLabels map[string]string) error {
+func createNamespace(namespaceName string, nsLabels map[string]string, nsAnnotations map[string]string) error {
 	ns := corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels},
+		ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabels, Annotations: nsAnnotations},
 	}
 	return RetryWithExponentialBackOff(func() (done bool, err error) {
 		_, err = ClientSet.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})

@@ -144,6 +144,8 @@ type Job struct {
 	PreLoadNodeLabels map[string]string `yaml:"preLoadNodeLabels" json:"-"`
 	// NamespaceLabels add custom labels to namespaces created by kube-burner
 	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"-"`
+	// NamespaceAnnotations add custom annotations to namespaces created by kube-burner
+	NamespaceAnnotations map[string]string `yaml:"namespaceAnnotations" json:"-"`
 	// Churn workload
 	Churn bool `yaml:"churn" json:"churn,omitempty"`
 	// Churn percentage

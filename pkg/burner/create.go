@@ -100,6 +100,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
 	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
+	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
 		"kube-burner-uuid":  ex.uuid,
@@ -112,9 +113,12 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	for label, value := range ex.NamespaceLabels {
 		nsLabels[label] = value
 	}
+	for annotation, value := range ex.NamespaceAnnotations {
+		nsAnnotations[annotation] = value
+	}
 	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
-		if err = createNamespace(ns, nsLabels); err != nil {
+		if err = createNamespace(ns, nsLabels, nsAnnotations); err != nil {
 			log.Fatal(err.Error())
 		}
 		*waitListNamespaces = append(*waitListNamespaces, ns)
@@ -133,7 +137,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
-				if err = createNamespace(ns, nsLabels); err != nil {
+				if err = createNamespace(ns, nsLabels, nsAnnotations); err != nil {
 					log.Error(err.Error())
 					continue
 				}

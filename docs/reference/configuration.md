@@ -64,6 +64,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `preLoadPeriod`          | How long to wait for the preload daemonset                                                                                        | Duration | 1m      |
 | `preloadNodeLabels`      | Add node selector labels for the resources created in preload stage                                                               | Object   | {}      |
 | `namespaceLabels`        | Add custom labels to the namespaces created by kube-burner                                                                        | Object   | {}      |
+| `namespaceAnnotations`   | Add custom annotations to the namespaces created by kube-burner                                                                   | Object   | {}      |
 | `churn`                  | Churn the workload. Only supports namespace based workloads                                                                       | Boolean  | false   |
 | `churnPercent`           | Percentage of the jobIterations to churn each period                                                                              | Integer  | 10      |
 | `churnDuration`          | Length of time that the job is churned for                                                                                        | Duration | 1h      |
