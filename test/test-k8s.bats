@@ -75,9 +75,10 @@ teardown_file() {
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
-@test "kube-burner index: local-indexing=true" {
-  run_cmd kube-burner index --uuid="${UUID}" -u http://localhost:9090 -m metrics-profile.yaml
+@test "kube-burner index: local-indexing=true; tarball=true" {
+  run_cmd kube-burner index --uuid="${UUID}" -u http://localhost:9090 -m metrics-profile.yaml --tarball-name=metrics.tgz
   check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/prometheusRSS.json
+  run_cmd kube-burner import --tarball=metrics.tgz --es-server=${ES_SERVER} --es-index=${ES_INDEX}
 }
 
 @test "kube-burner index: metrics-endpoint=true; os-indexing=true" {
