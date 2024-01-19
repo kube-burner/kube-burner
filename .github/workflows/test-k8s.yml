@@ -34,9 +34,13 @@ jobs:
         path: /tmp/
 
     - name: Install bats
-      uses: mig4/setup-bats@v1
+      uses: bats-core/bats-action@1.5.4
       with:
-        bats-version: 1.9.0
+        bats-version: 1.10.0
+        support-install: false
+        assert-install: false
+        detik-install: false
+        file-install: false
 
     - name: Execute Tests
       run: |
