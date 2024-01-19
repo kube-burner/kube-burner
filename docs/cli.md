@@ -21,7 +21,6 @@ Available Commands:
   index        Index kube-burner metrics
   init         Launch benchmark
   measure      Take measurements for a given set of resources without running workload
-  ocp          OpenShift wrapper
   version      Print the version number of kube-burner
 
 Flags:

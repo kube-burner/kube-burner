@@ -7,7 +7,6 @@ require (
 	github.com/cloud-bulldozer/go-commons v1.0.12
 	github.com/google/uuid v1.5.0
 	github.com/montanaflynn/stats v0.7.1
-	github.com/openshift/client-go v0.0.0-20230718165156-6014fb98e86a
 	github.com/prometheus/common v0.44.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
@@ -51,7 +50,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/opensearch-project/opensearch-go v1.1.0 // indirect
-	github.com/openshift/api v0.0.0-20230718161610-2a3e8b481cec // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
