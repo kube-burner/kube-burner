@@ -245,7 +245,6 @@ func (s *serviceLatency) stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	kutil.CleanupNamespaces(ctx, factory.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
-	factory.clientSet.CoreV1().Namespaces().Delete(context.TODO(), types.SvcLatencyNs, metav1.DeleteOptions{})
 	s.normalizeMetrics()
 	if globalCfg.IndexerConfig.Type != "" {
 		if factory.jobConfig.SkipIndexing {

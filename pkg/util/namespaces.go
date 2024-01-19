@@ -60,11 +60,11 @@ func CreateNamespace(clientSet *kubernetes.Clientset, name string, nsLabels map[
 func CleanupNamespaces(ctx context.Context, clientSet *kubernetes.Clientset, labelSelector string) {
 	ns, err := clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
-		log.Errorf("Error cleaning up namespaces: %v", err.Error())
+		log.Errorf("Error listing namespaces: %v", err.Error())
 		return
 	}
+	log.Infof("Deleting %d namespaces with label: %s", len(ns.Items), labelSelector)
 	if len(ns.Items) > 0 {
-		log.Infof("Deleting namespaces with label %s", labelSelector)
 		for _, ns := range ns.Items {
 			err := clientSet.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 			if err != nil {
@@ -101,7 +101,7 @@ func waitForDeleteNamespaces(ctx context.Context, clientSet *kubernetes.Clientse
 // Cleanup non-namespaced resources with the given selector
 func CleanupNonNamespacedResources(ctx context.Context, clientSet *kubernetes.Clientset, dynamicClient dynamic.Interface, labelSelector string) {
 	serverResources, _ := clientSet.Discovery().ServerPreferredResources()
-	log.Infof("Deleting non-namespace resources with label %s", labelSelector)
+	log.Infof("Deleting non-namespace resources with label: %s", labelSelector)
 	for _, resourceList := range serverResources {
 		for _, resource := range resourceList.APIResources {
 			if !resource.Namespaced {

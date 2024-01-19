@@ -118,7 +118,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	}
 	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
-		if err = util.CreateNamespace(ClientSet, ns, nsAnnotations, nsLabels); err != nil {
+		if err = util.CreateNamespace(ClientSet, ns, nsLabels, nsAnnotations); err != nil {
 			log.Fatal(err.Error())
 		}
 		*waitListNamespaces = append(*waitListNamespaces, ns)
@@ -137,7 +137,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
-				if err = util.CreateNamespace(ClientSet, ns, nsAnnotations, nsLabels); err != nil {
+				if err = util.CreateNamespace(ClientSet, ns, nsLabels, nsAnnotations); err != nil {
 					log.Error(err.Error())
 					continue
 				}
