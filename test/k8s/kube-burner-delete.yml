@@ -30,7 +30,7 @@ jobs:
     - objectTemplate: objectTemplates/deployment.yml
       replicas: 1
       inputVars:
-        containerImage: gcr.io/google_containers/pause-amd64:3.0
+        containerImage: gcr.io/google_containers/pause-amd64:3.2
         wait: true
     
      
