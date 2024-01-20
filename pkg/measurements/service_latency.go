@@ -47,7 +47,7 @@ const (
 type serviceLatency struct {
 	config           types.Measurement
 	svcWatcher       *metrics.Watcher
-	epwatcher        *metrics.Watcher
+	epWatcher        *metrics.Watcher
 	epLister         lcorev1.EndpointsLister
 	svcLister        lcorev1.ServiceLister
 	metrics          map[string]svcMetric
@@ -192,7 +192,7 @@ func (s *serviceLatency) setConfig(cfg types.Measurement) {
 
 func (s *serviceLatency) validateConfig() error {
 	if s.config.ServiceTimeout == 0 {
-		return fmt.Errorf("svcTimeout not set in service latency measurement")
+		return fmt.Errorf("svcTimeout cannot be 0")
 	}
 	return nil
 }
@@ -218,7 +218,7 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 	s.svcWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: s.handleCreateSvc,
 	})
-	s.epwatcher = metrics.NewWatcher(
+	s.epWatcher = metrics.NewWatcher(
 		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"epWatcher",
 		"endpoints",
@@ -228,11 +228,11 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 	)
 	// Use an endpoints lister to reduce and optimize API interactions in waitForEndpoints
 	s.svcLister = lcorev1.NewServiceLister(s.svcWatcher.Informer.GetIndexer())
-	s.epLister = lcorev1.NewEndpointsLister(s.epwatcher.Informer.GetIndexer())
+	s.epLister = lcorev1.NewEndpointsLister(s.epWatcher.Informer.GetIndexer())
 	if err := s.svcWatcher.StartAndCacheSync(); err != nil {
 		log.Errorf("Service Latency measurement error: %s", err)
 	}
-	if err := s.epwatcher.StartAndCacheSync(); err != nil {
+	if err := s.epWatcher.StartAndCacheSync(); err != nil {
 		log.Errorf("Service Latency measurement error: %s", err)
 	}
 	return nil
@@ -240,7 +240,7 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 
 func (s *serviceLatency) stop() error {
 	s.svcWatcher.StopWatcher()
-	s.epwatcher.StopWatcher()
+	s.epWatcher.StopWatcher()
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -281,7 +281,9 @@ func (s *serviceLatency) normalizeMetrics() {
 		latencySummary.MetricName = svcLatencyQuantilesMeasurement
 		return latencySummary
 	}
-	s.latencyQuantiles = []interface{}{calcSummary("Ready", latencies)}
+	if len(s.metrics) > 0 {
+		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("Ready", latencies))
+	}
 	if len(ipAssignedLatencies) > 0 {
 		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("IPAssigned", ipAssignedLatencies))
 	}

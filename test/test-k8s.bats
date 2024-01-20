@@ -8,8 +8,8 @@ setup_file() {
   cd k8s
   export BATS_TEST_TIMEOUT=600
   export JOB_ITERATIONS=4
-  export QPS=2
-  export BURST=2
+  export QPS=3
+  export BURST=3
   export GC=true
   export CHURN=false
   setup-kind
@@ -44,8 +44,8 @@ teardown_file() {
   export GC=false
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
-  check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 12
-  check_running_pods_in_ns default 6
+  check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 10
+  check_running_pods_in_ns default 5
   kube-burner destroy --uuid "${UUID}"
   check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"

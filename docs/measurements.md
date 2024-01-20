@@ -161,7 +161,7 @@ This measure is enabled with:
     svcTimeout: 5s
 ```
 
-Where `svcTimeout` defines the maximum amount of time for a service to be ready, when this timeout is fired, the metric from that service is **discarded**.
+Where `svcTimeout`, by default `5s`, defines the maximum amount of time the measurement will wait for a service to be ready, when this timeout is met, the metric from that service is **discarded**.
 
 !!! warning "Considerations"
     - Only TCP is supported.
@@ -170,7 +170,7 @@ Where `svcTimeout` defines the maximum amount of time for a service to be ready,
     - Make sure the endpoints of the service are correct and reachable from the pod running in the `kube-burner-service-latency`.
     - When the service is `NodePort`, the connectivity check is done against the node where the connectivity check pods runs.
     - By default all services created by the benchmark are tracked by this measurement, it's possible to discard service objects from tracking by annotating them with `kube-burner.io/service-latency=false`.
-    - Keep in mind that When service is `LoadBalacer` type, the provider needs to setup the load balancer, which adds some extra delay.
+    - Keep in mind that When service is `LoadBalancer` type, the provider needs to setup the load balancer, which adds some extra delay.
     - Endpoints are pinged one after another, this can create some delay when the number of endpoints of the service is big.
 
 ### Metrics
@@ -178,18 +178,18 @@ Where `svcTimeout` defines the maximum amount of time for a service to be ready,
 The metrics collected are service latency timeseries (`svcLatencyMeasurement`) and another document that holds a summary with the different service latency quantiles (`svcLatencyQuantilesMeasurement`). It is possible to skip indexing the `svcLatencyMeasurement` metric by configuring the field `svcLatencyMetrics` of this measurement to `quantiles`. Metric documents have the following structure:
 
 ```json
-  {
-    "timestamp": "2023-11-19T00:41:51Z",
-    "ready": 1631880721,
-    "metricName": "svcLatencyMeasurement",
-    "jobConfig": {
-      "config": "params"
-    },
-    "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
-    "namespace": "cluster-density-v2-2",
-    "service": "cluster-density-1",
-    "type": "ClusterIP"
-  }
+{
+  "timestamp": "2023-11-19T00:41:51Z",
+  "ready": 1631880721,
+  "metricName": "svcLatencyMeasurement",
+  "jobConfig": {
+    "config": "params"
+  },
+  "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
+  "namespace": "cluster-density-v2-2",
+  "service": "cluster-density-1",
+  "type": "ClusterIP"
+}
 ```
 
 !!! note
@@ -199,32 +199,32 @@ And the quantiles document has the structure:
 
 ```json
 {
-    "quantileName": "Ready",
-    "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
-    "P99": 1867593282,
-    "P95": 1856488440,
-    "P50": 1723817691,
-    "max": 1868307027,
-    "avg": 1722308938,
-    "timestamp": "2023-11-19T00:42:26.663991359Z",
-    "metricName": "svcLatencyQuantilesMeasurement",
-    "jobConfig": {
-      "config": "params"
-    }
+  "quantileName": "Ready",
+  "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
+  "P99": 1867593282,
+  "P95": 1856488440,
+  "P50": 1723817691,
+  "max": 1868307027,
+  "avg": 1722308938,
+  "timestamp": "2023-11-19T00:42:26.663991359Z",
+  "metricName": "svcLatencyQuantilesMeasurement",
+  "jobConfig": {
+    "config": "params"
+  }
 },
 {
-    "quantileName": "LoadBalancer",
-    "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
-    "P99": 1467593282,
-    "P95": 1356488440,
-    "P50": 1323817691,
-    "max": 2168307027,
-    "avg": 1822308938,
-    "timestamp": "2023-11-19T00:42:26.663991359Z",
-    "metricName": "svcLatencyQuantilesMeasurement",
-    "jobConfig": {
-      "config": "params"
-    }
+  "quantileName": "LoadBalancer",
+  "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
+  "P99": 1467593282,
+  "P95": 1356488440,
+  "P50": 1323817691,
+  "max": 2168307027,
+  "avg": 1822308938,
+  "timestamp": "2023-11-19T00:42:26.663991359Z",
+  "metricName": "svcLatencyQuantilesMeasurement",
+  "jobConfig": {
+    "config": "params"
+  }
 }
 ```
 

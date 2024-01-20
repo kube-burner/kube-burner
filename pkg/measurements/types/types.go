@@ -36,6 +36,7 @@ func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) er
 	measurement := rawMeasurement{
 		PProfDirectory:    pprofDirectory,
 		PodLatencyMetrics: All,
+		ServiceTimeout:    5 * time.Second,
 	}
 	if err := unmarshal(&measurement); err != nil {
 		return err

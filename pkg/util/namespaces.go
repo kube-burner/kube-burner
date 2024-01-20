@@ -63,8 +63,8 @@ func CleanupNamespaces(ctx context.Context, clientSet *kubernetes.Clientset, lab
 		log.Errorf("Error listing namespaces: %v", err.Error())
 		return
 	}
-	log.Infof("Deleting %d namespaces with label: %s", len(ns.Items), labelSelector)
 	if len(ns.Items) > 0 {
+		log.Infof("Deleting %d namespaces with label: %s", len(ns.Items), labelSelector)
 		for _, ns := range ns.Items {
 			err := clientSet.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 			if err != nil {
