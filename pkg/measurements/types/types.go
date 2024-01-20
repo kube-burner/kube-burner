@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type latencyMetric string
@@ -108,6 +109,7 @@ var SvcLatencyCheckerPod = &corev1.Pod{
 		Namespace: SvcLatencyNs,
 	},
 	Spec: corev1.PodSpec{
+		TerminationGracePeriodSeconds: ptr.To[int64](0),
 		Containers: []corev1.Container{
 			{
 				Image:           "quay.io/cloud-bulldozer/fedora-nc:latest",
