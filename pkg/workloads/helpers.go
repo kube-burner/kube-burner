@@ -120,6 +120,8 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 				auth := prometheus.Auth{
 					Token:         metricsEndpoint.Token,
 					SkipTLSVerify: true,
+					Username:      metricsEndpoint.Username,
+					Password:      metricsEndpoint.Password,
 				}
 				p, err := prometheus.NewPrometheusClient(ConfigSpec, metricsEndpoint.Endpoint, auth, stepSize, wh.MetricsMetadata, indexer, embedConfig)
 				if err != nil {

@@ -79,7 +79,8 @@ A metrics-endpoints.yaml file with valid keys for the `init` command would look 
   profile: metrics.yaml
   alertProfile: alert-profile.yaml
 - endpoint: http://remotehost:9090
-  token: <token>
+  username: foo
+  password: bar
 ```
 
 !!! Note

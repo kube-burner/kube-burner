@@ -63,6 +63,8 @@ type MetricEndpoint struct {
 	Token        string `yaml:"token"`
 	Profile      string `yaml:"profile"`
 	AlertProfile string `yaml:"alertProfile"`
+	Username     string `yaml:"username"`
+	Password     string `yaml:"password"`
 }
 
 type metric struct {
