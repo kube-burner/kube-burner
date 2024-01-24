@@ -1,5 +1,5 @@
 docs_dir: docs/
-repo_url: https://github.com/cloud-bulldozer/kube-burner
+repo_url: https://github.com/kube-burner/kube-burner
 nav:
 - Home: index.md
 - Command line: cli.md
@@ -11,7 +11,6 @@ nav:
   - Collecting metrics: observability/metrics.md
   - Indexing: observability/indexing.md
   - Alerting: observability/alerting.md
-- OpenShift Wrapper: ocp.md
 - Contributing:
   - contributing/index.md
   - GitHub Workflows:
