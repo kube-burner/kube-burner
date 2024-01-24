@@ -3,10 +3,9 @@
 If you want to contribute to kube-burner, you can do so by submitting a Pull Request, Issue or starting a Discussion.
 You can also reach us out in the `#kube-burner` channel of the [kubernetes slack](https://kubernetes.slack.com/messages/kube-burner).
 
-
 ## CI and Linting
 
-For running pre-commit checks on your code before comitting code and opening a PR, you can use the `pre-commit run` functionality.  See [CI docs](https://kube-burner.github.io/kube-burner/latest/contributing/pullrequest/#running-local-pre-commit) for more information on running pre-commits.
+For running pre-commit checks on your code before committing code and opening a PR, you can use the `pre-commit run` functionality.  See [CI docs](https://kube-burner.github.io/kube-burner/latest/contributing/pullrequest/#running-local-pre-commit) for more information on running pre-commits.
 
 ## Building
 

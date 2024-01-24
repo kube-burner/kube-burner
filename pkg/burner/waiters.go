@@ -31,13 +31,13 @@ import (
 )
 
 func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
-	waitNs := ns
 	for _, obj := range ex.objects {
+		waitNs := ns
 		if !obj.Wait {
 			continue
 		}
 		// When the object has defined its own namespace, we use it
-		// TODO objects with a fixed namespace doesn't need to be waited on a per iteration basis
+		// TODO objects with a fixed namespace don't need to be waited on a per iteration basis
 		if obj.namespace != "" {
 			waitNs = obj.namespace
 		}

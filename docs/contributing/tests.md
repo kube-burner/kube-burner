@@ -1,9 +1,10 @@
-The Tests Workflow, defined in the `tests-k8s.yml` file
+The testing Workflow, defined in the `tests-k8s.yml` file, runs tests defined in the `test` directory of the repository.
 
-Tests are orchestrated using [BATS](https://bats-core.readthedocs.io/en/stable/), they can be executed locally with `make test`
+Tests are orchestrated with [bats](https://bats-core.readthedocs.io/en/stable/)
 
-#### Requirements
+Tests can be executed locally with `make test`, some requirements are needed though:
 
 - make
 - bats
-- podman or docker (needed to spin-up a [kind](https://kind.sigs.k8s.io/) cluster)
+- kubectl
+- podman or docker (required to run [kind](https://kind.sigs.k8s.io/))
