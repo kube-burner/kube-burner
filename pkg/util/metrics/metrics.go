@@ -60,13 +60,15 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 				Token:        metricsScraperConfig.Token,
 				Profile:      metricsScraperConfig.MetricsProfile,
 				AlertProfile: metricsScraperConfig.AlertProfile,
+				Username:     metricsScraperConfig.Username,
+				Password:     metricsScraperConfig.Password,
 			})
 		}
 	}
 	for _, metricsEndpoint := range metricsEndpoints {
 		auth := prometheus.Auth{
-			Username:      metricsScraperConfig.Username,
-			Password:      metricsScraperConfig.Password,
+			Username:      metricsEndpoint.Username,
+			Password:      metricsEndpoint.Password,
 			Token:         metricsEndpoint.Token,
 			SkipTLSVerify: metricsScraperConfig.SkipTLSVerify,
 		}
