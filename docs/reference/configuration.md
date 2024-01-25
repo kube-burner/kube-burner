@@ -154,6 +154,35 @@ This type of job supports the following parameters. Some of them  are already de
 - `jobPause`
 - `jobIterationDelay`
 
+### Read
+
+This type of job reads objects described in the objects list. Using read as job type the objects list would have the following structure:
+
+```yaml
+objects:
+- kind: Deployment
+  labelSelector: {kube-burner-job: cluster-density}
+  apiVersion: apps/v1
+
+- kind: Secret
+  labelSelector: {kube-burner-job: cluster-density}
+```
+
+Where:
+
+- `kind`: Object kind of the k8s object to read.
+- `labelSelector`: Reads the objects with the given labels.
+- `apiVersion`: API version from the k8s object.
+
+This type of job supports the following parameters. Some of them  are already described in the [create job type section](#create):
+
+- `name`
+- `qps`
+- `burst`
+- `jobPause`
+- `jobIterationDelay`
+- `jobIterations`
+
 ### Patch
 
 This type of job can be used to patch objects with the template described in the object list. This object list has the following structure:

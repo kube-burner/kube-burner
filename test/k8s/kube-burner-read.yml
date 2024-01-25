@@ -1,0 +1,18 @@
+---
+global:
+  indexerConfig:
+    type: {{ .INDEXING_TYPE }}
+    metricsDirectory: {{ .METRICS_FOLDER }}
+    esServers: ["{{ .ES_SERVER }}"]
+    defaultIndex: {{ .ES_INDEX }}
+
+jobs:
+  - name: read-job
+    jobType: read
+    jobIterations: 20
+    qps: 5
+    burst: 10
+    jobPause: 5s
+    objects:
+    - kind: Namespace
+      labelSelector: {kubernetes.io/metadata.name: default}

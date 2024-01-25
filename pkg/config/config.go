@@ -138,7 +138,7 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 		if !job.NamespacedIterations && job.Churn {
 			log.Fatal("Cannot have Churn enabled without Namespaced Iterations also enabled")
 		}
-		if job.JobIterations < 1 && job.JobType == CreationJob {
+		if job.JobIterations < 1 && (job.JobType == CreationJob || job.JobType == ReadJob) {
 			log.Fatalf("Job %s has < 1 iterations", job.Name)
 		}
 		if job.JobType == DeletionJob {

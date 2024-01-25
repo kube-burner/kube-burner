@@ -32,6 +32,8 @@ const (
 	DeletionJob JobType = "delete"
 	// PatchJob used to patch objects
 	PatchJob JobType = "patch"
+	// ReadJob used to read objects
+	ReadJob JobType = "read"
 )
 
 // Spec configuration root
