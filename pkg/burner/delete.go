@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +66,7 @@ func (ex *Executor) RunDeleteJob() {
 		listOptions := metav1.ListOptions{
 			LabelSelector: labelSelector,
 		}
-		err := RetryWithExponentialBackOff(func() (done bool, err error) {
+		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
 			itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 			if err != nil {
 				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)

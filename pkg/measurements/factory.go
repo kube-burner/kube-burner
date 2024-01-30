@@ -38,10 +38,11 @@ type measurementFactory struct {
 }
 
 type measurement interface {
-	start(*sync.WaitGroup)
+	start(*sync.WaitGroup) error
 	stop() error
 	collect(*sync.WaitGroup)
-	setConfig(types.Measurement) error
+	setConfig(types.Measurement)
+	validateConfig() error
 }
 
 var factory measurementFactory
@@ -51,14 +52,7 @@ var globalCfg config.GlobalConfig
 // NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(configSpec config.Spec, indexer *indexers.Indexer, metadata map[string]interface{}) {
 	globalCfg = configSpec.GlobalConfig
-	_, restConfig, err := config.GetClientSet(0, 0)
-	if err != nil {
-		log.Fatalf("Error creating clientSet: %s", err)
-	}
-	clientSet := kubernetes.NewForConfigOrDie(restConfig)
 	factory = measurementFactory{
-		clientSet:   clientSet,
-		restConfig:  restConfig,
 		createFuncs: make(map[string]measurement),
 		indexer:     indexer,
 		metadata:    metadata,
@@ -78,8 +72,9 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 	if _, exists := mf.createFuncs[measurement.Name]; exists {
 		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
-		if err := measurementFunc.setConfig(measurement); err != nil {
-			return fmt.Errorf("Config validation error: %s", err)
+		measurementFunc.setConfig(measurement)
+		if err := measurementFunc.validateConfig(); err != nil {
+			return fmt.Errorf("%s config error: %s", measurement.Name, err)
 		}
 		mf.createFuncs[measurement.Name] = measurementFunc
 		log.Infof("📈 Registered measurement: %s", measurement.Name)
@@ -89,6 +84,12 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 
 func SetJobConfig(jobConfig *config.Job) {
 	factory.jobConfig = jobConfig
+	_, restConfig, err := config.GetClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
+	if err != nil {
+		log.Fatalf("Error creating clientSet: %s", err)
+	}
+	factory.clientSet = kubernetes.NewForConfigOrDie(restConfig)
+	factory.restConfig = restConfig
 }
 
 // Start starts registered measurements

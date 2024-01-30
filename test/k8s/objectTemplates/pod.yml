@@ -7,6 +7,6 @@ metadata:
   namespace: default
 spec:
   containers:
-  - image: gcr.io/google_containers/pause:3.1
+  - image: gcr.io/google_containers/pause:3.2
     name: pause
     imagePullPolicy: IfNotPresent

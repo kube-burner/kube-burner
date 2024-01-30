@@ -272,23 +272,21 @@ func (p *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 	p.mu.Unlock()
 }
 
-func (p *vmiLatency) setConfig(cfg types.Measurement) error {
+func (p *vmiLatency) setConfig(cfg types.Measurement) {
 	p.config = cfg
-	if err := p.validateConfig(); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Start starts vmiLatency measurement
-func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
+func (p *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 	if factory.jobConfig.JobType == config.DeletionJob {
 		log.Info("VMI latency measurement not compatible with delete jobs, skipping")
-		return
+		return nil
 	}
 	defer measurementWg.Done()
+	if err := p.validateConfig(); err != nil {
+		return err
+	}
 	p.metrics = make(map[string]*vmiMetric)
-
 	log.Infof("Creating VM latency watcher for %s", factory.jobConfig.Name)
 	restClient := newRESTClientWithRegisteredKubevirtResource()
 	p.vmWatcher = metrics.NewWatcher(
@@ -297,8 +295,9 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"virtualmachines",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", globalCfg.RUNID)
 		},
+		nil,
 	)
 	p.vmWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVM,
@@ -307,7 +306,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		},
 	})
 	if err := p.vmWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("VMI Latency measurement error: %s", err)
+		return fmt.Errorf("VMI Latency measurement error: %s", err)
 	}
 
 	log.Infof("Creating VMI latency watcher for %s", factory.jobConfig.Name)
@@ -317,8 +316,9 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"virtualmachineinstances",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", globalCfg.RUNID)
 		},
+		nil,
 	)
 	p.vmiWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVMI,
@@ -327,7 +327,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		},
 	})
 	if err := p.vmiWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("VMI Latency measurement error: %s", err)
+		return fmt.Errorf("VMI Latency measurement error: %s", err)
 	}
 
 	log.Infof("Creating VMI Pod latency watcher for %s", factory.jobConfig.Name)
@@ -337,8 +337,9 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		"pods",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%s", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", globalCfg.RUNID)
 		},
+		nil,
 	)
 	p.vmiPodWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: p.handleCreateVMIPod,
@@ -347,8 +348,9 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
 		},
 	})
 	if err := p.vmiPodWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("VMI Pod Latency measurement error: %s", err)
+		return fmt.Errorf("VMI Pod Latency measurement error: %s", err)
 	}
+	return nil
 }
 
 func newRESTClientWithRegisteredKubevirtResource() *rest.RESTClient {

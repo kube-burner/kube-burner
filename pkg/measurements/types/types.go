@@ -16,6 +16,11 @@ package types
 
 import (
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type latencyMetric string
@@ -32,6 +37,7 @@ func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) er
 	measurement := rawMeasurement{
 		PProfDirectory:    pprofDirectory,
 		PodLatencyMetrics: All,
+		ServiceTimeout:    5 * time.Second,
 	}
 	if err := unmarshal(&measurement); err != nil {
 		return err
@@ -54,6 +60,10 @@ type Measurement struct {
 	PProfDirectory string `yaml:"pprofDirectory"`
 	// Pod latency metrics to index
 	PodLatencyMetrics latencyMetric `yaml:"podLatencyMetrics"`
+	// Service latency metrics to index
+	ServiceLatencyMetrics latencyMetric `yaml:"svcLatencyMetrics"`
+	// Service latency endpoint timeout
+	ServiceTimeout time.Duration `yaml:"svcTimeout"`
 }
 
 // LatencyThreshold holds the thresholds configuration
@@ -86,4 +96,34 @@ type PProftarget struct {
 	Cert string `yaml:"cert"`
 	// Key Private key content
 	Key string `yaml:"key"`
+}
+
+const (
+	SvcLatencyNs          = "kube-burner-service-latency"
+	SvcLatencyCheckerName = "svc-checker"
+)
+
+var SvcLatencyCheckerPod = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      SvcLatencyCheckerName,
+		Namespace: SvcLatencyNs,
+	},
+	Spec: corev1.PodSpec{
+		TerminationGracePeriodSeconds: ptr.To[int64](0),
+		Containers: []corev1.Container{
+			{
+				Image:           "quay.io/cloud-bulldozer/fedora-nc:latest",
+				Command:         []string{"sleep", "inf"},
+				Name:            SvcLatencyCheckerName,
+				ImagePullPolicy: corev1.PullAlways,
+				SecurityContext: &corev1.SecurityContext{
+					AllowPrivilegeEscalation: pointer.Bool(false),
+					Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+					RunAsNonRoot:             pointer.Bool(true),
+					SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+					RunAsUser:                pointer.Int64(1000),
+				},
+			},
+		},
+	},
 }

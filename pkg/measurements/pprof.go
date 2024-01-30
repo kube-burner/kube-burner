@@ -45,15 +45,11 @@ func init() {
 	measurementMap["pprof"] = &pprof{}
 }
 
-func (p *pprof) setConfig(cfg types.Measurement) error {
+func (p *pprof) setConfig(cfg types.Measurement) {
 	p.config = cfg
-	if err := p.validateConfig(); err != nil {
-		return err
-	}
-	return nil
 }
 
-func (p *pprof) start(measurementWg *sync.WaitGroup) {
+func (p *pprof) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	var wg sync.WaitGroup
 	err := os.MkdirAll(p.config.PProfDirectory, 0744)
@@ -79,6 +75,7 @@ func (p *pprof) start(measurementWg *sync.WaitGroup) {
 			}
 		}
 	}()
+	return nil
 }
 
 func getPods(target types.PProftarget) []corev1.Pod {

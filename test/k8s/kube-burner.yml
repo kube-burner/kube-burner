@@ -4,6 +4,8 @@ global:
   gc: {{env "GC"}}
   measurements:
   - name: podLatency
+  - name: serviceLatency
+    svcTimeout: 5s
 
   indexerConfig:
     type: {{ .INDEXING_TYPE }}
@@ -40,7 +42,10 @@ jobs:
     - objectTemplate: objectTemplates/deployment.yml
       replicas: 1
       inputVars:
-        containerImage: gcr.io/google_containers/pause-amd64:3.0
+        containerImage: quay.io/cloud-bulldozer/sampleapp:latest
 
     - objectTemplate: objectTemplates/pod.yml
+      replicas: 1
+
+    - objectTemplate: objectTemplates/service.yml
       replicas: 1
