@@ -16,6 +16,7 @@ Available Commands:
   check-alerts Evaluate alerts for the given time range
   completion   Generates completion scripts for bash shell
   destroy      Destroy old namespaces labeled with the given UUID.
+  health-check Check for Health Status of the cluster
   help         Help about any command
   import       Import metrics tarball
   index        Index kube-burner metrics
@@ -111,6 +112,10 @@ This subcommand can be used to evaluate alerts configured in the given alert pro
 ## Destroy
 
 This subcommand requires the `uuid` flag to destroy all namespaces labeled with `kube-burner-uuid=<UUID>`.
+
+## Health Check
+
+The `health-check` subcommand assesses the status of nodes within the cluster. It provides information on the overall health of the cluster, indicating whether it is in a healthy state. In the event of an unhealthy cluster, the subcommand returns a list of nodes that are not in a "Ready" state, helping users identify and address specific issues affecting cluster stability.
 
 ## Completion
 

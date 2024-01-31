@@ -7,6 +7,7 @@ global:
     type: elastic
   measurements:
     - name: podLatency
+  clusterHealth: true
 
 jobs:
   - name: cluster-density

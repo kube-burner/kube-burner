@@ -69,6 +69,8 @@ type GlobalConfig struct {
 	GCTimeout time.Duration `yaml:"gcTimeout"`
 	// Boolean flag to collect metrics during garbage collection
 	GCMetrics bool `yaml:"gcMetrics"`
+	// Boolean flag to check for cluster-health
+	ClusterHealth bool `yaml:"clusterHealth"`
 }
 
 // Object defines an object that kube-burner will create

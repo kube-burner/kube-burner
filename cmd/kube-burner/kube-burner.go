@@ -120,6 +120,15 @@ func initCmd() *cobra.Command {
 					UserMetaData:    userMetadata,
 				})
 			}
+
+			if configSpec.GlobalConfig.ClusterHealth {
+				clientSet, _, err := config.GetClientSet(0, 0)
+				if err != nil {
+					log.Errorf("Error creating clientSet: %s", err)
+				}
+				util.ClusterHealthCheck(clientSet)
+			}
+
 			rc, err = burner.Run(configSpec, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.Metadata)
 			if err != nil {
 				log.Errorf(err.Error())
@@ -144,6 +153,27 @@ func initCmd() *cobra.Command {
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().SortFlags = false
+	return cmd
+}
+
+func healthCheck() *cobra.Command {
+	var rc int
+	cmd := &cobra.Command{
+		Use:   "health-check",
+		Short: "Check for Health Status of the cluster",
+		PostRun: func(cmd *cobra.Command, args []string) {
+			log.Info("👋 Exiting kube-burner ")
+			os.Exit(rc)
+		},
+		Args: cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			clientSet, _, err := config.GetClientSet(0, 0)
+			if err != nil {
+				log.Fatalf("Error creating clientSet: %s", err)
+			}
+			util.ClusterHealthCheck(clientSet)
+		},
+	}
 	return cmd
 }
 
@@ -462,6 +492,7 @@ func main() {
 		initCmd(),
 		measureCmd(),
 		destroyCmd(),
+		healthCheck(),
 		indexCmd(),
 		alertCmd(),
 		importCmd(),
