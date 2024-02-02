@@ -18,14 +18,12 @@ import (
 	"embed"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
 	"k8s.io/client-go/rest"
 )
 
 type Config struct {
 	UUID            string
-	Indexer         indexers.IndexerType
 	Timeout         time.Duration
 	MetricsEndpoint string
 	UserMetadata    string

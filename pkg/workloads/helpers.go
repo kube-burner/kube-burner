@@ -105,8 +105,8 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 		ConfigSpec.EmbedFS = wh.embedConfig
 		ConfigSpec.EmbedFSDir = path.Join(wh.ConfigDir, workload)
 	}
-	if wh.Config.Indexer != "" {
-		indexerConfig := ConfigSpec.GlobalConfig.IndexerConfig
+	indexerConfig := ConfigSpec.GlobalConfig.IndexerConfig
+	if indexerConfig.Type != "" {
 		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 		indexer, err = indexers.NewIndexer(indexerConfig)
 		if err != nil {
@@ -183,7 +183,7 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 		log.Error(err)
 	}
 	wh.Metadata.Passed = rc == 0
-	if wh.Indexer != "" {
+	if indexer != nil {
 		IndexMetadata(indexer, wh.Metadata)
 	}
 	log.Info("👋 Exiting kube-burner ", wh.UUID)
