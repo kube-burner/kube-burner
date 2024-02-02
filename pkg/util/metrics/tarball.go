@@ -68,7 +68,7 @@ func CreateTarball(indexerConfig indexers.IndexerConfig, tarballName string) err
 }
 
 func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string) error {
-	log.Infof("Importing tarball %v", tarball)
+	log.Infof("Importing tarball: %v", tarball)
 	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)
 	if err != nil {
@@ -93,12 +93,12 @@ func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string)
 		if err != nil {
 			return fmt.Errorf("Tarball read error: %v", err)
 		}
-		log.Infof("Importing metrics from %s", hdr.Name)
-		log.Infof("Writing metric to: %s", metricsDir)
-		_, err = (*indexer).Index(metrics, indexers.IndexingOpts{})
+		log.Infof("Reading metrics from %s", hdr.Name)
+		resp, err := (*indexer).Index(metrics, indexers.IndexingOpts{})
 		if err != nil {
 			return err
 		}
+		log.Info(resp)
 	}
 	return nil
 }
