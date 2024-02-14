@@ -99,7 +99,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metadata)
 		jobList = newExecutorList(configSpec, uuid, timeout)
-		ClientSet, restConfig, err = config.GetClientSet(10, 20)
+		ClientSet, restConfig, err = config.GetClientSet(rest.DefaultQPS, rest.DefaultBurst)
 		if err != nil {
 			log.Fatalf("Error creating clientSet: %s", err)
 		}
