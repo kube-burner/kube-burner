@@ -47,6 +47,7 @@ teardown_file() {
   check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 10
   check_running_pods_in_ns default 5
   kube-burner destroy --uuid "${UUID}"
+  kubectl delete pod -l kube-burner-uuid=${UUID} -n default
   check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
