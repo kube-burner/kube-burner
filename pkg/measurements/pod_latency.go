@@ -150,10 +150,6 @@ func (p *podLatency) validateConfig() error {
 // start podLatency measurement
 func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	if Factory.jobConfig.JobType == config.DeletionJob {
-		log.Info("Pod latency measurement not compatible with delete jobs, skipping")
-		return nil
-	}
 	p.metrics = make(map[string]podMetric)
 	log.Infof("Creating Pod latency watcher for %s", Factory.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
