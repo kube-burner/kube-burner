@@ -232,18 +232,18 @@ func measureCmd() *cobra.Command {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
 			log.Infof("%v", namespaceLabels)
-			mf := measurements.NewMeasurementFactory(configSpec, metadata)
-			mf.SetJobConfig(&config.Job{
+			measurements.NewMeasurementFactory(configSpec, metadata)
+			measurements.SetJobConfig(&config.Job{
 				Name:                 jobName,
 				Namespace:            rawNamespaces,
 				NamespaceLabels:      namespaceLabels,
 				NamespaceAnnotations: namespaceAnnotations,
 			})
-			mf.Collect()
-			if err = mf.Stop(); err != nil {
+			measurements.Collect()
+			if err = measurements.Stop(); err != nil {
 				log.Error(err.Error())
 			}
-			mf.Index(indexer, jobName)
+			measurements.Index(indexer, jobName)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")

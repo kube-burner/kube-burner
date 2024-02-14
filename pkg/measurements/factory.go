@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type MeasurementFactory struct {
+type measurementFactory struct {
 	jobConfig   *config.Job
 	clientSet   *kubernetes.Clientset
 	restConfig  *rest.Config
@@ -45,30 +45,29 @@ type measurement interface {
 	index(indexers.Indexer, string)
 }
 
-var Factory MeasurementFactory
+var factory measurementFactory
 var measurementMap = make(map[string]measurement)
 var globalCfg config.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) *MeasurementFactory {
+func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) {
 	globalCfg = configSpec.GlobalConfig
-	Factory = MeasurementFactory{
+	factory = measurementFactory{
 		createFuncs: make(map[string]measurement),
 		metadata:    metadata,
 	}
 	for _, measurement := range globalCfg.Measurements {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
-			if err := Factory.register(measurement, measurementFunc); err != nil {
+			if err := factory.register(measurement, measurementFunc); err != nil {
 				log.Fatal(err.Error())
 			}
 		} else {
 			log.Warnf("Measurement not found: %s", measurement.Name)
 		}
 	}
-	return &Factory
 }
 
-func (mf *MeasurementFactory) register(measurement types.Measurement, measurementFunc measurement) error {
+func (mf *measurementFactory) register(measurement types.Measurement, measurementFunc measurement) error {
 	if _, exists := mf.createFuncs[measurement.Name]; exists {
 		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
@@ -82,29 +81,29 @@ func (mf *MeasurementFactory) register(measurement types.Measurement, measuremen
 	return nil
 }
 
-func (mf *MeasurementFactory) SetJobConfig(jobConfig *config.Job) {
-	Factory.jobConfig = jobConfig
-	_, restConfig, err := config.GetClientSet(Factory.jobConfig.QPS, Factory.jobConfig.Burst)
+func SetJobConfig(jobConfig *config.Job) {
+	factory.jobConfig = jobConfig
+	_, restConfig, err := config.GetClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
 	if err != nil {
 		log.Fatalf("Error creating clientSet: %s", err)
 	}
-	Factory.clientSet = kubernetes.NewForConfigOrDie(restConfig)
-	Factory.restConfig = restConfig
+	factory.clientSet = kubernetes.NewForConfigOrDie(restConfig)
+	factory.restConfig = restConfig
 }
 
 // Start starts registered measurements
-func (mf *MeasurementFactory) Start() {
+func Start() {
 	var wg sync.WaitGroup
-	for _, measurement := range Factory.createFuncs {
+	for _, measurement := range factory.createFuncs {
 		wg.Add(1)
 		go measurement.start(&wg)
 	}
 	wg.Wait()
 }
 
-func (mf *MeasurementFactory) Collect() {
+func Collect() {
 	var wg sync.WaitGroup
-	for _, measurement := range Factory.createFuncs {
+	for _, measurement := range factory.createFuncs {
 		wg.Add(1)
 		go measurement.collect(&wg)
 	}
@@ -113,9 +112,9 @@ func (mf *MeasurementFactory) Collect() {
 
 // Stop stops registered measurements
 // returns a concatenated list of error strings with a new line between each string
-func (mf *MeasurementFactory) Stop() error {
+func Stop() error {
 	errs := []error{}
-	for name, measurement := range Factory.createFuncs {
+	for name, measurement := range factory.createFuncs {
 		log.Infof("Stopping measurement: %s", name)
 		errs = append(errs, measurement.stop())
 	}
@@ -127,8 +126,8 @@ func (mf *MeasurementFactory) Stop() error {
 // Parameters:
 //   - indexer: a pointer to the indexer
 //   - jobName: the name of the job, required as this task can be executed from a goroutine
-func (mf *MeasurementFactory) Index(indexer *indexers.Indexer, jobName string) {
-	for name, measurement := range Factory.createFuncs {
+func Index(indexer *indexers.Indexer, jobName string) {
+	for name, measurement := range factory.createFuncs {
 		log.Infof("Indexing collected data from measurement: %s", name)
 		measurement.index(*indexer, jobName)
 	}

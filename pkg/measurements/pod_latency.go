@@ -83,8 +83,8 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 			Name:       pod.Name,
 			MetricName: podLatencyMeasurement,
 			UUID:       globalCfg.UUID,
-			JobConfig:  *Factory.jobConfig,
-			Metadata:   Factory.metadata,
+			JobConfig:  *factory.jobConfig,
+			Metadata:   factory.metadata,
 		}
 	}
 }
@@ -151,9 +151,9 @@ func (p *podLatency) validateConfig() error {
 func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	p.metrics = make(map[string]podMetric)
-	log.Infof("Creating Pod latency watcher for %s", Factory.jobConfig.Name)
+	log.Infof("Creating Pod latency watcher for %s", factory.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
-		Factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"podWatcher",
 		"pods",
 		corev1.NamespaceAll,
@@ -178,13 +178,13 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var pods []corev1.Pod
-	labelSelector := labels.SelectorFromSet(Factory.jobConfig.NamespaceLabels)
+	labelSelector := labels.SelectorFromSet(factory.jobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
-	namespaces := strings.Split(Factory.jobConfig.Namespace, ",")
+	namespaces := strings.Split(factory.jobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
-		podList, err := Factory.clientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
+		podList, err := factory.clientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
 		if err != nil {
 			log.Errorf("error listing pods in namespace %s: %v", namespace, err)
 		}
@@ -212,8 +212,8 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			MetricName:      podLatencyMeasurement,
 			NodeName:        pod.Spec.NodeName,
 			UUID:            globalCfg.UUID,
-			JobConfig:       *Factory.jobConfig,
-			Metadata:        Factory.metadata,
+			JobConfig:       *factory.jobConfig,
+			Metadata:        factory.metadata,
 			scheduled:       scheduled,
 			initialized:     initialized,
 			containersReady: containersReady,
@@ -239,7 +239,7 @@ func (p *podLatency) stop() error {
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", Factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
 		log.Infof("Pod latencies error rate was: %.2f", errorRate)
@@ -335,8 +335,8 @@ func (p *podLatency) calcQuantiles() {
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
-		latencySummary.JobConfig = *Factory.jobConfig
-		latencySummary.Metadata = Factory.metadata
+		latencySummary.JobConfig = *factory.jobConfig
+		latencySummary.Metadata = factory.metadata
 		latencySummary.MetricName = podLatencyQuantilesMeasurement
 		return latencySummary
 	}
