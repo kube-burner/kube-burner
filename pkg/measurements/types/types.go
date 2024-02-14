@@ -35,9 +35,8 @@ const (
 func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) error {
 	type rawMeasurement Measurement
 	measurement := rawMeasurement{
-		PProfDirectory:    pprofDirectory,
-		PodLatencyMetrics: All,
-		ServiceTimeout:    5 * time.Second,
+		PProfDirectory: pprofDirectory,
+		ServiceTimeout: 5 * time.Second,
 	}
 	if err := unmarshal(&measurement); err != nil {
 		return err
@@ -58,8 +57,6 @@ type Measurement struct {
 	PProfInterval time.Duration `yaml:"pprofInterval"`
 	// PProfDirectory output directory
 	PProfDirectory string `yaml:"pprofDirectory"`
-	// Pod latency metrics to index
-	PodLatencyMetrics latencyMetric `yaml:"podLatencyMetrics"`
 	// Service latency metrics to index
 	ServiceLatencyMetrics latencyMetric `yaml:"svcLatencyMetrics"`
 	// Service latency endpoint timeout

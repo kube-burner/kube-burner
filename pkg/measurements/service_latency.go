@@ -284,9 +284,8 @@ func (s *serviceLatency) index(indexer indexers.Indexer) {
 		svcLatencyMetric:               s.normLatencies,
 		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
 	}
-	if s.config.ServiceLatencyMetrics == types.Quantiles {
-		delete(metricMap, svcLatencyMetric)
-	}
+	// Reset latency slices, required in multi-job benchmarks
+	s.latencyQuantiles, s.normLatencies = nil, nil
 	for metricName, documents := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
 			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),

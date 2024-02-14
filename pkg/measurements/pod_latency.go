@@ -248,8 +248,6 @@ func (p *podLatency) stop() error {
 	if errorRate > 0 {
 		log.Infof("Pod latencies error rate was: %.2f", errorRate)
 	}
-	// Reset latency slices, required in multi-job benchmarks
-	p.latencyQuantiles, p.normLatencies = nil, nil
 	return err
 }
 
@@ -260,9 +258,8 @@ func (p *podLatency) index(indexer indexers.Indexer) {
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
 	}
-	if p.config.PodLatencyMetrics == types.Quantiles {
-		delete(metricMap, podLatencyMeasurement)
-	}
+	// Reset latency slices, required in multi-job benchmarks
+	p.latencyQuantiles, p.normLatencies = nil, nil
 	for metricName, data := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
 			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
