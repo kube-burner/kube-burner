@@ -53,10 +53,10 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 }
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
-func (p *Prometheus) ScrapeJobsMetrics() error {
+func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 	docsToIndex := make(map[string][]interface{})
-	start := p.JobList[0].Start
-	end := p.JobList[len(p.JobList)-1].End
+	start := jobList[0].Start
+	end := jobList[len(jobList)-1].End
 	log.Infof("🔍 Scraping %v Profile: %v Start: %v End: %v",
 		p.Endpoint,
 		p.profileName,
@@ -66,7 +66,7 @@ func (p *Prometheus) ScrapeJobsMetrics() error {
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
-	for _, eachJob := range p.JobList {
+	for _, eachJob := range jobList {
 		if eachJob.JobConfig.SkipIndexing {
 			log.Infof("Skipping indexing in job: %v", eachJob.JobConfig.Name)
 			continue

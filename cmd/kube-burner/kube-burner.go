@@ -306,8 +306,7 @@ func indexCmd() *cobra.Command {
 						Name: jobName,
 					},
 				}
-				prometheusClient.JobList = append(prometheusClient.JobList, prometheusJob)
-				if err := prometheusClient.ScrapeJobsMetrics(); err != nil {
+				if err := prometheusClient.ScrapeJobsMetrics(prometheusJob); err != nil {
 					log.Fatal(err)
 				}
 			}

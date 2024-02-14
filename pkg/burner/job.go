@@ -249,7 +249,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		}
 		if indexer != nil {
 			for _, prometheusClient := range prometheusClients {
-				prometheusClient.ScrapeJobsMetrics()
+				prometheusClient.ScrapeJobsMetrics(executedJobs...)
 			}
 		}
 		if indexer != nil {
