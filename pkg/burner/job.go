@@ -99,6 +99,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metadata)
 		jobList = newExecutorList(configSpec, uuid, timeout)
+		ClientSet, restConfig, err = config.GetClientSet(10, 20)
+		if err != nil {
+			log.Fatalf("Error creating clientSet: %s", err)
+		}
 		for _, job := range jobList {
 			if job.PreLoadImages && job.JobType == config.CreationJob {
 				if err = preLoadImages(job); err != nil {
