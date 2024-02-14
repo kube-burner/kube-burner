@@ -85,7 +85,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	var rc int
 	var executedJobs []prometheus.Job
 	var jobList []Executor
-	var gcWg sync.WaitGroup
+	var msWg, gcWg sync.WaitGroup
 	embedFS = configSpec.EmbedFS
 	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
@@ -97,8 +97,15 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
-		measurements.NewMeasurementFactory(configSpec, indexer, metadata)
+		measurements.NewMeasurementFactory(configSpec, metadata)
 		jobList = newExecutorList(configSpec, uuid, timeout)
+		for _, job := range jobList {
+			if job.PreLoadImages && job.JobType == config.CreationJob {
+				if err = preLoadImages(job); err != nil {
+					log.Fatal(err.Error())
+				}
+			}
+		}
 		// Iterate job list
 		for jobPosition, job := range jobList {
 			var waitListNamespaces []string
@@ -116,11 +123,6 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			}
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
-			if job.PreLoadImages && job.JobType == config.CreationJob {
-				if err = preLoadImages(job); err != nil {
-					log.Fatal(err.Error())
-				}
-			}
 			currentJob := prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
@@ -186,20 +188,22 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := currentJob.End.Sub(currentJob.Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
-				if err = measurements.Stop(); err != nil {
-					errs = append(errs, err)
-					log.Error(err.Error())
-					innerRC = 1
-				}
 			}
-		}
-		if globalConfig.WaitWhenFinished {
-			runWaitList(globalWaitMap, executorMap)
 			if err = measurements.Stop(); err != nil {
 				errs = append(errs, err)
 				log.Error(err.Error())
 				innerRC = 1
 			}
+			if indexer != nil && !job.SkipIndexing {
+				msWg.Add(1)
+				go func() {
+					defer msWg.Done()
+					measurements.Index(indexer)
+				}()
+			}
+		}
+		if globalConfig.WaitWhenFinished {
+			runWaitList(globalWaitMap, executorMap)
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
@@ -224,6 +228,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				})
 			}
 		}
+		// Make sure that measurements have indexed their stuff before we index metrics
+		msWg.Wait()
 		for _, job := range executedJobs {
 			// elapsedTime is recalculated for every job of the list
 			if indexer != nil && !job.JobConfig.SkipIndexing {
@@ -241,10 +247,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				innerRC = 1
 			}
 		}
-		for _, prometheusClient := range prometheusClients {
-			prometheusClient.JobList = executedJobs
-			// If prometheus is enabled query metrics from the start of the first job to the end of the last one
-			if indexer != nil {
+		if indexer != nil {
+			for _, prometheusClient := range prometheusClients {
 				prometheusClient.ScrapeJobsMetrics()
 			}
 		}

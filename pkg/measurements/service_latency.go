@@ -244,14 +244,6 @@ func (s *serviceLatency) stop() error {
 	defer cancel()
 	kutil.CleanupNamespaces(ctx, factory.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
-	if globalCfg.IndexerConfig.Type != "" {
-		if factory.jobConfig.SkipIndexing {
-			log.Infof("Skipping service latency data indexing in job: %s", factory.jobConfig.Name)
-		} else {
-			log.Infof("Indexing service latency data for job: %s", factory.jobConfig.Name)
-			s.index()
-		}
-	}
 	for _, q := range s.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
@@ -287,7 +279,7 @@ func (s *serviceLatency) normalizeMetrics() {
 	}
 }
 
-func (s *serviceLatency) index() {
+func (s *serviceLatency) index(indexer indexers.Indexer) {
 	metricMap := map[string][]interface{}{
 		svcLatencyMetric:               s.normLatencies,
 		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
@@ -300,7 +292,7 @@ func (s *serviceLatency) index() {
 			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
 		}
 		log.Debugf("Indexing [%d] documents: %s", len(documents), metricName)
-		resp, err := (*factory.indexer).Index(documents, indexingOpts)
+		resp, err := indexer.Index(documents, indexingOpts)
 		if err != nil {
 			log.Error(err.Error())
 		} else {

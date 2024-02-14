@@ -232,7 +232,7 @@ func measureCmd() *cobra.Command {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
 			log.Infof("%v", namespaceLabels)
-			measurements.NewMeasurementFactory(configSpec, indexer, metadata)
+			measurements.NewMeasurementFactory(configSpec, metadata)
 			measurements.SetJobConfig(&config.Job{
 				Name:                 jobName,
 				Namespace:            rawNamespaces,
@@ -243,6 +243,7 @@ func measureCmd() *cobra.Command {
 			if err = measurements.Stop(); err != nil {
 				log.Error(err.Error())
 			}
+			measurements.Index(indexer)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")

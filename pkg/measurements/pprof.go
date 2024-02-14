@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -183,6 +184,10 @@ func (p *pprof) collect(measurementWg *sync.WaitGroup) {
 func (p *pprof) stop() error {
 	p.stopChannel <- true
 	return nil
+}
+
+// Fake index function for pprof
+func (p *pprof) index(_ indexers.Indexer) {
 }
 
 func readCerts(cert, privKey string) (string, string, error) {
