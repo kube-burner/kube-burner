@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type measurementFactory struct {
+type MeasurementFactory struct {
 	jobConfig   *config.Job
 	clientSet   *kubernetes.Clientset
 	restConfig  *rest.Config
@@ -42,32 +42,33 @@ type measurement interface {
 	collect(*sync.WaitGroup)
 	setConfig(types.Measurement)
 	validateConfig() error
-	index(indexers.Indexer)
+	index(indexers.Indexer, string)
 }
 
-var factory measurementFactory
+var Factory MeasurementFactory
 var measurementMap = make(map[string]measurement)
 var globalCfg config.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) {
+func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) *MeasurementFactory {
 	globalCfg = configSpec.GlobalConfig
-	factory = measurementFactory{
+	Factory = MeasurementFactory{
 		createFuncs: make(map[string]measurement),
 		metadata:    metadata,
 	}
 	for _, measurement := range globalCfg.Measurements {
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
-			if err := factory.register(measurement, measurementFunc); err != nil {
+			if err := Factory.register(measurement, measurementFunc); err != nil {
 				log.Fatal(err.Error())
 			}
 		} else {
 			log.Warnf("Measurement not found: %s", measurement.Name)
 		}
 	}
+	return &Factory
 }
 
-func (mf *measurementFactory) register(measurement types.Measurement, measurementFunc measurement) error {
+func (mf *MeasurementFactory) register(measurement types.Measurement, measurementFunc measurement) error {
 	if _, exists := mf.createFuncs[measurement.Name]; exists {
 		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
@@ -81,29 +82,29 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 	return nil
 }
 
-func SetJobConfig(jobConfig *config.Job) {
-	factory.jobConfig = jobConfig
-	_, restConfig, err := config.GetClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
+func (mf *MeasurementFactory) SetJobConfig(jobConfig *config.Job) {
+	Factory.jobConfig = jobConfig
+	_, restConfig, err := config.GetClientSet(Factory.jobConfig.QPS, Factory.jobConfig.Burst)
 	if err != nil {
 		log.Fatalf("Error creating clientSet: %s", err)
 	}
-	factory.clientSet = kubernetes.NewForConfigOrDie(restConfig)
-	factory.restConfig = restConfig
+	Factory.clientSet = kubernetes.NewForConfigOrDie(restConfig)
+	Factory.restConfig = restConfig
 }
 
 // Start starts registered measurements
-func Start() {
+func (mf *MeasurementFactory) Start() {
 	var wg sync.WaitGroup
-	for _, measurement := range factory.createFuncs {
+	for _, measurement := range Factory.createFuncs {
 		wg.Add(1)
 		go measurement.start(&wg)
 	}
 	wg.Wait()
 }
 
-func Collect() {
+func (mf *MeasurementFactory) Collect() {
 	var wg sync.WaitGroup
-	for _, measurement := range factory.createFuncs {
+	for _, measurement := range Factory.createFuncs {
 		wg.Add(1)
 		go measurement.collect(&wg)
 	}
@@ -112,18 +113,23 @@ func Collect() {
 
 // Stop stops registered measurements
 // returns a concatenated list of error strings with a new line between each string
-func Stop() error {
+func (mf *MeasurementFactory) Stop() error {
 	errs := []error{}
-	for name, measurement := range factory.createFuncs {
+	for name, measurement := range Factory.createFuncs {
 		log.Infof("Stopping measurement: %s", name)
 		errs = append(errs, measurement.stop())
 	}
 	return utilerrors.NewAggregate(errs)
 }
 
-func Index(indexer *indexers.Indexer) {
-	for name, measurement := range factory.createFuncs {
+// Index iterates through the createFuncs and indexes collected data from each measurement.
+//
+// Parameters:
+//   - indexer: a pointer to the indexer
+//   - jobName: the name of the job, required as this task can be executed from a goroutine
+func (mf *MeasurementFactory) Index(indexer *indexers.Indexer, jobName string) {
+	for name, measurement := range Factory.createFuncs {
 		log.Infof("Indexing collected data from measurement: %s", name)
-		measurement.index(*indexer)
+		measurement.index(*indexer, jobName)
 	}
 }

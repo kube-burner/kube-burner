@@ -100,15 +100,15 @@ func (p *vmiLatency) handleCreateVM(obj interface{}) {
 	vmID := vm.Labels["kubevirt-vm"]
 	p.mu.Lock()
 	if _, exists := p.metrics[vmID]; !exists {
-		if strings.Contains(vm.Namespace, factory.jobConfig.Namespace) {
+		if strings.Contains(vm.Namespace, Factory.jobConfig.Namespace) {
 			p.metrics[vmID] = &vmiMetric{
 				Timestamp:  time.Now().UTC(),
 				Namespace:  vm.Namespace,
 				Name:       vm.Name,
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
-				JobConfig:  *factory.jobConfig,
-				Metadata:   factory.metadata,
+				JobConfig:  *Factory.jobConfig,
+				Metadata:   Factory.metadata,
 			}
 		}
 	}
@@ -144,7 +144,7 @@ func (p *vmiLatency) handleCreateVMI(obj interface{}) {
 	}
 	p.mu.Lock()
 	if _, exists := p.metrics[vmID]; !exists {
-		if strings.Contains(vmi.Namespace, factory.jobConfig.Namespace) {
+		if strings.Contains(vmi.Namespace, Factory.jobConfig.Namespace) {
 			p.metrics[vmID] = &vmiMetric{
 				Timestamp:  time.Now().UTC(),
 				Namespace:  vmi.Namespace,
@@ -278,7 +278,7 @@ func (p *vmiLatency) setConfig(cfg types.Measurement) {
 
 // Start starts vmiLatency measurement
 func (p *vmiLatency) start(measurementWg *sync.WaitGroup) error {
-	if factory.jobConfig.JobType == config.DeletionJob {
+	if Factory.jobConfig.JobType == config.DeletionJob {
 		log.Info("VMI latency measurement not compatible with delete jobs, skipping")
 		return nil
 	}
@@ -287,7 +287,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 		return err
 	}
 	p.metrics = make(map[string]*vmiMetric)
-	log.Infof("Creating VM latency watcher for %s", factory.jobConfig.Name)
+	log.Infof("Creating VM latency watcher for %s", Factory.jobConfig.Name)
 	restClient := newRESTClientWithRegisteredKubevirtResource()
 	p.vmWatcher = metrics.NewWatcher(
 		restClient,
@@ -309,7 +309,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 		return fmt.Errorf("VMI Latency measurement error: %s", err)
 	}
 
-	log.Infof("Creating VMI latency watcher for %s", factory.jobConfig.Name)
+	log.Infof("Creating VMI latency watcher for %s", Factory.jobConfig.Name)
 	p.vmiWatcher = metrics.NewWatcher(
 		restClient,
 		"vmiWatcher",
@@ -330,9 +330,9 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 		return fmt.Errorf("VMI Latency measurement error: %s", err)
 	}
 
-	log.Infof("Creating VMI Pod latency watcher for %s", factory.jobConfig.Name)
+	log.Infof("Creating VMI Pod latency watcher for %s", Factory.jobConfig.Name)
 	p.vmiPodWatcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		Factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"podWatcher",
 		"pods",
 		corev1.NamespaceAll,
@@ -354,7 +354,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 }
 
 func newRESTClientWithRegisteredKubevirtResource() *rest.RESTClient {
-	shallowCopy := factory.restConfig
+	shallowCopy := Factory.restConfig
 	setConfigDefaults(shallowCopy)
 	restClient, err := rest.RESTClientFor(shallowCopy)
 	if err != nil {
@@ -382,7 +382,7 @@ func (p *vmiLatency) collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops vmiLatency measurement
 func (p *vmiLatency) stop() error {
-	if factory.jobConfig.JobType == config.DeletionJob {
+	if Factory.jobConfig.JobType == config.DeletionJob {
 		return nil
 	}
 	p.vmWatcher.StopWatcher()
@@ -395,7 +395,7 @@ func (p *vmiLatency) stop() error {
 }
 
 // index sends metrics to the configured indexer
-func (p *vmiLatency) index(indexer indexers.Indexer) {
+func (p *vmiLatency) index(indexer indexers.Indexer, jobName string) {
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
@@ -404,7 +404,7 @@ func (p *vmiLatency) index(indexer indexers.Indexer) {
 	p.latencyQuantiles, p.normLatencies = nil, nil
 	for metricName, data := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
+			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
 		}
 		log.Debugf("Indexing [%d] documents", len(data))
 		resp, err := indexer.Index(data, indexingOpts)
@@ -463,8 +463,8 @@ func (p *vmiLatency) calcQuantiles() {
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
-		latencySummary.JobConfig = *factory.jobConfig
-		latencySummary.Metadata = factory.metadata
+		latencySummary.JobConfig = *Factory.jobConfig
+		latencySummary.Metadata = Factory.metadata
 		latencySummary.MetricName = podLatencyQuantilesMeasurement
 		return latencySummary
 	}

@@ -83,8 +83,8 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 			Name:       pod.Name,
 			MetricName: podLatencyMeasurement,
 			UUID:       globalCfg.UUID,
-			JobConfig:  *factory.jobConfig,
-			Metadata:   factory.metadata,
+			JobConfig:  *Factory.jobConfig,
+			Metadata:   Factory.metadata,
 		}
 	}
 }
@@ -150,14 +150,14 @@ func (p *podLatency) validateConfig() error {
 // start podLatency measurement
 func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	if factory.jobConfig.JobType == config.DeletionJob {
+	if Factory.jobConfig.JobType == config.DeletionJob {
 		log.Info("Pod latency measurement not compatible with delete jobs, skipping")
 		return nil
 	}
 	p.metrics = make(map[string]podMetric)
-	log.Infof("Creating Pod latency watcher for %s", factory.jobConfig.Name)
+	log.Infof("Creating Pod latency watcher for %s", Factory.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		Factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"podWatcher",
 		"pods",
 		corev1.NamespaceAll,
@@ -182,13 +182,13 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var pods []corev1.Pod
-	labelSelector := labels.SelectorFromSet(factory.jobConfig.NamespaceLabels)
+	labelSelector := labels.SelectorFromSet(Factory.jobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
-	namespaces := strings.Split(factory.jobConfig.Namespace, ",")
+	namespaces := strings.Split(Factory.jobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
-		podList, err := factory.clientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
+		podList, err := Factory.clientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
 		if err != nil {
 			log.Errorf("error listing pods in namespace %s: %v", namespace, err)
 		}
@@ -216,8 +216,8 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			MetricName:      podLatencyMeasurement,
 			NodeName:        pod.Spec.NodeName,
 			UUID:            globalCfg.UUID,
-			JobConfig:       *factory.jobConfig,
-			Metadata:        factory.metadata,
+			JobConfig:       *Factory.jobConfig,
+			Metadata:        Factory.metadata,
 			scheduled:       scheduled,
 			initialized:     initialized,
 			containersReady: containersReady,
@@ -243,7 +243,7 @@ func (p *podLatency) stop() error {
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", Factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
 		log.Infof("Pod latencies error rate was: %.2f", errorRate)
@@ -252,8 +252,8 @@ func (p *podLatency) stop() error {
 }
 
 // index sends metrics to the configured indexer
-func (p *podLatency) index(indexer indexers.Indexer) {
-	log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
+func (p *podLatency) index(indexer indexers.Indexer, jobName string) {
+	log.Infof("Indexing pod latency data for job: %s", jobName)
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
@@ -262,7 +262,7 @@ func (p *podLatency) index(indexer indexers.Indexer) {
 	p.latencyQuantiles, p.normLatencies = nil, nil
 	for metricName, data := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
+			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
 		}
 		log.Debugf("Indexing [%d] documents: %s", len(data), metricName)
 		resp, err := indexer.Index(data, indexingOpts)
@@ -339,8 +339,8 @@ func (p *podLatency) calcQuantiles() {
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
-		latencySummary.JobConfig = *factory.jobConfig
-		latencySummary.Metadata = factory.metadata
+		latencySummary.JobConfig = *Factory.jobConfig
+		latencySummary.Metadata = Factory.metadata
 		latencySummary.MetricName = podLatencyQuantilesMeasurement
 		return latencySummary
 	}

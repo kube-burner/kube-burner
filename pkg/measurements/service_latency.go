@@ -81,10 +81,10 @@ func init() {
 
 func deployAssets() error {
 	var err error
-	if err = kutil.CreateNamespace(factory.clientSet, types.SvcLatencyNs, nil, nil); err != nil {
+	if err = kutil.CreateNamespace(Factory.clientSet, types.SvcLatencyNs, nil, nil); err != nil {
 		return err
 	}
-	if _, err = factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Create(context.TODO(), types.SvcLatencyCheckerPod, metav1.CreateOptions{}); err != nil {
+	if _, err = Factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Create(context.TODO(), types.SvcLatencyCheckerPod, metav1.CreateOptions{}); err != nil {
 		if errors.IsAlreadyExists(err) {
 			log.Warn(err)
 		} else {
@@ -92,7 +92,7 @@ func deployAssets() error {
 		}
 	}
 	err = wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-		pod, err := factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyCheckerPod.Name, metav1.GetOptions{})
+		pod, err := Factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyCheckerPod.Name, metav1.GetOptions{})
 		if err != nil {
 			return true, err
 		}
@@ -130,7 +130,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 		}
 		endpointsReadyTs := time.Now().UTC()
 		log.Debugf("Endpoints %v/%v ready", svc.Namespace, svc.Name)
-		svcLatencyChecker, err := util.NewSvcLatencyChecker(*factory.clientSet, *factory.restConfig)
+		svcLatencyChecker, err := util.NewSvcLatencyChecker(*Factory.clientSet, *Factory.restConfig)
 		if err != nil {
 			log.Error(err)
 		}
@@ -175,9 +175,9 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			MetricName:        svcLatencyMetric,
 			ServiceType:       svc.Spec.Type,
 			ReadyLatency:      svcLatency,
-			JobConfig:         *factory.jobConfig,
+			JobConfig:         *Factory.jobConfig,
 			UUID:              globalCfg.UUID,
-			Metadata:          factory.metadata,
+			Metadata:          Factory.metadata,
 			IPAssignedLatency: ipAssignedLatency,
 		}
 		s.metricLock.Unlock()
@@ -202,9 +202,9 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 		log.Fatal(err)
 		return err
 	}
-	log.Infof("Creating service latency watcher for %s", factory.jobConfig.Name)
+	log.Infof("Creating service latency watcher for %s", Factory.jobConfig.Name)
 	s.svcWatcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		Factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"svcWatcher",
 		"services",
 		corev1.NamespaceAll,
@@ -217,7 +217,7 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 		AddFunc: s.handleCreateSvc,
 	})
 	s.epWatcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		Factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"epWatcher",
 		"endpoints",
 		corev1.NamespaceAll,
@@ -242,12 +242,12 @@ func (s *serviceLatency) stop() error {
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	kutil.CleanupNamespaces(ctx, factory.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
+	kutil.CleanupNamespaces(ctx, Factory.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
 	for _, q := range s.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
-		log.Infof("%s: %s 50th: %dms 99th: %dms max: %dms avg: %dms", factory.jobConfig.Name, pq.QuantileName, pq.P50/1e6, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
+		log.Infof("%s: %s 50th: %dms 99th: %dms max: %dms avg: %dms", Factory.jobConfig.Name, pq.QuantileName, pq.P50/1e6, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
 	}
 	return nil
 }
@@ -265,9 +265,9 @@ func (s *serviceLatency) normalizeMetrics() {
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
-		latencySummary.JobConfig = *factory.jobConfig
+		latencySummary.JobConfig = *Factory.jobConfig
 		latencySummary.Timestamp = time.Now().UTC()
-		latencySummary.Metadata = factory.metadata
+		latencySummary.Metadata = Factory.metadata
 		latencySummary.MetricName = svcLatencyQuantilesMeasurement
 		return latencySummary
 	}
@@ -279,7 +279,7 @@ func (s *serviceLatency) normalizeMetrics() {
 	}
 }
 
-func (s *serviceLatency) index(indexer indexers.Indexer) {
+func (s *serviceLatency) index(indexer indexers.Indexer, jobName string) {
 	metricMap := map[string][]interface{}{
 		svcLatencyMetric:               s.normLatencies,
 		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
@@ -288,7 +288,7 @@ func (s *serviceLatency) index(indexer indexers.Indexer) {
 	s.latencyQuantiles, s.normLatencies = nil, nil
 	for metricName, documents := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
+			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
 		}
 		log.Debugf("Indexing [%d] documents: %s", len(documents), metricName)
 		resp, err := indexer.Index(documents, indexingOpts)

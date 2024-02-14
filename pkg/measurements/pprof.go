@@ -81,7 +81,7 @@ func (p *pprof) start(measurementWg *sync.WaitGroup) error {
 
 func getPods(target types.PProftarget) []corev1.Pod {
 	labelSelector := labels.Set(target.LabelSelector).String()
-	podList, err := factory.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+	podList, err := Factory.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		log.Errorf("Error found listing pods labeled with %s: %s", labelSelector, err)
 	}
@@ -142,7 +142,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				} else {
 					command = []string{"curl", "-sSLk", target.URL}
 				}
-				req := factory.clientSet.CoreV1().
+				req := Factory.clientSet.CoreV1().
 					RESTClient().
 					Post().
 					Resource("pods").
@@ -158,7 +158,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					Stdout:    true,
 				}, scheme.ParameterCodec)
 				log.Debugf("Executing %s in pod %s", command, pod.Name)
-				exec, err := remotecommand.NewSPDYExecutor(factory.restConfig, "POST", req.URL())
+				exec, err := remotecommand.NewSPDYExecutor(Factory.restConfig, "POST", req.URL())
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
 				}
@@ -187,7 +187,7 @@ func (p *pprof) stop() error {
 }
 
 // Fake index function for pprof
-func (p *pprof) index(_ indexers.Indexer) {
+func (p *pprof) index(_ indexers.Indexer, _ string) {
 }
 
 func readCerts(cert, privKey string) (string, string, error) {
@@ -220,7 +220,7 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 		"/tmp/pprof.key": privKey,
 	}
 	for dest, f := range fMap {
-		req := factory.clientSet.CoreV1().
+		req := Factory.clientSet.CoreV1().
 			RESTClient().
 			Post().
 			Resource("pods").
@@ -234,7 +234,7 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 			Stderr:    true,
 			Stdout:    false,
 		}, scheme.ParameterCodec)
-		exec, err := remotecommand.NewSPDYExecutor(factory.restConfig, "POST", req.URL())
+		exec, err := remotecommand.NewSPDYExecutor(Factory.restConfig, "POST", req.URL())
 		if err != nil {
 			return fmt.Errorf("Failed to establish SPDYExecutor on %s: %s", pod.Name, err)
 		}

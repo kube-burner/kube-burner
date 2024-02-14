@@ -97,7 +97,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
-		measurements.NewMeasurementFactory(configSpec, metadata)
+		mf := measurements.NewMeasurementFactory(configSpec, metadata)
 		jobList = newExecutorList(configSpec, uuid, timeout)
 		ClientSet, restConfig, err = config.GetClientSet(10, 20)
 		if err != nil {
@@ -131,9 +131,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
 			}
-			measurements.SetJobConfig(&job.Job)
+			mf.SetJobConfig(&job.Job)
 			log.Infof("Triggering job: %s", job.Name)
-			measurements.Start()
+			mf.Start()
 			switch job.JobType {
 			case config.CreationJob:
 				if job.Cleanup {
@@ -193,17 +193,17 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				elapsedTime := currentJob.End.Sub(currentJob.Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
-			if err = measurements.Stop(); err != nil {
+			if err = mf.Stop(); err != nil {
 				errs = append(errs, err)
 				log.Error(err.Error())
 				innerRC = 1
 			}
 			if indexer != nil && !job.SkipIndexing {
 				msWg.Add(1)
-				go func() {
+				go func(jobName string) {
 					defer msWg.Done()
-					measurements.Index(indexer)
-				}()
+					mf.Index(indexer, jobName)
+				}(job.Name)
 			}
 		}
 		if globalConfig.WaitWhenFinished {
