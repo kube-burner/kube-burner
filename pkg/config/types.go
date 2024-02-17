@@ -150,6 +150,8 @@ type Job struct {
 	NamespaceAnnotations map[string]string `yaml:"namespaceAnnotations" json:"-"`
 	// Churn workload
 	Churn bool `yaml:"churn" json:"churn,omitempty"`
+	// Churn cycles
+	ChurnCycles int `yaml:"churnCycles" json:"churnCycles,omitempty"`
 	// Churn percentage
 	ChurnPercent int `yaml:"churnPercent" json:"churnPercent,omitempty"`
 	// Churn duration

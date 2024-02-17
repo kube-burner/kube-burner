@@ -12,6 +12,7 @@ setup_file() {
   export BURST=3
   export GC=true
   export CHURN=false
+  export CHURN_CYCLES=100
   setup-kind
   setup-prometheus
 }
@@ -35,6 +36,7 @@ teardown_file() {
 
 @test "kube-burner init: churn=true" {
   export CHURN=true
+  export CHURN_CYCLES=2
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"

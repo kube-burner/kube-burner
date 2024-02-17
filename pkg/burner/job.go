@@ -136,6 +136,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				}
 				if job.Churn {
 					log.Info("Churning enabled")
+					log.Infof("Churn cycles: %v", job.ChurnCycles)
 					log.Infof("Churn duration: %v", job.ChurnDuration)
 					log.Infof("Churn percent: %v", job.ChurnPercent)
 					log.Infof("Churn delay: %v", job.ChurnDelay)
