@@ -109,7 +109,6 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	var wg sync.WaitGroup
 	var ns string
 	var err error
-	log.Infof("Running job %s", ex.Name)
 	for label, value := range ex.NamespaceLabels {
 		nsLabels[label] = value
 	}

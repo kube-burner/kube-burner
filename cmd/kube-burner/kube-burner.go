@@ -232,7 +232,7 @@ func measureCmd() *cobra.Command {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
 			log.Infof("%v", namespaceLabels)
-			measurements.NewMeasurementFactory(configSpec, indexer, metadata)
+			measurements.NewMeasurementFactory(configSpec, metadata)
 			measurements.SetJobConfig(&config.Job{
 				Name:                 jobName,
 				Namespace:            rawNamespaces,
@@ -243,6 +243,7 @@ func measureCmd() *cobra.Command {
 			if err = measurements.Stop(); err != nil {
 				log.Error(err.Error())
 			}
+			measurements.Index(indexer, jobName)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
@@ -305,8 +306,7 @@ func indexCmd() *cobra.Command {
 						Name: jobName,
 					},
 				}
-				prometheusClient.JobList = append(prometheusClient.JobList, prometheusJob)
-				if err := prometheusClient.ScrapeJobsMetrics(); err != nil {
+				if err := prometheusClient.ScrapeJobsMetrics(prometheusJob); err != nil {
 					log.Fatal(err)
 				}
 			}

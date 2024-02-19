@@ -150,10 +150,6 @@ func (p *podLatency) validateConfig() error {
 // start podLatency measurement
 func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	if factory.jobConfig.JobType == config.DeletionJob {
-		log.Info("Pod latency measurement not compatible with delete jobs, skipping")
-		return nil
-	}
 	p.metrics = make(map[string]podMetric)
 	log.Infof("Creating Pod latency watcher for %s", factory.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
@@ -228,9 +224,6 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops podLatency measurement
 func (p *podLatency) stop() error {
-	if factory.jobConfig.JobType == config.DeletionJob {
-		return nil
-	}
 	var err error
 	if p.watcher != nil {
 		p.watcher.StopWatcher()
@@ -244,13 +237,6 @@ func (p *podLatency) stop() error {
 	if len(p.config.LatencyThresholds) > 0 {
 		err = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
 	}
-	if globalCfg.IndexerConfig.Type != "" {
-		if factory.jobConfig.SkipIndexing {
-			log.Infof("Skipping pod latency data indexing in job: %s", factory.jobConfig.Name)
-		} else {
-			p.index()
-		}
-	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
@@ -258,27 +244,24 @@ func (p *podLatency) stop() error {
 	if errorRate > 0 {
 		log.Infof("Pod latencies error rate was: %.2f", errorRate)
 	}
-	// Reset latency slices, required in multi-job benchmarks
-	p.latencyQuantiles, p.normLatencies = nil, nil
 	return err
 }
 
 // index sends metrics to the configured indexer
-func (p *podLatency) index() {
-	log.Infof("Indexing pod latency data for job: %s", factory.jobConfig.Name)
+func (p *podLatency) index(indexer indexers.Indexer, jobName string) {
+	log.Infof("Indexing pod latency data for job: %s", jobName)
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
 	}
-	if p.config.PodLatencyMetrics == types.Quantiles {
-		delete(metricMap, podLatencyMeasurement)
-	}
+	// Reset latency slices, required in multi-job benchmarks
+	p.latencyQuantiles, p.normLatencies = nil, nil
 	for metricName, data := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
+			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
 		}
 		log.Debugf("Indexing [%d] documents: %s", len(data), metricName)
-		resp, err := (*factory.indexer).Index(data, indexingOpts)
+		resp, err := indexer.Index(data, indexingOpts)
 		if err != nil {
 			log.Error(err.Error())
 		} else {

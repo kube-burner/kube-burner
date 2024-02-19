@@ -78,7 +78,6 @@ func CleanupNamespaces(ctx context.Context, clientSet *kubernetes.Clientset, lab
 }
 
 func waitForDeleteNamespaces(ctx context.Context, clientSet *kubernetes.Clientset, labelSelector string) {
-	log.Info("Waiting for namespaces to be definitely deleted")
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		ns, err := clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
