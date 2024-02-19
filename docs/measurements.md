@@ -15,7 +15,7 @@ Collects latencies from the different pod startup phases, these **latency metric
 
 ### Metrics
 
-The metrics collected are pod latency timeeries (`podLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`). It's possible to skip indexing the `podLatencyMeasurement` metric by configuring the field `podLatencyMetrics` of this measurement to `quantiles`.
+The metrics collected are pod latency timeeries (`podLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`).
 
 One document, such as the following, is indexed per each pod created by the workload that enters in `Running` condition during the workload:
 

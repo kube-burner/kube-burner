@@ -33,7 +33,6 @@ type measurementFactory struct {
 	clientSet   *kubernetes.Clientset
 	restConfig  *rest.Config
 	createFuncs map[string]measurement
-	indexer     *indexers.Indexer
 	metadata    map[string]interface{}
 }
 
@@ -43,6 +42,7 @@ type measurement interface {
 	collect(*sync.WaitGroup)
 	setConfig(types.Measurement)
 	validateConfig() error
+	index(indexers.Indexer, string)
 }
 
 var factory measurementFactory
@@ -50,11 +50,10 @@ var measurementMap = make(map[string]measurement)
 var globalCfg config.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(configSpec config.Spec, indexer *indexers.Indexer, metadata map[string]interface{}) {
+func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) {
 	globalCfg = configSpec.GlobalConfig
 	factory = measurementFactory{
 		createFuncs: make(map[string]measurement),
-		indexer:     indexer,
 		metadata:    metadata,
 	}
 	for _, measurement := range globalCfg.Measurements {
@@ -120,4 +119,16 @@ func Stop() error {
 		errs = append(errs, measurement.stop())
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+// Index iterates through the createFuncs and indexes collected data from each measurement.
+//
+// Parameters:
+//   - indexer: a pointer to the indexer
+//   - jobName: the name of the job, required as this task can be executed from a goroutine
+func Index(indexer *indexers.Indexer, jobName string) {
+	for name, measurement := range factory.createFuncs {
+		log.Infof("Indexing collected data from measurement: %s", name)
+		measurement.index(*indexer, jobName)
+	}
 }
