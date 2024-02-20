@@ -22,7 +22,7 @@ func ClusterHealthyVanillaK8s(clientset *kubernetes.Clientset) bool {
 	var isHealthy = true
 	nodes, err := clientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		log.Errorf("Error getting nodes: %v\n", err)
+		log.Errorf("Error getting nodes: %v", err)
 		return false
 	}
 
