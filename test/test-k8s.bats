@@ -33,6 +33,7 @@ teardown_file() {
   $OCI_BIN rm -f prometheus
 }
 
+
 @test "kube-burner init: churn=true" {
   export CHURN=true
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
@@ -104,4 +105,8 @@ teardown_file() {
 @test "kube-burner init: read; os-indexing=true" {
   export INDEXING_TYPE=opensearch
   run_cmd kube-burner init -c kube-burner-read.yml --uuid "${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml
+}
+
+@test "kube-burner cluster health check" {
+  run_cmd kube-burner health-check
 }
