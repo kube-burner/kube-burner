@@ -324,6 +324,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.ChurnPercent*ex.JobIterations/100), 1))
 	now := time.Now().UTC()
+	cyclesCount := 0
 	rand.NewSource(now.UnixNano())
 	// Create timer for the churn duration
 	timer := time.After(ex.ChurnDuration)
@@ -336,6 +337,11 @@ func (ex *Executor) RunCreateJobWithChurn() {
 			return
 		default:
 			log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
+		}
+		// Exit if churn cycles are completed
+		if ex.ChurnCycles > 0 && cyclesCount >= ex.ChurnCycles {
+			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnCycles)
+			return
 		}
 		// Max amount of churn is 100% of namespaces
 		randStart := 1
@@ -373,5 +379,6 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		ex.RunCreateJob(randStart, numToChurn+randStart, &[]string{})
 		log.Infof("Sleeping for %v", ex.ChurnDelay)
 		time.Sleep(ex.ChurnDelay)
+		cyclesCount++
 	}
 }

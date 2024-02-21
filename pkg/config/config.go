@@ -86,6 +86,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		PreLoadImages:          true,
 		PreLoadPeriod:          1 * time.Minute,
 		Churn:                  false,
+		ChurnCycles:            100,
 		ChurnPercent:           10,
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,

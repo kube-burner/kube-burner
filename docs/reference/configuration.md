@@ -67,6 +67,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `namespaceLabels`        | Add custom labels to the namespaces created by kube-burner                                                                        | Object   | {}      |
 | `namespaceAnnotations`   | Add custom annotations to the namespaces created by kube-burner                                                                   | Object   | {}      |
 | `churn`                  | Churn the workload. Only supports namespace based workloads                                                                       | Boolean  | false   |
+| `churnCycles`           | Number of churn cycles to execute   | Integer | 100
 | `churnPercent`           | Percentage of the jobIterations to churn each period                                                                              | Integer  | 10      |
 | `churnDuration`          | Length of time that the job is churned for                                                                                        | Duration | 1h      |
 | `churnDelay`             | Length of time to wait between each churn period                                                                                  | Duration | 5m      |
