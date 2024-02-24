@@ -97,6 +97,8 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
+		var churnStart *time.Time
+		var churnEnd *time.Time
 		measurements.NewMeasurementFactory(configSpec, metadata)
 		jobList = newExecutorList(configSpec, uuid, timeout)
 		ClientSet, restConfig, err = config.GetClientSet(rest.DefaultQPS, rest.DefaultBurst)
@@ -160,7 +162,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					log.Error(err.Error())
 				}
 				if job.Churn {
+					currentJob.ChurnStart = time.Now().UTC()
 					job.RunCreateJobWithChurn()
+					currentJob.ChurnEnd = time.Now().UTC()
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
@@ -243,11 +247,19 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 					EndTimestamp: job.End,
 					ElapsedTime:  job.End.Sub(job.Start).Round(time.Second).Seconds(),
 				}
+				if !job.ChurnStart.IsZero() {
+					jobTimings.ChurnStartTimestamp = &job.ChurnStart
+					jobTimings.ChurnEndTimestamp = &job.ChurnEnd
+					if churnStart == nil {
+						churnStart = &job.ChurnStart
+					}
+					churnEnd = &job.ChurnEnd
+				}
 				indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
 			}
 		}
 		for _, alertM := range alertMs {
-			if err := alertM.Evaluate(executedJobs[0].Start, executedJobs[len(jobList)-1].End); err != nil {
+			if err := alertM.Evaluate(executedJobs[0].Start, executedJobs[len(jobList)-1].End, churnStart, churnEnd); err != nil {
 				errs = append(errs, err)
 				innerRC = 1
 			}

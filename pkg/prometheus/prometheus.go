@@ -84,14 +84,14 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 			query := renderedQuery.String()
 			renderedQuery.Reset()
 			if md.Instant {
-				docsToIndex[md.MetricName+"-start"] = append(docsToIndex[md.MetricName+"-start"], p.runInstantQuery(query, md.MetricName+"-start", jobStart, eachJob.JobConfig)...)
-				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob.JobConfig)...)
+				docsToIndex[md.MetricName+"-start"] = append(docsToIndex[md.MetricName+"-start"], p.runInstantQuery(query, md.MetricName+"-start", jobStart, eachJob)...)
+				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob)...)
 			} else {
 				requiresInstant = ((jobEnd.Sub(jobStart).Milliseconds())%(p.Step.Milliseconds()) != 0)
-				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runRangeQuery(query, md.MetricName, jobStart, jobEnd, eachJob.JobConfig)...)
+				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runRangeQuery(query, md.MetricName, jobStart, jobEnd, eachJob)...)
 			}
 			if requiresInstant {
-				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob.JobConfig)...)
+				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob)...)
 			}
 		}
 	}
@@ -100,27 +100,27 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 }
 
 // Parse vector parses results for an instant query
-func (p *Prometheus) parseVector(metricName, query string, jobConfig config.Job, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseVector(metricName, query string, job Job, value model.Value, metrics *[]interface{}) error {
 	data, ok := value.(model.Vector)
 	if !ok {
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, vector := range data {
-		m := p.createMetric(query, metricName, jobConfig, vector.Metric, vector.Value, vector.Timestamp.Time().UTC())
+		m := p.createMetric(query, metricName, job, vector.Metric, vector.Value, vector.Timestamp.Time().UTC(), true)
 		*metrics = append(*metrics, m)
 	}
 	return nil
 }
 
 // Parse matrix parses results for an non-instant query
-func (p *Prometheus) parseMatrix(metricName, query string, jobConfig config.Job, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.Value, metrics *[]interface{}) error {
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
 	}
 	for _, matrix := range data {
 		for _, val := range matrix.Values {
-			m := p.createMetric(query, metricName, jobConfig, matrix.Metric, val.Value, val.Timestamp.Time().UTC())
+			m := p.createMetric(query, metricName, job, matrix.Metric, val.Value, val.Timestamp.Time().UTC(), false)
 			*metrics = append(*metrics, m)
 		}
 	}
@@ -158,13 +158,13 @@ func (p *Prometheus) ReadProfile(metricsProfile string) error {
 }
 
 // Create metric creates metric to be indexed
-func (p *Prometheus) createMetric(query, metricName string, jobConfig config.Job, labels model.Metric, value model.SampleValue, timestamp time.Time) metric {
+func (p *Prometheus) createMetric(query, metricName string, job Job, labels model.Metric, value model.SampleValue, timestamp time.Time, isInstant bool) metric {
 	m := metric{
 		Labels:     make(map[string]string),
 		UUID:       p.UUID,
 		Query:      query,
 		MetricName: metricName,
-		JobConfig:  jobConfig,
+		JobConfig:  job.JobConfig,
 		Timestamp:  timestamp,
 		Metadata:   p.metadata,
 	}
@@ -178,11 +178,14 @@ func (p *Prometheus) createMetric(query, metricName string, jobConfig config.Job
 	} else {
 		m.Value = float64(value)
 	}
+	if !isInstant && timestamp.After(job.ChurnStart) && timestamp.Before(job.ChurnEnd) {
+		m.ChurnMetric = true
+	}
 	return m
 }
 
 // runInstantQuery function to run an instant query
-func (p *Prometheus) runInstantQuery(query, metricName string, timestamp time.Time, jobConfig config.Job) []interface{} {
+func (p *Prometheus) runInstantQuery(query, metricName string, timestamp time.Time, job Job) []interface{} {
 	var v model.Value
 	var err error
 	var datapoints []interface{}
@@ -191,14 +194,14 @@ func (p *Prometheus) runInstantQuery(query, metricName string, timestamp time.Ti
 		log.Warnf("Error found with query %s: %s", query, err)
 		return []interface{}{}
 	}
-	if err = p.parseVector(metricName, query, jobConfig, v, &datapoints); err != nil {
+	if err = p.parseVector(metricName, query, job, v, &datapoints); err != nil {
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
 	}
 	return datapoints
 }
 
 // runRangeQuery function to run a range query
-func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd time.Time, jobConfig config.Job) []interface{} {
+func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd time.Time, job Job) []interface{} {
 	var v model.Value
 	var err error
 	var datapoints []interface{}
@@ -208,7 +211,7 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 		log.Warnf("Error found with query %s: %s", query, err)
 		return []interface{}{}
 	}
-	if err = p.parseMatrix(metricName, query, jobConfig, v, &datapoints); err != nil {
+	if err = p.parseMatrix(metricName, query, job, v, &datapoints); err != nil {
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
 	}
 	return datapoints

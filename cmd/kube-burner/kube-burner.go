@@ -459,7 +459,7 @@ func alertCmd() *cobra.Command {
 			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p, false); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
-			err = alertM.Evaluate(startTime, endTime)
+			err = alertM.Evaluate(startTime, endTime, nil, nil)
 			log.Info("👋 Exiting kube-burner ", uuid)
 			if err != nil {
 				os.Exit(1)
