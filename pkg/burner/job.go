@@ -179,7 +179,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				cmd.Stderr = &errb
 				err := cmd.Run()
 				if err != nil {
-					log.Infof("BeforeCleanup failed: %v", err)
+					err = fmt.Errorf("BeforeCleanup failed: %v", err)
+					log.Error(err.Error())
+					errs = append(errs, err)
+					innerRC = 1
 				}
 				log.Infof("BeforeCleanup out: %v, err: %v", outb.String(), errb.String())
 			}
