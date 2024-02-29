@@ -24,26 +24,16 @@ import (
 
 // Processes common config and executes according to the caller
 func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
+	if len(scraperConfig.ConfigSpec.MetricsEndpoints) == 0 && scraperConfig.MetricsEndpoint == "" {
+		return Scraper{}
+	}
 	var err error
+	var indexer *indexers.Indexer
 	var indexerList []indexers.Indexer
-	var metricsEndpoints []metricEndpoint
 	var prometheusClients []*prometheus.Prometheus
 	var alertM *alerting.AlertManager
 	var alertMs []*alerting.AlertManager
-	if scraperConfig.MetricsEndpoint != "" && scraperConfig.URL != "" {
-		log.Fatal("Please use either of --metrics-endpoint or --prometheus-url flags to fetch metrics or alerts")
-	}
 	metadata := make(map[string]interface{})
-	for pos, indexer := range scraperConfig.ConfigSpec.Indexers {
-		if indexer.Type != "" {
-			log.Infof("📁 Creating indexer: %s", indexer.Type)
-			idx, err := indexers.NewIndexer(indexer.IndexerConfig)
-			if err != nil {
-				log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
-			}
-			indexerList = append(indexerList, *idx)
-		}
-	}
 	if scraperConfig.UserMetaData != "" {
 		metadata, err = util.ReadUserMetadata(scraperConfig.UserMetaData)
 		if err != nil {
@@ -54,52 +44,39 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	for k, v := range scraperConfig.RawMetadata {
 		metadata[k] = v
 	}
-	// Set up prometheusClients when Prometheus URl or MetricsEndpoint are set
-	if scraperConfig.URL != "" || scraperConfig.MetricsEndpoint != "" {
-		if scraperConfig.MetricsEndpoint != "" {
-			DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint, &metricsEndpoints)
-		} else {
-			for _, metricsProfile := range scraperConfig.MetricsProfiles {
-				metricsEndpoints = append(metricsEndpoints, metricEndpoint{
-					Endpoint:    scraperConfig.URL,
-					Token:       scraperConfig.Token,
-					Profile:     metricsProfile,
-					Username:    scraperConfig.Username,
-					Password:    scraperConfig.Password,
-					EmbedConfig: scraperConfig.EmbedConfig,
-				})
+	// MetricsEndpoint has preference over the configuration file
+	if scraperConfig.MetricsEndpoint != "" {
+		scraperConfig.ConfigSpec.MetricsEndpoints = DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint)
+	}
+	for pos, metricsEndpoint := range scraperConfig.ConfigSpec.MetricsEndpoints {
+		if metricsEndpoint.Type != "" {
+			log.Infof("📁 Creating indexer: %s", metricsEndpoint.Type)
+			indexer, err = indexers.NewIndexer(metricsEndpoint.IndexerConfig)
+			if err != nil {
+				log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 			}
-			for _, alertProfile := range scraperConfig.AlertProfiles {
-				metricsEndpoints = append(metricsEndpoints, metricEndpoint{
-					Endpoint:     scraperConfig.URL,
-					Token:        scraperConfig.Token,
-					AlertProfile: alertProfile,
-					Username:     scraperConfig.Username,
-					Password:     scraperConfig.Password,
-					EmbedConfig:  scraperConfig.EmbedConfig,
-				})
-			}
+			indexerList = append(indexerList, *indexer)
 		}
-		for _, metricsEndpoint := range metricsEndpoints {
+		if metricsEndpoint.PrometheusURL != "" {
 			auth := prometheus.Auth{
 				Username:      metricsEndpoint.Username,
 				Password:      metricsEndpoint.Password,
 				Token:         metricsEndpoint.Token,
-				SkipTLSVerify: scraperConfig.SkipTLSVerify,
+				SkipTLSVerify: metricsEndpoint.PrometheusSkipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(scraperConfig.ConfigSpec, metricsEndpoint.Endpoint, auth, scraperConfig.PrometheusStep, metadata, metricsEndpoint.EmbedConfig, indexerList...)
+			p, err := prometheus.NewPrometheusClient(scraperConfig.ConfigSpec, metricsEndpoint.PrometheusURL, auth, metricsEndpoint.PrometheusStep, metadata, metricsEndpoint.EmbedConfig, *indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if metricsEndpoint.Profile != "" {
-				err = p.ReadProfile(metricsEndpoint.Profile)
-				if err != nil {
-					log.Fatal(err)
+			for _, metricProfile := range metricsEndpoint.Metrics {
+				if err := p.ReadProfile(metricProfile); err != nil {
+					log.Fatal(err.Error())
 				}
 				prometheusClients = append(prometheusClients, p)
 			}
-			if metricsEndpoint.AlertProfile != "" {
-				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, metricsEndpoint.EmbedConfig, indexerList...); err != nil {
+			prometheusClients = append(prometheusClients, p)
+			for _, alertProfile := range metricsEndpoint.Alerts {
+				if alertM, err = alerting.NewAlertManager(alertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, metricsEndpoint.EmbedConfig, *indexer); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
 				}
 				alertMs = append(alertMs, alertM)

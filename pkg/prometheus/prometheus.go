@@ -33,7 +33,7 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool, indexers ...indexers.Indexer) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool, indexer indexers.Indexer) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:        step,
@@ -42,14 +42,11 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 		Endpoint:    url,
 		metadata:    metadata,
 		embedConfig: embedConfig,
-		indexers:    indexers,
+		indexer:     indexer,
 	}
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
 	p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
-	if err != nil {
-		return &p, err
-	}
-	return &p, nil
+	return &p, err
 }
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
@@ -59,43 +56,41 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 		return nil
 	}
 	docsToIndex := make(map[string][]interface{})
-	start := jobList[0].Start
-	end := jobList[len(jobList)-1].End
-	log.Infof("🔍 Scraping %v Profile: %v Start: %v End: %v",
-		p.Endpoint,
-		p.profileName,
-		start.Format(time.RFC3339),
-		end.Format(time.RFC3339))
-	elapsed := int(end.Sub(start).Seconds())
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
-	vars["elapsed"] = fmt.Sprintf("%ds", elapsed)
 	for _, eachJob := range jobList {
+		jobStart := eachJob.Start
+		jobEnd := eachJob.End
+		vars["elapsed"] = fmt.Sprintf("%ds", int(jobEnd.Sub(jobStart).Seconds()))
 		if eachJob.JobConfig.SkipIndexing {
 			log.Infof("Skipping indexing in job: %v", eachJob.JobConfig.Name)
 			continue
 		}
-		jobStart := eachJob.Start
-		jobEnd := eachJob.End
-		log.Info("Scraping metrics for job: ", eachJob.JobConfig.Name)
-		for _, md := range p.MetricProfile {
-			requiresInstant := false
-			t, _ := template.New("").Parse(md.Query)
-			if err := t.Execute(&renderedQuery, vars); err != nil {
-				log.Warnf("Error rendering query: %v", err)
-				continue
-			}
-			query := renderedQuery.String()
-			renderedQuery.Reset()
-			if md.Instant {
-				docsToIndex[md.MetricName+"-start"] = append(docsToIndex[md.MetricName+"-start"], p.runInstantQuery(query, md.MetricName+"-start", jobStart, eachJob)...)
-				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob)...)
-			} else {
-				requiresInstant = ((jobEnd.Sub(jobStart).Milliseconds())%(p.Step.Milliseconds()) != 0)
-				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runRangeQuery(query, md.MetricName, jobStart, jobEnd, eachJob)...)
-			}
-			if requiresInstant {
-				docsToIndex[md.MetricName] = append(docsToIndex[md.MetricName], p.runInstantQuery(query, md.MetricName, jobEnd, eachJob)...)
+		for _, metricProfile := range p.MetricProfiles {
+			log.Infof("🔍 Endpoint: %v; profile: %v start: %v end: %v; job: %v", p.Endpoint,
+				metricProfile.name,
+				jobStart.Format(time.RFC3339),
+				jobEnd.Format(time.RFC3339),
+				eachJob.JobConfig.Name)
+			for _, metric := range metricProfile.metrics {
+				requiresInstant := false
+				t, _ := template.New("").Parse(metric.Query)
+				if err := t.Execute(&renderedQuery, vars); err != nil {
+					log.Warnf("Error rendering query: %v", err)
+					continue
+				}
+				query := renderedQuery.String()
+				renderedQuery.Reset()
+				if metric.Instant {
+					docsToIndex[metric.MetricName+"-start"] = append(docsToIndex[metric.MetricName+"-start"], p.runInstantQuery(query, metric.MetricName+"-start", jobStart, eachJob)...)
+					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
+				} else {
+					requiresInstant = ((jobEnd.Sub(jobStart).Milliseconds())%(p.Step.Milliseconds()) != 0)
+					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runRangeQuery(query, metric.MetricName, jobStart, jobEnd, eachJob)...)
+				}
+				if requiresInstant {
+					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
+				}
 			}
 		}
 	}
@@ -132,32 +127,36 @@ func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.
 }
 
 // ReadProfile reads, parses and validates metric profile configuration
-func (p *Prometheus) ReadProfile(metricsProfile string) error {
+func (p *Prometheus) ReadProfile(location string) error {
 	var f io.Reader
 	var err error
 	if p.embedConfig {
-		metricsProfile = path.Join(path.Dir(p.ConfigSpec.EmbedFSDir), metricsProfile)
-		f, err = util.ReadEmbedConfig(p.ConfigSpec.EmbedFS, metricsProfile)
+		location = path.Join(path.Dir(p.ConfigSpec.EmbedFSDir), location)
+		f, err = util.ReadEmbedConfig(p.ConfigSpec.EmbedFS, location)
 	} else {
-		f, err = util.ReadConfig(metricsProfile)
+		f, err = util.ReadConfig(location)
 	}
-	p.profileName = metricsProfile
+	p.profileName = location
 	if err != nil {
-		return fmt.Errorf("error reading metrics profile %s: %s", metricsProfile, err)
+		return fmt.Errorf("error reading metrics profile %s: %s", location, err)
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
-	if err = yamlDec.Decode(&p.MetricProfile); err != nil {
-		return fmt.Errorf("error decoding metrics profile %s: %s", metricsProfile, err)
+	metricProfile := metricProfile{
+		name: location,
 	}
-	for i, md := range p.MetricProfile {
+	if err = yamlDec.Decode(&metricProfile.metrics); err != nil {
+		return fmt.Errorf("error decoding metrics profile %s: %s", location, err)
+	}
+	for i, md := range metricProfile.metrics {
 		if md.Query == "" {
-			return fmt.Errorf("query not defined in %d element", i)
+			return fmt.Errorf("query not defined in query number %d", i+1)
 		}
 		if md.MetricName == "" {
-			return fmt.Errorf("metricName not defined in %d element", i)
+			return fmt.Errorf("metricName not defined in query number %d", i+1)
 		}
 	}
+	p.MetricProfiles = append(p.MetricProfiles, metricProfile)
 	return nil
 }
 
@@ -224,13 +223,11 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 func (p *Prometheus) indexDatapoints(docsToIndex map[string][]interface{}) {
 	for metricName, docs := range docsToIndex {
 		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
-		for _, indexer := range p.indexers {
-			resp, err := indexer.Index(docs, indexers.IndexingOpts{MetricName: metricName})
-			if err != nil {
-				log.Error(err.Error())
-			} else {
-				log.Info(resp)
-			}
+		resp, err := p.indexer.Index(docs, indexers.IndexingOpts{MetricName: metricName})
+		if err != nil {
+			log.Error(err.Error())
+		} else {
+			log.Info(resp)
 		}
 	}
 }

@@ -203,13 +203,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				innerRC = 1
 			}
 			if !job.SkipIndexing {
-				for _, indexer := range metricsScraper.IndexerList {
-					msWg.Add(1)
-					go func(jobName string, indexer indexers.Indexer) {
-						defer msWg.Done()
-						measurements.Index(indexer, jobName)
-					}(job.Name, indexer)
-				}
+				msWg.Add(1)
+				go func(jobName string) {
+					defer msWg.Done()
+					measurements.Index(jobName, metricsScraper.IndexerList)
+				}(job.Name)
 			}
 		}
 		if globalConfig.WaitWhenFinished {
@@ -257,7 +255,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 						}
 						churnEnd = &job.ChurnEnd
 					}
-					indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metricsScraper.Metadata)
+					indexJobSummary(indexer, uuid, jobTimings, job.JobConfig, metricsScraper.Metadata)
 				}
 			}
 		}
@@ -270,7 +268,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		for _, prometheusClient := range metricsScraper.PrometheusClients {
 			prometheusClient.ScrapeJobsMetrics(executedJobs...)
 		}
-		for _, indexer := range configSpec.Indexers {
+		for _, indexer := range configSpec.MetricsEndpoints {
 			if indexer.IndexerConfig.Type == indexers.LocalIndexer && indexer.IndexerConfig.CreateTarball {
 				metrics.CreateTarball(indexer.IndexerConfig)
 			}

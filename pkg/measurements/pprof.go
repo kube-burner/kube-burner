@@ -187,7 +187,7 @@ func (p *pprof) stop() error {
 }
 
 // Fake index function for pprof
-func (p *pprof) index(_ indexers.Indexer, _ string) {
+func (p *pprof) index(_ string, _ []indexers.Indexer) {
 }
 
 func readCerts(cert, privKey string) (string, string, error) {

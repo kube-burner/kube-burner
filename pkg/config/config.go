@@ -16,7 +16,6 @@ package config
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -29,7 +28,6 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -49,19 +47,21 @@ var configSpec = Spec{
 }
 
 // UnmarshalYAML unmarshals YAML data into the Indexer struct.
-func (i *Indexer) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	type rawIndexer Indexer
+func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawIndexer MetricsEndpoint
 	indexer := rawIndexer{
 		IndexerConfig: indexers.IndexerConfig{
 			InsecureSkipVerify: false,
 			MetricsDirectory:   "collected-metrics",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
+		PrometheusSkipTLSVerify: true,
+		PrometheusStep:          30 * time.Second,
 	}
 	if err := unmarshal(&indexer); err != nil {
 		return err
 	}
-	*i = Indexer(indexer)
+	*i = MetricsEndpoint(indexer)
 	return nil
 }
 
@@ -156,11 +156,6 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 		}
 	}
 	configSpec.GlobalConfig.UUID = uuid
-	for i, indexer := range configSpec.Indexers {
-		if indexer.MetricsDirectory == "collected-metrics" {
-			configSpec.Indexers[i].MetricsDirectory += "-" + uuid
-		}
-	}
 	return configSpec, nil
 }
 
@@ -201,30 +196,6 @@ func (p *KubeClientProvider) ClientSet(QPS float32, burst int) (kubernetes.Inter
 	restConfig.QPS, restConfig.Burst = QPS, burst
 	restConfig.Timeout = configSpec.GlobalConfig.RequestTimeout
 	return kubernetes.NewForConfigOrDie(&restConfig), &restConfig
-}
-
-// FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
-func FetchConfigMap(configMap, namespace string, clientSet kubernetes.Interface) (string, string, error) {
-	log.Infof("Fetching configmap %s", configMap)
-	var metricProfile, alertProfile string
-	configMapData, err := clientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap, v1.GetOptions{})
-	if err != nil {
-		return metricProfile, alertProfile, err
-	}
-
-	for name, data := range configMapData.Data {
-		// We write the configMap data into the CWD
-		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
-			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
-		}
-		if name == "metrics.yml" {
-			metricProfile = "metrics.yml"
-		}
-		if name == "alerts.yml" {
-			alertProfile = "alerts.yml"
-		}
-	}
-	return metricProfile, alertProfile, nil
 }
 
 func validateDNS1123() error {

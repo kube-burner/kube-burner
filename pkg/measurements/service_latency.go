@@ -186,9 +186,9 @@ func (s *serviceLatency) validateConfig() error {
 
 // start service latency measurement
 func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
-	defer measurementWg.Done()
 	// Reset latency slices, required in multi-job benchmarks
 	s.latencyQuantiles, s.normLatencies = nil, nil
+	defer measurementWg.Done()
 	if err := deployAssets(); err != nil {
 		log.Fatal(err)
 		return err
@@ -228,11 +228,13 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 }
 
 func (s *serviceLatency) stop() error {
-	s.svcWatcher.StopWatcher()
-	s.epWatcher.StopWatcher()
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	defer func() {
+		cancel()
+		s.svcWatcher.StopWatcher()
+		s.epWatcher.StopWatcher()
+	}()
 	kutil.CleanupNamespaces(ctx, factory.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
 	for _, q := range s.latencyQuantiles {
@@ -269,23 +271,12 @@ func (s *serviceLatency) normalizeMetrics() {
 	}
 }
 
-func (s *serviceLatency) index(indexer indexers.Indexer, jobName string) {
+func (s *serviceLatency) index(jobName string, indexerList []indexers.Indexer) {
 	metricMap := map[string][]interface{}{
-		svcLatencyMetric:               s.normLatencies,
-		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
+		podLatencyMeasurement:          s.normLatencies,
+		podLatencyQuantilesMeasurement: s.latencyQuantiles,
 	}
-	for metricName, documents := range metricMap {
-		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
-		}
-		log.Debugf("Indexing [%d] documents: %s", len(documents), metricName)
-		resp, err := indexer.Index(documents, indexingOpts)
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			log.Info(resp)
-		}
-	}
+	indexLatencyMeasurement(s.config, jobName, metricMap, indexerList)
 }
 
 func (s *serviceLatency) waitForEndpoints(svc *corev1.Service) error {
