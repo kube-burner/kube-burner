@@ -40,7 +40,7 @@ type Prometheus struct {
 	ConfigSpec    config.Spec
 	metadata      map[string]interface{}
 	embedConfig   bool
-	indexer       *indexers.Indexer
+	indexers      []indexers.Indexer
 }
 
 type Job struct {
@@ -54,16 +54,6 @@ type metricDefinition struct {
 	Query      string `yaml:"query"`
 	MetricName string `yaml:"metricName"`
 	Instant    bool   `yaml:"instant"`
-}
-
-// MetricEndpoint describes prometheus endpoint to scrape
-type MetricEndpoint struct {
-	Endpoint     string `yaml:"endpoint"`
-	Token        string `yaml:"token"`
-	Profile      string `yaml:"profile"`
-	AlertProfile string `yaml:"alertProfile"`
-	Username     string `yaml:"username"`
-	Password     string `yaml:"password"`
 }
 
 type metric struct {

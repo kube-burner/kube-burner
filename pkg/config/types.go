@@ -38,6 +38,8 @@ const (
 
 // Spec configuration root
 type Spec struct {
+	// List of kube-burner indexers
+	Indexers []Indexer `yaml:"indexers"`
 	// GlobalConfig defines global configuration parameters
 	GlobalConfig GlobalConfig `yaml:"global"`
 	// Jobs list of kube-burner jobs
@@ -48,14 +50,16 @@ type Spec struct {
 	EmbedFSDir string
 }
 
+type Indexer struct {
+	indexers.IndexerConfig `yaml:",inline"`
+}
+
 // GlobalConfig holds the global configuration
 type GlobalConfig struct {
 	// Benchmark UUID
 	UUID string
 	// Benchmark RUNID
 	RUNID string
-	// IndexerConfig contains a IndexerConfig definition
-	IndexerConfig indexers.IndexerConfig `yaml:"indexerConfig"`
 	// Measurements describes a list of measurements kube-burner
 	// will take along with job
 	Measurements []mtypes.Measurement `yaml:"measurements"`

@@ -27,7 +27,6 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/go-commons/version"
-	"github.com/kube-burner/kube-burner/pkg/alerting"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
@@ -80,7 +79,7 @@ var embedFS embed.FS
 var embedFSDir string
 
 //nolint:gocyclo
-func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
+func Run(configSpec config.Spec, metricsScraper metrics.Scraper, timeout time.Duration) (int, error) {
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
@@ -97,7 +96,7 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
-		measurements.NewMeasurementFactory(configSpec, metadata)
+		measurements.NewMeasurementFactory(configSpec, metricsScraper.Metadata)
 		jobList = newExecutorList(configSpec, uuid, timeout)
 		ClientSet, restConfig, err = config.GetClientSet(rest.DefaultQPS, rest.DefaultBurst)
 		if err != nil {
@@ -192,22 +191,24 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			}
 			currentJob.End = time.Now().UTC()
 			executedJobs = append(executedJobs, currentJob)
-			// We stop and index measurements per job
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := currentJob.End.Sub(currentJob.Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
+			// We stop and index measurements per job
 			if err = measurements.Stop(); err != nil {
 				errs = append(errs, err)
 				log.Error(err.Error())
 				innerRC = 1
 			}
-			if indexer != nil && !job.SkipIndexing {
-				msWg.Add(1)
-				go func(jobName string) {
-					defer msWg.Done()
-					measurements.Index(indexer, jobName)
-				}(job.Name)
+			if !job.SkipIndexing {
+				for _, indexer := range metricsScraper.IndexerList {
+					msWg.Add(1)
+					go func(jobName string, indexer indexers.Indexer) {
+						defer msWg.Done()
+						measurements.Index(indexer, jobName)
+					}(job.Name, indexer)
+				}
 			}
 		}
 		if globalConfig.WaitWhenFinished {
@@ -240,29 +241,29 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		msWg.Wait()
 		for _, job := range executedJobs {
 			// elapsedTime is recalculated for every job of the list
-			if indexer != nil && !job.JobConfig.SkipIndexing {
-				jobTimings := timings{
-					Timestamp:    job.Start,
-					EndTimestamp: job.End,
-					ElapsedTime:  job.End.Sub(job.Start).Round(time.Second).Seconds(),
+			jobTimings := timings{
+				Timestamp:    job.Start,
+				EndTimestamp: job.End,
+				ElapsedTime:  job.End.Sub(job.Start).Round(time.Second).Seconds(),
+			}
+			if !job.JobConfig.SkipIndexing {
+				for _, indexer := range metricsScraper.IndexerList {
+					indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metricsScraper.Metadata)
 				}
-				indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
 			}
 		}
-		for _, alertM := range alertMs {
+		for _, alertM := range metricsScraper.AlertMs {
 			if err := alertM.Evaluate(executedJobs[0].Start, executedJobs[len(jobList)-1].End); err != nil {
 				errs = append(errs, err)
 				innerRC = 1
 			}
 		}
-		if indexer != nil {
-			for _, prometheusClient := range prometheusClients {
-				prometheusClient.ScrapeJobsMetrics(executedJobs...)
-			}
+		for _, prometheusClient := range metricsScraper.PrometheusClients {
+			prometheusClient.ScrapeJobsMetrics(executedJobs...)
 		}
-		if indexer != nil {
-			if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
-				metrics.CreateTarball(globalConfig.IndexerConfig, globalConfig.IndexerConfig.TarballName)
+		for _, indexer := range configSpec.Indexers {
+			if indexer.IndexerConfig.Type == indexers.LocalIndexer && indexer.IndexerConfig.CreateTarball {
+				metrics.CreateTarball(indexer.IndexerConfig)
 			}
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)

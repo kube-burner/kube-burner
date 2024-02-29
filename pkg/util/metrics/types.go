@@ -29,20 +29,32 @@ type ScraperConfig struct {
 	Password        string
 	PrometheusStep  time.Duration
 	MetricsEndpoint string
-	MetricsProfile  string
-	AlertProfile    string
+	MetricsProfiles []string
+	AlertProfiles   []string
 	SkipTLSVerify   bool
 	URL             string
 	Token           string
 	Username        string
 	UserMetaData    string
 	RawMetadata     map[string]interface{}
+	EmbedConfig     bool
 }
 
 // ScraperResponse holds parsed data related to scraper and target indexer
 type Scraper struct {
 	PrometheusClients []*prometheus.Prometheus
 	AlertMs           []*alerting.AlertManager
-	Indexer           *indexers.Indexer
+	IndexerList       []indexers.Indexer
 	Metadata          map[string]interface{}
+}
+
+// metricEndpoint describes prometheus endpoint to scrape
+type metricEndpoint struct {
+	Endpoint     string `yaml:"endpoint"`
+	Token        string `yaml:"token"`
+	Profile      string `yaml:"profile"`
+	AlertProfile string `yaml:"alertProfile"`
+	Username     string `yaml:"username"`
+	Password     string `yaml:"password"`
+	EmbedConfig  bool   `yaml:"embedConfig"`
 }
