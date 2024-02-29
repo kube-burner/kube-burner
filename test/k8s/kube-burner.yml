@@ -6,15 +6,27 @@ global:
   - name: podLatency
   - name: serviceLatency
     svcTimeout: 5s
-indexers:
+metricsEndpoints:
 {{ if .ES_INDEXING }}
-  - type: opensearch
-    esServers: ["{{ .ES_SERVER }}"]
-    defaultIndex: {{ .ES_INDEX }}
+  - prometheusURL: http://localhost:9090
+    indexer: 
+      type: opensearch
+      esServers: ["{{ .ES_SERVER }}"]
+      defaultIndex: {{ .ES_INDEX }}
+    metrics: [metrics-profile.yaml]
+{{ if .ALERTING }}
+    alerts: [alert-profile.yaml]
+{{ end }}
 {{ end }}
 {{ if .LOCAL_INDEXING }}
-  - type: local
-    metricsDirectory: {{ .METRICS_FOLDER }}
+  - prometheusURL: http://localhost:9090
+    indexer: 
+      type: local
+      metricsDirectory: {{ .METRICS_FOLDER }}
+    metrics: [metrics-profile.yaml]
+{{ if .ALERTING }}
+    alerts: [alert-profile.yaml]
+{{ end }}
 {{ end }}
 
 jobs:

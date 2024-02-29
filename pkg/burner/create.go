@@ -43,9 +43,6 @@ func setupCreateJob(jobConfig config.Job) Executor {
 	var err error
 	var f io.Reader
 	mapper := newRESTMapper()
-	if err != nil {
-		log.Fatalf("Error creating wait clientSet: %s", err.Error())
-	}
 	log.Debugf("Preparing create job: %s", jobConfig.Name)
 	ex := Executor{}
 	for _, o := range jobConfig.Objects {

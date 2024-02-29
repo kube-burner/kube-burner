@@ -18,28 +18,31 @@ import (
 	"bytes"
 	"io"
 
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
 // Decodes metrics endpoint yaml file
-func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]metricEndpoint) {
-	f, err := util.ReadConfig(metricsEndpoint)
+func DecodeMetricsEndpoint(metricsEndpointPath string) []config.MetricsEndpoint {
+	var metricsEndpoints []config.MetricsEndpoint
+	f, err := util.ReadConfig(metricsEndpointPath)
 	if err != nil {
-		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpoint, err)
+		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpointPath, err)
 	}
 	cfg, err := io.ReadAll(f)
 	if err != nil {
-		log.Fatalf("Error reading configuration file %s: %s", metricsEndpoint, err)
+		log.Fatalf("Error reading configuration file %s: %s", metricsEndpointPath, err)
 	}
 	renderedME, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
 	if err != nil {
-		log.Fatalf("Template error in %s: %s", metricsEndpoint, err)
+		log.Fatalf("Template error in %s: %s", metricsEndpointPath, err)
 	}
 	yamlDec := yaml.NewDecoder(bytes.NewReader(renderedME))
 	yamlDec.KnownFields(true)
 	if err := yamlDec.Decode(&metricsEndpoints); err != nil {
-		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpoint, err)
+		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpointPath, err)
 	}
+	return metricsEndpoints
 }

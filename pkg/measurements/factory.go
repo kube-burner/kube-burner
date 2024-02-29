@@ -41,7 +41,7 @@ type measurement interface {
 	collect(*sync.WaitGroup)
 	setConfig(types.Measurement)
 	validateConfig() error
-	index(indexers.Indexer, string)
+	index(string, []indexers.Indexer)
 }
 
 var factory measurementFactory
@@ -56,6 +56,12 @@ func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface
 		metadata:    metadata,
 	}
 	for _, measurement := range globalCfg.Measurements {
+		if measurement.QuantilesIndexer != 0 && configSpec.MetricsEndpoints[measurement.QuantilesIndexer-1].Type == "" {
+			log.Fatal("Quantiles indexer not defined")
+		}
+		if measurement.TimeseriesIndexer != 0 && configSpec.MetricsEndpoints[measurement.TimeseriesIndexer-1].Type == "" {
+			log.Fatal("Timeseries indexer not defined")
+		}
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
 			if err := factory.register(measurement, measurementFunc); err != nil {
 				log.Fatal(err.Error())
@@ -115,14 +121,13 @@ func Stop() error {
 	return utilerrors.NewAggregate(errs)
 }
 
-// Index iterates through the createFuncs and indexes collected data from each measurement.
+// Index iterates over the createFuncs map, indexes collected data from each measurement.
 //
-// Parameters:
-//   - indexer: a pointer to the indexer
-//   - jobName: the name of the job, required as this task can be executed from a goroutine
-func Index(indexer indexers.Indexer, jobName string) {
+// jobName is the name of the job to index data for.
+// indexerList is a variadic parameter of indexers.Indexer implementations.
+func Index(jobName string, indexerList []indexers.Indexer) {
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Indexing collected data from measurement: %s", name)
-		measurement.index(indexer, jobName)
+		measurement.index(jobName, indexerList)
 	}
 }
