@@ -6,11 +6,13 @@ global:
   - name: podLatency
   - name: serviceLatency
     svcTimeout: 5s
+{{ if .INDEXING_TYPE }}
 indexers:
   - type: {{ .INDEXING_TYPE }}
     metricsDirectory: {{ .METRICS_FOLDER }}
     esServers: ["{{ .ES_SERVER }}"]
     defaultIndex: {{ .ES_INDEX }}
+{{ end }}
 
 jobs:
   - name: namespaced

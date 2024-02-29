@@ -53,7 +53,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 		metadata[k] = v
 	}
 	// Set up prometheusClients when Prometheus URl or MetricsEndpoint are set
-	if scraperConfig.URL != "" && scraperConfig.MetricsEndpoint != "" {
+	if scraperConfig.URL != "" || scraperConfig.MetricsEndpoint != "" {
 		if scraperConfig.MetricsEndpoint != "" {
 			DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint, &metricsEndpoints)
 		} else {
