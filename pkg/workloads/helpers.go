@@ -101,27 +101,18 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 		ConfigSpec.EmbedFS = wh.embedConfig
 		ConfigSpec.EmbedFSDir = path.Join(wh.ConfigDir, workload)
 	}
-	if wh.MetricsEndpoint != "" {
-		metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-			ConfigSpec:      ConfigSpec,
-			PrometheusStep:  stepSize,
-			MetricsEndpoint: wh.MetricsEndpoint,
-			SkipTLSVerify:   true,
-			RawMetadata:     wh.MetricsMetadata,
-		})
-	} else if wh.PrometheusURL != "" {
-		metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-			ConfigSpec:      ConfigSpec,
-			PrometheusStep:  stepSize,
-			MetricsProfiles: metricsProfiles,
-			AlertProfiles:   alertsProfiles,
-			SkipTLSVerify:   true,
-			URL:             wh.PrometheusURL,
-			Token:           wh.PrometheusToken,
-			RawMetadata:     wh.MetricsMetadata,
-			EmbedConfig:     true,
-		})
-	}
+	metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+		ConfigSpec:      ConfigSpec,
+		PrometheusStep:  stepSize,
+		MetricsEndpoint: wh.MetricsEndpoint,
+		MetricsProfiles: metricsProfiles,
+		AlertProfiles:   alertsProfiles,
+		SkipTLSVerify:   true,
+		URL:             wh.PrometheusURL,
+		Token:           wh.PrometheusToken,
+		RawMetadata:     wh.MetricsMetadata,
+		EmbedConfig:     embedConfig,
+	})
 	rc, err = burner.Run(ConfigSpec, metricsScraper, wh.Timeout)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()

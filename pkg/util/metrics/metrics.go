@@ -23,22 +23,18 @@ import (
 )
 
 // Processes common config and executes according to the caller
-func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
-	// When no metrics endpoint is provided do nothing
-	if metricsScraperConfig.MetricsEndpoint == "" && len(metricsScraperConfig.MetricsProfiles) == 0 && len(metricsScraperConfig.AlertProfiles) == 0 {
-		return Scraper{}
-	}
+func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	var err error
 	var indexerList []indexers.Indexer
 	var metricsEndpoints []metricEndpoint
 	var prometheusClients []*prometheus.Prometheus
 	var alertM *alerting.AlertManager
 	var alertMs []*alerting.AlertManager
-	if (metricsScraperConfig.MetricsEndpoint != "" && metricsScraperConfig.URL != "") || (metricsScraperConfig.MetricsEndpoint == "" && metricsScraperConfig.URL == "") {
+	if scraperConfig.MetricsEndpoint != "" && scraperConfig.URL != "" {
 		log.Fatal("Please use either of --metrics-endpoint or --prometheus-url flags to fetch metrics or alerts")
 	}
 	metadata := make(map[string]interface{})
-	for pos, indexer := range metricsScraperConfig.ConfigSpec.Indexers {
+	for pos, indexer := range scraperConfig.ConfigSpec.Indexers {
 		log.Infof("📁 Creating indexer: %s", indexer.Type)
 		idx, err := indexers.NewIndexer(indexer.IndexerConfig)
 		if err != nil {
@@ -46,65 +42,67 @@ func ProcessMetricsScraperConfig(metricsScraperConfig ScraperConfig) Scraper {
 		}
 		indexerList = append(indexerList, *idx)
 	}
-	if metricsScraperConfig.UserMetaData != "" {
-		metadata, err = util.ReadUserMetadata(metricsScraperConfig.UserMetaData)
+	if scraperConfig.UserMetaData != "" {
+		metadata, err = util.ReadUserMetadata(scraperConfig.UserMetaData)
 		if err != nil {
 			log.Fatalf("Error reading provided user metadata: %v", err)
 		}
 	}
 	// Combine rawMetadata with user's provided metadata
-	for k, v := range metricsScraperConfig.RawMetadata {
+	for k, v := range scraperConfig.RawMetadata {
 		metadata[k] = v
 	}
-	// When a metric profile or a alert profile is passed we set up metricsEndpoints
-	if metricsScraperConfig.MetricsEndpoint != "" {
-		DecodeMetricsEndpoint(metricsScraperConfig.MetricsEndpoint, &metricsEndpoints)
-	} else {
-		for _, metricsProfile := range metricsScraperConfig.MetricsProfiles {
-			metricsEndpoints = append(metricsEndpoints, metricEndpoint{
-				Endpoint:    metricsScraperConfig.URL,
-				Token:       metricsScraperConfig.Token,
-				Profile:     metricsProfile,
-				Username:    metricsScraperConfig.Username,
-				Password:    metricsScraperConfig.Password,
-				EmbedConfig: metricsScraperConfig.EmbedConfig,
-			})
+	// Set up prometheusClients when Prometheus URl or MetricsEndpoint are set
+	if scraperConfig.URL != "" && scraperConfig.MetricsEndpoint != "" {
+		if scraperConfig.MetricsEndpoint != "" {
+			DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint, &metricsEndpoints)
+		} else {
+			for _, metricsProfile := range scraperConfig.MetricsProfiles {
+				metricsEndpoints = append(metricsEndpoints, metricEndpoint{
+					Endpoint:    scraperConfig.URL,
+					Token:       scraperConfig.Token,
+					Profile:     metricsProfile,
+					Username:    scraperConfig.Username,
+					Password:    scraperConfig.Password,
+					EmbedConfig: scraperConfig.EmbedConfig,
+				})
+			}
+			for _, alertProfile := range scraperConfig.AlertProfiles {
+				metricsEndpoints = append(metricsEndpoints, metricEndpoint{
+					Endpoint:     scraperConfig.URL,
+					Token:        scraperConfig.Token,
+					AlertProfile: alertProfile,
+					Username:     scraperConfig.Username,
+					Password:     scraperConfig.Password,
+					EmbedConfig:  scraperConfig.EmbedConfig,
+				})
+			}
 		}
-		for _, alertProfile := range metricsScraperConfig.AlertProfiles {
-			metricsEndpoints = append(metricsEndpoints, metricEndpoint{
-				Endpoint:     metricsScraperConfig.URL,
-				Token:        metricsScraperConfig.Token,
-				AlertProfile: alertProfile,
-				Username:     metricsScraperConfig.Username,
-				Password:     metricsScraperConfig.Password,
-				EmbedConfig:  metricsScraperConfig.EmbedConfig,
-			})
-		}
-	}
-	for _, metricsEndpoint := range metricsEndpoints {
-		auth := prometheus.Auth{
-			Username:      metricsEndpoint.Username,
-			Password:      metricsEndpoint.Password,
-			Token:         metricsEndpoint.Token,
-			SkipTLSVerify: metricsScraperConfig.SkipTLSVerify,
-		}
-		p, err := prometheus.NewPrometheusClient(metricsScraperConfig.ConfigSpec, metricsEndpoint.Endpoint, auth, metricsScraperConfig.PrometheusStep, metadata, false, indexerList...)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if metricsEndpoint.Profile != "" {
-			err = p.ReadProfile(metricsEndpoint.Profile)
+		for _, metricsEndpoint := range metricsEndpoints {
+			auth := prometheus.Auth{
+				Username:      metricsEndpoint.Username,
+				Password:      metricsEndpoint.Password,
+				Token:         metricsEndpoint.Token,
+				SkipTLSVerify: scraperConfig.SkipTLSVerify,
+			}
+			p, err := prometheus.NewPrometheusClient(scraperConfig.ConfigSpec, metricsEndpoint.Endpoint, auth, scraperConfig.PrometheusStep, metadata, metricsEndpoint.EmbedConfig, indexerList...)
 			if err != nil {
 				log.Fatal(err)
 			}
-		}
-		if metricsEndpoint.AlertProfile != "" {
-			if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, metricsScraperConfig.ConfigSpec.GlobalConfig.UUID, p, false, indexerList...); err != nil {
-				log.Fatalf("Error creating alert manager: %s", err)
+			if metricsEndpoint.Profile != "" {
+				err = p.ReadProfile(metricsEndpoint.Profile)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
-			alertMs = append(alertMs, alertM)
+			if metricsEndpoint.AlertProfile != "" {
+				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, metricsEndpoint.EmbedConfig, indexerList...); err != nil {
+					log.Fatalf("Error creating alert manager: %s", err)
+				}
+				alertMs = append(alertMs, alertM)
+			}
+			prometheusClients = append(prometheusClients, p)
 		}
-		prometheusClients = append(prometheusClients, p)
 	}
 	return Scraper{
 		PrometheusClients: prometheusClients,

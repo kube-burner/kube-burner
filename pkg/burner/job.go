@@ -78,7 +78,10 @@ var restConfig *rest.Config
 var embedFS embed.FS
 var embedFSDir string
 
-//nolint:gocyclo
+// Runs the with the given configuration and metrics scraper, with the specified timeout.
+// Returns:
+// - error code
+// - error
 func Run(configSpec config.Spec, metricsScraper metrics.Scraper, timeout time.Duration) (int, error) {
 	var err error
 	var rc int

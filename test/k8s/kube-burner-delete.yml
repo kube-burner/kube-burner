@@ -4,11 +4,11 @@ global:
   measurements:
   - name: podLatency
 
-  indexerConfig:
-    type: {{ .INDEXING_TYPE }}
-    metricsDirectory: {{ .METRICS_FOLDER }}
-    esServers: ["{{ .ES_SERVER }}"]
-    defaultIndex: {{ .ES_INDEX }}
+indexers:
+- type: {{ .INDEXING_TYPE }}
+  metricsDirectory: {{ .METRICS_FOLDER }}
+  esServers: ["{{ .ES_SERVER }}"]
+  defaultIndex: {{ .ES_INDEX }}
 
 jobs:
   - name: not-namespaced

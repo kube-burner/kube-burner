@@ -81,7 +81,6 @@ func initCmd() *cobra.Command {
 	var prometheusStep time.Duration
 	var timeout time.Duration
 	var rc int
-	var metricsScraper metrics.Scraper
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -113,21 +112,19 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
-			if url != "" || metricsEndpoint != "" {
-				metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-					ConfigSpec:      configSpec,
-					Password:        password,
-					PrometheusStep:  prometheusStep,
-					MetricsEndpoint: metricsEndpoint,
-					MetricsProfiles: metricsProfiles,
-					AlertProfiles:   alertsProfiles,
-					SkipTLSVerify:   skipTLSVerify,
-					URL:             url,
-					Token:           token,
-					Username:        username,
-					UserMetaData:    userMetadata,
-				})
-			}
+			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+				ConfigSpec:      configSpec,
+				Password:        password,
+				PrometheusStep:  prometheusStep,
+				MetricsEndpoint: metricsEndpoint,
+				MetricsProfiles: metricsProfiles,
+				AlertProfiles:   alertsProfiles,
+				SkipTLSVerify:   skipTLSVerify,
+				URL:             url,
+				Token:           token,
+				Username:        username,
+				UserMetaData:    userMetadata,
+			})
 			if configSpec.GlobalConfig.ClusterHealth {
 				clientSet, _, err := config.GetClientSet(0, 0)
 				if err != nil {
