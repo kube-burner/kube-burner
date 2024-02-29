@@ -4,12 +4,15 @@ global:
   measurements:
   - name: podLatency
 
-{{ if .INDEXING_TYPE }}
 indexers:
-- type: {{ .INDEXING_TYPE }}
-  metricsDirectory: {{ .METRICS_FOLDER }}
-  esServers: ["{{ .ES_SERVER }}"]
-  defaultIndex: {{ .ES_INDEX }}
+{{ if .OS_INDEXING }}
+  - type: opensearch
+    esServers: ["{{ .ES_SERVER }}"]
+    defaultIndex: {{ .ES_INDEX }}
+{{ end }}
+{{ if .LOCAL_INDEXING }}
+  - type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
 {{ end }}
 
 jobs:
