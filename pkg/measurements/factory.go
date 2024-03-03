@@ -24,13 +24,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
-
 	"k8s.io/client-go/rest"
 )
 
 type measurementFactory struct {
 	jobConfig   *config.Job
-	clientSet   *kubernetes.Clientset
+	clientSet   kubernetes.Interface
 	restConfig  *rest.Config
 	createFuncs map[string]measurement
 	metadata    map[string]interface{}
@@ -81,14 +80,10 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 	return nil
 }
 
-func SetJobConfig(jobConfig *config.Job) {
+func SetJobConfig(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider) {
 	factory.jobConfig = jobConfig
-	_, restConfig, err := config.GetClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
-	if err != nil {
-		log.Fatalf("Error creating clientSet: %s", err)
-	}
-	factory.clientSet = kubernetes.NewForConfigOrDie(restConfig)
-	factory.restConfig = restConfig
+	factory.clientSet = kubeClientProvider.ClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
+	factory.restConfig = kubeClientProvider.RestConfig(factory.jobConfig.QPS, factory.jobConfig.Burst)
 }
 
 // Start starts registered measurements

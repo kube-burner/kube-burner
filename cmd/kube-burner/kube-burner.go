@@ -21,23 +21,21 @@ import (
 	"path/filepath"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
+	"github.com/cloud-bulldozer/go-commons/indexers"
+	uid "github.com/google/uuid"
 	"github.com/kube-burner/kube-burner/pkg/alerting"
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements"
+	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
-
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/kube-burner/kube-burner/pkg/prometheus"
-
-	uid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -73,6 +71,7 @@ To configure your bash shell to load completions for each session execute:
 
 func initCmd() *cobra.Command {
 	var err error
+	var clientSet kubernetes.Interface
 	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
 	var username, password, uuid, token, configMap, namespace, userMetadata string
 	var skipTLSVerify bool
@@ -89,8 +88,10 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			kubeClientProvider := config.NewKubeClientProvider()
+			clientSet = kubeClientProvider.DefaultClientSet()
 			if configMap != "" {
-				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
+				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace, clientSet)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -122,14 +123,11 @@ func initCmd() *cobra.Command {
 			}
 
 			if configSpec.GlobalConfig.ClusterHealth {
-				clientSet, _, err := config.GetClientSet(0, 0)
-				if err != nil {
-					log.Errorf("Error creating clientSet: %s", err)
-				}
+				clientSet = kubeClientProvider.ClientSet(0, 0)
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.Metadata)
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.Metadata)
 			if err != nil {
 				log.Errorf(err.Error())
 				os.Exit(rc)
@@ -167,10 +165,7 @@ func healthCheck() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			clientSet, _, err := config.GetClientSet(0, 0)
-			if err != nil {
-				log.Fatalf("Error creating clientSet: %s", err)
-			}
+			clientSet := config.NewKubeClientProvider().ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
 		},
 	}
@@ -190,12 +185,10 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			clientSet, restConfig, err := config.GetClientSet(0, 0)
-			if err != nil {
-				log.Fatalf("Error creating clientSet: %s", err)
-			}
+			kubeClientProvider := config.NewKubeClientProvider()
+			clientSet := kubeClientProvider.ClientSet(0, 0)
 			burner.ClientSet = clientSet
-			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
+			burner.DynamicClient = dynamic.NewForConfigOrDie(kubeClientProvider.RestConfig(0, 0))
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
@@ -263,12 +256,15 @@ func measureCmd() *cobra.Command {
 			}
 			log.Infof("%v", namespaceLabels)
 			measurements.NewMeasurementFactory(configSpec, metadata)
-			measurements.SetJobConfig(&config.Job{
-				Name:                 jobName,
-				Namespace:            rawNamespaces,
-				NamespaceLabels:      namespaceLabels,
-				NamespaceAnnotations: namespaceAnnotations,
-			})
+			measurements.SetJobConfig(
+				&config.Job{
+					Name:                 jobName,
+					Namespace:            rawNamespaces,
+					NamespaceLabels:      namespaceLabels,
+					NamespaceAnnotations: namespaceAnnotations,
+				},
+				config.NewKubeClientProvider(),
+			)
 			measurements.Collect()
 			if err = measurements.Stop(); err != nil {
 				log.Error(err.Error())

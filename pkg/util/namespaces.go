@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func CreateNamespace(clientSet *kubernetes.Clientset, name string, nsLabels map[string]string, nsAnnotations map[string]string) error {
+func CreateNamespace(clientSet kubernetes.Interface, name string, nsLabels map[string]string, nsAnnotations map[string]string) error {
 	ns := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: nsLabels, Annotations: nsAnnotations},
 	}
@@ -57,7 +57,7 @@ func CreateNamespace(clientSet *kubernetes.Clientset, name string, nsLabels map[
 }
 
 // CleanupNamespaces deletes namespaces with the given selector
-func CleanupNamespaces(ctx context.Context, clientSet *kubernetes.Clientset, labelSelector string) {
+func CleanupNamespaces(ctx context.Context, clientSet kubernetes.Interface, labelSelector string) {
 	ns, err := clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		log.Errorf("Error listing namespaces: %v", err.Error())
@@ -77,7 +77,7 @@ func CleanupNamespaces(ctx context.Context, clientSet *kubernetes.Clientset, lab
 	}
 }
 
-func waitForDeleteNamespaces(ctx context.Context, clientSet *kubernetes.Clientset, labelSelector string) {
+func waitForDeleteNamespaces(ctx context.Context, clientSet kubernetes.Interface, labelSelector string) {
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		ns, err := clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
@@ -98,7 +98,7 @@ func waitForDeleteNamespaces(ctx context.Context, clientSet *kubernetes.Clientse
 }
 
 // Cleanup non-namespaced resources with the given selector
-func CleanupNonNamespacedResources(ctx context.Context, clientSet *kubernetes.Clientset, dynamicClient dynamic.Interface, labelSelector string) {
+func CleanupNonNamespacedResources(ctx context.Context, clientSet kubernetes.Interface, dynamicClient dynamic.Interface, labelSelector string) {
 	serverResources, _ := clientSet.Discovery().ServerPreferredResources()
 	log.Infof("Deleting non-namespace resources with label: %s", labelSelector)
 	for _, resourceList := range serverResources {

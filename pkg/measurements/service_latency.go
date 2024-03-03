@@ -130,7 +130,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 		}
 		endpointsReadyTs := time.Now().UTC()
 		log.Debugf("Endpoints %v/%v ready", svc.Namespace, svc.Name)
-		svcLatencyChecker, err := util.NewSvcLatencyChecker(*factory.clientSet, *factory.restConfig)
+		svcLatencyChecker, err := util.NewSvcLatencyChecker(factory.clientSet, *factory.restConfig)
 		if err != nil {
 			log.Error(err)
 		}
