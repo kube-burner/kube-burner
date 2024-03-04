@@ -82,8 +82,7 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 
 func SetJobConfig(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider) {
 	factory.jobConfig = jobConfig
-	factory.clientSet = kubeClientProvider.ClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
-	factory.restConfig = kubeClientProvider.RestConfig(factory.jobConfig.QPS, factory.jobConfig.Burst)
+	factory.clientSet, factory.restConfig = kubeClientProvider.ClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
 }
 
 // Start starts registered measurements

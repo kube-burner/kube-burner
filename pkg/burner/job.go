@@ -107,8 +107,7 @@ func Run(
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metadata)
 		jobList = newExecutorList(configSpec, kubeClientProvider, uuid, timeout)
-		ClientSet = kubeClientProvider.DefaultClientSet()
-		restConfig = kubeClientProvider.DefaultRestConfig()
+		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
 		for _, job := range jobList {
 			if job.PreLoadImages && job.JobType == config.CreationJob {
 				if err = preLoadImages(job); err != nil {
@@ -127,8 +126,7 @@ func Run(
 				log.Infof("QPS: %v", job.QPS)
 				log.Infof("Burst: %v", job.Burst)
 			}
-			ClientSet = kubeClientProvider.ClientSet(job.QPS, job.Burst)
-			restConfig = kubeClientProvider.RestConfig(job.QPS, job.Burst)
+			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			currentJob := prometheus.Job{
@@ -292,7 +290,7 @@ func Run(
 func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, uuid string, timeout time.Duration) []Executor {
 	var ex Executor
 	var executorList []Executor
-	restConfig = kubeClientProvider.RestConfig(100, 100) // Hardcoded QPS/Burst
+	_, restConfig = kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
 		switch job.JobType {

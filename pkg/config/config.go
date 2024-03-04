@@ -181,24 +181,16 @@ func NewKubeClientProvider(config, context string) *KubeClientProvider {
 	return &KubeClientProvider{restConfig: restConfig}
 }
 
-func (p *KubeClientProvider) DefaultRestConfig() *rest.Config {
+func (p *KubeClientProvider) DefaultClientSet() (kubernetes.Interface, *rest.Config) {
 	restConfig := *p.restConfig
-	return &restConfig
+	return kubernetes.NewForConfigOrDie(&restConfig), &restConfig
 }
 
-func (p *KubeClientProvider) DefaultClientSet() kubernetes.Interface {
-	return kubernetes.NewForConfigOrDie(p.DefaultRestConfig())
-}
-
-func (p *KubeClientProvider) RestConfig(QPS float32, burst int) *rest.Config {
+func (p *KubeClientProvider) ClientSet(QPS float32, burst int) (kubernetes.Interface, *rest.Config) {
 	restConfig := *p.restConfig
 	restConfig.QPS, restConfig.Burst = QPS, burst
 	restConfig.Timeout = configSpec.GlobalConfig.RequestTimeout
-	return &restConfig
-}
-
-func (p *KubeClientProvider) ClientSet(QPS float32, burst int) kubernetes.Interface {
-	return kubernetes.NewForConfigOrDie(p.RestConfig(QPS, burst))
+	return kubernetes.NewForConfigOrDie(&restConfig), &restConfig
 }
 
 // FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files

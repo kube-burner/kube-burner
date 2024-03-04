@@ -90,7 +90,7 @@ func initCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
-			clientSet = kubeClientProvider.DefaultClientSet()
+			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace, clientSet)
 				if err != nil {
@@ -124,7 +124,7 @@ func initCmd() *cobra.Command {
 			}
 
 			if configSpec.GlobalConfig.ClusterHealth {
-				clientSet = kubeClientProvider.ClientSet(0, 0)
+				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
 				util.ClusterHealthCheck(clientSet)
 			}
 
@@ -169,7 +169,7 @@ func healthCheck() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			clientSet := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
+			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
 		},
 	}
@@ -193,9 +193,9 @@ func destroyCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
-			clientSet := kubeClientProvider.ClientSet(0, 0)
+			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
 			burner.ClientSet = clientSet
-			burner.DynamicClient = dynamic.NewForConfigOrDie(kubeClientProvider.RestConfig(0, 0))
+			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
