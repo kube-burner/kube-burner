@@ -151,7 +151,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
-	cmd.Flags().StringVar(&kubeConfig, "kube-config", "", "Path to the kubeconfig file to use for CLI requests")
+	cmd.Flags().StringVar(&kubeConfig, "kube-config", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().SortFlags = false
 	return cmd
@@ -173,7 +173,7 @@ func healthCheck() *cobra.Command {
 			util.ClusterHealthCheck(clientSet)
 		},
 	}
-	cmd.Flags().StringVar(&kubeConfig, "kube-config", "", "Path to the kubeconfig file to use for CLI requests")
+	cmd.Flags().StringVar(&kubeConfig, "kube-config", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	return cmd
 }
@@ -205,7 +205,7 @@ func destroyCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
-	cmd.Flags().StringVar(&kubeConfig, "kube-config", "", "Path to the kubeconfig file to use for CLI requests")
+	cmd.Flags().StringVar(&kubeConfig, "kube-config", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
@@ -288,7 +288,7 @@ func measureCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-measure", "Measure job name")
 	cmd.Flags().StringVarP(&rawNamespaces, "namespaces", "n", corev1.NamespaceAll, "comma-separated list of namespaces")
 	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&kubeConfig, "kube-config", "", "Path to the kubeconfig file to use for CLI requests")
+	cmd.Flags().StringVar(&kubeConfig, "kube-config", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	return cmd
 }
