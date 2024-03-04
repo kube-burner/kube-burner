@@ -154,22 +154,27 @@ type KubeClientProvider struct {
 	restConfig *rest.Config
 }
 
-// func NewKubeClientProvider(config, context string) *KubeClientProvider {
-func NewKubeClientProvider() *KubeClientProvider {
-	var kubeconfig string
-	if os.Getenv("KUBECONFIG") != "" {
-		kubeconfig = os.Getenv("KUBECONFIG")
-	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
-		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+func NewKubeClientProvider(config, context string) *KubeClientProvider {
+	var kubeConfigPath string
+	if config != "" {
+		kubeConfigPath = config
+	} else if os.Getenv("KUBECONFIG") != "" {
+		kubeConfigPath = os.Getenv("KUBECONFIG")
+	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeConfigPath == "" && !os.IsNotExist(err) {
+		kubeConfigPath = filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	}
 	var restConfig *rest.Config
 	var err error
-	if kubeconfig == "" {
+	if kubeConfigPath == "" {
 		if restConfig, err = rest.InClusterConfig(); err != nil {
 			log.Fatalf("error preparing kubernetes client: %s", err)
 		}
 	} else {
-		if restConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig); err != nil {
+		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath},
+			&clientcmd.ConfigOverrides{CurrentContext: context},
+		)
+		if restConfig, err = kubeConfig.ClientConfig(); err != nil {
 			log.Fatalf("error preparing kubernetes client: %s", err)
 		}
 	}
