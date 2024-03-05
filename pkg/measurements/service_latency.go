@@ -190,6 +190,8 @@ func (s *serviceLatency) validateConfig() error {
 // start service latency measurement
 func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	// Reset latency slices, required in multi-job benchmarks
+	s.latencyQuantiles, s.normLatencies = nil, nil
 	if err := deployAssets(); err != nil {
 		log.Fatal(err)
 		return err
@@ -276,8 +278,6 @@ func (s *serviceLatency) index(indexer indexers.Indexer, jobName string) {
 		svcLatencyMetric:               s.normLatencies,
 		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
 	}
-	// Reset latency slices, required in multi-job benchmarks
-	s.latencyQuantiles, s.normLatencies = nil, nil
 	for metricName, documents := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
 			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
