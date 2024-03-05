@@ -23,7 +23,6 @@ import (
 )
 
 type latencyMetric string
-type MeasurementConfig map[string]any
 
 const (
 	pprofDirectory string = "pprof"
@@ -47,8 +46,6 @@ func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) er
 type Measurement struct {
 	// Name is the name the measurement
 	Name string `yaml:"name"`
-	// Measurement configuration
-	Config MeasurementConfig `yaml:"config"`
 	// LatencyThresholds config
 	LatencyThresholds []LatencyThreshold `yaml:"thresholds"`
 	// PPRofTargets targets config

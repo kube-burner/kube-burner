@@ -81,7 +81,6 @@ type vmiMetric struct {
 }
 
 type vmiLatency struct {
-	config2          types.MeasurementConfig
 	config           types.Measurement
 	vmWatcher        *metrics.Watcher
 	vmiWatcher       *metrics.Watcher

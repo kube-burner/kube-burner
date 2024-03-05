@@ -39,7 +39,6 @@ import (
 
 type pprof struct {
 	config      types.Measurement
-	config2     types.MeasurementConfig
 	stopChannel chan bool
 }
 
