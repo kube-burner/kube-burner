@@ -131,7 +131,7 @@ func createDSs(imageList []string, namespaceLabels map[string]string, namespaceA
 					Containers: []corev1.Container{
 						{
 							Name:            "sleep",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.1",
 							ImagePullPolicy: corev1.PullAlways,
 						},
 					},

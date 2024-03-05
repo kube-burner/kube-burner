@@ -69,7 +69,7 @@ This document looks like:
         "objectTemplate": "templates/pod.yml",
         "replicas": 1,
         "inputVars": {
-          "containerImage": "gcr.io/google_containers/pause-amd64:3.0"
+          "containerImage": "registry.k8s.io/pause:3.1"
         }
       }
     ],
