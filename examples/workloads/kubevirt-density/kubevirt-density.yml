@@ -1,14 +1,14 @@
+indexers:
+    # save metrics to database (e.g., elasticsearch)
+  - esServers: [http://localhost:9200]
+    insecureSkipVerify: true
+    defaultIndex: kube-burner
+    type: elastic
 global:
   # collect metrics from Prometheus and dump to files
   measurements:
   - name: vmiLatency
 
-  # save metrics to database (e.g., elasticsearch)
-  indexerConfig:
-    esServers: [http://localhost:9200]
-    insecureSkipVerify: true
-    defaultIndex: kube-burner
-    type: elastic
 
 jobs:
   # wait 5 minutes before creating objs to collect prometheus metrics from idle times

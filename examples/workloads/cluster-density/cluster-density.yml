@@ -1,10 +1,8 @@
 
+indexers:
+  - metricsDirectory: kube-burner
+    type: local
 global:
-  indexerConfig:
-    esServers: [http://elastic-elk.apps.rsevilla-ocp45-ovn.perf-testing.devcluster.openshift.com]
-    insecureSkipVerify: false
-    defaultIndex: kube-burner
-    type: elastic
   measurements:
     - name: podLatency
   clusterHealth: true
