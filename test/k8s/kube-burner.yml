@@ -7,7 +7,7 @@ global:
   - name: serviceLatency
     svcTimeout: 5s
 indexers:
-{{ if .OS_INDEXING }}
+{{ if .ES_INDEXING }}
   - type: opensearch
     esServers: ["{{ .ES_SERVER }}"]
     defaultIndex: {{ .ES_INDEX }}

@@ -5,7 +5,7 @@ global:
   - name: podLatency
 
 indexers:
-{{ if .OS_INDEXING }}
+{{ if .ES_INDEXING }}
   - type: opensearch
     esServers: ["{{ .ES_SERVER }}"]
     defaultIndex: {{ .ES_INDEX }}
