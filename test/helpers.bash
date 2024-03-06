@@ -16,7 +16,7 @@ setup-kind() {
 }
 
 create_test_kubeconfig() {
-  echo "Creating another kubeconfg"
+  echo "Creating another kubeconfig"
   "${KIND_FOLDER}"/kind-linux-amd64 export kubeconfig --kubeconfig "${TEST_KUBECONFIG}"
   kubectl config rename-context kind-kind "${TEST_KUBECONTEXT}" --kubeconfig "${TEST_KUBECONFIG}"
 }
