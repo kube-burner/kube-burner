@@ -150,10 +150,6 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 	return configSpec, nil
 }
 
-type KubeClientProvider struct {
-	restConfig *rest.Config
-}
-
 func NewKubeClientProvider(config, context string) *KubeClientProvider {
 	var kubeConfigPath string
 	if config != "" {
