@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -32,7 +31,7 @@ func validateMetricsEndpoint(metricsEndpoint string, prometheusURL string) {
 }
 
 // Decodes metrics endpoint yaml file
-func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheus.MetricEndpoint) {
+func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]metricEndpoint) {
 	f, err := util.ReadConfig(metricsEndpoint)
 	if err != nil {
 		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpoint, err)

@@ -24,10 +24,8 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/kube-burner/kube-burner/pkg/alerting"
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
@@ -69,10 +67,8 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 	var f io.Reader
 	var rc int
 	var err error
-	var prometheusClients []*prometheus.Prometheus
-	var alertMs []*alerting.AlertManager
-	var metricsEndpoints []prometheus.MetricEndpoint
 	var embedConfig bool
+	var metricsScraper metrics.Scraper
 	if wh.UserMetadata != "" {
 		wh.Metadata.UserMetadata, err = util.ReadUserMetadata(wh.UserMetadata)
 		if err != nil {
@@ -105,79 +101,19 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 		ConfigSpec.EmbedFS = wh.embedConfig
 		ConfigSpec.EmbedFSDir = path.Join(wh.ConfigDir, workload)
 	}
-	indexerConfig := ConfigSpec.GlobalConfig.IndexerConfig
-	if indexerConfig.Type != "" {
-		log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
-		indexer, err = indexers.NewIndexer(indexerConfig)
-		if err != nil {
-			log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
-		}
-		if wh.MetricsEndpoint != "" {
-			embedConfig = false
-			metrics.DecodeMetricsEndpoint(wh.MetricsEndpoint, &metricsEndpoints)
-			for _, metricsEndpoint := range metricsEndpoints {
-				// Updating the prometheus endpoint actually being used in spec.
-				auth := prometheus.Auth{
-					Token:         metricsEndpoint.Token,
-					SkipTLSVerify: true,
-					Username:      metricsEndpoint.Username,
-					Password:      metricsEndpoint.Password,
-				}
-				p, err := prometheus.NewPrometheusClient(ConfigSpec, metricsEndpoint.Endpoint, auth, stepSize, wh.MetricsMetadata, indexer, embedConfig)
-				if err != nil {
-					log.Fatal(err)
-				}
-				if p.ReadProfile(metricsEndpoint.Profile) != nil {
-					log.Fatal(err)
-				}
-				prometheusClients = append(prometheusClients, p)
-				if metricsEndpoint.AlertProfile != "" {
-					alertM, err := alerting.NewAlertManager(metricsEndpoint.AlertProfile, wh.Metadata.UUID, indexer, p, embedConfig)
-					if err != nil {
-						log.Fatal(err)
-					}
-					alertMs = append(alertMs, alertM)
-				}
-			}
-		} else {
-			for _, metricsProfile := range metricsProfiles {
-				p, err := prometheus.NewPrometheusClient(ConfigSpec,
-					wh.PrometheusURL,
-					prometheus.Auth{Token: wh.PrometheusToken, SkipTLSVerify: true},
-					stepSize,
-					wh.MetricsMetadata,
-					indexer,
-					embedConfig,
-				)
-				if err != nil {
-					log.Fatal(err)
-				}
-				if p.ReadProfile(metricsProfile) != nil {
-					log.Fatal(err)
-				}
-				prometheusClients = append(prometheusClients, p)
-			}
-			for _, alertsProfile := range alertsProfiles {
-				p, err := prometheus.NewPrometheusClient(ConfigSpec,
-					wh.PrometheusURL,
-					prometheus.Auth{Token: wh.PrometheusToken, SkipTLSVerify: true},
-					stepSize,
-					wh.MetricsMetadata,
-					indexer,
-					embedConfig,
-				)
-				if err != nil {
-					log.Fatal(err)
-				}
-				alertM, err := alerting.NewAlertManager(alertsProfile, wh.Metadata.UUID, indexer, p, embedConfig)
-				if err != nil {
-					log.Fatal(err)
-				}
-				alertMs = append(alertMs, alertM)
-			}
-		}
-	}
-	rc, err = burner.Run(ConfigSpec, prometheusClients, alertMs, indexer, wh.Timeout, wh.MetricsMetadata)
+	metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+		ConfigSpec:      ConfigSpec,
+		PrometheusStep:  stepSize,
+		MetricsEndpoint: wh.MetricsEndpoint,
+		MetricsProfiles: metricsProfiles,
+		AlertProfiles:   alertsProfiles,
+		SkipTLSVerify:   true,
+		URL:             wh.PrometheusURL,
+		Token:           wh.PrometheusToken,
+		RawMetadata:     wh.MetricsMetadata,
+		EmbedConfig:     embedConfig,
+	})
+	rc, err = burner.Run(ConfigSpec, metricsScraper, wh.Timeout)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)

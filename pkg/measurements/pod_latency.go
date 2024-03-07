@@ -150,6 +150,8 @@ func (p *podLatency) validateConfig() error {
 // start podLatency measurement
 func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	// Reset latency slices, required in multi-job benchmarks
+	p.latencyQuantiles, p.normLatencies = nil, nil
 	p.metrics = make(map[string]podMetric)
 	log.Infof("Creating Pod latency watcher for %s", factory.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
@@ -254,8 +256,6 @@ func (p *podLatency) index(indexer indexers.Indexer, jobName string) {
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
 	}
-	// Reset latency slices, required in multi-job benchmarks
-	p.latencyQuantiles, p.normLatencies = nil, nil
 	for metricName, data := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
 			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),

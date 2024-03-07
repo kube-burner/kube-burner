@@ -41,19 +41,31 @@ import (
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
-		RUNID:          uid.NewString(),
-		GC:             false,
-		GCMetrics:      false,
-		GCTimeout:      1 * time.Hour,
-		RequestTimeout: 60 * time.Second,
-		Measurements:   []mtypes.Measurement{},
+		RUNID:            uid.NewString(),
+		GC:               false,
+		GCMetrics:        false,
+		GCTimeout:        1 * time.Hour,
+		RequestTimeout:   60 * time.Second,
+		Measurements:     []mtypes.Measurement{},
+		WaitWhenFinished: false,
+	},
+}
+
+// UnmarshalYAML unmarshals YAML data into the Indexer struct.
+func (i *Indexer) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawIndexer Indexer
+	indexer := rawIndexer{
 		IndexerConfig: indexers.IndexerConfig{
 			InsecureSkipVerify: false,
 			MetricsDirectory:   "collected-metrics",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
-		WaitWhenFinished: false,
-	},
+	}
+	if err := unmarshal(&indexer); err != nil {
+		return err
+	}
+	*i = Indexer(indexer)
+	return nil
 }
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
@@ -147,8 +159,10 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 		}
 	}
 	configSpec.GlobalConfig.UUID = uuid
-	if configSpec.GlobalConfig.IndexerConfig.MetricsDirectory == "collected-metrics" {
-		configSpec.GlobalConfig.IndexerConfig.MetricsDirectory += "-" + uuid
+	for i, indexer := range configSpec.Indexers {
+		if indexer.MetricsDirectory == "collected-metrics" {
+			configSpec.Indexers[i].MetricsDirectory += "-" + uuid
+		}
 	}
 	return configSpec, nil
 }

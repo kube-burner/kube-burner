@@ -1,23 +1,14 @@
 ---
 global:
-  indexerConfig:
-    esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
-    insecureSkipVerify: true
-    defaultIndex: kube-burner
-    type: elastic
+  gc: true
   measurements:
-    - name: podLatency
-      thresholds:
-      - conditionType: Ready
-        metric: Avg
-        threshold: 4s
-
-
+   - name: podLatency
 jobs:
   - name: kubelet-density
-    jobIterations: 50
-    qps: 20
-    burst: 20
+    jobIterations: 25
+    qps: 2
+    burst: 2
+    preLoadImages: false
     namespacedIterations: false
     namespace: kubelet-density
     waitWhenFinished: true

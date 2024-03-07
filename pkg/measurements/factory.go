@@ -126,9 +126,9 @@ func Stop() error {
 // Parameters:
 //   - indexer: a pointer to the indexer
 //   - jobName: the name of the job, required as this task can be executed from a goroutine
-func Index(indexer *indexers.Indexer, jobName string) {
+func Index(indexer indexers.Indexer, jobName string) {
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Indexing collected data from measurement: %s", name)
-		measurement.index(*indexer, jobName)
+		measurement.index(indexer, jobName)
 	}
 }

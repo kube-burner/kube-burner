@@ -4,14 +4,26 @@ Kube-burner can index the collected metrics into a given indexer.
 
 ## Indexers
 
-Configured in the `indexerConfig` object, they can be tweaked by the following parameters:
+Configured in the `indexers` field, this field defines a list of indexers, making collected metrics to be indexed in them
 
-| Option    | Description     | Type    | Default |
-| --------- | --------------- | ------- | ------- |
-| `type`    | Type of indexer | String  | ""      |
+| Option    | Description     | Supported values   |
+| --------- | --------------- | ------- |
+| `type`    | Type of indexer | `elastic`, `opensearch`, `local`|
 
-!!! Note
-    Currently, `elastic`, `opensearch` and `local` are the only supported indexers
+Where each indexer supports different options, as in the example below:
+
+```yaml
+global:
+  gc: true
+  measurements:
+    - name: podLatency
+ indexers:                                       
+   - type: opensearch                            
+     esServers: ["blablabla:9200"]             
+     defaultIndex: indexName   
+   - type: local                                 
+     metricsDirectory: collected-metrics
+```
 
 ### Elastic/OpenSearch
 

@@ -74,12 +74,13 @@ To configure your bash shell to load completions for each session execute:
 func initCmd() *cobra.Command {
 	var err error
 	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
+	var metricsProfiles []string
+	var alertsProfiles []string
 	var username, password, uuid, token, configMap, namespace, userMetadata string
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
 	var timeout time.Duration
 	var rc int
-	var metricsScraper metrics.Scraper
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -97,6 +98,12 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
+			if metricsProfile != "" {
+				metricsProfiles = append(metricsProfiles, metricsProfile)
+			}
+			if alertProfile != "" {
+				alertsProfiles = append(alertsProfiles, alertProfile)
+			}
 			f, err := util.ReadConfig(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
@@ -105,22 +112,19 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
-			if configSpec.GlobalConfig.IndexerConfig.Type != "" || alertProfile != "" {
-				metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-					ConfigSpec:      configSpec,
-					Password:        password,
-					PrometheusStep:  prometheusStep,
-					MetricsEndpoint: metricsEndpoint,
-					MetricsProfile:  metricsProfile,
-					AlertProfile:    alertProfile,
-					SkipTLSVerify:   skipTLSVerify,
-					URL:             url,
-					Token:           token,
-					Username:        username,
-					UserMetaData:    userMetadata,
-				})
-			}
-
+			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+				ConfigSpec:      configSpec,
+				Password:        password,
+				PrometheusStep:  prometheusStep,
+				MetricsEndpoint: metricsEndpoint,
+				MetricsProfiles: metricsProfiles,
+				AlertProfiles:   alertsProfiles,
+				SkipTLSVerify:   skipTLSVerify,
+				URL:             url,
+				Token:           token,
+				Username:        username,
+				UserMetaData:    userMetadata,
+			})
 			if configSpec.GlobalConfig.ClusterHealth {
 				clientSet, _, err := config.GetClientSet(0, 0)
 				if err != nil {
@@ -129,7 +133,7 @@ func initCmd() *cobra.Command {
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.Metadata)
+			rc, err = burner.Run(configSpec, metricsScraper, timeout)
 			if err != nil {
 				log.Errorf(err.Error())
 				os.Exit(rc)
@@ -216,7 +220,7 @@ func measureCmd() *cobra.Command {
 	var configFile string
 	var jobName string
 	var userMetadata string
-	var indexer *indexers.Indexer
+	var indexerList []indexers.Indexer
 	metadata := make(map[string]interface{})
 	cmd := &cobra.Command{
 		Use:   "measure",
@@ -237,13 +241,13 @@ func measureCmd() *cobra.Command {
 			if len(configSpec.Jobs) > 0 {
 				log.Fatal("No jobs are allowed in a measure subcommand config file")
 			}
-			if configSpec.GlobalConfig.IndexerConfig.Type != "" {
-				indexerConfig := configSpec.GlobalConfig.IndexerConfig
-				log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
-				indexer, err = indexers.NewIndexer(indexerConfig)
+			for pos, indexer := range configSpec.Indexers {
+				log.Infof("📁 Creating indexer: %s", indexer.Type)
+				idx, err := indexers.NewIndexer(indexer.IndexerConfig)
 				if err != nil {
-					log.Fatalf("%v indexer: %v", indexerConfig.Type, err.Error())
+					log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 				}
+				indexerList = append(indexerList, *idx)
 			}
 			if userMetadata != "" {
 				metadata, err = util.ReadUserMetadata(userMetadata)
@@ -273,7 +277,9 @@ func measureCmd() *cobra.Command {
 			if err = measurements.Stop(); err != nil {
 				log.Error(err.Error())
 			}
-			measurements.Index(indexer, jobName)
+			for _, indexer := range indexerList {
+				measurements.Index(indexer, jobName)
+			}
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
@@ -305,23 +311,30 @@ func indexCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
-					Type:    indexers.ElasticIndexer,
-					Servers: []string{esServer},
-					Index:   esIndex,
-				}
+				configSpec.Indexers = append(configSpec.Indexers,
+					config.Indexer{
+						IndexerConfig: indexers.IndexerConfig{
+							Type:    indexers.ElasticIndexer,
+							Servers: []string{esServer},
+							Index:   esIndex,
+						},
+					})
 			} else {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
-					Type:             indexers.LocalIndexer,
-					MetricsDirectory: metricsDirectory,
-				}
+				configSpec.Indexers = append(configSpec.Indexers,
+					config.Indexer{
+						IndexerConfig: indexers.IndexerConfig{
+							Type:             indexers.LocalIndexer,
+							MetricsDirectory: metricsDirectory,
+							TarballName:      tarballName,
+						},
+					})
 			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      configSpec,
 				Password:        password,
 				PrometheusStep:  prometheusStep,
 				MetricsEndpoint: metricsEndpoint,
-				MetricsProfile:  metricsProfile,
+				MetricsProfiles: []string{metricsProfile},
 				SkipTLSVerify:   skipTLSVerify,
 				URL:             url,
 				Token:           token,
@@ -340,8 +353,8 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err)
 				}
 			}
-			if configSpec.GlobalConfig.IndexerConfig.Type == indexers.LocalIndexer && tarballName != "" {
-				if err := metrics.CreateTarball(configSpec.GlobalConfig.IndexerConfig, tarballName); err != nil {
+			if configSpec.Indexers[0].Type == indexers.LocalIndexer && tarballName != "" {
+				if err := metrics.CreateTarball(configSpec.Indexers[0].IndexerConfig); err != nil {
 					log.Fatal(err)
 				}
 			}
@@ -371,24 +384,23 @@ func indexCmd() *cobra.Command {
 func importCmd() *cobra.Command {
 	var tarball string
 	var esServer, esIndex, metricsDirectory string
-	var configSpec config.Spec
+	var indexerConfig indexers.IndexerConfig
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "Import metrics tarball",
 		Run: func(cmd *cobra.Command, args []string) {
 			if esServer != "" && esIndex != "" {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
 					Servers: []string{esServer},
 					Index:   esIndex,
 				}
 			} else {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexerConfig = indexers.IndexerConfig{
 					Type:             indexers.LocalIndexer,
 					MetricsDirectory: metricsDirectory,
 				}
 			}
-			indexerConfig := configSpec.GlobalConfig.IndexerConfig
 			log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 			indexer, err := indexers.NewIndexer(indexerConfig)
 			if err != nil {
@@ -418,6 +430,7 @@ func alertCmd() *cobra.Command {
 	var alertM *alerting.AlertManager
 	var prometheusStep time.Duration
 	var indexer *indexers.Indexer
+	var indexerConfig indexers.IndexerConfig
 	cmd := &cobra.Command{
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
@@ -425,19 +438,18 @@ func alertCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
 					Servers: []string{esServer},
 					Index:   esIndex,
 				}
 			} else if metricsDirectory != "" {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexerConfig = indexers.IndexerConfig{
 					Type:             indexers.LocalIndexer,
 					MetricsDirectory: metricsDirectory,
 				}
 			}
-			if configSpec.GlobalConfig.IndexerConfig.Type != "" {
-				indexerConfig := configSpec.GlobalConfig.IndexerConfig
+			if indexer != nil {
 				log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 				indexer, err = indexers.NewIndexer(indexerConfig)
 				if err != nil {
@@ -450,13 +462,13 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, indexer, false)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, false, *indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p, false); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, *indexer); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(startTime, endTime)
