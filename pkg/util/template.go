@@ -43,6 +43,17 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 	funcMap["GetSubnet24"] = func(subnetIdx int) string {
 		return netip.AddrFrom4([4]byte{byte(subnetIdx>>16 + 1), byte(subnetIdx >> 8), byte(subnetIdx), 0}).String() + "/24"
 	}
+	funcMap["GetIPAddress"] = func(eipAddresses string, Iteration int, addressesPerIteration int) string {
+		fmt.Println("Iteration %s addressesPerIteration %s", Iteration, addressesPerIteration)
+	        iteration := Iteration
+		var eips []string
+
+		addrSlice := strings.Split(eipAddresses, " ")
+		for i := 0; i < addressesPerIteration; i++ {
+			eips = append(eips, addrSlice[(iteration * addressesPerIteration) + i])
+		}
+		return strings.Join(eips, " ")
+	}
 	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
 		return nil, fmt.Errorf("parsing error: %s", err)
