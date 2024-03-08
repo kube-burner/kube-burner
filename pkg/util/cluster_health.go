@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func ClusterHealthCheck(clientSet *kubernetes.Clientset) {
+func ClusterHealthCheck(clientSet kubernetes.Interface) {
 	log.Infof("🏥 Checking for Cluster Health")
 	if ClusterHealthyVanillaK8s(clientSet) {
 		log.Infof("Cluster is healthy.")
@@ -18,7 +18,7 @@ func ClusterHealthCheck(clientSet *kubernetes.Clientset) {
 	}
 }
 
-func ClusterHealthyVanillaK8s(clientset *kubernetes.Clientset) bool {
+func ClusterHealthyVanillaK8s(clientset kubernetes.Interface) bool {
 	var isHealthy = true
 	nodes, err := clientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {

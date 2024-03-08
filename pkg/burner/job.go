@@ -71,7 +71,7 @@ const (
 	garbageCollectionJob = "garbage-collection"
 )
 
-var ClientSet *kubernetes.Clientset
+var ClientSet kubernetes.Interface
 var DynamicClient dynamic.Interface
 var discoveryClient *discovery.DiscoveryClient
 var restConfig *rest.Config
@@ -82,7 +82,7 @@ var embedFSDir string
 // Returns:
 // - error code
 // - error
-func Run(configSpec config.Spec, metricsScraper metrics.Scraper, timeout time.Duration) (int, error) {
+func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, timeout time.Duration) (int, error) {
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
@@ -100,11 +100,8 @@ func Run(configSpec config.Spec, metricsScraper metrics.Scraper, timeout time.Du
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.Metadata)
-		jobList = newExecutorList(configSpec, uuid, timeout)
-		ClientSet, restConfig, err = config.GetClientSet(rest.DefaultQPS, rest.DefaultBurst)
-		if err != nil {
-			log.Fatalf("Error creating clientSet: %s", err)
-		}
+		jobList = newExecutorList(configSpec, kubeClientProvider, uuid, timeout)
+		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
 		for _, job := range jobList {
 			if job.PreLoadImages && job.JobType == config.CreationJob {
 				if err = preLoadImages(job); err != nil {
@@ -123,17 +120,14 @@ func Run(configSpec config.Spec, metricsScraper metrics.Scraper, timeout time.Du
 				log.Infof("QPS: %v", job.QPS)
 				log.Infof("Burst: %v", job.Burst)
 			}
-			ClientSet, restConfig, err = config.GetClientSet(job.QPS, job.Burst)
-			if err != nil {
-				log.Fatalf("Error creating clientSet: %s", err)
-			}
+			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			currentJob := prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
 			}
-			measurements.SetJobConfig(&job.Job)
+			measurements.SetJobConfig(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
 			measurements.Start()
 			switch job.JobType {
@@ -289,13 +283,10 @@ func Run(configSpec config.Spec, metricsScraper metrics.Scraper, timeout time.Du
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration) []Executor {
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, uuid string, timeout time.Duration) []Executor {
 	var ex Executor
 	var executorList []Executor
-	_, restConfig, err := config.GetClientSet(100, 100) // Hardcoded QPS/Burst
-	if err != nil {
-		log.Fatalf("Error creating clientSet: %s", err)
-	}
+	_, restConfig = kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
 		switch job.JobType {

@@ -15,6 +15,12 @@ setup-kind() {
   ${KIND_FOLDER}/kind-linux-amd64 create cluster --config kind.yml --image kindest/node:"${K8S_VERSION}" --name kind --wait 300s -v=1
 }
 
+create_test_kubeconfig() {
+  echo "Creating another kubeconfig"
+  "${KIND_FOLDER}"/kind-linux-amd64 export kubeconfig --kubeconfig "${TEST_KUBECONFIG}"
+  kubectl config rename-context kind-kind "${TEST_KUBECONTEXT}" --kubeconfig "${TEST_KUBECONFIG}"
+}
+
 destroy-kind() {
   echo "Destroying kind server"
   "${KIND_FOLDER}"/kind-linux-amd64 delete cluster

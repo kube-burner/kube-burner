@@ -13,7 +13,10 @@ setup_file() {
   export GC=true
   export CHURN=false
   export CHURN_CYCLES=100
+  export TEST_KUBECONFIG; TEST_KUBECONFIG=$(mktemp -d)/kubeconfig
+  export TEST_KUBECONTEXT=test-context
   setup-kind
+  create_test_kubeconfig
   setup-prometheus
 }
 
@@ -112,6 +115,19 @@ teardown_file() {
   run_cmd kube-burner init -c kube-burner-read.yml --uuid "${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
   check_file_list ${METRICS_FOLDER}/jobSummary-read-job.json ${METRICS_FOLDER}/prometheusBuildInfo.json
+}
+
+@test "kube-burner init: kubeconfig" {
+  run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug --kubeconfig="${TEST_KUBECONFIG}"
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+}
+
+@test "kube-burner init: kubeconfig kube-context" {
+  run_cmd kubectl --kubeconfig "${TEST_KUBECONFIG}" config unset current-context
+  run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
 @test "kube-burner cluster health check" {

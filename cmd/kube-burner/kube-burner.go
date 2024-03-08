@@ -21,23 +21,21 @@ import (
 	"path/filepath"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
+	"github.com/cloud-bulldozer/go-commons/indexers"
+	uid "github.com/google/uuid"
 	"github.com/kube-burner/kube-burner/pkg/alerting"
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements"
+	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
-
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/kube-burner/kube-burner/pkg/prometheus"
-
-	uid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -73,6 +71,8 @@ To configure your bash shell to load completions for each session execute:
 
 func initCmd() *cobra.Command {
 	var err error
+	var clientSet kubernetes.Interface
+	var kubeConfig, kubeContext string
 	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
 	var metricsProfiles []string
 	var alertsProfiles []string
@@ -90,8 +90,10 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			if configMap != "" {
-				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
+				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace, clientSet)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -126,14 +128,11 @@ func initCmd() *cobra.Command {
 				UserMetaData:    userMetadata,
 			})
 			if configSpec.GlobalConfig.ClusterHealth {
-				clientSet, _, err := config.GetClientSet(0, 0)
-				if err != nil {
-					log.Errorf("Error creating clientSet: %s", err)
-				}
+				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, metricsScraper, timeout)
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, timeout)
 			if err != nil {
 				log.Errorf(err.Error())
 				os.Exit(rc)
@@ -156,11 +155,14 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
+	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
+	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
 
 func healthCheck() *cobra.Command {
+	var kubeConfig, kubeContext string
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "health-check",
@@ -171,19 +173,19 @@ func healthCheck() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			clientSet, _, err := config.GetClientSet(0, 0)
-			if err != nil {
-				log.Fatalf("Error creating clientSet: %s", err)
-			}
+			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
 		},
 	}
+	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
+	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	return cmd
 }
 
 func destroyCmd() *cobra.Command {
 	var uuid string
 	var timeout time.Duration
+	var kubeConfig, kubeContext string
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "destroy",
@@ -194,10 +196,8 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			clientSet, restConfig, err := config.GetClientSet(0, 0)
-			if err != nil {
-				log.Fatalf("Error creating clientSet: %s", err)
-			}
+			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
 			burner.ClientSet = clientSet
 			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -209,6 +209,8 @@ func destroyCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
+	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
+	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
@@ -221,6 +223,7 @@ func measureCmd() *cobra.Command {
 	var jobName string
 	var userMetadata string
 	var indexerList []indexers.Indexer
+	var kubeConfig, kubeContext string
 	metadata := make(map[string]interface{})
 	cmd := &cobra.Command{
 		Use:   "measure",
@@ -267,12 +270,15 @@ func measureCmd() *cobra.Command {
 			}
 			log.Infof("%v", namespaceLabels)
 			measurements.NewMeasurementFactory(configSpec, metadata)
-			measurements.SetJobConfig(&config.Job{
-				Name:                 jobName,
-				Namespace:            rawNamespaces,
-				NamespaceLabels:      namespaceLabels,
-				NamespaceAnnotations: namespaceAnnotations,
-			})
+			measurements.SetJobConfig(
+				&config.Job{
+					Name:                 jobName,
+					Namespace:            rawNamespaces,
+					NamespaceLabels:      namespaceLabels,
+					NamespaceAnnotations: namespaceAnnotations,
+				},
+				config.NewKubeClientProvider(kubeConfig, kubeContext),
+			)
 			measurements.Collect()
 			if err = measurements.Stop(); err != nil {
 				log.Error(err.Error())
@@ -288,6 +294,8 @@ func measureCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-measure", "Measure job name")
 	cmd.Flags().StringVarP(&rawNamespaces, "namespaces", "n", corev1.NamespaceAll, "comma-separated list of namespaces")
 	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
+	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	return cmd
 }
 

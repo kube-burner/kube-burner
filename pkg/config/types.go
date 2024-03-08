@@ -20,6 +20,7 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"k8s.io/client-go/rest"
 )
 
 // JobType type of job
@@ -173,4 +174,8 @@ type Job struct {
 type WaitOptions struct {
 	// ForCondition wait for this condition to become true
 	ForCondition string `yaml:"forCondition" json:"forCondition,omitempty"`
+}
+
+type KubeClientProvider struct {
+	restConfig *rest.Config
 }

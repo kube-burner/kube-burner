@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"path/filepath"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -29,7 +28,6 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -41,24 +39,14 @@ var ConfigSpec config.Spec
 var indexer *indexers.Indexer
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(config Config, embedConfig embed.FS) WorkloadHelper {
-	var kubeconfig string
-	if os.Getenv("KUBECONFIG") != "" {
-		kubeconfig = os.Getenv("KUBECONFIG")
-	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
-		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	}
-	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		log.Fatal(err)
-	}
+func NewWorkloadHelper(config Config, embedConfig embed.FS, kubeClientProvider *config.KubeClientProvider) WorkloadHelper {
 	if config.ConfigDir == "" {
 		log.Fatal("Config dir cannot be empty")
 	}
 	wh := WorkloadHelper{
-		Config:      config,
-		embedConfig: embedConfig,
-		RestConfig:  restConfig,
+		Config:             config,
+		embedConfig:        embedConfig,
+		kubeClientProvider: kubeClientProvider,
 	}
 	return wh
 }
@@ -113,7 +101,7 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 		RawMetadata:     wh.MetricsMetadata,
 		EmbedConfig:     embedConfig,
 	})
-	rc, err = burner.Run(ConfigSpec, metricsScraper, wh.Timeout)
+	rc, err = burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, wh.Timeout)
 	if err != nil {
 		wh.Metadata.ExecutionErrors = err.Error()
 		log.Error(err)
