@@ -22,10 +22,11 @@ setup_file() {
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  export INDEXING_TYPE=""
   export ES_SERVER="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com"
   export ES_INDEX="kube-burner"
   export METRICS_FOLDER="metrics-${UUID}"
+  export ES_INDEXING=""
+  export LOCAL_INDEXING=""
 }
 
 teardown() {
@@ -59,25 +60,26 @@ teardown_file() {
 }
 
 @test "kube-burner init: local-indexing=true; pod-latency-metrics-indexing=true" {
-  export INDEXING_TYPE=local
+  export LOCAL_INDEXING=true
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
-  check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
+  check_file_list ${METRICS_FOLDER}/jobSummary-namespaced.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
 @test "kube-burner init: os-indexing=true; alerting=true"  {
-  export INDEXING_TYPE=opensearch
+  export ES_INDEXING=true
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml -a alert-profile.yaml
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement alert
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
-@test "kube-burner init: os-indexing=true; metrics-endpoint=true" {
-  export INDEXING_TYPE=opensearch
+@test "kube-burner init: os-indexing=true; local-indexing=true; metrics-endpoint=true" {
+  export ES_INDEXING=true LOCAL_INDEXING=true
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -e metrics-endpoints.yaml
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement svcLatencyMeasurement svcLatencyQuantilesMeasurement
+  check_file_list ${METRICS_FOLDER}/jobSummary-namespaced.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
@@ -100,16 +102,19 @@ teardown_file() {
   kubectl delete -f objectTemplates/storageclass.yml
 }
 
-@test "kube-burner init: delete=true; os-indexing=true" {
-  export INDEXING_TYPE=opensearch
+@test "kube-burner init: delete=true; os-indexing=true; local-indexing=true" {
+  export ES_INDEXING=true LOCAL_INDEXING=true
   run_cmd kube-burner init -c kube-burner-delete.yml --uuid "${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
+  check_file_list ${METRICS_FOLDER}/jobSummary-delete-job.json ${METRICS_FOLDER}/podLatencyMeasurement-delete-job.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-delete-job.json ${METRICS_FOLDER}/prometheusBuildInfo.json
 }
 
-@test "kube-burner init: read; os-indexing=true" {
-  export INDEXING_TYPE=opensearch
+@test "kube-burner init: read; os-indexing=true; local-indexing=true" {
+  export ES_INDEXING=true LOCAL_INDEXING=true
   run_cmd kube-burner init -c kube-burner-read.yml --uuid "${UUID}" --log-level=debug -u http://localhost:9090 -m metrics-profile.yaml
+  check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
+  check_file_list ${METRICS_FOLDER}/jobSummary-read-job.json ${METRICS_FOLDER}/prometheusBuildInfo.json
 }
 
 @test "kube-burner init: kubeconfig" {

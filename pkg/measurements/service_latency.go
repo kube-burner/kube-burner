@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	lcorev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -65,12 +64,6 @@ type svcMetric struct {
 	Name              string             `json:"service"`
 	Metadata          interface{}        `json:"metadata,omitempty"`
 	ServiceType       corev1.ServiceType `json:"type"`
-}
-
-type SvcLatencyChecker struct {
-	pod        *corev1.Pod
-	clientSet  kubernetes.Clientset
-	restConfig rest.Config
 }
 
 func init() {
@@ -187,7 +180,6 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 func (s *serviceLatency) setConfig(cfg types.Measurement) {
 	s.config = cfg
 }
-
 func (s *serviceLatency) validateConfig() error {
 	if s.config.ServiceTimeout == 0 {
 		return fmt.Errorf("svcTimeout cannot be 0")
@@ -198,6 +190,8 @@ func (s *serviceLatency) validateConfig() error {
 // start service latency measurement
 func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	// Reset latency slices, required in multi-job benchmarks
+	s.latencyQuantiles, s.normLatencies = nil, nil
 	if err := deployAssets(); err != nil {
 		log.Fatal(err)
 		return err
@@ -284,8 +278,6 @@ func (s *serviceLatency) index(indexer indexers.Indexer, jobName string) {
 		svcLatencyMetric:               s.normLatencies,
 		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
 	}
-	// Reset latency slices, required in multi-job benchmarks
-	s.latencyQuantiles, s.normLatencies = nil, nil
 	for metricName, documents := range metricMap {
 		indexingOpts := indexers.IndexingOpts{
 			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),

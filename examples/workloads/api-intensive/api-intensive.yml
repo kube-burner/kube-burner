@@ -1,10 +1,10 @@
 ---
-global:
-  indexerConfig:
-    esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
+indexers:
+  - esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
     insecureSkipVerify: true
     defaultIndex: kube-burner
     type: elastic
+global:
   measurements:
     - name: podLatency
 
