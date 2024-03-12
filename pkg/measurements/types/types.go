@@ -19,16 +19,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
 type latencyMetric string
 
 const (
-	All            latencyMetric = "all"       // Both quantiles and per pod documents
-	Quantiles      latencyMetric = "quantiles" // Single quantile document
-	pprofDirectory string        = "pprof"
+	pprofDirectory string = "pprof"
 )
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
@@ -114,11 +111,11 @@ var SvcLatencyCheckerPod = &corev1.Pod{
 				Name:            SvcLatencyCheckerName,
 				ImagePullPolicy: corev1.PullAlways,
 				SecurityContext: &corev1.SecurityContext{
-					AllowPrivilegeEscalation: pointer.Bool(false),
+					AllowPrivilegeEscalation: ptr.To[bool](false),
 					Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-					RunAsNonRoot:             pointer.Bool(true),
+					RunAsNonRoot:             ptr.To[bool](true),
 					SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
-					RunAsUser:                pointer.Int64(1000),
+					RunAsUser:                ptr.To[int64](1000),
 				},
 			},
 		},

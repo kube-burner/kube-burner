@@ -20,6 +20,7 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"k8s.io/client-go/rest"
 )
 
 // JobType type of job
@@ -38,6 +39,8 @@ const (
 
 // Spec configuration root
 type Spec struct {
+	// List of kube-burner indexers
+	Indexers []Indexer `yaml:"indexers"`
 	// GlobalConfig defines global configuration parameters
 	GlobalConfig GlobalConfig `yaml:"global"`
 	// Jobs list of kube-burner jobs
@@ -48,14 +51,16 @@ type Spec struct {
 	EmbedFSDir string
 }
 
+type Indexer struct {
+	indexers.IndexerConfig `yaml:",inline"`
+}
+
 // GlobalConfig holds the global configuration
 type GlobalConfig struct {
 	// Benchmark UUID
 	UUID string
 	// Benchmark RUNID
 	RUNID string
-	// IndexerConfig contains a IndexerConfig definition
-	IndexerConfig indexers.IndexerConfig `yaml:"indexerConfig"`
 	// Measurements describes a list of measurements kube-burner
 	// will take along with job
 	Measurements []mtypes.Measurement `yaml:"measurements"`
@@ -169,4 +174,8 @@ type Job struct {
 type WaitOptions struct {
 	// ForCondition wait for this condition to become true
 	ForCondition string `yaml:"forCondition" json:"forCondition,omitempty"`
+}
+
+type KubeClientProvider struct {
+	restConfig *rest.Config
 }

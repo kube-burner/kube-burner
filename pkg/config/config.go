@@ -24,36 +24,45 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	uid "github.com/google/uuid"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
-
-	uid "github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
-		RUNID:          uid.NewString(),
-		GC:             false,
-		GCMetrics:      false,
-		GCTimeout:      1 * time.Hour,
-		RequestTimeout: 60 * time.Second,
-		Measurements:   []mtypes.Measurement{},
+		RUNID:            uid.NewString(),
+		GC:               false,
+		GCMetrics:        false,
+		GCTimeout:        1 * time.Hour,
+		RequestTimeout:   60 * time.Second,
+		Measurements:     []mtypes.Measurement{},
+		WaitWhenFinished: false,
+	},
+}
+
+// UnmarshalYAML unmarshals YAML data into the Indexer struct.
+func (i *Indexer) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawIndexer Indexer
+	indexer := rawIndexer{
 		IndexerConfig: indexers.IndexerConfig{
 			InsecureSkipVerify: false,
 			MetricsDirectory:   "collected-metrics",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
-		WaitWhenFinished: false,
-	},
+	}
+	if err := unmarshal(&indexer); err != nil {
+		return err
+	}
+	*i = Indexer(indexer)
+	return nil
 }
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
@@ -147,26 +156,57 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 		}
 	}
 	configSpec.GlobalConfig.UUID = uuid
-	if configSpec.GlobalConfig.IndexerConfig.MetricsDirectory == "collected-metrics" {
-		configSpec.GlobalConfig.IndexerConfig.MetricsDirectory += "-" + uuid
+	for i, indexer := range configSpec.Indexers {
+		if indexer.MetricsDirectory == "collected-metrics" {
+			configSpec.Indexers[i].MetricsDirectory += "-" + uuid
+		}
 	}
 	return configSpec, nil
 }
 
+func NewKubeClientProvider(config, context string) *KubeClientProvider {
+	var kubeConfigPath string
+	if config != "" {
+		kubeConfigPath = config
+	} else if os.Getenv("KUBECONFIG") != "" {
+		kubeConfigPath = os.Getenv("KUBECONFIG")
+	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeConfigPath == "" && !os.IsNotExist(err) {
+		kubeConfigPath = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
+	var restConfig *rest.Config
+	var err error
+	if kubeConfigPath == "" {
+		if restConfig, err = rest.InClusterConfig(); err != nil {
+			log.Fatalf("error preparing kubernetes client: %s", err)
+		}
+	} else {
+		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath},
+			&clientcmd.ConfigOverrides{CurrentContext: context},
+		)
+		if restConfig, err = kubeConfig.ClientConfig(); err != nil {
+			log.Fatalf("error preparing kubernetes client: %s", err)
+		}
+	}
+	return &KubeClientProvider{restConfig: restConfig}
+}
+
+func (p *KubeClientProvider) DefaultClientSet() (kubernetes.Interface, *rest.Config) {
+	restConfig := *p.restConfig
+	return kubernetes.NewForConfigOrDie(&restConfig), &restConfig
+}
+
+func (p *KubeClientProvider) ClientSet(QPS float32, burst int) (kubernetes.Interface, *rest.Config) {
+	restConfig := *p.restConfig
+	restConfig.QPS, restConfig.Burst = QPS, burst
+	restConfig.Timeout = configSpec.GlobalConfig.RequestTimeout
+	return kubernetes.NewForConfigOrDie(&restConfig), &restConfig
+}
+
 // FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
-func FetchConfigMap(configMap, namespace string) (string, string, error) {
+func FetchConfigMap(configMap, namespace string, clientSet kubernetes.Interface) (string, string, error) {
 	log.Infof("Fetching configmap %s", configMap)
-	var kubeconfig, metricProfile, alertProfile string
-	if os.Getenv("KUBECONFIG") != "" {
-		kubeconfig = os.Getenv("KUBECONFIG")
-	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
-		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	}
-	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		return metricProfile, alertProfile, err
-	}
-	clientSet := kubernetes.NewForConfigOrDie(restConfig)
+	var metricProfile, alertProfile string
 	configMapData, err := clientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap, v1.GetOptions{})
 	if err != nil {
 		return metricProfile, alertProfile, err
@@ -199,37 +239,6 @@ func validateDNS1123() error {
 		}
 	}
 	return nil
-}
-
-// GetRestConfig returns restConfig with the given QPS and burst
-func GetClientSet(QPS float32, burst int) (*kubernetes.Clientset, *rest.Config, error) {
-	var err error
-	var restConfig *rest.Config
-	var kubeconfig string
-	if os.Getenv("KUBECONFIG") != "" {
-		kubeconfig = os.Getenv("KUBECONFIG")
-	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
-		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	}
-	restConfig, err = buildConfig(kubeconfig)
-	if err != nil {
-		return &kubernetes.Clientset{}, restConfig, err
-	}
-	restConfig.QPS, restConfig.Burst = QPS, burst
-	restConfig.Timeout = configSpec.GlobalConfig.RequestTimeout
-	return kubernetes.NewForConfigOrDie(restConfig), restConfig, nil
-}
-
-func buildConfig(kubeconfigPath string) (*rest.Config, error) {
-	if kubeconfigPath == "" {
-		kubeconfig, err := rest.InClusterConfig()
-		if err == nil {
-			return kubeconfig, nil
-		}
-	}
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: ""}}).ClientConfig()
 }
 
 func jobIsDuped() error {

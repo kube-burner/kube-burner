@@ -29,8 +29,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func CreateTarball(indexerConfig indexers.IndexerConfig, tarballName string) error {
-	tarball, err := os.Create(tarballName)
+func CreateTarball(indexerConfig indexers.IndexerConfig) error {
+	tarball, err := os.Create(indexerConfig.TarballName)
 	if err != nil {
 		return fmt.Errorf("Could not create tarball file: %v", err)
 	}
@@ -67,7 +67,7 @@ func CreateTarball(indexerConfig indexers.IndexerConfig, tarballName string) err
 	return nil
 }
 
-func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string) error {
+func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 	log.Infof("Importing tarball: %v", tarball)
 	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)

@@ -27,7 +27,6 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/cloud-bulldozer/go-commons/version"
-	"github.com/kube-burner/kube-burner/pkg/alerting"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
@@ -72,15 +71,18 @@ const (
 	garbageCollectionJob = "garbage-collection"
 )
 
-var ClientSet *kubernetes.Clientset
+var ClientSet kubernetes.Interface
 var DynamicClient dynamic.Interface
 var discoveryClient *discovery.DiscoveryClient
 var restConfig *rest.Config
 var embedFS embed.FS
 var embedFSDir string
 
-//nolint:gocyclo
-func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, alertMs []*alerting.AlertManager, indexer *indexers.Indexer, timeout time.Duration, metadata map[string]interface{}) (int, error) {
+// Runs the with the given configuration and metrics scraper, with the specified timeout.
+// Returns:
+// - error code
+// - error
+func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, timeout time.Duration) (int, error) {
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
@@ -99,9 +101,9 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		var innerRC int
 		var churnStart *time.Time
 		var churnEnd *time.Time
-		measurements.NewMeasurementFactory(configSpec, metadata)
-		jobList = newExecutorList(configSpec, uuid, timeout)
-		ClientSet, restConfig, err = config.GetClientSet(rest.DefaultQPS, rest.DefaultBurst)
+		measurements.NewMeasurementFactory(configSpec, metricsScraper.Metadata)
+		jobList = newExecutorList(configSpec, kubeClientProvider, uuid, timeout)
+		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
 		if err != nil {
 			log.Fatalf("Error creating clientSet: %s", err)
 		}
@@ -123,17 +125,14 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				log.Infof("QPS: %v", job.QPS)
 				log.Infof("Burst: %v", job.Burst)
 			}
-			ClientSet, restConfig, err = config.GetClientSet(job.QPS, job.Burst)
-			if err != nil {
-				log.Fatalf("Error creating clientSet: %s", err)
-			}
+			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 			currentJob := prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
 			}
-			measurements.SetJobConfig(&job.Job)
+			measurements.SetJobConfig(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
 			measurements.Start()
 			switch job.JobType {
@@ -183,7 +182,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 				cmd.Stderr = &errb
 				err := cmd.Run()
 				if err != nil {
-					log.Infof("BeforeCleanup failed: %v", err)
+					err = fmt.Errorf("BeforeCleanup failed: %v", err)
+					log.Error(err.Error())
+					errs = append(errs, err)
+					innerRC = 1
 				}
 				log.Infof("BeforeCleanup out: %v, err: %v", outb.String(), errb.String())
 			}
@@ -193,22 +195,24 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 			}
 			currentJob.End = time.Now().UTC()
 			executedJobs = append(executedJobs, currentJob)
-			// We stop and index measurements per job
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := currentJob.End.Sub(currentJob.Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
+			// We stop and index measurements per job
 			if err = measurements.Stop(); err != nil {
 				errs = append(errs, err)
 				log.Error(err.Error())
 				innerRC = 1
 			}
-			if indexer != nil && !job.SkipIndexing {
-				msWg.Add(1)
-				go func(jobName string) {
-					defer msWg.Done()
-					measurements.Index(indexer, jobName)
-				}(job.Name)
+			if !job.SkipIndexing {
+				for _, indexer := range metricsScraper.IndexerList {
+					msWg.Add(1)
+					go func(jobName string, indexer indexers.Indexer) {
+						defer msWg.Done()
+						measurements.Index(indexer, jobName)
+					}(job.Name, indexer)
+				}
 			}
 		}
 		if globalConfig.WaitWhenFinished {
@@ -241,37 +245,37 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 		msWg.Wait()
 		for _, job := range executedJobs {
 			// elapsedTime is recalculated for every job of the list
-			if indexer != nil && !job.JobConfig.SkipIndexing {
-				jobTimings := timings{
-					Timestamp:    job.Start,
-					EndTimestamp: job.End,
-					ElapsedTime:  job.End.Sub(job.Start).Round(time.Second).Seconds(),
-				}
-				if !job.ChurnStart.IsZero() {
-					jobTimings.ChurnStartTimestamp = &job.ChurnStart
-					jobTimings.ChurnEndTimestamp = &job.ChurnEnd
-					if churnStart == nil {
-						churnStart = &job.ChurnStart
+			jobTimings := timings{
+				Timestamp:    job.Start,
+				EndTimestamp: job.End,
+				ElapsedTime:  job.End.Sub(job.Start).Round(time.Second).Seconds(),
+			}
+			if !job.JobConfig.SkipIndexing {
+				for _, indexer := range metricsScraper.IndexerList {
+					if !job.ChurnStart.IsZero() {
+						jobTimings.ChurnStartTimestamp = &job.ChurnStart
+						jobTimings.ChurnEndTimestamp = &job.ChurnEnd
+						if churnStart == nil {
+							churnStart = &job.ChurnStart
+						}
+						churnEnd = &job.ChurnEnd
 					}
-					churnEnd = &job.ChurnEnd
+					indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metricsScraper.Metadata)
 				}
-				indexjobSummaryInfo(indexer, uuid, jobTimings, job.JobConfig, metadata)
 			}
 		}
-		for _, alertM := range alertMs {
+		for _, alertM := range metricsScraper.AlertMs {
 			if err := alertM.Evaluate(executedJobs[0].Start, executedJobs[len(jobList)-1].End, churnStart, churnEnd); err != nil {
 				errs = append(errs, err)
 				innerRC = 1
 			}
 		}
-		if indexer != nil {
-			for _, prometheusClient := range prometheusClients {
-				prometheusClient.ScrapeJobsMetrics(executedJobs...)
-			}
+		for _, prometheusClient := range metricsScraper.PrometheusClients {
+			prometheusClient.ScrapeJobsMetrics(executedJobs...)
 		}
-		if indexer != nil {
-			if globalConfig.IndexerConfig.Type == indexers.LocalIndexer && globalConfig.IndexerConfig.CreateTarball {
-				metrics.CreateTarball(globalConfig.IndexerConfig, globalConfig.IndexerConfig.TarballName)
+		for _, indexer := range configSpec.Indexers {
+			if indexer.IndexerConfig.Type == indexers.LocalIndexer && indexer.IndexerConfig.CreateTarball {
+				metrics.CreateTarball(indexer.IndexerConfig)
 			}
 		}
 		log.Infof("Finished execution with UUID: %s", uuid)
@@ -294,13 +298,10 @@ func Run(configSpec config.Spec, prometheusClients []*prometheus.Prometheus, ale
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, uuid string, timeout time.Duration) []Executor {
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, uuid string, timeout time.Duration) []Executor {
 	var ex Executor
 	var executorList []Executor
-	_, restConfig, err := config.GetClientSet(100, 100) // Hardcoded QPS/Burst
-	if err != nil {
-		log.Fatalf("Error creating clientSet: %s", err)
-	}
+	_, restConfig = kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
 		switch job.JobType {

@@ -19,7 +19,7 @@ import (
 	"time"
 
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
-	"k8s.io/client-go/rest"
+	"github.com/kube-burner/kube-burner/pkg/config"
 )
 
 type Config struct {
@@ -45,9 +45,9 @@ type BenchmarkMetadata struct {
 
 type WorkloadHelper struct {
 	Config
-	Metadata        BenchmarkMetadata
-	embedConfig     embed.FS
-	MetadataAgent   ocpmetadata.Metadata
-	RestConfig      *rest.Config
-	MetricsMetadata map[string]interface{}
+	Metadata           BenchmarkMetadata
+	embedConfig        embed.FS
+	kubeClientProvider *config.KubeClientProvider
+	MetadataAgent      ocpmetadata.Metadata
+	MetricsMetadata    map[string]interface{}
 }

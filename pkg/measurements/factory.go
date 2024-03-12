@@ -24,13 +24,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
-
 	"k8s.io/client-go/rest"
 )
 
 type measurementFactory struct {
 	jobConfig   *config.Job
-	clientSet   *kubernetes.Clientset
+	clientSet   kubernetes.Interface
 	restConfig  *rest.Config
 	createFuncs map[string]measurement
 	metadata    map[string]interface{}
@@ -81,14 +80,9 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 	return nil
 }
 
-func SetJobConfig(jobConfig *config.Job) {
+func SetJobConfig(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider) {
 	factory.jobConfig = jobConfig
-	_, restConfig, err := config.GetClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
-	if err != nil {
-		log.Fatalf("Error creating clientSet: %s", err)
-	}
-	factory.clientSet = kubernetes.NewForConfigOrDie(restConfig)
-	factory.restConfig = restConfig
+	factory.clientSet, factory.restConfig = kubeClientProvider.ClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
 }
 
 // Start starts registered measurements
@@ -126,9 +120,9 @@ func Stop() error {
 // Parameters:
 //   - indexer: a pointer to the indexer
 //   - jobName: the name of the job, required as this task can be executed from a goroutine
-func Index(indexer *indexers.Indexer, jobName string) {
+func Index(indexer indexers.Indexer, jobName string) {
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Indexing collected data from measurement: %s", name)
-		measurement.index(*indexer, jobName)
+		measurement.index(indexer, jobName)
 	}
 }

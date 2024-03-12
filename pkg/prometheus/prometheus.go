@@ -33,7 +33,7 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, indexer *indexers.Indexer, embedConfig bool) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool, indexers ...indexers.Indexer) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:        step,
@@ -42,7 +42,7 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 		Endpoint:    url,
 		metadata:    metadata,
 		embedConfig: embedConfig,
-		indexer:     indexer,
+		indexers:    indexers,
 	}
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
 	p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
@@ -221,11 +221,13 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 func (p *Prometheus) indexDatapoints(docsToIndex map[string][]interface{}) {
 	for metricName, docs := range docsToIndex {
 		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
-		resp, err := (*p.indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			log.Info(resp)
+		for _, indexer := range p.indexers {
+			resp, err := indexer.Index(docs, indexers.IndexingOpts{MetricName: metricName})
+			if err != nil {
+				log.Error(err.Error())
+			} else {
+				log.Info(resp)
+			}
 		}
 	}
 }

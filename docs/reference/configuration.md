@@ -2,12 +2,19 @@
 
 All of the magic that `kube-burner` does is described in its configuration file. As previously mentioned, the location of this configuration file is provided by the flag `-c`. This flag points to a YAML-formatted file that consists of several sections.
 
-It is possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file. It is also important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, you could define the `indexerConfig` section of your own configuration file, such as:
+It is possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file. It is also important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, you could define the `indexers` section of your own configuration file, such as:
 
 ```yaml
-type: elastic
-esServers: [{{ .ES_SERVER }}]
-defaultIndex: elasticsearch-index
+indexers:
+{{ if .OS_INDEXING }}
+  - type: opensearch
+    esServers: ["{{ .ES_SERVER }}"]
+    defaultIndex: {{ .ES_INDEX }}
+{{ end }}
+{{ if .LOCAL_INDEXING }}
+  - type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+{{ end }}
 ```
 
 This feature can be very useful at the time of defining secrets, such as the user and password of our indexer, or a token to use in pprof collection.
@@ -19,7 +26,6 @@ In this section is described global job configuration, it holds the following pa
 | Option           | Description                                                                                              | Type           | Default      |
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|--------------|
 | `measurements`     | List of measurements. Detailed in the [measurements section](/kube-burner/latest/measurements)                            | List          | []          |
-| `indexerConfig`    | Holds the indexer configuration. Detailed in the [indexers section](/kube-burner/latest/observability/indexing)                 | Object        | {}           |
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 60s         |
 | `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
 | `gcMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |

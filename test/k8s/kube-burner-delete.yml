@@ -4,11 +4,16 @@ global:
   measurements:
   - name: podLatency
 
-  indexerConfig:
-    type: {{ .INDEXING_TYPE }}
-    metricsDirectory: {{ .METRICS_FOLDER }}
+indexers:
+{{ if .ES_INDEXING }}
+  - type: opensearch
     esServers: ["{{ .ES_SERVER }}"]
     defaultIndex: {{ .ES_INDEX }}
+{{ end }}
+{{ if .LOCAL_INDEXING }}
+  - type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+{{ end }}
 
 jobs:
   - name: not-namespaced
@@ -30,7 +35,7 @@ jobs:
     - objectTemplate: objectTemplates/deployment.yml
       replicas: 1
       inputVars:
-        containerImage: gcr.io/google_containers/pause-amd64:3.2
+        containerImage: registry.k8s.io/pause:3.1
         wait: true
     
      

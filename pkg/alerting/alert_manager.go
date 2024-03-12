@@ -66,7 +66,7 @@ type alert struct {
 type AlertManager struct {
 	alertProfile alertProfile
 	prometheus   *prometheus.Prometheus
-	indexer      *indexers.Indexer
+	indexers     []indexers.Indexer
 	uuid         string
 }
 
@@ -81,12 +81,12 @@ type descriptionTemplate struct {
 }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(alertProfileCfg, uuid string, indexer *indexers.Indexer, prometheusClient *prometheus.Prometheus, embedConfig bool) (*AlertManager, error) {
+func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, embedConfig bool, indexers ...indexers.Indexer) (*AlertManager, error) {
 	log.Infof("🔔 Initializing alert manager for prometheus: %v", prometheusClient.Endpoint)
 	a := AlertManager{
 		prometheus: prometheusClient,
 		uuid:       uuid,
-		indexer:    indexer,
+		indexers:   indexers,
 	}
 	if err := a.readProfile(alertProfileCfg, embedConfig); err != nil {
 		return &a, err
@@ -144,7 +144,7 @@ func (a *AlertManager) Evaluate(start, end time.Time, churnStart, churnEnd *time
 			alertList = append(alertList, alertSet)
 		}
 	}
-	if len(alertList) > 0 && a.indexer != nil {
+	if len(alertList) > 0 && len(a.indexers) > 0 {
 		a.index(alertList)
 	}
 	return utilerrors.NewAggregate(errs)
@@ -214,10 +214,12 @@ func parseMatrix(value model.Value, description string, severity severityLevel, 
 func (a *AlertManager) index(alertSet []interface{}) {
 	log.Info("Indexing alerts")
 	log.Debugf("Indexing [%d] documents", len(alertSet))
-	resp, err := (*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
-	if err != nil {
-		log.Error(err)
-	} else {
-		log.Info(resp)
+	for _, indexer := range a.indexers {
+		resp, err := indexer.Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
+		if err != nil {
+			log.Error(err)
+		} else {
+			log.Info(resp)
+		}
 	}
 }
