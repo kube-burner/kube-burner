@@ -104,9 +104,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.Metadata)
 		jobList = newExecutorList(configSpec, kubeClientProvider, uuid, timeout)
 		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
-		if err != nil {
-			log.Fatalf("Error creating clientSet: %s", err)
-		}
 		for _, job := range jobList {
 			if job.PreLoadImages && job.JobType == config.CreationJob {
 				if err = preLoadImages(job); err != nil {
@@ -252,7 +249,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if !job.JobConfig.SkipIndexing {
 				for _, indexer := range metricsScraper.IndexerList {
-					if !job.ChurnStart.IsZero() {
+					if job.JobConfig.Churn {
 						jobTimings.ChurnStartTimestamp = &job.ChurnStart
 						jobTimings.ChurnEndTimestamp = &job.ChurnEnd
 						if churnStart == nil {
