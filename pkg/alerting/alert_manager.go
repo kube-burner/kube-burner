@@ -59,6 +59,7 @@ type alert struct {
 	Severity    severityLevel `json:"severity"`
 	Description string        `json:"description"`
 	MetricName  string        `json:"metricName"`
+	ChurnMetric bool          `json:"churnMetric,omitempty"`
 }
 
 // AlertManager configuration
@@ -114,7 +115,7 @@ func (a *AlertManager) readProfile(alertProfileCfg string, embedConfig bool) err
 }
 
 // Evaluate evaluates expressions
-func (a *AlertManager) Evaluate(start, end time.Time) error {
+func (a *AlertManager) Evaluate(start, end time.Time, churnStart, churnEnd *time.Time) error {
 	errs := []error{}
 	log.Infof("Evaluating alerts for prometheus: %v", a.prometheus.Endpoint)
 	var alertList []interface{}
@@ -133,7 +134,7 @@ func (a *AlertManager) Evaluate(start, end time.Time) error {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, alert.Description, alert.Severity)
+		alertData, err := parseMatrix(v, alert.Description, alert.Severity, churnStart, churnEnd)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)
@@ -158,7 +159,7 @@ func (a *AlertManager) validateTemplates() error {
 	return nil
 }
 
-func parseMatrix(value model.Value, description string, severity severityLevel) ([]alert, error) {
+func parseMatrix(value model.Value, description string, severity severityLevel, churnStart, churnEnd *time.Time) ([]alert, error) {
 	var renderedDesc bytes.Buffer
 	var templateData descriptionTemplate
 	// The same query can fire multiple alerts, so we have to return an array of them
@@ -184,12 +185,16 @@ func parseMatrix(value model.Value, description string, severity severityLevel) 
 				errs = append(errs, err)
 			}
 			msg := fmt.Sprintf("alert at %v: '%s'", val.Timestamp.Time().UTC().Format(time.RFC3339), renderedDesc.String())
-			alertSet = append(alertSet, alert{
+			alert := alert{
 				Timestamp:   val.Timestamp.Time().UTC(),
 				Severity:    severity,
 				Description: renderedDesc.String(),
 				MetricName:  alertMetricName,
-			})
+			}
+			if churnStart != nil && alert.Timestamp.After(*churnStart) && alert.Timestamp.Before(*churnEnd) {
+				alert.ChurnMetric = true
+			}
+			alertSet = append(alertSet, alert)
 			switch severity {
 			case sevWarn:
 				log.Warnf("🚨 %s", msg)

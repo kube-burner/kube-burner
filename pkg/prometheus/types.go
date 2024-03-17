@@ -44,9 +44,11 @@ type Prometheus struct {
 }
 
 type Job struct {
-	Start     time.Time
-	End       time.Time
-	JobConfig config.Job
+	Start      time.Time
+	End        time.Time
+	ChurnStart time.Time
+	ChurnEnd   time.Time
+	JobConfig  config.Job
 }
 
 // metricDefinition describes what metrics kube-burner collects
@@ -57,12 +59,13 @@ type metricDefinition struct {
 }
 
 type metric struct {
-	Timestamp  time.Time         `json:"timestamp"`
-	Labels     map[string]string `json:"labels,omitempty"`
-	Value      float64           `json:"value"`
-	UUID       string            `json:"uuid"`
-	Query      string            `json:"query"`
-	MetricName string            `json:"metricName,omitempty"`
-	JobConfig  config.Job        `json:"jobConfig,omitempty"`
-	Metadata   interface{}       `json:"metadata,omitempty"`
+	Timestamp   time.Time         `json:"timestamp"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Value       float64           `json:"value"`
+	UUID        string            `json:"uuid"`
+	Query       string            `json:"query"`
+	ChurnMetric bool              `json:"churnMetric,omitempty"`
+	MetricName  string            `json:"metricName,omitempty"`
+	JobConfig   config.Job        `json:"jobConfig,omitempty"`
+	Metadata    interface{}       `json:"metadata,omitempty"`
 }

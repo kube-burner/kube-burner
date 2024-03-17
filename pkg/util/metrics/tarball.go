@@ -67,7 +67,7 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 	return nil
 }
 
-func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string) error {
+func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 	log.Infof("Importing tarball: %v", tarball)
 	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)

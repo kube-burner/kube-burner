@@ -23,13 +23,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Performs the validity check of metrics endpoint and prometheus url
-func validateMetricsEndpoint(metricsEndpoint string, prometheusURL string) {
-	if (metricsEndpoint != "" && prometheusURL != "") || (metricsEndpoint == "" && prometheusURL == "") {
-		log.Fatal("Please use either of --metrics-endpoint or --prometheus-url flags to fetch metrics or alerts")
-	}
-}
-
 // Decodes metrics endpoint yaml file
 func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]metricEndpoint) {
 	f, err := util.ReadConfig(metricsEndpoint)

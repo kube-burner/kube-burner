@@ -414,7 +414,7 @@ func importCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			err = metrics.ImportTarball(tarball, indexer, indexerConfig.MetricsDirectory)
+			err = metrics.ImportTarball(tarball, indexer)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -479,7 +479,7 @@ func alertCmd() *cobra.Command {
 			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, *indexer); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
-			err = alertM.Evaluate(startTime, endTime)
+			err = alertM.Evaluate(startTime, endTime, nil, nil)
 			log.Info("👋 Exiting kube-burner ", uuid)
 			if err != nil {
 				os.Exit(1)
