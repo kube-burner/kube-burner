@@ -1,39 +1,45 @@
 # Indexing
 
-Kube-burner can index the collected metrics into a given indexer.
+Kube-burner can collect metrics and alerts from prometheus and from measurements and send them to the configured indexers.
+
+## Metrics endpoints
+
+The logic to configure metric collection and indexing is established by the `metricsEndpoints` field of the configuration file, this field is a list of objects with the following structure:
+
+| Field     | Description     | Example   |
+| --------- | --------------- | --------- |
+| `prometheusURL` | Define the prometheus endpoint to scrape | `https://prom.my-domain.com` |
+| `username` | Prometheus username (Basic auth) | `username` |
+| `password` | Prometheus password (Basic auth) | `topSecret` |
+| `token` | Prometheus bearer token (Bearer auth) | `yourTokenDefinition` |
+| `prometheusStep` | Prometheus step size, used when scraping it, by default `30s` | `1m` |
+| `prometheusSkipTLSVerify` | Skip TLS certificate verification, `true` by default | `true` |
+| `metrics` | List of metrics files | `[metrics.yml, more-metrics.yml]` |
+| `alerts` | List of alerts files | `[alerts.yml, more-alerts.yml]` |
+| `indexer` | Indexer configuration | [indexers](#indexers) |
+
+!!! Note
+    Info about how to configure [metrics-profiles](metrics.md) and [alerts-profiles](alerting.md)
 
 ## Indexers
 
-Configured in the `indexers` field, this field defines a list of indexers, making collected metrics to be indexed in them
+Configured by the `indexer` field, it defines an indexer for the Prometheus endpoint, making all collected metrics to be indexed in it.
+Depending on the indexer, different configuration parameters need to be specified. The type of indexer is configured by the field `type`
 
 | Option    | Description     | Supported values   |
 | --------- | --------------- | ------- |
 | `type`    | Type of indexer | `elastic`, `opensearch`, `local`|
 
-Where each indexer supports different options, as in the example below:
-
-```yaml
-global:
-  gc: true
-  measurements:
-    - name: podLatency
- indexers:                                       
-   - type: opensearch                            
-     esServers: ["blablabla:9200"]             
-     defaultIndex: indexName   
-   - type: local                                 
-     metricsDirectory: collected-metrics
-```
 
 ### Elastic/OpenSearch
 
-This indexer send collected documents to Elasticsearch 7 instances or OpenSearch instances.
+Send collected documents to Elasticsearch7 or OpenSearch instances.
 
 The `elastic` or `opensearch` indexer can be configured by the parameters below:
 
 | Option               | Description                                       | Type    | Default |
 | -------------------- | ------------------------------------------------- | ------- | ------- |
-| `esServers`          | List of Elasticsearch or OpenSearch instances     | List    | ""      |
+| `esServers`          | List of Elasticsearch or OpenSearch URLs          | List    | []      |
 | `defaultIndex`       | Default index to send the Prometheus metrics into | String  | ""      |
 | `insecureSkipVerify` | TLS certificate verification                      | Boolean | false   |
 
@@ -56,7 +62,7 @@ The `local` indexer can be configured by the parameters below:
 
 ## Job Summary
 
-When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. It also contains the timestaps of the execution phase (`timestamp` and `endTimestamp`) as well as the cleanup phase (`cleanupTimestamp` and `cleanupEndTimestamp`).
+When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. It also contains the timestamps of the execution phase (`timestamp` and `endTimestamp`) as well as the cleanup phase (`cleanupTimestamp` and `cleanupEndTimestamp`).
 
 This document looks like:
 
