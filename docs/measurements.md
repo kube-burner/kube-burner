@@ -4,9 +4,17 @@ Kube-burner allows you to get further metrics using other mechanisms or data sou
 
 Measurements are enabled in the `measurements` object of the configuration file. This object contains a list of measurements with their options.
 
-## Pod latency
 
-Collects latencies from the different pod startup phases, these **latency metrics are in ms**. It can be enabled with:
+## Pod and VMI latency
+
+Collects latencies from the different pod/vm/vmi startup phases, these **latency metrics are in ms**. It can be enabled with:
+
+```yaml
+  measurements:
+  - name: podLatency
+```
+
+or
 
 ```yaml
   measurements:
@@ -15,7 +23,7 @@ Collects latencies from the different pod startup phases, these **latency metric
 
 ### Metrics
 
-The metrics collected are pod latency timeeries (`podLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`).
+The metrics collected are pod latency timeseries (`podLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`).
 
 One document, such as the following, is indexed per each pod created by the workload that enters in `Running` condition during the workload:
 
@@ -109,8 +117,10 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
 
 ### Measure subcommand CLI example
+
 Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
-```
+
+```shell
 kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2 
 time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
 time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
@@ -254,3 +264,27 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 
 !!! warning
     As mentioned before, this measurement requires the `curl` command to be available in the target pods.
+
+
+## Indexing in different places
+
+The pod/vmi and service latency measurements send their metrics by default to all the indexers configured in the `metricsEndpoints` list, but it's possible to configure a different indexer for the quantile and the timeseries metrics by using the fields `quantilesIndexer` and `timeseriesIndexer`.
+
+For example
+
+```yaml
+metricsEndpoints:
+- indexer:
+    type: local
+- indexer:
+    type: opensearch
+    defaultIndex: kube-burner
+    esServers: ["https://opensearch.domain:9200"]
+global:
+  measurements:
+  - name: podLatency
+    timeseriesIndexer: 1
+    quantilesIndexer: 2
+```
+
+With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics.
