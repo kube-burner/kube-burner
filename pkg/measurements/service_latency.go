@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	svcLatencyMetric               = "svcLatencyMeasurement"
+	svcLatencyMeasurement          = "svcLatencyMeasurement"
 	svcLatencyQuantilesMeasurement = "svcLatencyQuantilesMeasurement"
 )
 
@@ -163,7 +163,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			Name:              svc.Name,
 			Namespace:         svc.Namespace,
 			Timestamp:         svc.CreationTimestamp.Time.UTC(),
-			MetricName:        svcLatencyMetric,
+			MetricName:        svcLatencyMeasurement,
 			ServiceType:       svc.Spec.Type,
 			ReadyLatency:      svcLatency,
 			UUID:              globalCfg.UUID,
@@ -273,8 +273,8 @@ func (s *serviceLatency) normalizeMetrics() {
 
 func (s *serviceLatency) index(jobName string, indexerList []indexers.Indexer) {
 	metricMap := map[string][]interface{}{
-		podLatencyMeasurement:          s.normLatencies,
-		podLatencyQuantilesMeasurement: s.latencyQuantiles,
+		svcLatencyMeasurement:          s.normLatencies,
+		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
 	}
 	indexLatencyMeasurement(s.config, jobName, metricMap, indexerList)
 }
