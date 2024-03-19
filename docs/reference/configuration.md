@@ -79,6 +79,9 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `churnDelay`             | Length of time to wait between each churn period                                                                                  | Duration | 5m      |
 | `churnDeletionStrategy`  | Churn deletion strategy to apply, "default" or "gvr" (where `default` churns namespaces and `gvr` churns objects within namespaces)                                                      | String   | default |
 
+!!! note
+    Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
+
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
 Examples of valid configuration files can be found in the [examples folder](https://github.com/kube-burner/kube-burner/tree/master/examples).
