@@ -36,7 +36,6 @@ const (
 )
 
 var ConfigSpec config.Spec
-var indexer *indexers.Indexer
 
 // NewWorkloadHelper initializes workloadHelper
 func NewWorkloadHelper(config Config, embedConfig embed.FS, kubeClientProvider *config.KubeClientProvider) WorkloadHelper {
@@ -107,7 +106,7 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 		log.Error(err)
 	}
 	wh.Metadata.Passed = rc == 0
-	if indexer != nil {
+	for _, indexer := range metricsScraper.IndexerList {
 		IndexMetadata(indexer, wh.Metadata)
 	}
 	log.Info("👋 Exiting kube-burner ", wh.UUID)
@@ -141,10 +140,10 @@ func ExtractWorkload(embedConfig embed.FS, configDir string, workload string, ro
 }
 
 // IndexMetadata indexes metadata using given indexer.
-func IndexMetadata(indexer *indexers.Indexer, metadata BenchmarkMetadata) {
+func IndexMetadata(indexer indexers.Indexer, metadata BenchmarkMetadata) {
 	log.Info("Indexing cluster metadata document")
 	metadata.EndDate = time.Now().UTC()
-	msg, err := (*indexer).Index([]interface{}{metadata}, indexers.IndexingOpts{
+	msg, err := (indexer).Index([]interface{}{metadata}, indexers.IndexingOpts{
 		MetricName: metadata.MetricName,
 	})
 	if err != nil {
