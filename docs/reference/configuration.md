@@ -5,15 +5,19 @@ All of the magic that `kube-burner` does is described in its configuration file.
 It is possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file. It is also important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, you could define the `indexers` section of your own configuration file, such as:
 
 ```yaml
-indexers:
+metricsEndpoints:
 {{ if .OS_INDEXING }}
-  - type: opensearch
-    esServers: ["{{ .ES_SERVER }}"]
-    defaultIndex: {{ .ES_INDEX }}
+  - prometheusURL: http://localhost:9090
+    indexer:
+      type: opensearch
+      esServers: ["{{ .ES_SERVER }}"]
+      defaultIndex: {{ .ES_INDEX }}
 {{ end }}
 {{ if .LOCAL_INDEXING }}
-  - type: local
-    metricsDirectory: {{ .METRICS_FOLDER }}
+  - prometheusURL: http://localhost:9090
+    indexer:
+      type: local
+      metricsDirectory: {{ .METRICS_FOLDER }}
 {{ end }}
 ```
 
@@ -49,7 +53,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | Option                   | Description                                                                                                                       | Type     | Default |
 |--------------------------|-----------------------------------------------------------------------------------------------------------------------------------|----------|---------|
 | `name`                   | Job name                                                                                                                          | String   | ""      |
-| `jobType`                | Type of job to execute. More details at [job types](#job-types)                                                                   | string   | create  |
+| `jobType`                | Type of job to execute. More details at [job types](#job-types)                                                                   | String   | create  |
 | `jobIterations`          | How many times to execute the job                                                                                                 | Integer  | 0       |
 | `namespace`              | Namespace base name to use                                                                                                        | String   | ""      |
 | `namespacedIterations`   | Whether to create a namespace per job iteration                                                                                   | Boolean  | true    |
@@ -67,17 +71,17 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `verifyObjects`          | Verify object count after running each job                                                                                        | Boolean  | true    |
 | `errorOnVerify`          | Set RC to 1 when objects verification fails                                                                                       | Boolean  | true    |
 | `skipIndexing`           | Skip metric indexing on this job                                                                                                  | Boolean  | false   |
-| `preLoadImages`          | Kube-burner will create a DS before triggering the job to pull all the images of the job                                          | true     |         |
-| `preLoadPeriod`          | How long to wait for the preload daemonset                                                                                        | Duration | 1m      |
+| `preLoadImages`          | Kube-burner will create a DS before triggering the job to pull all the images of the job                                          | Boolean  |         |
+| `preLoadPeriod`          | How long to wait for the preload DaemonSet                                                                                        | Duration | 1m      |
 | `preloadNodeLabels`      | Add node selector labels for the resources created in preload stage                                                               | Object   | {}      |
 | `namespaceLabels`        | Add custom labels to the namespaces created by kube-burner                                                                        | Object   | {}      |
 | `namespaceAnnotations`   | Add custom annotations to the namespaces created by kube-burner                                                                   | Object   | {}      |
 | `churn`                  | Churn the workload. Only supports namespace based workloads                                                                       | Boolean  | false   |
-| `churnCycles`           | Number of churn cycles to execute   | Integer | 100
+| `churnCycles`            | Number of churn cycles to execute                                                                                                 | Integer  | 100     |
 | `churnPercent`           | Percentage of the jobIterations to churn each period                                                                              | Integer  | 10      |
 | `churnDuration`          | Length of time that the job is churned for                                                                                        | Duration | 1h      |
 | `churnDelay`             | Length of time to wait between each churn period                                                                                  | Duration | 5m      |
-| `churnDeletionStrategy`  | Churn deletion strategy to apply, "default" or "gvr" (where `default` churns namespaces and `gvr` churns objects within namespaces)                                                      | String   | default |
+| `churnDeletionStrategy`  | Churn deletion strategy to apply, `default` or `gvr` (where `default` churns namespaces and `gvr` churns objects within namespaces)                                                      | String   | default |
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
@@ -86,7 +90,7 @@ Our configuration files strictly follow YAML syntax. To clarify on List and Obje
 
 Examples of valid configuration files can be found in the [examples folder](https://github.com/kube-burner/kube-burner/tree/master/examples).
 
-## Objects
+### Objects
 
 The objects created by `kube-burner` are rendered using the default golang's [template library](https://golang.org/pkg/text/template/).
 Each object element supports the following parameters:
@@ -97,7 +101,7 @@ Each object element supports the following parameters:
 | `replicas`             | How replicas of this object to create per job iteration           | Integer | -       |
 | `inputVars`            | Map of arbitrary input variables to inject to the object template | Object  | -       |
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
-| `waitOptions`          | Customize [how to wait](#wait-options) for object to be ready     | Object  | {}       |
+| `waitOptions`          | Customize [how to wait](#object-wait-options) for object to be ready     | Object  | {}       |
 | `runOnce`              | Create or delete this object only once during the entire job    | Boolean | false   |
 
 !!! warning
@@ -106,7 +110,7 @@ Each object element supports the following parameters:
 !!! info
     Find more info about the waiters implementation in the `pkg/burner/waiters.go` file
 
-### Wait Options
+### Object wait Options
 
 If you want to override the default waiter behaviors, you can specify wait options for your objects.
 
@@ -130,7 +134,12 @@ All objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kub
 
 ## Job types
 
-Configured by the parameter `jobType`, kube-burner supports three types of jobs with different parameters each.
+Configured by the parameter `jobType`, kube-burner supports four types of jobs with different parameters each:
+
+- Create
+- Delete
+- Read
+- Patch
 
 ### Create
 
@@ -156,7 +165,7 @@ Where:
 - `labelSelector`: Deletes the objects with the given labels.
 - `apiVersion`: API version from the k8s object.
 
-This type of job supports the following parameters. Some of them  are already described in the [create job type section](#create):
+This type of job supports the following parameters. Described in the [jobs section](#jobs):
 
 - `waitForDeletion`: Wait for objects to be deleted before finishing the job. Defaults to `true`.
 - `name`
@@ -185,7 +194,7 @@ Where:
 - `labelSelector`: Reads the objects with the given labels.
 - `apiVersion`: API version from the k8s object.
 
-This type of job supports the following parameters. Some of them  are already described in the [create job type section](#create):
+This type of job supports the following parameters. Described in the [jobs section](#jobs):
 
 - `name`
 - `qps`
@@ -330,9 +339,9 @@ spec:
 
 In addition to the default [golang template semantics](https://golang.org/pkg/text/template/), kube-burner is compiled with the [sprig library](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.
 
-## RunOnce 
+## RunOnce
 
-All objects within the job will iteratively run based on the JobIteration number, 
+All objects within the job will iteratively run based on the JobIteration number,
 but there may be a situation if an object need to be created only once (ex. clusterrole), in such cases
 we can add an optional field as `runOnce` for that particular object to execute only once in the entire job.
 

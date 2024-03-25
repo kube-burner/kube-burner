@@ -40,7 +40,7 @@ const (
 // Spec configuration root
 type Spec struct {
 	// List of kube-burner indexers
-	Indexers []Indexer `yaml:"indexers"`
+	MetricsEndpoints []MetricsEndpoint `yaml:"metricsEndpoints"`
 	// GlobalConfig defines global configuration parameters
 	GlobalConfig GlobalConfig `yaml:"global"`
 	// Jobs list of kube-burner jobs
@@ -51,8 +51,18 @@ type Spec struct {
 	EmbedFSDir string
 }
 
-type Indexer struct {
-	indexers.IndexerConfig `yaml:",inline"`
+// metricEndpoint describes prometheus endpoint to scrape
+type MetricsEndpoint struct {
+	indexers.IndexerConfig  `yaml:"indexer"`
+	Metrics                 []string      `yaml:"metrics"`
+	Alerts                  []string      `yaml:"alerts"`
+	PrometheusURL           string        `yaml:"prometheusURL"`
+	PrometheusStep          time.Duration `yaml:"prometheusStep"`
+	PrometheusSkipTLSVerify bool          `yaml:"prometheusSkipTLSVerify"`
+	Token                   string        `yaml:"token"`
+	Username                string        `yaml:"username"`
+	Password                string        `yaml:"password"`
+	EmbedConfig             bool
 }
 
 // GlobalConfig holds the global configuration

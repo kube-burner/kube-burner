@@ -23,6 +23,7 @@ import (
 )
 
 type latencyMetric string
+type MeasurementConfig map[string]any
 
 const (
 	pprofDirectory string = "pprof"
@@ -46,6 +47,8 @@ func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) er
 type Measurement struct {
 	// Name is the name the measurement
 	Name string `yaml:"name"`
+	// Measurement configuration
+	Config MeasurementConfig `yaml:"config"`
 	// LatencyThresholds config
 	LatencyThresholds []LatencyThreshold `yaml:"thresholds"`
 	// PPRofTargets targets config
@@ -58,6 +61,10 @@ type Measurement struct {
 	ServiceLatencyMetrics latencyMetric `yaml:"svcLatencyMetrics"`
 	// Service latency endpoint timeout
 	ServiceTimeout time.Duration `yaml:"svcTimeout"`
+	// Defines the indexer for quantile metrics
+	QuantilesIndexer int `yaml:"quantilesIndexer"`
+	// Defines the indexer for timeseries
+	TimeseriesIndexer int `yaml:"timeseriesIndexer"`
 }
 
 // LatencyThreshold holds the thresholds configuration
