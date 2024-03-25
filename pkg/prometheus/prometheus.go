@@ -54,6 +54,10 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
+	if len(p.indexers) == 0 {
+		log.Debug("Indexing not required for this run")
+		return nil
+	}
 	docsToIndex := make(map[string][]interface{})
 	start := jobList[0].Start
 	end := jobList[len(jobList)-1].End

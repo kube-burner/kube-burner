@@ -35,12 +35,14 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	}
 	metadata := make(map[string]interface{})
 	for pos, indexer := range scraperConfig.ConfigSpec.Indexers {
-		log.Infof("📁 Creating indexer: %s", indexer.Type)
-		idx, err := indexers.NewIndexer(indexer.IndexerConfig)
-		if err != nil {
-			log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
+		if indexer.Type != "" {
+			log.Infof("📁 Creating indexer: %s", indexer.Type)
+			idx, err := indexers.NewIndexer(indexer.IndexerConfig)
+			if err != nil {
+				log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
+			}
+			indexerList = append(indexerList, *idx)
 		}
-		indexerList = append(indexerList, *idx)
 	}
 	if scraperConfig.UserMetaData != "" {
 		metadata, err = util.ReadUserMetadata(scraperConfig.UserMetaData)
