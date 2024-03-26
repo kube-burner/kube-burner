@@ -32,7 +32,10 @@ github.com/kube-burner/kube-burner/cmd/kube-burner
 
 ## Install
 
-To install kube-burner in local, just execute `sudo make install`, once finished the kube-burner binary should be available across the system.
+To install kube-burner in local, just execute `make install`. Once finished the kube-burner binary should be available across the system.
+
+!!! Note
+    If the above command fails either use `sudo` or try running it as `root`.
 
 ## Making changes relevant to OCP wrapper (.i.e. [kube-burner-ocp](https://github.com/kube-burner/kube-burner-ocp))
 
@@ -41,37 +44,23 @@ As of today, we have an OCP wrapper (.i.e. `kube-burner-ocp`) as one of our depe
 ### Changes at kube-burner/kube-burner repo level
 
 1. Clone this repo and make changes in your fork.
-2. Once done with the changes, commit you changes and execute the below command from your repo's root directory.
-```
-# This will replace all the imports in GO files with your fork path
-find . -type f -name "*.go" -exec sed -i 's/github.com\/kube-burner\/kube-burner/github.com\/<your-fork>\/kube-burner/g' {} +
-```
-3. Finally update the `go.mod` to use your fork. For example
-```
-Replace - module github.com/kube-burner/kube-burner
-With    -> module github.com/<your-fork>/kube-burner
-```
-4. Verify all your changes through `make build; sudo make install`, run some tests locally to verify functionality if required. After that please make a second `git commit` to your changes and push them to your fork.
-5. Cut a release for your fork like one of these [here](https://github.com/kube-burner/kube-burner/releases) and make a note of version tag. Let's call it `v0.0.1` here.
-6. Now in your local revert the second commit done in `Step 4` using below command.
+2. Once done with the changes, please execute `make replace-imports GITHUB_USERNAME=<your-fork-username>`. This will replace all your import and module statement names with your fork's github username.
+3. Verify all your changes by building and installing locally and run some tests to verify functionality if required. After that please make a second `git commit` to your changes and push them to your fork.
+4. Cut a release for your fork like one of these [here](https://github.com/kube-burner/kube-burner/releases) and make a note of version tag. Let's call it `v0.0.1` here.
+5. Now in your local revert the second commit done in `Step 3` using below command.
 ```
 git revert <commit-hash>
 ```
-7. Now raise a PR for you changes in `kube-burner/kube-burner` repo if confident enough. Or else wait for your changes to get verified which is described in the below section.
+6. Now raise a PR for you changes in `kube-burner/kube-burner` repo if confident enough. Or else wait for your changes to get verified which is described in the below section.
 
 ### Changes at kube-burner/kube-burner-ocp level
 
 1. Clone this repo and make changes in your fork.
-2. Similar to `Step 2` in the previous section, commit your changes and execute the below command from your repo's root directory.
-```
-# This will replace all the imports in GO files with your fork path
-find . -type f -name "*.go" -exec sed -i 's/github.com\/kube-burner\/kube-burner/github.com\/<your-fork>\/kube-burner/g' {} +
-```
-Make sure you point out the correct value for your fork of `kube-burner/kube-burner` which was done as part of `Step 1` in the previous section.  
+2. Once done with the changes, please execute `make replace-imports GITHUB_USERNAME=<your-fork-username>`. This will replace all your import and module statement names with your fork's github username.  
 3. Finally update the `go.mod` to use your fork. For example
 ```
 Replace - module github.com/kube-burner/kube-burner v0.0.0
-With    -> module github.com/<your-fork>/kube-burner v0.0.1 (in our case.i.e. your fork release version tag)
+With    -> module github.com/<your-fork>/kube-burner v0.0.1 (in our case .i.e. your fork release version tag)
 ```
 4. Now do a second `git commit` on top of these changes and raise a PR. 
 

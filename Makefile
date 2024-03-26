@@ -1,5 +1,5 @@
 
-.PHONY: build lint clean test help images push manifest manifest-build all
+.PHONY: build lint clean test help images push replace-imports manifest manifest-build all
 
 
 ARCH ?= amd64
@@ -8,6 +8,7 @@ BIN_DIR = bin
 BIN_PATH = $(BIN_DIR)/$(ARCH)/$(BIN_NAME)
 CGO = 0
 
+GITHUB_USERNAME := $(if $(GITHUB_USERNAME),$(GITHUB_USERNAME),kube-burner)
 GIT_COMMIT = $(shell git rev-parse HEAD)
 VERSION ?= $(shell hack/tag_name.sh)
 SOURCES := $(shell find . -type f -name "*.go")
@@ -21,6 +22,7 @@ ORG ?= kube-burner
 CONTAINER_NAME = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)
 CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)-$(ARCH)
 MANIFEST_ARCHS ?= amd64 arm64 ppc64le s390x
+SED_COMMAND := sed -i 's/github.com\/kube-burner\/kube-burner/github.com\/$(GITHUB_USERNAME)\/kube-burner/g'
 
 all: lint build images push
 
@@ -62,6 +64,10 @@ images:
 push:
 	@echo -e "\033[2mPushing container $(CONTAINER_NAME_ARCH)\033[0m"
 	$(ENGINE) push $(CONTAINER_NAME_ARCH)
+
+replace-imports:
+	find . -type f -name "*.go" -exec $(SED_COMMAND) {} +
+	find . -type f -name "go.mod" -exec $(SED_COMMAND) {} +
 
 manifest: manifest-build
 	@echo -e "\033[2mPushing container manifest $(CONTAINER_NAME)\033[0m"
