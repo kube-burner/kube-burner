@@ -168,7 +168,6 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 		UUID:       p.UUID,
 		Query:      query,
 		MetricName: metricName,
-		JobConfig:  job.JobConfig,
 		Timestamp:  timestamp,
 		Metadata:   p.metadata,
 	}

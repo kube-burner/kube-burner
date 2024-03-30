@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
@@ -49,7 +48,6 @@ type podMetric struct {
 	podReady               time.Time
 	PodReadyLatency        int         `json:"podReadyLatency"`
 	MetricName             string      `json:"metricName"`
-	JobConfig              config.Job  `json:"jobConfig"`
 	UUID                   string      `json:"uuid"`
 	Namespace              string      `json:"namespace"`
 	Name                   string      `json:"podName"`
@@ -83,7 +81,6 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 			Name:       pod.Name,
 			MetricName: podLatencyMeasurement,
 			UUID:       globalCfg.UUID,
-			JobConfig:  *factory.jobConfig,
 			Metadata:   factory.metadata,
 		}
 	}
@@ -214,7 +211,6 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			MetricName:      podLatencyMeasurement,
 			NodeName:        pod.Spec.NodeName,
 			UUID:            globalCfg.UUID,
-			JobConfig:       *factory.jobConfig,
 			Metadata:        factory.metadata,
 			scheduled:       scheduled,
 			initialized:     initialized,
@@ -335,7 +331,6 @@ func (p *podLatency) calcQuantiles() {
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
-		latencySummary.JobConfig = *factory.jobConfig
 		latencySummary.Metadata = factory.metadata
 		latencySummary.MetricName = podLatencyQuantilesMeasurement
 		return latencySummary

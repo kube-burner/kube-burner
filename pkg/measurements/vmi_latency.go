@@ -72,7 +72,6 @@ type vmiMetric struct {
 	VMReadyLatency int `json:"vmReadyLatency"`
 
 	MetricName string      `json:"metricName"`
-	JobConfig  config.Job  `json:"jobConfig"`
 	Metadata   interface{} `json:"metadata,omitempty"`
 	UUID       string      `json:"uuid"`
 	Namespace  string      `json:"namespace"`
@@ -107,7 +106,6 @@ func (p *vmiLatency) handleCreateVM(obj interface{}) {
 				Name:       vm.Name,
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
-				JobConfig:  *factory.jobConfig,
 				Metadata:   factory.metadata,
 			}
 		}
@@ -463,7 +461,6 @@ func (p *vmiLatency) calcQuantiles() {
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
-		latencySummary.JobConfig = *factory.jobConfig
 		latencySummary.Metadata = factory.metadata
 		latencySummary.MetricName = podLatencyQuantilesMeasurement
 		return latencySummary
