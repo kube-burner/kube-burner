@@ -248,7 +248,7 @@ func (p *podLatency) stop() error {
 }
 
 // index sends metrics to the configured indexer
-func (p *podLatency) index(jobName string, indexerList []indexers.Indexer) {
+func (p *podLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,

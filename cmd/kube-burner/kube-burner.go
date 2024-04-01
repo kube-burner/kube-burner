@@ -187,8 +187,8 @@ func measureCmd() *cobra.Command {
 	var configFile string
 	var jobName string
 	var userMetadata string
-	var indexerList []indexers.Indexer
 	var kubeConfig, kubeContext string
+	indexerList := make(map[string]indexers.Indexer)
 	metadata := make(map[string]interface{})
 	cmd := &cobra.Command{
 		Use:   "measure",
@@ -215,7 +215,7 @@ func measureCmd() *cobra.Command {
 				if err != nil {
 					log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 				}
-				indexerList = append(indexerList, *idx)
+				indexerList[string(indexer.Alias)] = *idx
 			}
 			if userMetadata != "" {
 				metadata, err = util.ReadUserMetadata(userMetadata)

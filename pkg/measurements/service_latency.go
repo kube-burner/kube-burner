@@ -271,7 +271,7 @@ func (s *serviceLatency) normalizeMetrics() {
 	}
 }
 
-func (s *serviceLatency) index(jobName string, indexerList []indexers.Indexer) {
+func (s *serviceLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]interface{}{
 		svcLatencyMeasurement:          s.normLatencies,
 		svcLatencyQuantilesMeasurement: s.latencyQuantiles,

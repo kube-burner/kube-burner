@@ -15,6 +15,8 @@
 package metrics
 
 import (
+	"fmt"
+
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/kube-burner/kube-burner/pkg/alerting"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
@@ -29,7 +31,8 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	}
 	var err error
 	var indexer *indexers.Indexer
-	var indexerList []indexers.Indexer
+	var indexerAlias string
+	indexerList := make(map[string]indexers.Indexer)
 	var prometheusClients []*prometheus.Prometheus
 	var alertM *alerting.AlertManager
 	var alertMs []*alerting.AlertManager
@@ -56,7 +59,12 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 			if err != nil {
 				log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 			}
-			indexerList = append(indexerList, *indexer)
+			if metricsEndpoint.Alias == "" {
+				indexerAlias = fmt.Sprintf("indexer-%d", pos)
+			} else {
+				indexerAlias = string(metricsEndpoint.Alias)
+			}
+			indexerList[indexerAlias] = *indexer
 		}
 		if metricsEndpoint.PrometheusURL != "" {
 			auth := prometheus.Auth{

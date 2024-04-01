@@ -34,6 +34,6 @@ type ScraperConfig struct {
 type Scraper struct {
 	PrometheusClients []*prometheus.Prometheus
 	AlertMs           []*alerting.AlertManager
-	IndexerList       []indexers.Indexer
+	IndexerList       map[string]indexers.Indexer
 	Metadata          map[string]interface{}
 }

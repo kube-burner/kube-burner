@@ -41,7 +41,7 @@ type measurement interface {
 	collect(*sync.WaitGroup)
 	setConfig(types.Measurement)
 	validateConfig() error
-	index(string, []indexers.Indexer)
+	index(string, map[string]indexers.Indexer)
 }
 
 var factory measurementFactory
@@ -50,17 +50,36 @@ var globalCfg config.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) {
+	var indexerFound bool
 	globalCfg = configSpec.GlobalConfig
 	factory = measurementFactory{
 		createFuncs: make(map[string]measurement),
 		metadata:    metadata,
 	}
 	for _, measurement := range globalCfg.Measurements {
-		if measurement.QuantilesIndexer != 0 && configSpec.MetricsEndpoints[measurement.QuantilesIndexer-1].Type == "" {
-			log.Fatal("Quantiles indexer not defined")
+		indexerFound = false
+		if measurement.QuantilesIndexer != types.All {
+			for _, indexer := range configSpec.MetricsEndpoints {
+				if indexer.Alias == measurement.QuantilesIndexer {
+					indexerFound = true
+					break
+				}
+			}
 		}
-		if measurement.TimeseriesIndexer != 0 && configSpec.MetricsEndpoints[measurement.TimeseriesIndexer-1].Type == "" {
-			log.Fatal("Timeseries indexer not defined")
+		if !indexerFound {
+			log.Fatalf("Quantiles indexer not found: %s", measurement.QuantilesIndexer)
+		}
+		if measurement.TimeseriesIndexer != types.All {
+			for _, indexer := range configSpec.MetricsEndpoints {
+				indexerFound = false
+				if indexer.Alias == measurement.TimeseriesIndexer {
+					indexerFound = true
+					break
+				}
+			}
+		}
+		if !indexerFound {
+			log.Fatalf("Timeseries indexer not found: %s", measurement.TimeseriesIndexer)
 		}
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
 			if err := factory.register(measurement, measurementFunc); err != nil {
@@ -125,7 +144,7 @@ func Stop() error {
 //
 // jobName is the name of the job to index data for.
 // indexerList is a variadic parameter of indexers.Indexer implementations.
-func Index(jobName string, indexerList []indexers.Indexer) {
+func Index(jobName string, indexerList map[string]indexers.Indexer) {
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Indexing collected data from measurement: %s", name)
 		measurement.index(jobName, indexerList)

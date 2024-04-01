@@ -22,7 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func indexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList []indexers.Indexer) {
+func indexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
 	indexDocuments := func(indexer indexers.Indexer, metricName string, data []interface{}) {
 		log.Infof("Indexing metric %s", metricName)
 		indexingOpts := indexers.IndexingOpts{
@@ -38,12 +38,14 @@ func indexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 	}
 	for metricName, data := range metricMap {
 		// Use the configured TimeseriesIndexer or QuantilesIndexer when specified or else use all indexers
-		if metricName == podLatencyMeasurement && config.TimeseriesIndexer != 0 {
-			indexer := indexerList[config.TimeseriesIndexer-1]
-			indexDocuments(indexer, metricName, data)
-		} else if metricName == podLatencyQuantilesMeasurement && config.QuantilesIndexer != 0 {
-			indexer := indexerList[config.QuantilesIndexer-1]
-			indexDocuments(indexer, metricName, data)
+		if config.TimeseriesIndexer != types.All || config.QuantilesIndexer != types.All {
+			if metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement {
+				indexer := indexerList[string(config.TimeseriesIndexer)]
+				indexDocuments(indexer, metricName, data)
+			} else if metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement {
+				indexer := indexerList[string(config.QuantilesIndexer)]
+				indexDocuments(indexer, metricName, data)
+			}
 		} else {
 			for _, indexer := range indexerList {
 				indexDocuments(indexer, metricName, data)

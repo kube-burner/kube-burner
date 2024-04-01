@@ -54,14 +54,15 @@ type Spec struct {
 // metricEndpoint describes prometheus endpoint to scrape
 type MetricsEndpoint struct {
 	indexers.IndexerConfig  `yaml:"indexer"`
-	Metrics                 []string      `yaml:"metrics"`
-	Alerts                  []string      `yaml:"alerts"`
-	PrometheusURL           string        `yaml:"prometheusURL"`
-	PrometheusStep          time.Duration `yaml:"prometheusStep"`
-	PrometheusSkipTLSVerify bool          `yaml:"prometheusSkipTLSVerify"`
-	Token                   string        `yaml:"token"`
-	Username                string        `yaml:"username"`
-	Password                string        `yaml:"password"`
+	Metrics                 []string            `yaml:"metrics"`
+	Alerts                  []string            `yaml:"alerts"`
+	PrometheusURL           string              `yaml:"prometheusURL"`
+	PrometheusStep          time.Duration       `yaml:"prometheusStep"`
+	PrometheusSkipTLSVerify bool                `yaml:"prometheusSkipTLSVerify"`
+	Token                   string              `yaml:"token"`
+	Username                string              `yaml:"username"`
+	Password                string              `yaml:"password"`
+	Alias                   mtypes.IndexerAlias `yaml:"alias"`
 	EmbedConfig             bool
 }
 
