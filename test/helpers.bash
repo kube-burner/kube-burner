@@ -89,6 +89,17 @@ check_file_list() {
   return 0
 }
 
+check_files_dont_exist() {
+  for f in "${@}"; do
+    if [[ -f ${f} ]]; then
+      echo "File ${f} found"
+      return 1
+    fi
+  done
+  return 0
+}
+
+
 print_events() {
   kubectl get events --sort-by='.lastTimestamp' -A
 }
