@@ -29,7 +29,7 @@ Depending on the indexer, different configuration parameters need to be specifie
 | Option    | Description     | Supported values   |
 | --------- | --------------- | ------- |
 | `type`    | Type of indexer | `elastic`, `opensearch`, `local`|
-
+| `alias`   | Indexer alias   | Arbitrary string |
 
 ### Elastic/OpenSearch
 

@@ -1,6 +1,6 @@
 # Overview
 
-Performing a benchmark using kube-burner is relatively simple. However, it is sometimes necessary to analyze and be able to react to some KPIs in order to validate a benchmark. That  is why kube-burner ships  [metric-collection](metrics.md) and [alerting](alerting.md) systems based on Prometheus expressions.
+Performing a benchmark using kube-burner is relatively simple. However, it is sometimes necessary to analyze and be able to react to some KPIs in order to validate a benchmark. That is why kube-burner ships [metric-collection](metrics.md) and [alerting](alerting.md) systems based on Prometheus expressions.
 
 Kube-burner also ships an [indexing](indexing.md) feature that, in combination with the metric-collection and alerting features, can be used to analyze these KPIs in an external tool, such as [Grafana](https://grafana.com/) or similar.
 

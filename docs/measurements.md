@@ -4,7 +4,6 @@ Kube-burner allows you to get further metrics using other mechanisms or data sou
 
 Measurements are enabled in the `measurements` object of the configuration file. This object contains a list of measurements with their options.
 
-
 ## Pod and VMI latency
 
 Collects latencies from the different pod/vm/vmi startup phases, these **latency metrics are in ms**. It can be enabled with:
@@ -276,15 +275,17 @@ For example
 metricsEndpoints:
 - indexer:
     type: local
+    alias: local-indexer
 - indexer:
     type: opensearch
     defaultIndex: kube-burner
     esServers: ["https://opensearch.domain:9200"]
+    alias: os-indexer
 global:
   measurements:
   - name: podLatency
-    timeseriesIndexer: 1
-    quantilesIndexer: 2
+    timeseriesIndexer: local-indexer
+    quantilesIndexer: os-indexer
 ```
 
-With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics.
+With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics. The value of these two fields is `all` by default.
