@@ -62,7 +62,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 			if metricsEndpoint.Alias == "" {
 				indexerAlias = fmt.Sprintf("indexer-%d", pos)
 			} else {
-				indexerAlias = string(metricsEndpoint.Alias)
+				indexerAlias = metricsEndpoint.Alias
 			}
 			indexerList[indexerAlias] = *indexer
 		}

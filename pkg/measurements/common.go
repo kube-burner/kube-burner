@@ -38,7 +38,7 @@ func indexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 	}
 	for metricName, data := range metricMap {
 		// Use the configured TimeseriesIndexer or QuantilesIndexer when specified or else use all indexers
-		if config.TimeseriesIndexer != types.All || config.QuantilesIndexer != types.All {
+		if config.TimeseriesIndexer != "" || config.QuantilesIndexer != "" {
 			if metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement {
 				indexer := indexerList[string(config.TimeseriesIndexer)]
 				indexDocuments(indexer, metricName, data)

@@ -17,6 +17,7 @@ The logic to configure metric collection and indexing is established by the `met
 | `metrics` | List of metrics files | `[metrics.yml, more-metrics.yml]` |
 | `alerts` | List of alerts files | `[alerts.yml, more-alerts.yml]` |
 | `indexer` | Indexer configuration | [indexers](#indexers) |
+| `alias`   | Indexer alias, an arbitrary string required to send measurement results to an specific indexer  | `my-indexer` |
 
 !!! Note
     Info about how to configure [metrics-profiles](metrics.md) and [alerts-profiles](alerting.md)
@@ -29,7 +30,6 @@ Depending on the indexer, different configuration parameters need to be specifie
 | Option    | Description     | Supported values   |
 | --------- | --------------- | ------- |
 | `type`    | Type of indexer | `elastic`, `opensearch`, `local`|
-| `alias`   | Indexer alias   | Arbitrary string |
 
 ### Elastic/OpenSearch
 

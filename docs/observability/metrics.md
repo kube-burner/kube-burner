@@ -18,7 +18,7 @@ The `query` field holds the Prometheus expression to evaluate, and `metricName` 
 
 ## Instant queries
 
-In addition to the default range queries, kube-burner has the ability execute [instant queries](https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries) against the provided Prometheus API. This can be enaled by enabling the field `instant` to the desired metric.
+In addition to the default range queries, kube-burner has the ability execute [instant queries](https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries) against the provided Prometheus API. This can be configured by enabling the field `instant` to the desired metric.
 
 ```yaml
 - query: kube_node_role

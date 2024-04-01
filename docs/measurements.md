@@ -264,7 +264,6 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 !!! warning
     As mentioned before, this measurement requires the `curl` command to be available in the target pods.
 
-
 ## Indexing in different places
 
 The pod/vmi and service latency measurements send their metrics by default to all the indexers configured in the `metricsEndpoints` list, but it's possible to configure a different indexer for the quantile and the timeseries metrics by using the fields `quantilesIndexer` and `timeseriesIndexer`.
@@ -288,4 +287,4 @@ global:
     quantilesIndexer: os-indexer
 ```
 
-With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics. The value of these two fields is `all` by default.
+With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics.

@@ -125,9 +125,6 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 	if err != nil {
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}
-	if err != nil {
-		return configSpec, err
-	}
 	cfgReader := bytes.NewReader(renderedCfg)
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)

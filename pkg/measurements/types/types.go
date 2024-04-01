@@ -22,21 +22,16 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-type IndexerAlias string
-
 const (
-	pprofDirectory string       = "pprof"
-	All            IndexerAlias = "all"
+	pprofDirectory string = "pprof"
 )
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
 func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) error {
 	type rawMeasurement Measurement
 	measurement := rawMeasurement{
-		PProfDirectory:    pprofDirectory,
-		ServiceTimeout:    5 * time.Second,
-		TimeseriesIndexer: All,
-		QuantilesIndexer:  All,
+		PProfDirectory: pprofDirectory,
+		ServiceTimeout: 5 * time.Second,
 	}
 	if err := unmarshal(&measurement); err != nil {
 		return err
@@ -60,9 +55,9 @@ type Measurement struct {
 	// Service latency endpoint timeout
 	ServiceTimeout time.Duration `yaml:"svcTimeout"`
 	// Defines the indexer for quantile metrics
-	QuantilesIndexer IndexerAlias `yaml:"quantilesIndexer"`
+	QuantilesIndexer string `yaml:"quantilesIndexer"`
 	// Defines the indexer for timeseries
-	TimeseriesIndexer IndexerAlias `yaml:"timeseriesIndexer"`
+	TimeseriesIndexer string `yaml:"timeseriesIndexer"`
 }
 
 // LatencyThreshold holds the thresholds configuration
