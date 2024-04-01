@@ -431,7 +431,7 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, false, *indexer)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, false, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}

@@ -40,7 +40,7 @@ type Prometheus struct {
 	ConfigSpec     config.Spec
 	metadata       map[string]interface{}
 	embedConfig    bool
-	indexer        indexers.Indexer
+	indexer        *indexers.Indexer
 }
 
 type Job struct {

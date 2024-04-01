@@ -33,7 +33,7 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool, indexer indexers.Indexer) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool, indexer *indexers.Indexer) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:        step,
@@ -51,8 +51,8 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 
 // ScrapeJobsMetrics gets all prometheus metrics required and handles them
 func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
-	if len(p.indexers) == 0 {
-		log.Debug("Indexing not required for this run")
+	if p.indexer == nil {
+		log.Info("Indexer not configured, skipping metric scraping")
 		return nil
 	}
 	docsToIndex := make(map[string][]interface{})
@@ -223,7 +223,7 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 func (p *Prometheus) indexDatapoints(docsToIndex map[string][]interface{}) {
 	for metricName, docs := range docsToIndex {
 		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
-		resp, err := p.indexer.Index(docs, indexers.IndexingOpts{MetricName: metricName})
+		resp, err := (*p.indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
 		if err != nil {
 			log.Error(err.Error())
 		} else {

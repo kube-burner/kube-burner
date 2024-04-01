@@ -49,6 +49,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 		scraperConfig.ConfigSpec.MetricsEndpoints = DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint)
 	}
 	for pos, metricsEndpoint := range scraperConfig.ConfigSpec.MetricsEndpoints {
+		indexer = nil
 		if metricsEndpoint.Type != "" {
 			log.Infof("📁 Creating indexer: %s", metricsEndpoint.Type)
 			indexer, err = indexers.NewIndexer(metricsEndpoint.IndexerConfig)
@@ -64,7 +65,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				Token:         metricsEndpoint.Token,
 				SkipTLSVerify: metricsEndpoint.PrometheusSkipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(scraperConfig.ConfigSpec, metricsEndpoint.PrometheusURL, auth, metricsEndpoint.PrometheusStep, metadata, metricsEndpoint.EmbedConfig, *indexer)
+			p, err := prometheus.NewPrometheusClient(scraperConfig.ConfigSpec, metricsEndpoint.PrometheusURL, auth, metricsEndpoint.PrometheusStep, metadata, metricsEndpoint.EmbedConfig, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
