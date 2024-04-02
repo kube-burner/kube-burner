@@ -94,7 +94,7 @@ func (wh *WorkloadHelper) Run(workload string) {
 		ConfigSpec.MetricsEndpoints[pos].PrometheusURL = wh.PrometheusToken
 	}
 	metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-		ConfigSpec:      ConfigSpec,
+		ConfigSpec:      &ConfigSpec,
 		MetricsEndpoint: wh.MetricsEndpoint,
 		RawMetadata:     wh.MetricsMetadata,
 		EmbedConfig:     embedConfig,

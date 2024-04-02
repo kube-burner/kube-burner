@@ -72,7 +72,6 @@ func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface
 		if measurement.TimeseriesIndexer != "" {
 			indexerFound = false
 			for _, indexer := range configSpec.MetricsEndpoints {
-				fmt.Println(indexer.Type)
 				if indexer.Alias == measurement.TimeseriesIndexer {
 					indexerFound = true
 					break

@@ -97,7 +97,7 @@ func initCmd() *cobra.Command {
 				log.Fatalf("Config error: %s", err.Error())
 			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-				ConfigSpec:      configSpec,
+				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,
 				UserMetaData:    userMetadata,
 			})
@@ -306,7 +306,7 @@ func indexCmd() *cobra.Command {
 			}
 			configSpec.MetricsEndpoints = append(configSpec.MetricsEndpoints, indexer)
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-				ConfigSpec:      configSpec,
+				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,
 				UserMetaData:    userMetadata,
 			})

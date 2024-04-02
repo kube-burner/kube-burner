@@ -8,6 +8,7 @@
   alerts:
   - alert-profile.yaml
 - prometheusURL: http://localhost:9090
+  alias: local-indexing
   indexer:
     type: local
     metricsDirectory: {{ .METRICS_FOLDER }}

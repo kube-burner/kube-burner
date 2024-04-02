@@ -23,7 +23,7 @@ import (
 
 // ScraperConfig holds data related to scraper and target indexer
 type ScraperConfig struct {
-	ConfigSpec      config.Spec
+	ConfigSpec      *config.Spec
 	MetricsEndpoint string
 	UserMetaData    string
 	RawMetadata     map[string]interface{}

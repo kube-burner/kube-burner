@@ -12,7 +12,6 @@ global:
 metricsEndpoints:
 {{ if .ES_INDEXING }}
   - prometheusURL: http://localhost:9090
-    alias: my-opensearch
     indexer:
       type: opensearch
       esServers: ["{{ .ES_SERVER }}"]
