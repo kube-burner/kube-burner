@@ -54,15 +54,15 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	for pos, metricsEndpoint := range scraperConfig.ConfigSpec.MetricsEndpoints {
 		indexer = nil
 		if metricsEndpoint.Type != "" {
-			log.Infof("📁 Creating indexer: %s", metricsEndpoint.Type)
-			indexer, err = indexers.NewIndexer(metricsEndpoint.IndexerConfig)
-			if err != nil {
-				log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
-			}
 			if metricsEndpoint.Alias == "" {
 				indexerAlias = fmt.Sprintf("indexer-%d", pos)
 			} else {
 				indexerAlias = metricsEndpoint.Alias
+			}
+			log.Infof("📁 Creating %s indexer: %s", metricsEndpoint.Type, indexerAlias)
+			indexer, err = indexers.NewIndexer(metricsEndpoint.IndexerConfig)
+			if err != nil {
+				log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 			}
 			indexerList[indexerAlias] = *indexer
 		}
