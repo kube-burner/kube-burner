@@ -19,7 +19,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/montanaflynn/stats"
 	log "github.com/sirupsen/logrus"
@@ -37,7 +36,6 @@ type LatencyQuantiles struct {
 	Avg          int         `json:"avg"`
 	Timestamp    time.Time   `json:"timestamp"`
 	MetricName   string      `json:"metricName"`
-	JobConfig    config.Job  `json:"jobConfig"`
 	Metadata     interface{} `json:"metadata,omitempty"`
 }
 

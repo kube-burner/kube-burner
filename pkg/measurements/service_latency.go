@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
@@ -58,7 +57,6 @@ type svcMetric struct {
 	IPAssignedLatency time.Duration      `json:"ipAssigned,omitempty"`
 	ReadyLatency      time.Duration      `json:"ready"`
 	MetricName        string             `json:"metricName"`
-	JobConfig         config.Job         `json:"jobConfig"`
 	UUID              string             `json:"uuid"`
 	Namespace         string             `json:"namespace"`
 	Name              string             `json:"service"`
@@ -168,7 +166,6 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			MetricName:        svcLatencyMetric,
 			ServiceType:       svc.Spec.Type,
 			ReadyLatency:      svcLatency,
-			JobConfig:         *factory.jobConfig,
 			UUID:              globalCfg.UUID,
 			Metadata:          factory.metadata,
 			IPAssignedLatency: ipAssignedLatency,
@@ -259,7 +256,6 @@ func (s *serviceLatency) normalizeMetrics() {
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
-		latencySummary.JobConfig = *factory.jobConfig
 		latencySummary.Timestamp = time.Now().UTC()
 		latencySummary.Metadata = factory.metadata
 		latencySummary.MetricName = svcLatencyQuantilesMeasurement
