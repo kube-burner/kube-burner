@@ -24,45 +24,37 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type Timings struct {
-	Timestamp           time.Time  `json:"timestamp"`
-	EndTimestamp        time.Time  `json:"endTimestamp"`
-	ChurnStartTimestamp *time.Time `json:"churnStartTimestamp,omitempty"`
-	ChurnEndTimestamp   *time.Time `json:"churnEndTimestamp,omitempty"`
-	ElapsedTime         float64    `json:"elapsedTime"`
-}
-
 type jobSummary struct {
-	Timings
-	UUID       string                 `json:"uuid"`
-	MetricName string                 `json:"metricName"`
-	JobConfig  config.Job             `json:"jobConfig"`
-	Metadata   map[string]interface{} `json:"metadata"`
-	Version    string                 `json:"version"`
+	Timestamp           time.Time              `json:"timestamp"`
+	EndTimestamp        time.Time              `json:"endTimestamp"`
+	ChurnStartTimestamp *time.Time             `json:"churnStartTimestamp,omitempty"`
+	ChurnEndTimestamp   *time.Time             `json:"churnEndTimestamp,omitempty"`
+	ElapsedTime         float64                `json:"elapsedTime"`
+	UUID                string                 `json:"uuid"`
+	MetricName          string                 `json:"metricName"`
+	JobConfig           config.Job             `json:"jobConfig"`
+	Metadata            map[string]interface{} `json:"metadata,omitempty"`
+	Version             string                 `json:"version"`
+	Passed              bool                   `json:"passed"`
+	ExecutionErrors     string                 `json:"executionErrors",omitempty"`
 }
 
 const jobSummaryMetric = "jobSummary"
 
-// IndexJobSummary Generates and indexes a document with summary information of the passed job
-func IndexJobSummary(indexer indexers.Indexer, uuid string, jobTimings Timings, jobConfig config.Job, metadata map[string]interface{}) {
-	metadataInfo := []interface{}{
-		jobSummary{
-			UUID:       uuid,
-			JobConfig:  jobConfig,
-			MetricName: jobSummaryMetric,
-			Metadata:   metadata,
-			Version:    fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
-			Timings:    jobTimings,
-		},
-	}
-	log.Infof("Indexing metric %s", jobSummaryMetric)
-	indexingOpts := indexers.IndexingOpts{
-		MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, jobConfig.Name),
-	}
-	resp, err := indexer.Index(metadataInfo, indexingOpts)
-	if err != nil {
-		log.Error(err)
-	} else {
-		log.Info(resp)
+// indexMetadataInfo Generates and indexes a document with metadata information of the passed job
+func IndexJobSummary(jobSummaries []jobSummary, indexer indexers.Indexer) {
+	for _, summary := range jobSummaries {
+		summary.Version = fmt.Sprintf("%v@%v", version.Version, version.GitCommit)
+		summary.MetricName = jobSummaryMetric
+		log.Infof("Indexing job summary for job: %s", summary.JobConfig.Name)
+		indexingOpts := indexers.IndexingOpts{
+			MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, summary.JobConfig.Name),
+		}
+		resp, err := indexer.Index([]interface{}{summary}, indexingOpts)
+		if err != nil {
+			log.Error(err)
+		} else {
+			log.Info(resp)
+		}
 	}
 }

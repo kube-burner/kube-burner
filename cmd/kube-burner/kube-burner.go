@@ -439,12 +439,14 @@ func alertCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err)
 			}
-			startTime := time.Unix(start, 0)
-			endTime := time.Unix(end, 0)
+			job := prometheus.Job{
+				Start: time.Unix(start, 0),
+				End:   time.Unix(end, 0),
+			}
 			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, indexer); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
-			err = alertM.Evaluate(startTime, endTime, nil, nil)
+			err = alertM.Evaluate(job)
 			log.Info("👋 Exiting kube-burner ", uuid)
 			if err != nil {
 				os.Exit(1)

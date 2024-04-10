@@ -88,6 +88,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var executedJobs []prometheus.Job
 	var jobList []Executor
 	var msWg, gcWg sync.WaitGroup
+	var jobSummaries []jobSummary
 	embedFS = configSpec.EmbedFS
 	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
@@ -99,8 +100,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
-		var churnStart *time.Time
-		var churnEnd *time.Time
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.Metadata)
 		jobList = newExecutorList(configSpec, kubeClientProvider, uuid, timeout)
 		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
@@ -239,30 +238,27 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// Make sure that measurements have indexed their stuff before we index metrics
 		msWg.Wait()
 		for _, job := range executedJobs {
-			// elapsedTime is recalculated for every job of the list
-			jobTimings := Timings{
-				Timestamp:    job.Start,
-				EndTimestamp: job.End,
-				ElapsedTime:  job.End.Sub(job.Start).Round(time.Second).Seconds(),
-			}
-			if !job.JobConfig.SkipIndexing {
-				for _, indexer := range metricsScraper.IndexerList {
-					if job.JobConfig.Churn {
-						jobTimings.ChurnStartTimestamp = &job.ChurnStart
-						jobTimings.ChurnEndTimestamp = &job.ChurnEnd
-						if churnStart == nil {
-							churnStart = &job.ChurnStart
-						}
-						churnEnd = &job.ChurnEnd
-					}
-					IndexJobSummary(indexer, uuid, jobTimings, job.JobConfig, metricsScraper.Metadata)
+			var jobAlerts string
+			for _, alertM := range metricsScraper.AlertMs {
+				if err := alertM.Evaluate(job); err != nil {
+					jobAlerts = err.Error()
+					errs = append(errs, err)
+					innerRC = 1
 				}
 			}
-		}
-		for _, alertM := range metricsScraper.AlertMs {
-			if err := alertM.Evaluate(executedJobs[0].Start, executedJobs[len(jobList)-1].End, churnStart, churnEnd); err != nil {
-				errs = append(errs, err)
-				innerRC = 1
+			if !job.JobConfig.SkipIndexing {
+				jobSummaries = append(jobSummaries, jobSummary{
+					UUID:                uuid,
+					Timestamp:           job.Start,
+					EndTimestamp:        job.End,
+					ElapsedTime:         job.End.Sub(job.Start).Round(time.Second).Seconds(),
+					ChurnStartTimestamp: &job.ChurnStart,
+					ChurnEndTimestamp:   &job.ChurnEnd,
+					JobConfig:           job.JobConfig,
+					Metadata:            metricsScraper.Metadata,
+					Passed:              innerRC == 0,
+					ExecutionErrors:     jobAlerts,
+				})
 			}
 		}
 		for _, prometheusClient := range metricsScraper.PrometheusClients {
