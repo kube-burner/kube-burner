@@ -179,20 +179,28 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {
 
 func waitForPod(ns string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != corev1.PodRunning {
-				return false, nil
-			}
-			for _, c := range pod.Status.Conditions {
-				if c.Type == corev1.PodReady && c.Status == corev1.ConditionFalse {
+		// We need to paginate these requests to ensure we don't miss any pods
+		listOptions := metav1.ListOptions{Limit: 1000}
+		for {
+			limiter.Wait(context.TODO())
+			pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), listOptions)
+			listOptions.Continue = pods.GetContinue()
+			for _, pod := range pods.Items {
+				if pod.Status.Phase != corev1.PodRunning {
 					return false, nil
 				}
+				for _, c := range pod.Status.Conditions {
+					if c.Type == corev1.PodReady && c.Status == corev1.ConditionFalse {
+						return false, nil
+					}
+				}
 			}
-		}
-		if err != nil {
-			return false, err
+			if err != nil {
+				return false, err
+			}
+			if listOptions.Continue == "" {
+				break
+			}
 		}
 		return true, nil
 	})
