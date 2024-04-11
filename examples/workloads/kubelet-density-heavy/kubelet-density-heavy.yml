@@ -1,17 +1,18 @@
 ---
 global:
-    type: elastic
+  gc: true
   measurements:
     - name: podLatency
 
 jobs:
   - name: kubelet-density-heavy
-    jobIterations: 280
-    qps: 25
-    burst: 25
+    jobIterations: 10
+    qps: 10
+    burst: 10
     namespacedIterations: false
     namespace: kubelet-density-heavy
     waitWhenFinished: true
+    preLoadImages: false
     podWait: false
     objects:
 

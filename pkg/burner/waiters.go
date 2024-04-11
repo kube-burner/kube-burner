@@ -22,8 +22,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -178,11 +180,18 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {
 func waitForPod(ns string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		limiter.Wait(context.TODO())
-		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
+		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase=Running"})
+		for _, pod := range pods.Items {
+			for _, c := range pod.Status.Conditions {
+				if c.Type == corev1.PodReady && c.Status == corev1.ConditionFalse {
+					return false, nil
+				}
+			}
+		}
 		if err != nil {
 			return false, err
 		}
-		return len(pods.Items) == 0, nil
+		return true, nil
 	})
 }
 
