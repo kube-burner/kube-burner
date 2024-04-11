@@ -31,7 +31,6 @@ One document, such as the following, is indexed per each pod created by the work
   "namespace": "kubelet-density",
   "podName": "kubelet-density-13",
   "nodeName": "worker-001",
-  "jobConfig": {"config": "params"}
 }
 ```
 
@@ -50,9 +49,6 @@ Pod latency quantile sample:
   "avg": 2876.3,
   "timestamp": "2020-11-15T22:26:51.553221077+01:00",
   "metricName": "podLatencyQuantilesMeasurement",
-  "jobConfig": {
-    "config": "params"
-  }
 },
 {
   "quantileName": "PodScheduled",
@@ -64,9 +60,6 @@ Pod latency quantile sample:
   "avg": 5.38,
   "timestamp": "2020-11-15T22:26:51.553225151+01:00",
   "metricName": "podLatencyQuantilesMeasurement",
-  "jobConfig": {
-    "config": "params"
-  }
 }
 ```
 
@@ -182,9 +175,6 @@ The metrics collected are service latency timeseries (`svcLatencyMeasurement`) a
   "timestamp": "2023-11-19T00:41:51Z",
   "ready": 1631880721,
   "metricName": "svcLatencyMeasurement",
-  "jobConfig": {
-    "config": "params"
-  },
   "uuid": "c4558ba8-1e29-4660-9b31-02b9f01c29bf",
   "namespace": "cluster-density-v2-2",
   "service": "cluster-density-1",
@@ -208,9 +198,6 @@ And the quantiles document has the structure:
   "avg": 1722308938,
   "timestamp": "2023-11-19T00:42:26.663991359Z",
   "metricName": "svcLatencyQuantilesMeasurement",
-  "jobConfig": {
-    "config": "params"
-  }
 },
 {
   "quantileName": "LoadBalancer",
@@ -222,9 +209,6 @@ And the quantiles document has the structure:
   "avg": 1822308938,
   "timestamp": "2023-11-19T00:42:26.663991359Z",
   "metricName": "svcLatencyQuantilesMeasurement",
-  "jobConfig": {
-    "config": "params"
-  }
 }
 ```
 
