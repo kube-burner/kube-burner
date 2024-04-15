@@ -45,9 +45,6 @@ The collected metrics have the following shape:
     "uuid": "<UUID>",
     "query": "sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) > 0",
     "metricName": "nodeCPU",
-    "jobConfig": {
-      "truncated_job_configuration": "foobar"
-    }
   },
   {
     "timestamp": "2021-06-23T11:50:45+02:00",
@@ -59,14 +56,11 @@ The collected metrics have the following shape:
     "uuid": "<UUID>",
     "query": "sum(irate(node_cpu_seconds_total[2m])) by (mode,instance) > 0",
     "metricName": "nodeCPU",
-    "jobConfig": {
-      "truncated_job_configuration": "foobar"
-    }
   }
 ]
 ```
 
-Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query`, `metricName` and `jobConfig`.
+Notice that kube-burner enriches the query results by adding some extra fields like `uuid`, `query` and `metricName`.
 !!! info
     These extra fields are especially useful at the time of identifying and representing the collected metrics.
 

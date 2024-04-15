@@ -65,7 +65,7 @@ check_running_pods() {
 }
 
 check_running_pods_in_ns() {
-    running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced | grep -c Running)
+    running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced --field-selector=status.phase==Running --no-headers | wc -l)
     if [[ "${running_pods}" != "${2}" ]]; then
       echo "Running pods in namespace $1 different from expected. Expected=${2}, observed=${running_pods}"
       return 1

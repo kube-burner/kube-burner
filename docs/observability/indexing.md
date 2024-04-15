@@ -76,20 +76,10 @@ This document looks like:
     "jobIterationDelay": 0,
     "jobPause": 0,
     "name": "kubelet-density",
-    "objects": [
-      {
-        "objectTemplate": "templates/pod.yml",
-        "replicas": 1,
-        "inputVars": {
-          "containerImage": "registry.k8s.io/pause:3.1"
-        }
-      }
-    ],
     "jobType": "create",
     "qps": 5,
     "burst": 5,
     "namespace": "kubelet-density",
-    "waitFor": null,
     "maxWaitTimeout": 43200000000000,
     "waitForDeletion": true,
     "podWait": false,

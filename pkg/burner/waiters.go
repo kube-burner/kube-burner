@@ -22,8 +22,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -45,7 +47,7 @@ func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
 			if !obj.Namespaced {
 				waitNs = ""
 			}
-			waitForCondition(obj.gvr, waitNs, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, limiter)
+			verifyCondition(obj.gvr, waitNs, obj.WaitOptions.ForCondition, ex.MaxWaitTimeout, limiter)
 		} else {
 			switch obj.kind {
 			case "Deployment":
@@ -177,12 +179,30 @@ func waitForDS(ns string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {
 
 func waitForPod(ns string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Running"})
-		if err != nil {
-			return false, err
+		// We need to paginate these requests to ensure we don't miss any pods
+		listOptions := metav1.ListOptions{Limit: 1000}
+		for {
+			limiter.Wait(context.TODO())
+			pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), listOptions)
+			listOptions.Continue = pods.GetContinue()
+			for _, pod := range pods.Items {
+				if pod.Status.Phase != corev1.PodRunning {
+					return false, nil
+				}
+				for _, c := range pod.Status.Conditions {
+					if c.Type == corev1.PodReady && c.Status == corev1.ConditionFalse {
+						return false, nil
+					}
+				}
+			}
+			if err != nil {
+				return false, err
+			}
+			if listOptions.Continue == "" {
+				break
+			}
 		}
-		return len(pods.Items) == 0, nil
+		return true, nil
 	})
 }
 
@@ -228,10 +248,6 @@ func waitForJob(ns string, maxWaitTimeout time.Duration, limiter *rate.Limiter) 
 		Resource: "jobs",
 	}
 	verifyCondition(gvr, ns, "Complete", maxWaitTimeout, limiter)
-}
-
-func waitForCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {
-	verifyCondition(gvr, ns, condition, maxWaitTimeout, limiter)
 }
 
 func verifyCondition(gvr schema.GroupVersionResource, ns, condition string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {

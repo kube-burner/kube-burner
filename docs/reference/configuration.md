@@ -30,7 +30,7 @@ In this section is described global job configuration, it holds the following pa
 | `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
 | `gcMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
 | `gcTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
-| `waitWhenFinished` | Wait for all pods to be running when all jobs are completed                                             | Boolean        | false      |
+| `waitWhenFinished` | Wait for all pods/jobs (including probes) to be running/completed when all jobs are completed           | Boolean  | false   |
 | `clusterHealth` | Checks if all the nodes are in "Ready" state                                             | Boolean        | false      |
 
 !!! note
@@ -55,8 +55,8 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `namespacedIterations`   | Whether to create a namespace per job iteration                                                                                   | Boolean  | true    |
 | `iterationsPerNamespace` | The maximum number of `jobIterations` to create in a single namespace. Important for node-density workloads that create Services. | Integer  | 1       |
 | `cleanup`                | Cleanup clean up old namespaces                                                                                                   | Boolean  | true    |
-| `podWait`                | Wait for all pods to be running before moving forward to the next job iteration                                                   | Boolean  | false   |
-| `waitWhenFinished`       | Wait for all pods to be running when all iterations are completed                                                                 | Boolean  | true    |
+| `podWait`                | Wait for all pods/jobs (including probes) to be running/completed before moving forward to the next job iteration                 | Boolean  | false   |
+| `waitWhenFinished`       | Wait for all pods/jobs (including probes) to be running/completed when all job iterations are completed                           | Boolean  | true    |
 | `maxWaitTimeout`         | Maximum wait timeout per namespace                                                                                                | Duration | 4h      |
 | `jobIterationDelay`      | How long to wait between each job iteration. This is also the wait interval between each delete operation                         | Duration | 0s      |
 | `jobPause`               | How long to pause after finishing the job                                                                                         | Duration | 0s      |
