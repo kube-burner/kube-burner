@@ -58,27 +58,15 @@ func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface
 	}
 	for _, measurement := range globalCfg.Measurements {
 		indexerFound = false
-		if measurement.QuantilesIndexer != "" {
+		if measurement.QuantilesIndexer != "" || measurement.TimeseriesIndexer != "" {
 			for _, indexer := range configSpec.MetricsEndpoints {
-				if indexer.Alias == measurement.QuantilesIndexer {
+				if indexer.Alias == measurement.QuantilesIndexer || indexer.Alias == measurement.TimeseriesIndexer {
 					indexerFound = true
 					break
 				}
 			}
 			if !indexerFound {
-				log.Fatalf("Quantiles indexer not found: %s", measurement.QuantilesIndexer)
-			}
-		}
-		if measurement.TimeseriesIndexer != "" {
-			indexerFound = false
-			for _, indexer := range configSpec.MetricsEndpoints {
-				if indexer.Alias == measurement.TimeseriesIndexer {
-					indexerFound = true
-					break
-				}
-			}
-			if !indexerFound {
-				log.Fatalf("Timeseries indexer not found: %s", measurement.TimeseriesIndexer)
+				log.Fatalf("One of the indexers for measurement %s has not been found", measurement.Name)
 			}
 		}
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
