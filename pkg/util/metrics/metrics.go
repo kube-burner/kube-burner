@@ -96,6 +96,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				if err != nil {
 					log.Fatal(err)
 				}
+				prometheusClients = append(prometheusClients, p)
 			}
 			if metricsEndpoint.AlertProfile != "" {
 				if alertM, err = alerting.NewAlertManager(metricsEndpoint.AlertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, metricsEndpoint.EmbedConfig, indexerList...); err != nil {
@@ -103,7 +104,6 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				}
 				alertMs = append(alertMs, alertM)
 			}
-			prometheusClients = append(prometheusClients, p)
 		}
 	}
 	return Scraper{
