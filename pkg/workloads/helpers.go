@@ -22,7 +22,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
@@ -31,8 +30,7 @@ import (
 )
 
 const (
-	stepSize              = 30 * time.Second
-	clusterMetadataMetric = "clusterMetadata"
+	stepSize = 30 * time.Second
 )
 
 var ConfigSpec config.Spec
@@ -101,12 +99,7 @@ func (wh *WorkloadHelper) Run(workload string) {
 	})
 	rc, err = burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, wh.Timeout)
 	if err != nil {
-		wh.Metadata.ExecutionErrors = err.Error()
-		log.Error(err)
-	}
-	wh.Metadata.Passed = rc == 0
-	for _, indexer := range metricsScraper.IndexerList {
-		IndexMetadata(indexer, wh.Metadata)
+		log.Errorf(err.Error())
 	}
 	log.Info("👋 Exiting kube-burner ", wh.UUID)
 	os.Exit(rc)
@@ -136,18 +129,4 @@ func ExtractWorkload(embedConfig embed.FS, configDir string, workload string, ro
 		}
 	}
 	return nil
-}
-
-// IndexMetadata indexes metadata using given indexer.
-func IndexMetadata(indexer indexers.Indexer, metadata BenchmarkMetadata) {
-	log.Info("Indexing cluster metadata document")
-	metadata.EndDate = time.Now().UTC()
-	msg, err := (indexer).Index([]interface{}{metadata}, indexers.IndexingOpts{
-		MetricName: metadata.MetricName,
-	})
-	if err != nil {
-		log.Error(err.Error())
-	} else {
-		log.Info(msg)
-	}
 }

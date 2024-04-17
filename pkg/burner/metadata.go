@@ -46,7 +46,7 @@ func IndexJobSummary(jobSummaries []jobSummary, indexer indexers.Indexer) {
 	for _, summary := range jobSummaries {
 		summary.Version = fmt.Sprintf("%v@%v", version.Version, version.GitCommit)
 		summary.MetricName = jobSummaryMetric
-		log.Infof("Indexing job summary for job: %s", summary.JobConfig.Name)
+		log.Infof("Indexing summary for job: %s", summary.JobConfig.Name)
 		indexingOpts := indexers.IndexingOpts{
 			MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, summary.JobConfig.Name),
 		}
