@@ -318,7 +318,12 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 				log.Fatalf("Job names must be unique: %s", job.Name)
 			}
 		}
-		job.MaxWaitTimeout = timeout
+		if job.MaxWaitTimeout == 0 {
+			log.Debugf("job.MaxWaitTimeout is zero in %s, override by timeout: %s", job.Name, timeout)
+			job.MaxWaitTimeout = timeout
+		} else {
+			log.Debugf("job.MaxWaitTimeout is non zero in %s: %s", job.Name, job.MaxWaitTimeout)
+		}
 		// Limits the number of workers to QPS and Burst
 		ex.limiter = rate.NewLimiter(rate.Limit(job.QPS), job.Burst)
 		ex.Job = job

@@ -91,7 +91,6 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ErrorOnVerify:          true,
 		JobType:                CreationJob,
 		WaitForDeletion:        true,
-		MaxWaitTimeout:         4 * time.Hour,
 		PreLoadImages:          true,
 		PreLoadPeriod:          1 * time.Minute,
 		Churn:                  false,
