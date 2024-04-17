@@ -66,7 +66,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 			}
 			indexerList[indexerAlias] = *indexer
 		}
-		if metricsEndpoint.PrometheusURL != "" {
+		if (len(metricsEndpoint.Metrics) > 0 || len(metricsEndpoint.Alerts) > 0) && metricsEndpoint.PrometheusURL != "" {
 			auth := prometheus.Auth{
 				Username:      metricsEndpoint.Username,
 				Password:      metricsEndpoint.Password,
