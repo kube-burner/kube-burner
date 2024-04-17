@@ -36,7 +36,7 @@ type jobSummary struct {
 	Metadata            map[string]interface{} `json:"metadata,omitempty"`
 	Version             string                 `json:"version"`
 	Passed              bool                   `json:"passed"`
-	ExecutionErrors     string                 `json:"executionErrors",omitempty"`
+	ExecutionErrors     string                 `json:"executionErrors,omitempty"`
 }
 
 const jobSummaryMetric = "jobSummary"

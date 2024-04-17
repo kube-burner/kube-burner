@@ -54,13 +54,14 @@ func (wh *WorkloadHelper) Run(workload string) {
 	var err error
 	var embedConfig bool
 	var metricsScraper metrics.Scraper
+	var userMetadataContent map[string]interface{}
 	if wh.UserMetadata != "" {
-		wh.Metadata.UserMetadata, err = util.ReadUserMetadata(wh.UserMetadata)
+		userMetadataContent, err = util.ReadUserMetadata(wh.UserMetadata)
 		if err != nil {
 			log.Fatalf("Error reading provided user metadata: %v", err)
 		}
 		// Combine provided userMetadata with the regular OCP metadata
-		for k, v := range wh.Metadata.UserMetadata {
+		for k, v := range userMetadataContent {
 			wh.MetricsMetadata[k] = v
 		}
 	}
