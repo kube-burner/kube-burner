@@ -77,13 +77,12 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 			if err != nil {
 				log.Fatal(err)
 			}
+			prometheusClients = append(prometheusClients, p)
 			for _, metricProfile := range metricsEndpoint.Metrics {
 				if err := p.ReadProfile(metricProfile); err != nil {
 					log.Fatal(err.Error())
 				}
-				prometheusClients = append(prometheusClients, p)
 			}
-			prometheusClients = append(prometheusClients, p)
 			for _, alertProfile := range metricsEndpoint.Alerts {
 				if alertM, err = alerting.NewAlertManager(alertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, metricsEndpoint.EmbedConfig, *indexer); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
