@@ -258,6 +258,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					Metadata:            metricsScraper.Metadata,
 					Passed:              innerRC == 0,
 					ExecutionErrors:     jobAlerts,
+					Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
+					MetricName:          jobSummaryMetric,
 				})
 			}
 		}

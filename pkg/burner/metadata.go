@@ -15,11 +15,9 @@
 package burner
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/go-commons/version"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
@@ -43,18 +41,18 @@ const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
 func IndexJobSummary(jobSummaries []jobSummary, indexer indexers.Indexer) {
+	log.Info("Indexing job summaries")
+	var jobSummariesInt []interface{}
+	indexingOpts := indexers.IndexingOpts{
+		MetricName: jobSummaryMetric,
+	}
 	for _, summary := range jobSummaries {
-		summary.Version = fmt.Sprintf("%v@%v", version.Version, version.GitCommit)
-		summary.MetricName = jobSummaryMetric
-		log.Infof("Indexing summary for job: %s", summary.JobConfig.Name)
-		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, summary.JobConfig.Name),
-		}
-		resp, err := indexer.Index([]interface{}{summary}, indexingOpts)
-		if err != nil {
-			log.Error(err)
-		} else {
-			log.Info(resp)
-		}
+		jobSummariesInt = append(jobSummariesInt, summary)
+	}
+	resp, err := indexer.Index(jobSummariesInt, indexingOpts)
+	if err != nil {
+		log.Error(err)
+	} else {
+		log.Info(resp)
 	}
 }
