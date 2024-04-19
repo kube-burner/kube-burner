@@ -146,9 +146,9 @@ func (p *podLatency) validateConfig() error {
 
 // start podLatency measurement
 func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
-	defer measurementWg.Done()
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
+	defer measurementWg.Done()
 	p.metrics = make(map[string]podMetric)
 	log.Infof("Creating Pod latency watcher for %s", factory.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
@@ -223,9 +223,11 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 // Stop stops podLatency measurement
 func (p *podLatency) stop() error {
 	var err error
-	if p.watcher != nil {
-		p.watcher.StopWatcher()
-	}
+	defer func() {
+		if p.watcher != nil {
+			p.watcher.StopWatcher()
+		}
+	}()
 	errorRate := p.normalizeMetrics()
 	if errorRate > 10.00 {
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")
@@ -246,24 +248,12 @@ func (p *podLatency) stop() error {
 }
 
 // index sends metrics to the configured indexer
-func (p *podLatency) index(indexer indexers.Indexer, jobName string) {
-	log.Infof("Indexing pod latency data for job: %s", jobName)
+func (p *podLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
 	}
-	for metricName, data := range metricMap {
-		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
-		}
-		log.Debugf("Indexing [%d] documents: %s", len(data), metricName)
-		resp, err := indexer.Index(data, indexingOpts)
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			log.Info(resp)
-		}
-	}
+	indexLatencyMeasurement(p.config, jobName, metricMap, indexerList)
 }
 
 func (p *podLatency) normalizeMetrics() float64 {

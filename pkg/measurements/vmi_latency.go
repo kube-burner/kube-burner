@@ -382,12 +382,14 @@ func (p *vmiLatency) collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops vmiLatency measurement
 func (p *vmiLatency) stop() error {
+	defer func() {
+		p.vmWatcher.StopWatcher()
+		p.vmiWatcher.StopWatcher()
+		p.vmiPodWatcher.StopWatcher()
+	}()
 	if factory.jobConfig.JobType == config.DeletionJob {
 		return nil
 	}
-	p.vmWatcher.StopWatcher()
-	p.vmiWatcher.StopWatcher()
-	p.vmiPodWatcher.StopWatcher()
 	p.normalizeMetrics()
 	p.calcQuantiles()
 	err := metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
@@ -395,23 +397,12 @@ func (p *vmiLatency) stop() error {
 }
 
 // index sends metrics to the configured indexer
-func (p *vmiLatency) index(indexer indexers.Indexer, jobName string) {
+func (p *vmiLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]interface{}{
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
 	}
-	for metricName, data := range metricMap {
-		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
-		}
-		log.Debugf("Indexing [%d] documents", len(data))
-		resp, err := indexer.Index(data, indexingOpts)
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			log.Info(resp)
-		}
-	}
+	indexLatencyMeasurement(p.config, jobName, metricMap, indexerList)
 }
 
 func (p *vmiLatency) normalizeMetrics() {

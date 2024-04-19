@@ -41,7 +41,7 @@ type measurement interface {
 	collect(*sync.WaitGroup)
 	setConfig(types.Measurement)
 	validateConfig() error
-	index(indexers.Indexer, string)
+	index(string, map[string]indexers.Indexer)
 }
 
 var factory measurementFactory
@@ -50,12 +50,25 @@ var globalCfg config.GlobalConfig
 
 // NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) {
+	var indexerFound bool
 	globalCfg = configSpec.GlobalConfig
 	factory = measurementFactory{
 		createFuncs: make(map[string]measurement),
 		metadata:    metadata,
 	}
 	for _, measurement := range globalCfg.Measurements {
+		indexerFound = false
+		if measurement.QuantilesIndexer != "" || measurement.TimeseriesIndexer != "" {
+			for _, indexer := range configSpec.MetricsEndpoints {
+				if indexer.Alias == measurement.QuantilesIndexer || indexer.Alias == measurement.TimeseriesIndexer {
+					indexerFound = true
+					break
+				}
+			}
+			if !indexerFound {
+				log.Fatalf("One of the indexers for measurement %s has not been found", measurement.Name)
+			}
+		}
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
 			if err := factory.register(measurement, measurementFunc); err != nil {
 				log.Fatal(err.Error())
@@ -115,14 +128,13 @@ func Stop() error {
 	return utilerrors.NewAggregate(errs)
 }
 
-// Index iterates through the createFuncs and indexes collected data from each measurement.
+// Index iterates over the createFuncs map, indexes collected data from each measurement.
 //
-// Parameters:
-//   - indexer: a pointer to the indexer
-//   - jobName: the name of the job, required as this task can be executed from a goroutine
-func Index(indexer indexers.Indexer, jobName string) {
+// jobName is the name of the job to index data for.
+// indexerList is a variadic parameter of indexers.Indexer implementations.
+func Index(jobName string, indexerList map[string]indexers.Indexer) {
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Indexing collected data from measurement: %s", name)
-		measurement.index(indexer, jobName)
+		measurement.index(jobName, indexerList)
 	}
 }

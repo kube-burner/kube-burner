@@ -47,7 +47,7 @@ func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}
 	for _, phase := range thresholds {
 		for _, pq := range quantiles {
 			if phase.ConditionType == pq.(LatencyQuantiles).QuantileName {
-				// Required to acccess the attribute by name
+				// Required to access the attribute by name
 				r := reflect.ValueOf(pq.(LatencyQuantiles))
 				v := r.FieldByName(phase.Metric).Int()
 				if v > phase.Threshold.Milliseconds() {

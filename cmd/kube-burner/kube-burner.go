@@ -70,15 +70,11 @@ To configure your bash shell to load completions for each session execute:
 }
 
 func initCmd() *cobra.Command {
-	var err error
 	var clientSet kubernetes.Interface
 	var kubeConfig, kubeContext string
-	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
-	var metricsProfiles []string
-	var alertsProfiles []string
-	var username, password, uuid, token, configMap, namespace, userMetadata string
+	var metricsEndpoint, configFile string
+	var uuid, userMetadata string
 	var skipTLSVerify bool
-	var prometheusStep time.Duration
 	var timeout time.Duration
 	var rc int
 	cmd := &cobra.Command{
@@ -92,20 +88,6 @@ func initCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			if configMap != "" {
-				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace, clientSet)
-				if err != nil {
-					log.Fatal(err.Error())
-				}
-				// We assume configFile is config.yml
-				configFile = "config.yml"
-			}
-			if metricsProfile != "" {
-				metricsProfiles = append(metricsProfiles, metricsProfile)
-			}
-			if alertProfile != "" {
-				alertsProfiles = append(alertsProfiles, alertProfile)
-			}
 			f, err := util.ReadConfig(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
@@ -115,16 +97,8 @@ func initCmd() *cobra.Command {
 				log.Fatalf("Config error: %s", err.Error())
 			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-				ConfigSpec:      configSpec,
-				Password:        password,
-				PrometheusStep:  prometheusStep,
+				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,
-				MetricsProfiles: metricsProfiles,
-				AlertProfiles:   alertsProfiles,
-				SkipTLSVerify:   skipTLSVerify,
-				URL:             url,
-				Token:           token,
-				Username:        username,
 				UserMetaData:    userMetadata,
 			})
 			if configSpec.GlobalConfig.ClusterHealth {
@@ -140,24 +114,15 @@ func initCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", uid.NewString(), "Benchmark UUID")
-	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
-	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
-	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
-	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
-	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "", "Metrics profile file or URL")
 	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
-	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
-	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
-	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
-	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
-	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().SortFlags = false
+	cmd.MarkFlagRequired("config")
 	return cmd
 }
 
@@ -222,8 +187,8 @@ func measureCmd() *cobra.Command {
 	var configFile string
 	var jobName string
 	var userMetadata string
-	var indexerList []indexers.Indexer
 	var kubeConfig, kubeContext string
+	indexerList := make(map[string]indexers.Indexer)
 	metadata := make(map[string]interface{})
 	cmd := &cobra.Command{
 		Use:   "measure",
@@ -244,13 +209,13 @@ func measureCmd() *cobra.Command {
 			if len(configSpec.Jobs) > 0 {
 				log.Fatal("No jobs are allowed in a measure subcommand config file")
 			}
-			for pos, indexer := range configSpec.Indexers {
+			for pos, indexer := range configSpec.MetricsEndpoints {
 				log.Infof("📁 Creating indexer: %s", indexer.Type)
 				idx, err := indexers.NewIndexer(indexer.IndexerConfig)
 				if err != nil {
 					log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 				}
-				indexerList = append(indexerList, *idx)
+				indexerList[string(indexer.Alias)] = *idx
 			}
 			if userMetadata != "" {
 				metadata, err = util.ReadUserMetadata(userMetadata)
@@ -283,9 +248,7 @@ func measureCmd() *cobra.Command {
 			if err = measurements.Stop(); err != nil {
 				log.Error(err.Error())
 			}
-			for _, indexer := range indexerList {
-				measurements.Index(indexer, jobName)
-			}
+			measurements.Index(jobName, indexerList)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
@@ -308,6 +271,7 @@ func indexCmd() *cobra.Command {
 	var skipTLSVerify bool
 	var prometheusStep time.Duration
 	var tarballName string
+	var indexer config.MetricsEndpoint
 	cmd := &cobra.Command{
 		Use:   "index",
 		Short: "Index kube-burner metrics",
@@ -318,35 +282,32 @@ func indexCmd() *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec.GlobalConfig.UUID = uuid
-			if esServer != "" && esIndex != "" {
-				configSpec.Indexers = append(configSpec.Indexers,
-					config.Indexer{
-						IndexerConfig: indexers.IndexerConfig{
-							Type:    indexers.ElasticIndexer,
-							Servers: []string{esServer},
-							Index:   esIndex,
-						},
-					})
-			} else {
-				configSpec.Indexers = append(configSpec.Indexers,
-					config.Indexer{
-						IndexerConfig: indexers.IndexerConfig{
-							Type:             indexers.LocalIndexer,
-							MetricsDirectory: metricsDirectory,
-							TarballName:      tarballName,
-						},
-					})
+			indexer = config.MetricsEndpoint{
+				Username:                username,
+				Password:                password,
+				Token:                   token,
+				PrometheusStep:          prometheusStep,
+				PrometheusURL:           url,
+				Metrics:                 []string{metricsProfile},
+				PrometheusSkipTLSVerify: skipTLSVerify,
 			}
+			if esServer != "" && esIndex != "" {
+				indexer.IndexerConfig = indexers.IndexerConfig{
+					Type:    indexers.ElasticIndexer,
+					Servers: []string{esServer},
+					Index:   esIndex,
+				}
+			} else {
+				indexer.IndexerConfig = indexers.IndexerConfig{
+					Type:             indexers.LocalIndexer,
+					MetricsDirectory: metricsDirectory,
+					TarballName:      tarballName,
+				}
+			}
+			configSpec.MetricsEndpoints = append(configSpec.MetricsEndpoints, indexer)
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-				ConfigSpec:      configSpec,
-				Password:        password,
-				PrometheusStep:  prometheusStep,
+				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,
-				MetricsProfiles: []string{metricsProfile},
-				SkipTLSVerify:   skipTLSVerify,
-				URL:             url,
-				Token:           token,
-				Username:        username,
 				UserMetaData:    userMetadata,
 			})
 			for _, prometheusClient := range metricsScraper.PrometheusClients {
@@ -361,8 +322,8 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err)
 				}
 			}
-			if configSpec.Indexers[0].Type == indexers.LocalIndexer && tarballName != "" {
-				if err := metrics.CreateTarball(configSpec.Indexers[0].IndexerConfig); err != nil {
+			if configSpec.MetricsEndpoints[0].Type == indexers.LocalIndexer && tarballName != "" {
+				if err := metrics.CreateTarball(configSpec.MetricsEndpoints[0].IndexerConfig); err != nil {
 					log.Fatal(err)
 				}
 			}
@@ -470,7 +431,7 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, false, *indexer)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, false, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}

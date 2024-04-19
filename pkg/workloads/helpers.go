@@ -50,7 +50,7 @@ func NewWorkloadHelper(config Config, embedConfig embed.FS, kubeClientProvider *
 	return wh
 }
 
-func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsProfiles []string) {
+func (wh *WorkloadHelper) Run(workload string) {
 	var f io.Reader
 	var rc int
 	var err error
@@ -88,15 +88,14 @@ func (wh *WorkloadHelper) Run(workload string, metricsProfiles []string, alertsP
 		ConfigSpec.EmbedFS = wh.embedConfig
 		ConfigSpec.EmbedFSDir = path.Join(wh.ConfigDir, workload)
 	}
+	// Overwrite credentials
+	for pos, _ := range ConfigSpec.MetricsEndpoints {
+		ConfigSpec.MetricsEndpoints[pos].PrometheusURL = wh.PrometheusURL
+		ConfigSpec.MetricsEndpoints[pos].PrometheusURL = wh.PrometheusToken
+	}
 	metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-		ConfigSpec:      ConfigSpec,
-		PrometheusStep:  stepSize,
+		ConfigSpec:      &ConfigSpec,
 		MetricsEndpoint: wh.MetricsEndpoint,
-		MetricsProfiles: metricsProfiles,
-		AlertProfiles:   alertsProfiles,
-		SkipTLSVerify:   true,
-		URL:             wh.PrometheusURL,
-		Token:           wh.PrometheusToken,
 		RawMetadata:     wh.MetricsMetadata,
 		EmbedConfig:     embedConfig,
 	})

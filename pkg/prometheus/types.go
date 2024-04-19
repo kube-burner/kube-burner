@@ -31,16 +31,16 @@ type Auth struct {
 
 // Prometheus describes the prometheus connection
 type Prometheus struct {
-	Client        *prometheus.Prometheus
-	Endpoint      string
-	profileName   string
-	MetricProfile []metricDefinition
-	Step          time.Duration
-	UUID          string
-	ConfigSpec    config.Spec
-	metadata      map[string]interface{}
-	embedConfig   bool
-	indexers      []indexers.Indexer
+	Client         *prometheus.Prometheus
+	Endpoint       string
+	profileName    string
+	MetricProfiles []metricProfile
+	Step           time.Duration
+	UUID           string
+	ConfigSpec     config.Spec
+	metadata       map[string]interface{}
+	embedConfig    bool
+	indexer        *indexers.Indexer
 }
 
 type Job struct {
@@ -49,6 +49,11 @@ type Job struct {
 	ChurnStart time.Time
 	ChurnEnd   time.Time
 	JobConfig  config.Job
+}
+
+type metricProfile struct {
+	name    string
+	metrics []metricDefinition
 }
 
 // metricDefinition describes what metrics kube-burner collects

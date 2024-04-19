@@ -22,8 +22,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-type latencyMetric string
-
 const (
 	pprofDirectory string = "pprof"
 )
@@ -54,10 +52,12 @@ type Measurement struct {
 	PProfInterval time.Duration `yaml:"pprofInterval"`
 	// PProfDirectory output directory
 	PProfDirectory string `yaml:"pprofDirectory"`
-	// Service latency metrics to index
-	ServiceLatencyMetrics latencyMetric `yaml:"svcLatencyMetrics"`
 	// Service latency endpoint timeout
 	ServiceTimeout time.Duration `yaml:"svcTimeout"`
+	// Defines the indexer for quantile metrics
+	QuantilesIndexer string `yaml:"quantilesIndexer"`
+	// Defines the indexer for timeseries
+	TimeseriesIndexer string `yaml:"timeseriesIndexer"`
 }
 
 // LatencyThreshold holds the thresholds configuration

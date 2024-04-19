@@ -35,7 +35,7 @@ Use "kube-burner [command] --help" for more information about a command.
 
 This is the main subcommand; it triggers a new kube-burner benchmark and it supports the these flags:
 
-- `uuid`: Benchmark ID. This is essentially an arbitrary string that is used for different purposes along the benchmark. For example, label the objects created by kube-burner as mentioned in the [reference chapter](/kube-burner/configuration/#default-labels). By default, it is auto-generated.
+- `uuid`: Benchmark ID. This is essentially an arbitrary string that is used for different purposes along the benchmark. For example, to label the objects created by kube-burner as mentioned in the [reference chapter](/kube-burner/configuration/#default-labels). By default, it is auto-generated.
 - `config`: Path or URL to a valid configuration file. See details about the configuration schema in the [reference chapter](/kube-burner/configuration/).
 - `configmap`: In case of not providing the `--config` flag, kube-burner is able to fetch its configuration from a given `configMap`. This variable configures its name. kube-burner expects the configMap to hold all the required configuration: config.yml, metrics.yml, and alerts.yml. Where metrics.yml and alerts.yml are optional.
 - `namespace`: Name of the namespace where the configmap is.
@@ -59,13 +59,13 @@ This is the main subcommand; it triggers a new kube-burner benchmark and it supp
 With the above, running a kube-burner benchmark would be as simple as:
 
 ```console
-kube-burner init -c cfg.yml -u https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
 Kube-burner also supports remote configuration files served by a web server. To use it, rather than a path, pass a URL. For example:
 
 ```console
-kube-burner init -c http://web.domain.com:8080/cfg.yml -t ${token} --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+kube-burner init -c http://web.domain.com:8080/cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
 To scrape metrics from multiple endpoints, the  `init` command can be triggered. For example:

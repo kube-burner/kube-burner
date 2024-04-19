@@ -1,5 +1,16 @@
-- endpoint: http://localhost:9090
-  profile: metrics-profile.yaml
-  alertProfile: alert-profile.yaml
-- endpoint: http://localhost:9090
-  profile: metrics-profile.yaml
+- prometheusURL: http://localhost:9090
+  alias: os-indexing
+  indexer:
+    type: opensearch
+    esServers: ["{{ .ES_SERVER }}"]
+    defaultIndex: {{ .ES_INDEX }}
+  metrics:
+  - metrics-profile.yaml
+  alerts:
+  - alert-profile.yaml
+- prometheusURL: http://localhost:9090
+  indexer:
+    type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+  metrics:
+  - metrics-profile.yaml
