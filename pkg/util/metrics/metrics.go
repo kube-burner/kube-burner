@@ -73,7 +73,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				Token:         metricsEndpoint.Token,
 				SkipTLSVerify: metricsEndpoint.PrometheusSkipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(*scraperConfig.ConfigSpec, metricsEndpoint.PrometheusURL, auth, metricsEndpoint.PrometheusStep, metadata, metricsEndpoint.EmbedConfig, indexer)
+			p, err := prometheus.NewPrometheusClient(*scraperConfig.ConfigSpec, metricsEndpoint.PrometheusURL, auth, metricsEndpoint.PrometheusStep, metadata, scraperConfig.EmbedConfig, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -84,7 +84,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				}
 			}
 			for _, alertProfile := range metricsEndpoint.Alerts {
-				if alertM, err = alerting.NewAlertManager(alertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, metricsEndpoint.EmbedConfig, indexer); err != nil {
+				if alertM, err = alerting.NewAlertManager(alertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, scraperConfig.EmbedConfig, indexer); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
 				}
 				alertMs = append(alertMs, alertM)

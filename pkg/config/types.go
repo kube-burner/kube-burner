@@ -63,7 +63,6 @@ type MetricsEndpoint struct {
 	Username                string        `yaml:"username"`
 	Password                string        `yaml:"password"`
 	Alias                   string        `yaml:"alias"`
-	EmbedConfig             bool
 }
 
 // GlobalConfig holds the global configuration

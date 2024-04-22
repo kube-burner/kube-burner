@@ -91,7 +91,7 @@ func (wh *WorkloadHelper) Run(workload string) {
 	// Overwrite credentials
 	for pos, _ := range ConfigSpec.MetricsEndpoints {
 		ConfigSpec.MetricsEndpoints[pos].PrometheusURL = wh.PrometheusURL
-		ConfigSpec.MetricsEndpoints[pos].PrometheusURL = wh.PrometheusToken
+		ConfigSpec.MetricsEndpoints[pos].Token = wh.PrometheusToken
 	}
 	metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 		ConfigSpec:      &ConfigSpec,
