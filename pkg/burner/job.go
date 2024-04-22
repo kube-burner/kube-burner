@@ -263,6 +263,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				})
 			}
 		}
+		for _, indexer := range metricsScraper.IndexerList {
+			indexJobSummary(jobSummaries, indexer)
+		}
 		for _, prometheusClient := range metricsScraper.PrometheusClients {
 			prometheusClient.ScrapeJobsMetrics(executedJobs...)
 		}
