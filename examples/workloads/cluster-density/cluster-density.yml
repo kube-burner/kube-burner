@@ -1,7 +1,8 @@
 
-indexers:
-  - metricsDirectory: kube-burner
-    type: local
+metricsEndpoints:
+  - indexer:
+      metricsDirectory: kube-burner
+      type: local
 global:
   measurements:
     - name: podLatency
