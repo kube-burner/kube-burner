@@ -66,7 +66,7 @@ type alert struct {
 type AlertManager struct {
 	alertProfile alertProfile
 	prometheus   *prometheus.Prometheus
-	indexer      indexers.Indexer
+	indexer      *indexers.Indexer
 	uuid         string
 }
 
@@ -81,7 +81,7 @@ type descriptionTemplate struct {
 }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, embedConfig bool, indexer indexers.Indexer) (*AlertManager, error) {
+func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, embedConfig bool, indexer *indexers.Indexer) (*AlertManager, error) {
 	log.Infof("🔔 Initializing alert manager for prometheus: %v", prometheusClient.Endpoint)
 	a := AlertManager{
 		prometheus: prometheusClient,
@@ -214,7 +214,7 @@ func parseMatrix(value model.Value, description string, severity severityLevel, 
 func (a *AlertManager) index(alertSet []interface{}) {
 	log.Info("Indexing alerts")
 	log.Debugf("Indexing [%d] documents", len(alertSet))
-	resp, err := a.indexer.Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
+	resp, err := (*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})
 	if err != nil {
 		log.Error(err)
 	} else {

@@ -84,7 +84,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				}
 			}
 			for _, alertProfile := range metricsEndpoint.Alerts {
-				if alertM, err = alerting.NewAlertManager(alertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, metricsEndpoint.EmbedConfig, *indexer); err != nil {
+				if alertM, err = alerting.NewAlertManager(alertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, metricsEndpoint.EmbedConfig, indexer); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
 				}
 				alertMs = append(alertMs, alertM)

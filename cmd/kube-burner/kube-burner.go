@@ -418,7 +418,7 @@ func alertCmd() *cobra.Command {
 					MetricsDirectory: metricsDirectory,
 				}
 			}
-			if indexer != nil {
+			if indexerConfig.Type != "" {
 				log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 				indexer, err = indexers.NewIndexer(indexerConfig)
 				if err != nil {
@@ -437,7 +437,7 @@ func alertCmd() *cobra.Command {
 			}
 			startTime := time.Unix(start, 0)
 			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, *indexer); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, indexer); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(startTime, endTime, nil, nil)

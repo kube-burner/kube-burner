@@ -138,3 +138,8 @@ teardown_file() {
 @test "kube-burner cluster health check" {
   run_cmd kube-burner health-check
 }
+
+@test "kube-burner check-alerts" {
+  run_cmd kube-burner check-alerts -a alerts.yml -u http://localhost:9090 --metrics-directory=alerts
+  check_file_list alerts/alert.json
+}
