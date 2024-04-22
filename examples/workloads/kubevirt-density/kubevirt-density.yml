@@ -1,9 +1,10 @@
-indexers:
-    # save metrics to database (e.g., elasticsearch)
-  - esServers: [http://localhost:9200]
-    insecureSkipVerify: true
-    defaultIndex: kube-burner
-    type: elastic
+metricsEndpoints:
+  - indexer:
+      # save metrics to database (e.g., elasticsearch)
+      esServers: [http://localhost:9200]
+      insecureSkipVerify: true
+      defaultIndex: kube-burner
+      type: elastic
 global:
   # collect metrics from Prometheus and dump to files
   measurements:
