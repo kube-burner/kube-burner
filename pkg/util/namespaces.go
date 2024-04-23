@@ -127,12 +127,11 @@ func CleanupNonNamespacedResources(ctx context.Context, clientSet kubernetes.Int
 func DeleteNonNamespacedResources(ctx context.Context, resources *unstructured.UnstructuredList, resourceInterface dynamic.NamespaceableResourceInterface) {
 	if len(resources.Items) > 0 {
 		for _, item := range resources.Items {
-			go func(item unstructured.Unstructured) {
-				err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
-				if err != nil {
-					log.Errorf("Error deleting %v/%v: %v", item.GetKind(), item.GetName(), err)
-				}
-			}(item)
+			log.Debugf("Deleting non-namespaced resource: %s", item.GetName())
+			err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
+			if err != nil {
+				log.Errorf("Error deleting %v/%v: %v", item.GetKind(), item.GetName(), err)
+			}
 		}
 	}
 }
