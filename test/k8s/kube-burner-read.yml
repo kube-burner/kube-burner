@@ -9,7 +9,7 @@ metricsEndpoints:
     metrics: [metrics-profile.yaml]
 {{ end }}
 {{ if .LOCAL_INDEXING }}
-  - prometheusURL: http://localhost:9090
+  - endpoint: http://localhost:9090
     indexer: 
       type: local
       metricsDirectory: {{ .METRICS_FOLDER }}
