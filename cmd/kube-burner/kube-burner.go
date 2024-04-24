@@ -283,13 +283,13 @@ func indexCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec.GlobalConfig.UUID = uuid
 			indexer = config.MetricsEndpoint{
-				Username:                username,
-				Password:                password,
-				Token:                   token,
-				PrometheusStep:          prometheusStep,
-				PrometheusURL:           url,
-				Metrics:                 []string{metricsProfile},
-				PrometheusSkipTLSVerify: skipTLSVerify,
+				Username:      username,
+				Password:      password,
+				Token:         token,
+				Step:          prometheusStep,
+				Endpoint:      url,
+				Metrics:       []string{metricsProfile},
+				SkipTLSVerify: skipTLSVerify,
 			}
 			if esServer != "" && esIndex != "" {
 				indexer.IndexerConfig = indexers.IndexerConfig{

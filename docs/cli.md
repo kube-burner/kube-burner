@@ -79,15 +79,14 @@ A metrics-endpoints.yaml file with valid keys for the `init` command would look 
 ```yaml
 - endpoint: http://localhost:9090
   token: <token>
-  profile: metrics.yaml
-  alertProfile: alert-profile.yaml
+  metrics: [metrics.yaml]
+  indexer:
+    type: local
 - endpoint: http://remotehost:9090
   username: foo
   password: bar
+  alerts: [alert-profile.yaml]
 ```
-
-!!! Note
-    Options `profile` and `alertProfile` are optional. If not provided, the options will be taken from the CLI flags first. Otherwise, they are populated with the default values. Invalid keys are ignored.
 
 ## Index
 
