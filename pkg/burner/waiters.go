@@ -135,11 +135,17 @@ func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, limiter *rate.L
 func waitForPVC(ns string, maxWaitTimeout time.Duration, limiter *rate.Limiter) {
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		limiter.Wait(context.TODO())
-		pvc, err := ClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{FieldSelector: "status.phase!=Bound"})
+		pvcs, err := ClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-		return len(pvc.Items) == 0, nil
+		for _, pvc := range pvcs.Items {
+			if pvc.Status.Phase != corev1.ClaimBound {
+				log.Debugf("Waiting for pvcs in ns %s to be Bound", ns)
+				return false, nil
+			}
+		}
+		return true, nil
 	})
 }
 
