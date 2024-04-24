@@ -55,8 +55,8 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(interface{}) error) error
 			MetricsDirectory:   "collected-metrics",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
-		PrometheusSkipTLSVerify: true,
-		PrometheusStep:          30 * time.Second,
+		SkipTLSVerify: true,
+		Step:          30 * time.Second,
 	}
 	if err := unmarshal(&indexer); err != nil {
 		return err

@@ -8,12 +8,12 @@ The logic to configure metric collection and indexing is established by the `met
 
 | Field     | Description     | Example   |
 | --------- | --------------- | --------- |
-| `prometheusURL` | Define the prometheus endpoint to scrape | `https://prom.my-domain.com` |
+| `endpoint` | Define the prometheus endpoint to scrape | `https://prom.my-domain.com` |
 | `username` | Prometheus username (Basic auth) | `username` |
 | `password` | Prometheus password (Basic auth) | `topSecret` |
 | `token` | Prometheus bearer token (Bearer auth) | `yourTokenDefinition` |
-| `prometheusStep` | Prometheus step size, used when scraping it, by default `30s` | `1m` |
-| `prometheusSkipTLSVerify` | Skip TLS certificate verification, `true` by default | `true` |
+| `step` | Prometheus step size, used when scraping it, by default `30s` | `1m` |
+| `skipTLSVerify` | Skip TLS certificate verification, `true` by default | `true` |
 | `metrics` | List of metrics files | `[metrics.yml, more-metrics.yml]` |
 | `alerts` | List of alerts files | `[alerts.yml, more-alerts.yml]` |
 | `indexer` | Indexer configuration | [indexers](#indexers) |
@@ -30,6 +30,29 @@ Depending on the indexer, different configuration parameters need to be specifie
 | Option    | Description     | Supported values   |
 | --------- | --------------- | ------- |
 | `type`    | Type of indexer | `elastic`, `opensearch`, `local`|
+
+## Example
+
+An example of how the `metricsEndpoints` section would look like in the configuration is:
+
+```yaml
+metricsEndpoints:
+  - endpoint: http://localhost:9090
+    alias: os-indexing
+    alerts:
+    - alert-profile.yaml
+  - endpoint: https://remote-endpoint:9090
+    metrics:
+    - metrics-profile.yaml
+    indexer:
+      type: local
+      metricsDirectory: my-metrics
+```
+
+In the example above, two endpoints are defined, the first will be used to scrape for the alerts defined in the file `alert-profile.yaml` and the second one will be used to scrape the metrics defined in `metrics-profile.yaml`, these metrics will be indexed by the configured indexer.
+
+!!! info
+    Configuring an indexer in an endpoint is only required when any metrics profile is configured
 
 ### Elastic/OpenSearch
 
@@ -122,12 +145,13 @@ A valid file provided to the `--metrics-endpoint` looks like this:
 ```yaml
 - endpoint: http://localhost:9090 # This is one of the Prometheus endpoints
   token: <token> # Authentication token
-  profile: metrics.yaml # Metrics profile to use in this target
-  alertProfile: alerts.yaml # Alert profile, optional
+  metrics: [metrics.yaml] # Metrics profiles to use for this endpoint
+  indexer:
+    - type: local
 - endpoint: http://remotehost:9090 # Another Prometheus endpoint
   token: <token>
-  profile: metrics.yaml
+  alerts: [alerts.yaml] # Alert profile, when metrics is not defined, defining an indexer is optional
 ```
 
 !!! Note
-    The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file. The `profile` and `alertProfile` parameters are optional. If not provided, they will be taken from the CLI flags.
+    The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file.

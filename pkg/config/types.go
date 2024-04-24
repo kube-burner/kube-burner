@@ -53,16 +53,16 @@ type Spec struct {
 
 // metricEndpoint describes prometheus endpoint to scrape
 type MetricsEndpoint struct {
-	indexers.IndexerConfig  `yaml:"indexer"`
-	Metrics                 []string      `yaml:"metrics"`
-	Alerts                  []string      `yaml:"alerts"`
-	PrometheusURL           string        `yaml:"prometheusURL"`
-	PrometheusStep          time.Duration `yaml:"prometheusStep"`
-	PrometheusSkipTLSVerify bool          `yaml:"prometheusSkipTLSVerify"`
-	Token                   string        `yaml:"token"`
-	Username                string        `yaml:"username"`
-	Password                string        `yaml:"password"`
-	Alias                   string        `yaml:"alias"`
+	indexers.IndexerConfig `yaml:"indexer"`
+	Metrics                []string      `yaml:"metrics"`
+	Alerts                 []string      `yaml:"alerts"`
+	Endpoint               string        `yaml:"endpoint"`
+	Step                   time.Duration `yaml:"step"`
+	SkipTLSVerify          bool          `yaml:"skipTLSVerify"`
+	Token                  string        `yaml:"token"`
+	Username               string        `yaml:"username"`
+	Password               string        `yaml:"password"`
+	Alias                  string        `yaml:"alias"`
 }
 
 // GlobalConfig holds the global configuration

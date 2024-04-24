@@ -66,19 +66,22 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 			}
 			indexerList[indexerAlias] = *indexer
 		}
-		if (len(metricsEndpoint.Metrics) > 0 || len(metricsEndpoint.Alerts) > 0) && metricsEndpoint.PrometheusURL != "" {
+		if (len(metricsEndpoint.Metrics) > 0 || len(metricsEndpoint.Alerts) > 0) && metricsEndpoint.Endpoint != "" {
 			auth := prometheus.Auth{
 				Username:      metricsEndpoint.Username,
 				Password:      metricsEndpoint.Password,
 				Token:         metricsEndpoint.Token,
-				SkipTLSVerify: metricsEndpoint.PrometheusSkipTLSVerify,
+				SkipTLSVerify: metricsEndpoint.SkipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(*scraperConfig.ConfigSpec, metricsEndpoint.PrometheusURL, auth, metricsEndpoint.PrometheusStep, metadata, scraperConfig.EmbedConfig, indexer)
+			p, err := prometheus.NewPrometheusClient(*scraperConfig.ConfigSpec, metricsEndpoint.Endpoint, auth, metricsEndpoint.Step, metadata, scraperConfig.EmbedConfig, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
 			prometheusClients = append(prometheusClients, p)
 			for _, metricProfile := range metricsEndpoint.Metrics {
+				if indexer == nil {
+					log.Fatalf("Metrics profile is configured for endpoint #%d but no indexer was defined", pos)
+				}
 				if err := p.ReadProfile(metricProfile); err != nil {
 					log.Fatal(err.Error())
 				}
