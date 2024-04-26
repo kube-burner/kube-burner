@@ -69,10 +69,10 @@ func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string)
 	unstructured.SetNestedMap(obj.Object, metadata, templatePath...)
 }
 
-func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
+func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
 	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
 	if err != nil {
-		log.Fatalf("Error decoding YAML: %s", err)
+		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
 	}
 	return o, gvk
 }

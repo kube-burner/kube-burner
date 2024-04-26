@@ -71,7 +71,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		if err != nil {
 			log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
 		}
-		_, gvk := yamlToUnstructured(cleanTemplate, uns)
+		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
 		mapping, err := mapper.RESTMapping(gvk.GroupKind())
 		if err != nil {
 			log.Fatal(err)
@@ -239,7 +239,7 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 				log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 			}
 			// Re-decode rendered object
-			yamlToUnstructured(renderedObj, newObject)
+			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
 
 			for k, v := range newObject.GetLabels() {
 				copiedLabels[k] = v

@@ -72,7 +72,7 @@ func getJobImages(job Executor) ([]string, error) {
 		if err != nil {
 			return imageList, err
 		}
-		yamlToUnstructured(renderedObj, &unstructuredObject)
+		yamlToUnstructured(object.ObjectTemplate, renderedObj, &unstructuredObject)
 		switch unstructuredObject.GetKind() {
 		case "Deployment", "DaemonSet", "ReplicaSet", "Job":
 			var pod NestedPod
