@@ -27,7 +27,7 @@ In addition to the default range queries, kube-burner has the ability execute [i
 ```
 
 !!! info
-    When using instant queries, at least two documents are generated, one resulting from scraping the last timestamp of the job, which would have the configued `metricName` field and an another one resulting from scraping the first timestamp of the job, the `metricName` of document is appended the `-start` suffix.
+    When using instant queries, the generated documents are resulting from scraping the last timestamp of each job, it's possible to generate an extra document resulting from scraping the first timestamp of the jobs by adding `captureStart: true` to the metric definition, the resulting document's `metricName` are appended the `-start` suffix.
 
 ## Metric format
 

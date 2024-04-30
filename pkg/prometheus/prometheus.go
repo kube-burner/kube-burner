@@ -82,7 +82,9 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 				query := renderedQuery.String()
 				renderedQuery.Reset()
 				if metric.Instant {
-					docsToIndex[metric.MetricName+"-start"] = append(docsToIndex[metric.MetricName+"-start"], p.runInstantQuery(query, metric.MetricName+"-start", jobStart, eachJob)...)
+					if metric.CaptureStart {
+						docsToIndex[metric.MetricName+"-start"] = append(docsToIndex[metric.MetricName+"-start"], p.runInstantQuery(query, metric.MetricName+"-start", jobStart, eachJob)...)
+					}
 					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
 				} else {
 					requiresInstant = ((jobEnd.Sub(jobStart).Milliseconds())%(p.Step.Milliseconds()) != 0)
