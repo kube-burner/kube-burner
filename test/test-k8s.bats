@@ -87,7 +87,7 @@ teardown_file() {
 }
 
 @test "kube-burner index: local-indexing=true; tarball=true" {
-  run_cmd kube-burner index --uuid="${UUID}" -u http://localhost:9090 -m metrics-profile.yaml --tarball-name=metrics.tgz
+  run_cmd kube-burner index --uuid="${UUID}" -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz
   check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/prometheusRSS.json
   run_cmd kube-burner import --tarball=metrics.tgz --es-server=${ES_SERVER} --es-index=${ES_INDEX}
 }
