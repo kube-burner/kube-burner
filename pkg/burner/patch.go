@@ -151,7 +151,7 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 			patchOptions.FieldManager = "kube-controller-manager"
 		} else {
 			newObject := &unstructured.Unstructured{}
-			yamlToUnstructured(renderedObj, newObject)
+			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
 			data, err = newObject.MarshalJSON()
 			if err != nil {
 				log.Errorf("Error converting patch to JSON")
