@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -282,13 +283,16 @@ func indexCmd() *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec.GlobalConfig.UUID = uuid
+			metricsProfiles := strings.FieldsFunc(metricsProfile, func(r rune) bool {
+				return r == ',' || r == ' '
+			})
 			indexer = config.MetricsEndpoint{
 				Username:      username,
 				Password:      password,
 				Token:         token,
 				Step:          prometheusStep,
 				Endpoint:      url,
-				Metrics:       []string{metricsProfile},
+				Metrics:       metricsProfiles,
 				SkipTLSVerify: skipTLSVerify,
 			}
 			if esServer != "" && esIndex != "" {
@@ -334,7 +338,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
-	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file")
+	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "comma-separated list of metric profiles")
 	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
