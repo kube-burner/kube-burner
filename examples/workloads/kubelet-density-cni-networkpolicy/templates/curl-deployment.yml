@@ -36,7 +36,5 @@ spec:
   selector:
     matchLabels:
       name: curl-{{.Replica}}-{{.Iteration}}
-  triggers:
-  - type: ConfigChange
   strategy:
     type: RollingUpdate
