@@ -120,7 +120,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		*waitListNamespaces = append(*waitListNamespaces, ns)
 	}
 	// We have to sum 1 since the iterations start from 1
-	iterationProgress := (iterationEnd - iterationStart) / 10
+	iterationProgress := (iterationEnd - iterationStart + 9) / 10
 	percent := 1
 	var namespacesCreated = make(map[string]bool)
 	var namespacesWaited = make(map[string]bool)
