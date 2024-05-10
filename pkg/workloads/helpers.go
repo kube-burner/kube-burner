@@ -89,7 +89,7 @@ func (wh *WorkloadHelper) Run(workload string) {
 		ConfigSpec.EmbedFSDir = path.Join(wh.ConfigDir, workload)
 	}
 	// Overwrite credentials
-	for pos, _ := range ConfigSpec.MetricsEndpoints {
+	for pos := range ConfigSpec.MetricsEndpoints {
 		ConfigSpec.MetricsEndpoints[pos].Endpoint = wh.PrometheusURL
 		ConfigSpec.MetricsEndpoints[pos].Token = wh.PrometheusToken
 	}
