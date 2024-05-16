@@ -98,8 +98,13 @@ func (a *AlertManager) readProfile(alertProfileCfg string, embedConfig bool) err
 	var f io.Reader
 	var err error
 	if embedConfig {
-		alertProfileCfg = path.Join(path.Dir(a.prometheus.ConfigSpec.EmbedFSDir), alertProfileCfg)
-		f, err = util.ReadEmbedConfig(a.prometheus.ConfigSpec.EmbedFS, alertProfileCfg)
+		embededLocation := path.Join(path.Dir(a.prometheus.ConfigSpec.EmbedFSDir), alertProfileCfg)
+		f, err = util.ReadEmbedConfig(a.prometheus.ConfigSpec.EmbedFS, embededLocation)
+		if err != nil {
+			log.Info("Embedded config doesn't contain alert profile. Falling back to original path")
+			f, err = util.ReadConfig(alertProfileCfg)
+		}
+		alertProfileCfg = embededLocation
 	} else {
 		f, err = util.ReadConfig(alertProfileCfg)
 	}
