@@ -238,11 +238,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// Make sure that measurements have indexed their stuff before we index metrics
 		msWg.Wait()
 		for _, job := range executedJobs {
-			var jobAlerts string
+			// Declare slice on each iteration
+			var jobAlerts []error
 			for _, alertM := range metricsScraper.AlertMs {
 				if err := alertM.Evaluate(job); err != nil {
-					jobAlerts = err.Error()
 					errs = append(errs, err)
+					jobAlerts = append(jobAlerts, err)
 					innerRC = 1
 				}
 			}
@@ -257,7 +258,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					JobConfig:           job.JobConfig,
 					Metadata:            metricsScraper.Metadata,
 					Passed:              innerRC == 0,
-					ExecutionErrors:     jobAlerts,
+					ExecutionErrors:     utilerrors.NewAggregate(jobAlerts).Error(),
 					Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
 					MetricName:          jobSummaryMetric,
 				})
