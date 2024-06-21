@@ -240,12 +240,16 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		for _, job := range executedJobs {
 			// Declare slice on each iteration
 			var jobAlerts []error
+			var executionErrors string
 			for _, alertM := range metricsScraper.AlertMs {
 				if err := alertM.Evaluate(job); err != nil {
 					errs = append(errs, err)
 					jobAlerts = append(jobAlerts, err)
 					innerRC = 1
 				}
+			}
+			if len(jobAlerts) > 0 {
+				executionErrors = utilerrors.NewAggregate(jobAlerts).Error()
 			}
 			if !job.JobConfig.SkipIndexing {
 				jobSummaries = append(jobSummaries, jobSummary{
@@ -258,7 +262,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					JobConfig:           job.JobConfig,
 					Metadata:            metricsScraper.Metadata,
 					Passed:              innerRC == 0,
-					ExecutionErrors:     utilerrors.NewAggregate(jobAlerts).Error(),
+					ExecutionErrors:     executionErrors,
 					Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
 					MetricName:          jobSummaryMetric,
 				})
