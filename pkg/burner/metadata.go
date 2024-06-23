@@ -24,7 +24,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type timings struct {
+type Timings struct {
 	Timestamp           time.Time  `json:"timestamp"`
 	EndTimestamp        time.Time  `json:"endTimestamp"`
 	ChurnStartTimestamp *time.Time `json:"churnStartTimestamp,omitempty"`
@@ -33,7 +33,7 @@ type timings struct {
 }
 
 type jobSummary struct {
-	timings
+	Timings
 	UUID       string                 `json:"uuid"`
 	MetricName string                 `json:"metricName"`
 	JobConfig  config.Job             `json:"jobConfig"`
@@ -43,8 +43,8 @@ type jobSummary struct {
 
 const jobSummaryMetric = "jobSummary"
 
-// indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func indexJobSummary(indexer indexers.Indexer, uuid string, jobTimings timings, jobConfig config.Job, metadata map[string]interface{}) {
+// IndexJobSummary Generates and indexes a document with summary information of the passed job
+func IndexJobSummary(indexer indexers.Indexer, uuid string, jobTimings Timings, jobConfig config.Job, metadata map[string]interface{}) {
 	metadataInfo := []interface{}{
 		jobSummary{
 			UUID:       uuid,
@@ -52,7 +52,7 @@ func indexJobSummary(indexer indexers.Indexer, uuid string, jobTimings timings, 
 			MetricName: jobSummaryMetric,
 			Metadata:   metadata,
 			Version:    fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
-			timings:    jobTimings,
+			Timings:    jobTimings,
 		},
 	}
 	log.Infof("Indexing metric %s", jobSummaryMetric)
