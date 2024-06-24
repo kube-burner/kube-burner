@@ -22,7 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type jobSummary struct {
+type JobSummary struct {
 	Timestamp           time.Time              `json:"timestamp"`
 	EndTimestamp        time.Time              `json:"endTimestamp"`
 	ChurnStartTimestamp *time.Time             `json:"churnStartTimestamp,omitempty"`
@@ -40,7 +40,7 @@ type jobSummary struct {
 const jobSummaryMetric = "jobSummary"
 
 // indexMetadataInfo Generates and indexes a document with metadata information of the passed job
-func IndexJobSummary(jobSummaries []jobSummary, indexer indexers.Indexer) {
+func IndexJobSummary(jobSummaries []JobSummary, indexer indexers.Indexer) {
 	log.Info("Indexing job summaries")
 	var jobSummariesInt []interface{}
 	indexingOpts := indexers.IndexingOpts{

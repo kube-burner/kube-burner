@@ -88,7 +88,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var executedJobs []prometheus.Job
 	var jobList []Executor
 	var msWg, gcWg sync.WaitGroup
-	var jobSummaries []jobSummary
+	var jobSummaries []JobSummary
 	embedFS = configSpec.EmbedFS
 	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
@@ -252,7 +252,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				executionErrors = utilerrors.NewAggregate(jobAlerts).Error()
 			}
 			if !job.JobConfig.SkipIndexing {
-				jobSummaries = append(jobSummaries, jobSummary{
+				jobSummaries = append(jobSummaries, JobSummary{
 					UUID:                uuid,
 					Timestamp:           job.Start,
 					EndTimestamp:        job.End,
