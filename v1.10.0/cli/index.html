@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../media/logos/kube-burner-logo-mini.png">
-      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.22">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.27">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.732c4fb1.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.6543a935.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -183,7 +183,7 @@
       
     </form>
     <div class="md-search__output">
-      <div class="md-search__scrollwrap" data-md-scrollfix>
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
         <div class="md-search-result" data-md-component="search-result">
           <div class="md-search-result__meta">
             Initializing search
@@ -799,8 +799,6 @@ given rate. The actions taken by this tool are highly customizable and their ava
 <ul>
 <li><code>uuid</code>: Benchmark ID. This is essentially an arbitrary string that is used for different purposes along the benchmark. For example, to label the objects created by kube-burner as mentioned in the <a href="/kube-burner/configuration/#default-labels">reference chapter</a>. By default, it is auto-generated.</li>
 <li><code>config</code>: Path or URL to a valid configuration file. See details about the configuration schema in the <a href="/kube-burner/configuration/">reference chapter</a>.</li>
-<li><code>configmap</code>: In case of not providing the <code>--config</code> flag, kube-burner is able to fetch its configuration from a given <code>configMap</code>. This variable configures its name. kube-burner expects the configMap to hold all the required configuration: config.yml, metrics.yml, and alerts.yml. Where metrics.yml and alerts.yml are optional.</li>
-<li><code>namespace</code>: Name of the namespace where the configmap is.</li>
 <li><code>log-level</code>: Logging level, one of: <code>debug</code>, <code>error</code>, <code>info</code> or <code>fatal</code>. Default <code>info</code>.</li>
 <li><code>prometheus-url</code>: Prometheus endpoint, required for metrics collection. For example: <code>https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com</code></li>
 <li><code>metrics-profile</code>: Path to a valid metrics profile file. The default is <code>metrics.yml</code>.</li>
@@ -934,7 +932,7 @@ We can specify a list of namespaces and selector labels as input.</p>
     <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"limit": 3, "provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.5cfa9459.min.js"></script>
+      <script src="../assets/javascripts/bundle.ad660dcc.min.js"></script>
       
     
   </body>
