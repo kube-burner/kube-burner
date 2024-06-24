@@ -240,7 +240,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		msWg.Wait()
 		for _, job := range executedJobs {
 			// elapsedTime is recalculated for every job of the list
-			jobTimings := timings{
+			jobTimings := Timings{
 				Timestamp:    job.Start,
 				EndTimestamp: job.End,
 				ElapsedTime:  job.End.Sub(job.Start).Round(time.Second).Seconds(),
@@ -255,7 +255,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 						}
 						churnEnd = &job.ChurnEnd
 					}
-					indexJobSummary(indexer, uuid, jobTimings, job.JobConfig, metricsScraper.Metadata)
+					IndexJobSummary(indexer, uuid, jobTimings, job.JobConfig, metricsScraper.Metadata)
 				}
 			}
 		}
