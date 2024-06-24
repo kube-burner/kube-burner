@@ -58,9 +58,10 @@ type metricProfile struct {
 
 // metricDefinition describes what metrics kube-burner collects
 type metricDefinition struct {
-	Query      string `yaml:"query"`
-	MetricName string `yaml:"metricName"`
-	Instant    bool   `yaml:"instant"`
+	Query        string `yaml:"query"`
+	MetricName   string `yaml:"metricName"`
+	Instant      bool   `yaml:"instant"`
+	CaptureStart bool   `yaml:"captureStart"`
 }
 
 type metric struct {

@@ -72,7 +72,7 @@ teardown_file() {
 @test "kube-burner init: os-indexing=true; local-indexing=true; alerting=true"  {
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
-  check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement alert
+  check_metric_value jobSummary top2PrometheusCPU-start prometheusRSS prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary-namespaced.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
@@ -87,8 +87,8 @@ teardown_file() {
 }
 
 @test "kube-burner index: local-indexing=true; tarball=true" {
-  run_cmd kube-burner index --uuid="${UUID}" -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz
-  check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/prometheusRSS.json
+  run_cmd kube-burner index --uuid="${UUID}" -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz --start="$(date -d "-2 minutes" +%s)"
+  check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/top2PrometheusCPU-start.json collected-metrics/prometheusRSS.json
   run_cmd kube-burner import --tarball=metrics.tgz --es-server=${ES_SERVER} --es-index=${ES_INDEX}
 }
 
