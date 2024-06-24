@@ -32,20 +32,9 @@ type Config struct {
 	PrometheusToken string
 }
 
-type BenchmarkMetadata struct {
-	ocpmetadata.ClusterMetadata
-	UUID            string                 `json:"uuid"`
-	Benchmark       string                 `json:"benchmark"`
-	Timestamp       time.Time              `json:"timestamp"`
-	EndDate         time.Time              `json:"endDate"`
-	Passed          bool                   `json:"passed"`
-	ExecutionErrors string                 `json:"executionErrors"`
-	UserMetadata    map[string]interface{} `json:"metadata,omitempty"`
-}
-
 type WorkloadHelper struct {
 	Config
-	Metadata           BenchmarkMetadata
+	ClusterMetadata    ocpmetadata.ClusterMetadata
 	embedConfig        embed.FS
 	kubeClientProvider *config.KubeClientProvider
 	MetadataAgent      ocpmetadata.Metadata

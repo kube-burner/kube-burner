@@ -120,12 +120,16 @@ func (a *AlertManager) readProfile(alertProfileCfg string, embedConfig bool) err
 }
 
 // Evaluate evaluates expressions
-func (a *AlertManager) Evaluate(start, end time.Time, churnStart, churnEnd *time.Time) error {
+func (a *AlertManager) Evaluate(job prometheus.Job) error {
 	errs := []error{}
-	log.Infof("Evaluating alerts for prometheus: %v", a.prometheus.Endpoint)
 	var alertList []interface{}
-	elapsed := int(end.Sub(start).Minutes())
 	var renderedQuery bytes.Buffer
+	if job.JobConfig.Name != "" {
+		log.Infof("Evaluating alerts for job %s in: %v", job.JobConfig.Name, a.prometheus.Endpoint)
+	} else {
+		log.Infof("Evaluating alerts in: %v", a.prometheus.Endpoint)
+	}
+	elapsed := int(job.End.Sub(job.Start).Minutes())
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
 	for _, alert := range a.alertProfile {
@@ -134,12 +138,12 @@ func (a *AlertManager) Evaluate(start, end time.Time, churnStart, churnEnd *time
 		expr := renderedQuery.String()
 		renderedQuery.Reset()
 		log.Debugf("Evaluating expression: '%s'", expr)
-		v, err := a.prometheus.Client.QueryRange(expr, start, end, a.prometheus.Step)
+		v, err := a.prometheus.Client.QueryRange(expr, job.Start, job.End, a.prometheus.Step)
 		if err != nil {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, alert.Description, alert.Severity, churnStart, churnEnd)
+		alertData, err := parseMatrix(v, alert.Description, alert.Severity, &job.ChurnStart, &job.ChurnEnd)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)

@@ -100,6 +100,9 @@ This document looks like:
   "cleanupEndTimestamp": "2023-08-29T00:18:49.014541929Z",
   "metricName": "jobSummary",
   "elapsedTime": 8.768932955,
+  "version": "v1.1.0",
+  "passed": true,
+  "executionErrors": "",
   "jobConfig": {
     "jobIterations": 10,
     "jobIterationDelay": 0,

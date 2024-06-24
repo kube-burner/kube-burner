@@ -15,51 +15,41 @@
 package burner
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/go-commons/version"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
 
-type Timings struct {
-	Timestamp           time.Time  `json:"timestamp"`
-	EndTimestamp        time.Time  `json:"endTimestamp"`
-	ChurnStartTimestamp *time.Time `json:"churnStartTimestamp,omitempty"`
-	ChurnEndTimestamp   *time.Time `json:"churnEndTimestamp,omitempty"`
-	ElapsedTime         float64    `json:"elapsedTime"`
-}
-
-type jobSummary struct {
-	Timings
-	UUID       string                 `json:"uuid"`
-	MetricName string                 `json:"metricName"`
-	JobConfig  config.Job             `json:"jobConfig"`
-	Metadata   map[string]interface{} `json:"metadata"`
-	Version    string                 `json:"version"`
+type JobSummary struct {
+	Timestamp           time.Time              `json:"timestamp"`
+	EndTimestamp        time.Time              `json:"endTimestamp"`
+	ChurnStartTimestamp *time.Time             `json:"churnStartTimestamp,omitempty"`
+	ChurnEndTimestamp   *time.Time             `json:"churnEndTimestamp,omitempty"`
+	ElapsedTime         float64                `json:"elapsedTime"`
+	UUID                string                 `json:"uuid"`
+	MetricName          string                 `json:"metricName"`
+	JobConfig           config.Job             `json:"jobConfig"`
+	Metadata            map[string]interface{} `json:"metadata,omitempty"`
+	Version             string                 `json:"version"`
+	Passed              bool                   `json:"passed"`
+	ExecutionErrors     string                 `json:"executionErrors,omitempty"`
 }
 
 const jobSummaryMetric = "jobSummary"
 
-// IndexJobSummary Generates and indexes a document with summary information of the passed job
-func IndexJobSummary(indexer indexers.Indexer, uuid string, jobTimings Timings, jobConfig config.Job, metadata map[string]interface{}) {
-	metadataInfo := []interface{}{
-		jobSummary{
-			UUID:       uuid,
-			JobConfig:  jobConfig,
-			MetricName: jobSummaryMetric,
-			Metadata:   metadata,
-			Version:    fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
-			Timings:    jobTimings,
-		},
-	}
-	log.Infof("Indexing metric %s", jobSummaryMetric)
+// indexMetadataInfo Generates and indexes a document with metadata information of the passed job
+func IndexJobSummary(jobSummaries []JobSummary, indexer indexers.Indexer) {
+	log.Info("Indexing job summaries")
+	var jobSummariesInt []interface{}
 	indexingOpts := indexers.IndexingOpts{
-		MetricName: fmt.Sprintf("%s-%s", jobSummaryMetric, jobConfig.Name),
+		MetricName: jobSummaryMetric,
 	}
-	resp, err := indexer.Index(metadataInfo, indexingOpts)
+	for _, summary := range jobSummaries {
+		jobSummariesInt = append(jobSummariesInt, summary)
+	}
+	resp, err := indexer.Index(jobSummariesInt, indexingOpts)
 	if err != nil {
 		log.Error(err)
 	} else {
