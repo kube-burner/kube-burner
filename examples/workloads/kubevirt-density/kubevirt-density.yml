@@ -62,7 +62,7 @@ jobs:
     objects:
 
     - objectTemplate: templates/vm-ephemeral.yml
-      replicas: {{ .OBJ_REPLICAS }}
+      replicas: 1
       inputVars:
         name: kubevirt-density
         image: quay.io/kubevirt/fedora-with-test-tooling-container-disk:v0.48.1
