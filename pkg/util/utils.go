@@ -15,6 +15,7 @@
 package util
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -37,7 +38,7 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 }
 
 func SetupLogging(uuid string) {
-	logFileName := "logfile_" + uuid + ".log"
+	logFileName := fmt.Sprintf("logfile_%s.log", uuid)
 	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
