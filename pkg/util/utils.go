@@ -15,9 +15,12 @@
 package util
 
 import (
+	"io"
 	"math"
+	"os"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -31,4 +34,14 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 		Steps:    steps,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func SetupLogging(uuid string) {
+	logFileName := "logfile_" + uuid + ".log"
+	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %v", err)
+	}
+	mw := io.MultiWriter(os.Stdout, file)
+	log.SetOutput(mw)
 }
