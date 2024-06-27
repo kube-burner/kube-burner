@@ -16,6 +16,7 @@ package workloads
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -55,6 +56,7 @@ func (wh *WorkloadHelper) Run(workload string) {
 	var embedConfig bool
 	var metricsScraper metrics.Scraper
 	var userMetadataContent map[string]interface{}
+	var clusterMetadataMap map[string]interface{}
 	if wh.UserMetadata != "" {
 		userMetadataContent, err = util.ReadUserMetadata(wh.UserMetadata)
 		if err != nil {
@@ -98,6 +100,11 @@ func (wh *WorkloadHelper) Run(workload string) {
 		RawMetadata:     wh.MetricsMetadata,
 		EmbedConfig:     embedConfig,
 	})
+	jsonData, _ := json.Marshal(wh.ClusterMetadata)
+	json.Unmarshal(jsonData, &clusterMetadataMap)
+	for k, v := range clusterMetadataMap {
+		metricsScraper.Metadata[k] = v
+	}
 	rc, err = burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, wh.Timeout)
 	if err != nil {
 		log.Errorf(err.Error())
