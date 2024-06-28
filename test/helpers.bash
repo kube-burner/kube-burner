@@ -126,3 +126,13 @@ run_cmd(){
   echo "$@"
   ${@}
 }
+
+check_file_exists() {
+  for f in "${@}"; do
+      if [[ ! -f ${f} ]]; then
+          echo "File ${f} not found"
+          return 1
+      fi
+  done
+  return 0
+}

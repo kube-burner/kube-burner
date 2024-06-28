@@ -87,6 +87,7 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.SetupLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			f, err := util.ReadConfig(configFile)
@@ -139,6 +140,8 @@ func healthCheck() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			var uuid = uid.NewString()
+			util.SetupLogging(uuid)
 			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
 		},
@@ -162,6 +165,7 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.SetupLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
 			burner.ClientSet = clientSet
@@ -199,6 +203,7 @@ func measureCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.SetupLogging(uuid)
 			f, err := util.ReadConfig(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
@@ -282,6 +287,7 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			util.SetupLogging(uuid)
 			configSpec.GlobalConfig.UUID = uuid
 			metricsProfiles := strings.FieldsFunc(metricsProfile, func(r rune) bool {
 				return r == ',' || r == ' '
