@@ -279,13 +279,6 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
-	if factory.jobConfig.JobType == config.DeletionJob {
-		log.Info("VMI latency measurement not compatible with delete jobs, skipping")
-		return nil
-	}
-	if err := p.validateConfig(); err != nil {
-		return err
-	}
 	p.metrics = make(map[string]*vmiMetric)
 	log.Infof("Creating VM latency watcher for %s", factory.jobConfig.Name)
 	restClient := newRESTClientWithRegisteredKubevirtResource()
