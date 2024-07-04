@@ -20,17 +20,12 @@ import (
 	"io"
 	"os"
 	"path"
-	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
-)
-
-const (
-	stepSize = 30 * time.Second
 )
 
 var ConfigSpec config.Spec
@@ -44,6 +39,7 @@ func NewWorkloadHelper(config Config, embedConfig embed.FS, kubeClientProvider *
 		Config:             config,
 		embedConfig:        embedConfig,
 		kubeClientProvider: kubeClientProvider,
+		MetricsMetadata:    make(map[string]interface{}),
 	}
 	return wh
 }
