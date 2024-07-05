@@ -26,8 +26,11 @@ import (
 
 // Processes common config and executes according to the caller
 func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
+	metadata := make(map[string]interface{})
 	if len(scraperConfig.ConfigSpec.MetricsEndpoints) == 0 && scraperConfig.MetricsEndpoint == "" {
-		return Scraper{}
+		return Scraper{
+			Metadata: metadata,
+		}
 	}
 	var err error
 	var indexer *indexers.Indexer
@@ -36,7 +39,6 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	var prometheusClients []*prometheus.Prometheus
 	var alertM *alerting.AlertManager
 	var alertMs []*alerting.AlertManager
-	metadata := make(map[string]interface{})
 	if scraperConfig.UserMetaData != "" {
 		metadata, err = util.ReadUserMetadata(scraperConfig.UserMetaData)
 		if err != nil {
