@@ -100,29 +100,36 @@ This document looks like:
   "cleanupEndTimestamp": "2023-08-29T00:18:49.014541929Z",
   "metricName": "jobSummary",
   "elapsedTime": 8.768932955,
-  "version": "v1.1.0",
+  "version": "v1.10.0",
   "passed": true,
-  "executionErrors": "",
-  "jobConfig": {
-    "jobIterations": 10,
-    "jobIterationDelay": 0,
-    "jobPause": 0,
-    "name": "kubelet-density",
-    "jobType": "create",
-    "qps": 5,
-    "burst": 5,
-    "namespace": "kubelet-density",
-    "maxWaitTimeout": 43200000000000,
+  "executionErrors": "this is an exmample",
+  "jobConfig": {                          
+    "jobIterations": 1,                                                                                              
+    "name": "cluster-density-v2",                                                                                    
+    "jobType": "create",                                                                                             
+    "qps": 20,                                                                                                       
+    "burst": 20,
+    "namespace": "cluster-density-v2",
+    "maxWaitTimeout": 14400000000000,
     "waitForDeletion": true,
-    "podWait": false,
     "waitWhenFinished": true,
     "cleanup": true,
-    "namespacedIterations": false,
+    "namespacedIterations": true,
+    "iterationsPerNamespace": 1,
     "verifyObjects": true,
-    "errorOnVerify": false
+    "errorOnVerify": true,
+    "preLoadImages": true,
+    "preLoadPeriod": 15000000000,
+    "churnPercent": 10,
+    "churnDuration": 3600000000000,
+    "churnDelay": 120000000000,
+    "churnDeletionStrategy": "default"
   }
 }
 ```
+
+!!! Note
+    It's possible that some of the fields from the document above don't get indexed when it has no value
 
 ## Metric exporting & importing
 
