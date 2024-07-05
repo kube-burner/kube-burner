@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/cloud-bulldozer/go-commons v1.0.15
+	github.com/cloud-bulldozer/go-commons v1.0.16
 	github.com/google/uuid v1.5.0
 	github.com/montanaflynn/stats v0.7.1
 	github.com/prometheus/common v0.52.3

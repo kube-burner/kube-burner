@@ -83,7 +83,7 @@ The `local` indexer can be configured by the parameters below:
 | `createTarball`    | Create metrics tarball                | Boolean | false                   |
 | `tarballName`      | Name of the metrics tarball           | String  | kube-burner-metrics.tgz |
 
-## Job Summary and metadata
+## Job Summary
 
 When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. It also contains the timestamps of the execution phase (`timestamp` and `endTimestamp`) as well as the cleanup phase (`cleanupTimestamp` and `cleanupEndTimestamp`).
 
