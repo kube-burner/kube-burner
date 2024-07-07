@@ -175,7 +175,9 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 		Query:      query,
 		MetricName: metricName,
 		Timestamp:  timestamp,
-		Metadata:   p.metadata,
+	}
+	if len(p.metadata) != 0 {
+		m.Metadata = p.metadata 
 	}
 	for k, v := range labels {
 		if k != "__name__" {
