@@ -41,7 +41,7 @@ func SetupLogging(uuid string) {
 	logFileName := fmt.Sprintf("kube-burner-%s.log", uuid)
 	file, err := os.Create(logFileName)
 	if err != nil {
-		log.Fatalf("Failed to open log file: %v", err)
+		log.Fatalf("Failed to create log file: %v", err)
 	}
 	mw := io.MultiWriter(os.Stdout, file)
 	log.SetOutput(mw)
