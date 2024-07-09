@@ -15,9 +15,13 @@
 package util
 
 import (
+	"fmt"
+	"io"
 	"math"
+	"os"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -31,4 +35,14 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 		Steps:    steps,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func SetupLogging(uuid string) {
+	logFileName := fmt.Sprintf("kube-burner-%s.log", uuid)
+	file, err := os.Create(logFileName)
+	if err != nil {
+		log.Fatalf("Failed to create log file: %v", err)
+	}
+	mw := io.MultiWriter(os.Stdout, file)
+	log.SetOutput(mw)
 }

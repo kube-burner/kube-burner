@@ -140,3 +140,8 @@ teardown_file() {
   run_cmd kube-burner check-alerts -a alerts.yml -u http://localhost:9090 --metrics-directory=alerts
   check_file_list alerts/alert.json
 }
+
+@test "kube-burner log file output" {
+  run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  check_file_exists "kube-burner-${UUID}.log"
+}
