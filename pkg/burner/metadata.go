@@ -32,7 +32,7 @@ type JobSummary struct {
 	MetricName          string                 `json:"metricName"`
 	JobConfig           config.Job             `json:"jobConfig"`
 	Metadata            map[string]interface{} `json:"metadata,omitempty"`
-	Version             string                 `json:"version"`
+	Version             string                 `json:"version,omitempty"`
 	Passed              bool                   `json:"passed"`
 	ExecutionErrors     string                 `json:"executionErrors,omitempty"`
 }
