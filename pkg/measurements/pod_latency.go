@@ -58,64 +58,60 @@ type podMetric struct {
 type podLatency struct {
 	config           types.Measurement
 	watcher          *metrics.Watcher
-	metrics          map[string]podMetric
-	metricLock       sync.RWMutex
+	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
 }
 
 func init() {
 	measurementMap["podLatency"] = &podLatency{
-		metrics: make(map[string]podMetric),
+		metrics: sync.Map{},
 	}
 }
 
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	pod := obj.(*corev1.Pod)
-	p.metricLock.Lock()
-	defer p.metricLock.Unlock()
-	if _, exists := p.metrics[string(pod.UID)]; !exists {
-		p.metrics[string(pod.UID)] = podMetric{
-			Timestamp:  pod.CreationTimestamp.Time.UTC(),
-			Namespace:  pod.Namespace,
-			Name:       pod.Name,
-			MetricName: podLatencyMeasurement,
-			UUID:       globalCfg.UUID,
-			Metadata:   factory.metadata,
-		}
-	}
+	p.metrics.LoadOrStore(string(pod.UID), podMetric{
+		Timestamp:  pod.CreationTimestamp.Time.UTC(),
+		Namespace:  pod.Namespace,
+		Name:       pod.Name,
+		MetricName: podLatencyMeasurement,
+		UUID:       globalCfg.UUID,
+		Metadata:   factory.metadata,
+	})
 }
 
 func (p *podLatency) handleUpdatePod(obj interface{}) {
 	pod := obj.(*corev1.Pod)
-	p.metricLock.Lock()
-	defer p.metricLock.Unlock()
-	if pm, exists := p.metrics[string(pod.UID)]; exists && pm.podReady.IsZero() {
-		for _, c := range pod.Status.Conditions {
-			if c.Status == corev1.ConditionTrue {
-				switch c.Type {
-				case corev1.PodScheduled:
-					if pm.scheduled.IsZero() {
-						pm.scheduled = c.LastTransitionTime.Time.UTC()
-						pm.NodeName = pod.Spec.NodeName
-					}
-				case corev1.PodInitialized:
-					if pm.initialized.IsZero() {
-						pm.initialized = c.LastTransitionTime.Time.UTC()
-					}
-				case corev1.ContainersReady:
-					if pm.containersReady.IsZero() {
-						pm.containersReady = c.LastTransitionTime.Time.UTC()
-					}
-				case corev1.PodReady:
-					if pm.podReady.IsZero() {
-						log.Debugf("Pod %s is ready", pod.Name)
-						pm.podReady = c.LastTransitionTime.Time.UTC()
+	if value, exists := p.metrics.Load(string(pod.UID)); exists {
+		pm := value.(podMetric)
+		if pm.podReady.IsZero() {
+			for _, c := range pod.Status.Conditions {
+				if c.Status == corev1.ConditionTrue {
+					switch c.Type {
+					case corev1.PodScheduled:
+						if pm.scheduled.IsZero() {
+							pm.scheduled = c.LastTransitionTime.Time.UTC()
+							pm.NodeName = pod.Spec.NodeName
+						}
+					case corev1.PodInitialized:
+						if pm.initialized.IsZero() {
+							pm.initialized = c.LastTransitionTime.Time.UTC()
+						}
+					case corev1.ContainersReady:
+						if pm.containersReady.IsZero() {
+							pm.containersReady = c.LastTransitionTime.Time.UTC()
+						}
+					case corev1.PodReady:
+						if pm.podReady.IsZero() {
+							log.Debugf("Pod %s is ready", pod.Name)
+							pm.podReady = c.LastTransitionTime.Time.UTC()
+						}
 					}
 				}
 			}
+			p.metrics.Store(string(pod.UID), pm)
 		}
-		p.metrics[string(pod.UID)] = pm
 	}
 }
 
@@ -149,7 +145,7 @@ func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
 	defer measurementWg.Done()
-	p.metrics = make(map[string]podMetric)
+	p.metrics = sync.Map{}
 	log.Infof("Creating Pod latency watcher for %s", factory.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
 		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
@@ -189,7 +185,7 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 		}
 		pods = append(pods, podList.Items...)
 	}
-	p.metrics = make(map[string]podMetric)
+	p.metrics = sync.Map{}
 	for _, pod := range pods {
 		var scheduled, initialized, containersReady, podReady time.Time
 		for _, c := range pod.Status.Conditions {
@@ -204,7 +200,7 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 				podReady = c.LastTransitionTime.Time.UTC()
 			}
 		}
-		p.metrics[string(pod.UID)] = podMetric{
+		p.metrics.Store(string(pod.UID), podMetric{
 			Timestamp:       pod.Status.StartTime.Time.UTC(),
 			Namespace:       pod.Namespace,
 			Name:            pod.Name,
@@ -216,7 +212,7 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			initialized:     initialized,
 			containersReady: containersReady,
 			podReady:        podReady,
-		}
+		})
 	}
 }
 
@@ -259,11 +255,13 @@ func (p *podLatency) index(jobName string, indexerList map[string]indexers.Index
 func (p *podLatency) normalizeMetrics() float64 {
 	totalPods := 0
 	erroredPods := 0
-	for _, m := range p.metrics {
+
+	p.metrics.Range(func(key, value interface{}) bool {
+		m := value.(podMetric)
 		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {
 			log.Tracef("Pod %v latency ignored as it did not reach Ready state", m.Name)
-			continue
+			return true
 		}
 		// latencyTime should be always larger than zero, however, in some cases, it might be a
 		// negative value due to the precision of timestamp can only get to the level of second
@@ -303,7 +301,8 @@ func (p *podLatency) normalizeMetrics() float64 {
 		totalPods++
 		erroredPods += errorFlag
 		p.normLatencies = append(p.normLatencies, m)
-	}
+		return true
+	})
 	if totalPods == 0 {
 		return 0.0
 	}

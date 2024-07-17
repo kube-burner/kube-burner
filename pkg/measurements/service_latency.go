@@ -46,10 +46,9 @@ type serviceLatency struct {
 	epWatcher        *metrics.Watcher
 	epLister         lcorev1.EndpointsLister
 	svcLister        lcorev1.ServiceLister
-	metrics          map[string]svcMetric
+	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
-	metricLock       sync.RWMutex
 }
 
 type svcMetric struct {
@@ -66,7 +65,7 @@ type svcMetric struct {
 
 func init() {
 	measurementMap["serviceLatency"] = &serviceLatency{
-		metrics: map[string]svcMetric{},
+		metrics: sync.Map{},
 	}
 }
 
@@ -158,8 +157,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 		}
 		svcLatency := time.Since(endpointsReadyTs)
 		log.Debugf("Service %v/%v latency was: %vms", svc.Namespace, svc.Name, svcLatency.Milliseconds())
-		s.metricLock.Lock()
-		s.metrics[string(svc.UID)] = svcMetric{
+		s.metrics.Store(string(svc.UID), svcMetric{
 			Name:              svc.Name,
 			Namespace:         svc.Namespace,
 			Timestamp:         svc.CreationTimestamp.Time.UTC(),
@@ -169,14 +167,14 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			UUID:              globalCfg.UUID,
 			Metadata:          factory.metadata,
 			IPAssignedLatency: ipAssignedLatency,
-		}
-		s.metricLock.Unlock()
+		})
 	}(svc)
 }
 
 func (s *serviceLatency) setConfig(cfg types.Measurement) {
 	s.config = cfg
 }
+
 func (s *serviceLatency) validateConfig() error {
 	if s.config.ServiceTimeout == 0 {
 		return fmt.Errorf("svcTimeout cannot be 0")
@@ -248,13 +246,17 @@ func (s *serviceLatency) stop() error {
 func (s *serviceLatency) normalizeMetrics() {
 	var latencies []float64
 	var ipAssignedLatencies []float64
-	for _, metric := range s.metrics {
+	sLen := 0
+	s.metrics.Range(func(key, value interface{}) bool {
+		sLen++
+		metric := value.(svcMetric)
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		s.normLatencies = append(s.normLatencies, metric)
 		if metric.IPAssignedLatency != 0 {
 			ipAssignedLatencies = append(ipAssignedLatencies, float64(metric.IPAssignedLatency))
 		}
-	}
+		return true
+	})
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
@@ -263,7 +265,7 @@ func (s *serviceLatency) normalizeMetrics() {
 		latencySummary.MetricName = svcLatencyQuantilesMeasurement
 		return latencySummary
 	}
-	if len(s.metrics) > 0 {
+	if sLen > 0 {
 		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("Ready", latencies))
 	}
 	if len(ipAssignedLatencies) > 0 {

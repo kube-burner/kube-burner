@@ -84,10 +84,9 @@ type vmiLatency struct {
 	vmWatcher        *metrics.Watcher
 	vmiWatcher       *metrics.Watcher
 	vmiPodWatcher    *metrics.Watcher
-	metrics          map[string]*vmiMetric
+	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
-	mu               sync.Mutex
 }
 
 func init() {
@@ -97,36 +96,35 @@ func init() {
 func (p *vmiLatency) handleCreateVM(obj interface{}) {
 	vm := obj.(*kvv1.VirtualMachine)
 	vmID := vm.Labels["kubevirt-vm"]
-	p.mu.Lock()
-	if _, exists := p.metrics[vmID]; !exists {
+	if _, exists := p.metrics.Load(vmID); !exists {
 		if strings.Contains(vm.Namespace, factory.jobConfig.Namespace) {
-			p.metrics[vmID] = &vmiMetric{
+			p.metrics.Store(vmID, &vmiMetric{
 				Timestamp:  time.Now().UTC(),
 				Namespace:  vm.Namespace,
 				Name:       vm.Name,
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
 				Metadata:   factory.metadata,
-			}
+			})
 		}
 	}
-	p.mu.Unlock()
 }
 
 func (p *vmiLatency) handleUpdateVM(obj interface{}) {
 	vm := obj.(*kvv1.VirtualMachine)
 	vmID := vm.Labels["kubevirt-vm"]
-	p.mu.Lock()
-	if vmM, exists := p.metrics[vmID]; exists && vmM.vmReady.IsZero() {
-		for _, c := range vm.Status.Conditions {
-			if c.Status == corev1.ConditionTrue {
-				if c.Type == kvv1.VirtualMachineReady {
-					vmM.vmReady = time.Now().UTC()
+	if vmM, ok := p.metrics.Load(vmID); ok {
+		vmMetric := vmM.(*vmiMetric)
+		if vmMetric.vmReady.IsZero() {
+			for _, c := range vm.Status.Conditions {
+				if c.Status == corev1.ConditionTrue && c.Type == kvv1.VirtualMachineReady {
+					vmMetric.vmReady = time.Now().UTC()
+					log.Infof("Updated VM readiness time: %s", vm.Name)
+					break
 				}
 			}
 		}
 	}
-	p.mu.Unlock()
 }
 
 func (p *vmiLatency) handleCreateVMI(obj interface{}) {
@@ -140,24 +138,23 @@ func (p *vmiLatency) handleCreateVMI(obj interface{}) {
 	if vmID == "" {
 		vmID = string(vmi.UID)
 	}
-	p.mu.Lock()
-	if _, exists := p.metrics[vmID]; !exists {
+	if _, exists := p.metrics.Load(vmID); !exists {
 		if strings.Contains(vmi.Namespace, factory.jobConfig.Namespace) {
-			p.metrics[vmID] = &vmiMetric{
+			p.metrics.Store(vmID, &vmiMetric{
 				Timestamp:  time.Now().UTC(),
 				Namespace:  vmi.Namespace,
 				Name:       vmi.Name,
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
-			}
+			})
 		}
 	}
-	if vmiM, exists := p.metrics[vmID]; exists {
-		if vmiM.vmiCreated.IsZero() {
-			vmiM.vmiCreated = time.Now().UTC()
+	if vmiM, ok := p.metrics.Load(vmID); ok {
+		vmiMetric := vmiM.(*vmiMetric)
+		if vmiMetric.vmiCreated.IsZero() {
+			vmiMetric.vmiCreated = time.Now().UTC()
 		}
 	}
-	p.mu.Unlock()
 }
 
 func (p *vmiLatency) handleUpdateVMI(obj interface{}) {
@@ -171,37 +168,36 @@ func (p *vmiLatency) handleUpdateVMI(obj interface{}) {
 	if vmID == "" {
 		vmID = string(vmi.UID)
 	}
-	p.mu.Lock()
-	if vmiM, exists := p.metrics[vmID]; exists && vmiM.vmReady.IsZero() {
-		for _, c := range vmi.Status.Conditions {
-			if c.Status == corev1.ConditionTrue {
-				if c.Type == kvv1.VirtualMachineInstanceReady {
-					vmiM.vmiReady = time.Now().UTC()
-					log.Debugf("VMI %s is Ready", vmi.Name)
+	if vmiM, ok := p.metrics.Load(vmID); ok {
+		vmiMetric := vmiM.(*vmiMetric)
+		if vmiMetric.vmiReady.IsZero() {
+			for _, c := range vmi.Status.Conditions {
+				if c.Status == corev1.ConditionTrue && c.Type == kvv1.VirtualMachineInstanceReady {
+					vmiMetric.vmiReady = time.Now().UTC()
+					log.Infof("Updated VMI readiness time: %s", vmi.Name)
+					break
+				}
+			}
+			switch vmi.Status.Phase {
+			case kvv1.Pending:
+				if vmiMetric.vmiPending.IsZero() {
+					vmiMetric.vmiPending = time.Now().UTC()
+				}
+			case kvv1.Scheduling:
+				if vmiMetric.vmiScheduling.IsZero() {
+					vmiMetric.vmiScheduling = time.Now().UTC()
+				}
+			case kvv1.Scheduled:
+				if vmiMetric.vmiScheduled.IsZero() {
+					vmiMetric.vmiScheduled = time.Now().UTC()
+				}
+			case kvv1.Running:
+				if vmiMetric.vmiRunning.IsZero() {
+					vmiMetric.vmiRunning = time.Now().UTC()
 				}
 			}
 		}
-		// Although the pattern of using phase is deprecated, kubevirt still strongly relies on it.
-		switch vmi.Status.Phase {
-		case kvv1.Pending:
-			if vmiM.vmiPending.IsZero() {
-				vmiM.vmiPending = time.Now().UTC()
-			}
-		case kvv1.Scheduling:
-			if vmiM.vmiScheduling.IsZero() {
-				vmiM.vmiScheduling = time.Now().UTC()
-			}
-		case kvv1.Scheduled:
-			if vmiM.vmiScheduled.IsZero() {
-				vmiM.vmiScheduled = time.Now().UTC()
-			}
-		case kvv1.Running:
-			if vmiM.vmiRunning.IsZero() {
-				vmiM.vmiRunning = time.Now().UTC()
-			}
-		}
 	}
-	p.mu.Unlock()
 }
 
 func (p *vmiLatency) handleCreateVMIPod(obj interface{}) {
@@ -219,13 +215,13 @@ func (p *vmiLatency) handleCreateVMIPod(obj interface{}) {
 	if vmID == "" {
 		return
 	}
-	p.mu.Lock()
-	if vmiM, exists := p.metrics[vmID]; exists {
-		if vmiM.podCreated.IsZero() {
-			vmiM.podCreated = time.Now().UTC()
+	if vmM, ok := p.metrics.Load(vmID); ok {
+		vmiMetric := vmM.(*vmiMetric)
+		if vmiMetric.podCreated.IsZero() {
+			vmiMetric.podCreated = time.Now().UTC()
+			log.Infof("Updated pod creation time for VMI: %s", pod.Name)
 		}
 	}
-	p.mu.Unlock()
 }
 
 func (p *vmiLatency) handleUpdateVMIPod(obj interface{}) {
@@ -243,31 +239,36 @@ func (p *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 	if vmID == "" {
 		return
 	}
-	p.mu.Lock()
-	if vmiM, exists := p.metrics[vmID]; exists && vmiM.podReady.IsZero() {
-		for _, c := range pod.Status.Conditions {
-			if c.Status == corev1.ConditionTrue {
-				switch c.Type {
-				case corev1.PodScheduled:
-					if vmiM.podScheduled.IsZero() {
-						vmiM.podScheduled = time.Now().UTC()
-						vmiM.NodeName = pod.Spec.NodeName
+	if vmM, ok := p.metrics.Load(vmID); ok {
+		vmiMetric := vmM.(*vmiMetric)
+		if vmiMetric.podReady.IsZero() {
+			for _, c := range pod.Status.Conditions {
+				if c.Status == corev1.ConditionTrue {
+					switch c.Type {
+						case corev1.PodScheduled:
+							if vmiMetric.podScheduled.IsZero() {
+								vmiMetric.podScheduled = time.Now().UTC()
+								vmiMetric.NodeName = pod.Spec.NodeName
+								log.Infof("Updated pod scheduling time for VMI: %s", pod.Name)
+							}
+						case corev1.PodInitialized:
+							if vmiMetric.podInitialized.IsZero() {
+								vmiMetric.podInitialized = time.Now().UTC()
+								log.Infof("Updated pod initialization time for VMI: %s", pod.Name)
+							}
+						case corev1.ContainersReady:
+							if vmiMetric.podContainersReady.IsZero() {
+								vmiMetric.podContainersReady = time.Now().UTC()
+								log.Infof("Updated pod containers ready time for VMI: %s", pod.Name)
+							}
+						case corev1.PodReady:
+							vmiMetric.podReady = time.Now().UTC()
+							log.Infof("Updated pod readiness time for VMI: %s", pod.Name)
 					}
-				case corev1.PodInitialized:
-					if vmiM.podInitialized.IsZero() {
-						vmiM.podInitialized = time.Now().UTC()
-					}
-				case corev1.ContainersReady:
-					if vmiM.podContainersReady.IsZero() {
-						vmiM.podContainersReady = time.Now().UTC()
-					}
-				case corev1.PodReady:
-					vmiM.podReady = time.Now().UTC()
 				}
 			}
 		}
 	}
-	p.mu.Unlock()
 }
 
 func (p *vmiLatency) setConfig(cfg types.Measurement) {
@@ -279,7 +280,7 @@ func (p *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	// Reset latency slices, required in multi-job benchmarks
 	p.latencyQuantiles, p.normLatencies = nil, nil
-	p.metrics = make(map[string]*vmiMetric)
+	p.metrics = sync.Map{}
 	log.Infof("Creating VM latency watcher for %s", factory.jobConfig.Name)
 	restClient := newRESTClientWithRegisteredKubevirtResource()
 	p.vmWatcher = metrics.NewWatcher(
@@ -399,10 +400,10 @@ func (p *vmiLatency) index(jobName string, indexerList map[string]indexers.Index
 }
 
 func (p *vmiLatency) normalizeMetrics() {
-	for _, m := range p.metrics {
-		// If a does not reach the Ready state (this timestamp wasn't set), we skip that vmi
+	p.metrics.Range(func(key, value interface{}) bool {
+		m := value.(*vmiMetric)
 		if m.vmiReady.IsZero() {
-			continue
+			return true
 		}
 		m.VMReadyLatency = int(m.vmReady.Sub(m.Timestamp).Milliseconds())
 
@@ -420,7 +421,8 @@ func (p *vmiLatency) normalizeMetrics() {
 		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
 
 		p.normLatencies = append(p.normLatencies, m)
-	}
+		return true
+	})
 }
 
 func (p *vmiLatency) calcQuantiles() {
