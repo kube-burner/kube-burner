@@ -62,6 +62,12 @@ type Executor struct {
 	nsRequired bool
 }
 
+// returnPair is a pair of return codes for a job
+type returnPair struct {
+	innerRC int
+	executionErrors string
+}
+
 const (
 	jobName              = "JobName"
 	replica              = "Replica"
@@ -88,7 +94,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var executedJobs []prometheus.Job
 	var jobList []Executor
 	var msWg, gcWg sync.WaitGroup
-	var jobSummaries []JobSummary
 	embedFS = configSpec.EmbedFS
 	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
@@ -97,6 +102,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	globalConfig := configSpec.GlobalConfig
 	globalWaitMap := make(map[string][]string)
 	executorMap := make(map[string]Executor)
+	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
@@ -237,7 +243,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 		// Make sure that measurements have indexed their stuff before we index metrics
 		msWg.Wait()
-		for _, job := range executedJobs {
+		for jobPosition, job := range executedJobs {
 			// Declare slice on each iteration
 			var jobAlerts []error
 			var executionErrors string
@@ -251,34 +257,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if len(jobAlerts) > 0 {
 				executionErrors = utilerrors.NewAggregate(jobAlerts).Error()
 			}
-			if !job.JobConfig.SkipIndexing {
-				jobSummaries = append(jobSummaries, JobSummary{
-					UUID:                uuid,
-					Timestamp:           job.Start,
-					EndTimestamp:        job.End,
-					ElapsedTime:         job.End.Sub(job.Start).Round(time.Second).Seconds(),
-					ChurnStartTimestamp: &job.ChurnStart,
-					ChurnEndTimestamp:   &job.ChurnEnd,
-					JobConfig:           job.JobConfig,
-					Metadata:            metricsScraper.Metadata,
-					Passed:              innerRC == 0,
-					ExecutionErrors:     executionErrors,
-					Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
-					MetricName:          jobSummaryMetric,
-				})
-			}
+			returnMap[strconv.Itoa(jobPosition)+job.JobConfig.Name] = returnPair{innerRC: innerRC, executionErrors: executionErrors}
 		}
-		for _, indexer := range metricsScraper.IndexerList {
-			IndexJobSummary(jobSummaries, indexer)
-		}
-		for _, prometheusClient := range metricsScraper.PrometheusClients {
-			prometheusClient.ScrapeJobsMetrics(executedJobs...)
-		}
-		for _, indexer := range configSpec.MetricsEndpoints {
-			if indexer.IndexerConfig.Type == indexers.LocalIndexer && indexer.IndexerConfig.CreateTarball {
-				metrics.CreateTarball(indexer.IndexerConfig)
-			}
-		}
+		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec)
 		log.Infof("Finished execution with UUID: %s", uuid)
 		res <- innerRC
 	}()
@@ -289,6 +270,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		log.Errorf(err.Error())
 		errs = append(errs, err)
 		rc = rcTimeout
+		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec)
 	}
 	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
 	if globalConfig.GC && !globalConfig.GCMetrics {
@@ -296,6 +278,46 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		gcWg.Wait()
 	}
 	return rc, utilerrors.NewAggregate(errs)
+}
+
+// indexMetrics indexes metrics for the executed jobs
+func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[string]returnPair, metricsScraper metrics.Scraper, configSpec config.Spec) {
+	var jobSummaries []JobSummary
+	for jobPosition, job := range executedJobs {
+		if !job.JobConfig.SkipIndexing {
+			var innerRC bool
+			var executionErrors string
+			if value, exists := returnMap[strconv.Itoa(jobPosition)+job.JobConfig.Name]; exists {
+				innerRC = value.innerRC == 0
+				executionErrors = value.executionErrors
+			}
+			jobSummaries = append(jobSummaries, JobSummary{
+				UUID:                uuid,
+				Timestamp:           job.Start,
+				EndTimestamp:        job.End,
+				ElapsedTime:         job.End.Sub(job.Start).Round(time.Second).Seconds(),
+				ChurnStartTimestamp: &job.ChurnStart,
+				ChurnEndTimestamp:   &job.ChurnEnd,
+				JobConfig:           job.JobConfig,
+				Metadata:            metricsScraper.Metadata,
+				Passed:              innerRC,
+				ExecutionErrors:     executionErrors,
+				Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
+				MetricName:          jobSummaryMetric,
+			})
+		}
+	}
+	for _, indexer := range metricsScraper.IndexerList {
+		IndexJobSummary(jobSummaries, indexer)
+	}
+	for _, prometheusClient := range metricsScraper.PrometheusClients {
+		prometheusClient.ScrapeJobsMetrics(executedJobs...)
+	}
+	for _, indexer := range configSpec.MetricsEndpoints {
+		if indexer.IndexerConfig.Type == indexers.LocalIndexer && indexer.IndexerConfig.CreateTarball {
+			metrics.CreateTarball(indexer.IndexerConfig)
+		}
+	}
 }
 
 // newExecutorList Returns a list of executors
