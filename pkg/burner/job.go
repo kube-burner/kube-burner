@@ -243,7 +243,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 		// Make sure that measurements have indexed their stuff before we index metrics
 		msWg.Wait()
-		for jobPosition, job := range executedJobs {
+		for _, job := range executedJobs {
 			// Declare slice on each iteration
 			var jobAlerts []error
 			var executionErrors string
@@ -257,9 +257,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if len(jobAlerts) > 0 {
 				executionErrors = utilerrors.NewAggregate(jobAlerts).Error()
 			}
-			returnMap[strconv.Itoa(jobPosition)+job.JobConfig.Name] = returnPair{innerRC: innerRC, executionErrors: executionErrors}
+			returnMap[job.JobConfig.Name] = returnPair{innerRC: innerRC, executionErrors: executionErrors}
 		}
-		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec)
+		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, true, "", false)
 		log.Infof("Finished execution with UUID: %s", uuid)
 		res <- innerRC
 	}()
@@ -270,7 +270,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		log.Errorf(err.Error())
 		errs = append(errs, err)
 		rc = rcTimeout
-		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec)
+		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
 	if globalConfig.GC && !globalConfig.GCMetrics {
@@ -281,13 +281,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 }
 
 // indexMetrics indexes metrics for the executed jobs
-func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[string]returnPair, metricsScraper metrics.Scraper, configSpec config.Spec) {
+func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[string]returnPair, metricsScraper metrics.Scraper, configSpec config.Spec, innerRC bool, executionErrors string, isTimeout bool) {
 	var jobSummaries []JobSummary
-	for jobPosition, job := range executedJobs {
+	for _, job := range executedJobs {
 		if !job.JobConfig.SkipIndexing {
-			var innerRC bool
-			var executionErrors string
-			if value, exists := returnMap[strconv.Itoa(jobPosition)+job.JobConfig.Name]; exists {
+			if value, exists := returnMap[job.JobConfig.Name]; exists && !isTimeout{
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
 			}
