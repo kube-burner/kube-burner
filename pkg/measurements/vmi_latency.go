@@ -77,6 +77,7 @@ type vmiMetric struct {
 	Namespace  string      `json:"namespace"`
 	Name       string      `json:"podName"`
 	NodeName   string      `json:"nodeName"`
+	JobName    string      `json:"jobName,omitempty"`
 }
 
 type vmiLatency struct {
@@ -107,6 +108,7 @@ func (p *vmiLatency) handleCreateVM(obj interface{}) {
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
 				Metadata:   factory.metadata,
+				JobName:    factory.jobConfig.Name,
 			}
 		}
 	}
@@ -405,20 +407,18 @@ func (p *vmiLatency) normalizeMetrics() {
 			continue
 		}
 		m.VMReadyLatency = int(m.vmReady.Sub(m.Timestamp).Milliseconds())
-
 		m.VMICreatedLatency = int(m.vmiCreated.Sub(m.Timestamp).Milliseconds())
 		m.VMIPendingLatency = int(m.vmiPending.Sub(m.Timestamp).Milliseconds())
 		m.VMISchedulingLatency = int(m.vmiScheduling.Sub(m.Timestamp).Milliseconds())
 		m.VMIScheduledLatency = int(m.vmiScheduled.Sub(m.Timestamp).Milliseconds())
 		m.VMIReadyLatency = int(m.vmiReady.Sub(m.Timestamp).Milliseconds())
 		m.VMIRunningLatency = int(m.vmiRunning.Sub(m.Timestamp).Milliseconds())
-
 		m.PodCreatedLatency = int(m.podCreated.Sub(m.Timestamp).Milliseconds())
 		m.PodScheduledLatency = int(m.podScheduled.Sub(m.Timestamp).Milliseconds())
 		m.PodInitializedLatency = int(m.podInitialized.Sub(m.Timestamp).Milliseconds())
 		m.PodContainersReadyLatency = int(m.podContainersReady.Sub(m.Timestamp).Milliseconds())
 		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
-
+		m.JobName = factory.jobConfig.Name
 		p.normLatencies = append(p.normLatencies, m)
 	}
 }
