@@ -177,7 +177,7 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 		JobName:    job.JobConfig.Name,
 	}
 	for k, v := range labels {
-		if k != "__name__" {
+		if k != model.MetricNameLabel {
 			m.Labels[string(k)] = string(v)
 		}
 	}
