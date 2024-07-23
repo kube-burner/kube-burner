@@ -19,8 +19,10 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	networkingv1 "k8s.io/client-go/informers/networking/v1"
 )
 
 const informerTimeout = time.Minute
@@ -43,6 +45,16 @@ func NewWatcher(restClient *rest.RESTClient, name string, resource string, names
 		name:        name,
 		stopChannel: make(chan struct{}),
 		Informer:    cache.NewSharedIndexInformer(lw, nil, 0, indexers),
+	}
+}
+
+func NewNetworkWatcher(restClient kubernetes.Interface, name string, namespace string, optionsModifier func(options *metav1.ListOptions), indexers cache.Indexers) *Watcher {
+
+	netpolInformer := networkingv1.NewFilteredNetworkPolicyInformer(restClient, namespace, 0, indexers, optionsModifier)
+	return &Watcher{
+		name:        name,
+		stopChannel: make(chan struct{}),
+		Informer:    netpolInformer,
 	}
 }
 
