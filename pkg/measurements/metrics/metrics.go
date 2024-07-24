@@ -36,6 +36,7 @@ type LatencyQuantiles struct {
 	Avg          int         `json:"avg"`
 	Timestamp    time.Time   `json:"timestamp"`
 	MetricName   string      `json:"metricName"`
+	JobName      string      `json:"jobName,omitempty"`
 	Metadata     interface{} `json:"metadata,omitempty"`
 }
 

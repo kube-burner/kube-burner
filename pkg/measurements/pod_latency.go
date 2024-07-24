@@ -49,6 +49,7 @@ type podMetric struct {
 	PodReadyLatency        int         `json:"podReadyLatency"`
 	MetricName             string      `json:"metricName"`
 	UUID                   string      `json:"uuid"`
+	JobName                string      `json:"jobName,omitempty"`
 	Namespace              string      `json:"namespace"`
 	Name                   string      `json:"podName"`
 	NodeName               string      `json:"nodeName"`
@@ -82,6 +83,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 			MetricName: podLatencyMeasurement,
 			UUID:       globalCfg.UUID,
 			Metadata:   factory.metadata,
+			JobName:    factory.jobConfig.Name,
 		}
 	}
 }
@@ -216,6 +218,7 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			initialized:     initialized,
 			containersReady: containersReady,
 			podReady:        podReady,
+			JobName:         factory.jobConfig.Name,
 		}
 	}
 }
@@ -323,6 +326,7 @@ func (p *podLatency) calcQuantiles() {
 		latencySummary.UUID = globalCfg.UUID
 		latencySummary.Metadata = factory.metadata
 		latencySummary.MetricName = podLatencyQuantilesMeasurement
+		latencySummary.JobName = factory.jobConfig.Name
 		return latencySummary
 	}
 	for podCondition, latencies := range quantileMap {
