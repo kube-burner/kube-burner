@@ -182,6 +182,10 @@ type Job struct {
 }
 
 type WaitOptions struct {
+	// Kind object kind to consider for wait
+	Kind string `yaml:"kind" json:"kind,omitempty"`
+	// LabelSelector objects with these labels will be considered
+	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// ForCondition wait for this condition to become true
 	ForCondition string `yaml:"forCondition" json:"forCondition,omitempty"`
 }

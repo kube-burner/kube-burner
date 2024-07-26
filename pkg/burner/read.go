@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -62,6 +63,8 @@ func (ex *Executor) RunReadJob(iterationStart, iterationEnd int) {
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
+	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
+	ex.waitForObjects("", waitRateLimiter)
 	for i := iterationStart; i < iterationEnd; i++ {
 		if i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)

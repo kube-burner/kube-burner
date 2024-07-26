@@ -72,5 +72,6 @@ type metric struct {
 	Query       string            `json:"query"`
 	ChurnMetric bool              `json:"churnMetric,omitempty"`
 	MetricName  string            `json:"metricName,omitempty"`
+	JobName     string            `json:"jobName,omitempty"`
 	Metadata    interface{}       `json:"metadata,omitempty"`
 }

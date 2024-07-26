@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"golang.org/x/time/rate"
 )
 
 func setupPatchJob(jobConfig config.Job) Executor {
@@ -114,6 +115,8 @@ func (ex *Executor) RunPatchJob() {
 		}
 	}
 	wg.Wait()
+	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
+	ex.waitForObjects("", waitRateLimiter)
 }
 
 func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructured,

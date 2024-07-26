@@ -116,17 +116,24 @@ If you want to override the default waiter behaviors, you can specify wait optio
 
 | Option       | Description                                             | Type    | Default |
 |--------------|---------------------------------------------------------|---------|---------|
-| `forCondition` | Wait for the object condition with this name to be true | String  | ""      |
+| `kind` | Object kind to consider for wait | String | "" |
+| `labelSelector` | Objects with these labels will be considered for wait | Object | {} |
+| `forCondition` | Wait for the object condition with this name to be true | String  | "" |
 
 For example, the snippet below can be used to make kube-burner wait for all containers from the pod defined at `pod.yml` to be ready.
 
 ```yaml
 objects:
-- objectTemplate: pod.yml
+- objectTemplate: deployment.yml
   replicas: 3
   waitOptions:
+    kind: Pod
+    labelSelector: {kube-burner-label : abcd}
     forCondition: Ready
 ```
+
+!!! note
+    `waitOptions.kind` and `waitOptions.labelSelector` are fully optional. `waitOptions.kind` is used when an application has child objects to be waited & `waitOptions.labelSelector` is used when we want to wait on objects with specific labels.
 
 ### Default labels
 
