@@ -46,14 +46,13 @@ type podMetric struct {
 	containersReady        time.Time
 	ContainersReadyLatency int `json:"containersReadyLatency"`
 	podReady               time.Time
-	PodReadyLatency        int         `json:"podReadyLatency"`
-	MetricName             string      `json:"metricName"`
-	UUID                   string      `json:"uuid"`
-	JobName                string      `json:"jobName,omitempty"`
-	Namespace              string      `json:"namespace"`
-	Name                   string      `json:"podName"`
-	NodeName               string      `json:"nodeName"`
-	Metadata               interface{} `json:"metadata,omitempty"`
+	PodReadyLatency        int    `json:"podReadyLatency"`
+	MetricName             string `json:"metricName"`
+	UUID                   string `json:"uuid"`
+	JobName                string `json:"jobName,omitempty"`
+	Namespace              string `json:"namespace"`
+	Name                   string `json:"podName"`
+	NodeName               string `json:"nodeName"`
 }
 
 type podLatency struct {
@@ -78,8 +77,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 		Name:       pod.Name,
 		MetricName: podLatencyMeasurement,
 		UUID:       globalCfg.UUID,
-		Metadata:   factory.metadata,
-    JobName:    factory.jobConfig.Name,
+		JobName:    factory.jobConfig.Name,
 	})
 }
 
@@ -209,13 +207,12 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			MetricName:      podLatencyMeasurement,
 			NodeName:        pod.Spec.NodeName,
 			UUID:            globalCfg.UUID,
-			Metadata:        factory.metadata,
 			scheduled:       scheduled,
 			initialized:     initialized,
 			containersReady: containersReady,
 			podReady:        podReady,
 			JobName:         factory.jobConfig.Name,
-    })
+		})
 	}
 }
 

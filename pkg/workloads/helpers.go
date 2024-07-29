@@ -16,7 +16,6 @@ package workloads
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -40,7 +39,7 @@ func NewWorkloadHelper(config Config, embedConfig embed.FS, kubeClientProvider *
 		Config:             config,
 		embedConfig:        embedConfig,
 		kubeClientProvider: kubeClientProvider,
-		MetricsMetadata:    make(map[string]interface{}),
+		Metadata:           make(map[string]interface{}),
 	}
 	return wh
 }
@@ -51,18 +50,6 @@ func (wh *WorkloadHelper) Run(workload string) {
 	var err error
 	var embedConfig bool
 	var metricsScraper metrics.Scraper
-	var userMetadataContent map[string]interface{}
-	var clusterMetadataMap map[string]interface{}
-	if wh.UserMetadata != "" {
-		userMetadataContent, err = util.ReadUserMetadata(wh.UserMetadata)
-		if err != nil {
-			log.Fatalf("Error reading provided user metadata: %v", err)
-		}
-		// Combine provided userMetadata with the regular OCP metadata
-		for k, v := range userMetadataContent {
-			wh.MetricsMetadata[k] = v
-		}
-	}
 	configFile := fmt.Sprintf("%s.yml", workload)
 	if _, err := os.Stat(configFile); err != nil {
 		f, err = util.ReadEmbedConfig(wh.embedConfig, path.Join(wh.ConfigDir, workload, configFile))
@@ -93,14 +80,10 @@ func (wh *WorkloadHelper) Run(workload string) {
 	metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 		ConfigSpec:      &ConfigSpec,
 		MetricsEndpoint: wh.MetricsEndpoint,
-		RawMetadata:     wh.MetricsMetadata,
+		RawMetadata:     wh.Metadata,
 		EmbedConfig:     embedConfig,
+		UserMetaData:    wh.UserMetadata,
 	})
-	jsonData, _ := json.Marshal(wh.ClusterMetadata)
-	json.Unmarshal(jsonData, &clusterMetadataMap)
-	for k, v := range clusterMetadataMap {
-		metricsScraper.Metadata[k] = v
-	}
 	rc, err = burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, wh.Timeout)
 	if err != nil {
 		log.Errorf(err.Error())

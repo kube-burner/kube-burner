@@ -71,13 +71,12 @@ type vmiMetric struct {
 	vmReady        time.Time
 	VMReadyLatency int `json:"vmReadyLatency"`
 
-	MetricName string      `json:"metricName"`
-	Metadata   interface{} `json:"metadata,omitempty"`
-	UUID       string      `json:"uuid"`
-	Namespace  string      `json:"namespace"`
-	Name       string      `json:"podName"`
-	NodeName   string      `json:"nodeName"`
-	JobName    string      `json:"jobName,omitempty"`
+	MetricName string `json:"metricName"`
+	UUID       string `json:"uuid"`
+	Namespace  string `json:"namespace"`
+	Name       string `json:"podName"`
+	NodeName   string `json:"nodeName"`
+	JobName    string `json:"jobName,omitempty"`
 }
 
 type vmiLatency struct {
@@ -105,8 +104,7 @@ func (p *vmiLatency) handleCreateVM(obj interface{}) {
 				Name:       vm.Name,
 				MetricName: vmiLatencyMeasurement,
 				UUID:       globalCfg.UUID,
-				Metadata:   factory.metadata,
-        JobName:    factory.jobConfig.Name,
+				JobName:    factory.jobConfig.Name,
 			})
 		}
 	}
@@ -247,25 +245,25 @@ func (p *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 			for _, c := range pod.Status.Conditions {
 				if c.Status == corev1.ConditionTrue {
 					switch c.Type {
-						case corev1.PodScheduled:
-							if vmiMetric.podScheduled.IsZero() {
-								vmiMetric.podScheduled = time.Now().UTC()
-								vmiMetric.NodeName = pod.Spec.NodeName
-								log.Infof("Updated pod scheduling time for VMI: %s", pod.Name)
-							}
-						case corev1.PodInitialized:
-							if vmiMetric.podInitialized.IsZero() {
-								vmiMetric.podInitialized = time.Now().UTC()
-								log.Infof("Updated pod initialization time for VMI: %s", pod.Name)
-							}
-						case corev1.ContainersReady:
-							if vmiMetric.podContainersReady.IsZero() {
-								vmiMetric.podContainersReady = time.Now().UTC()
-								log.Infof("Updated pod containers ready time for VMI: %s", pod.Name)
-							}
-						case corev1.PodReady:
-							vmiMetric.podReady = time.Now().UTC()
-							log.Infof("Updated pod readiness time for VMI: %s", pod.Name)
+					case corev1.PodScheduled:
+						if vmiMetric.podScheduled.IsZero() {
+							vmiMetric.podScheduled = time.Now().UTC()
+							vmiMetric.NodeName = pod.Spec.NodeName
+							log.Infof("Updated pod scheduling time for VMI: %s", pod.Name)
+						}
+					case corev1.PodInitialized:
+						if vmiMetric.podInitialized.IsZero() {
+							vmiMetric.podInitialized = time.Now().UTC()
+							log.Infof("Updated pod initialization time for VMI: %s", pod.Name)
+						}
+					case corev1.ContainersReady:
+						if vmiMetric.podContainersReady.IsZero() {
+							vmiMetric.podContainersReady = time.Now().UTC()
+							log.Infof("Updated pod containers ready time for VMI: %s", pod.Name)
+						}
+					case corev1.PodReady:
+						vmiMetric.podReady = time.Now().UTC()
+						log.Infof("Updated pod readiness time for VMI: %s", pod.Name)
 					}
 				}
 			}

@@ -94,7 +94,6 @@ This document looks like:
   "timestamp": "2023-08-29T00:17:27.942960538Z",
   "endTimestamp": "2023-08-29T00:18:15.817272025Z",
   "uuid": "83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16",
-  "metricName": "jobSummary",
   "elapsedTime": 48,
   "cleanupTimestamp": "2023-08-29T00:18:18.015107794Z",
   "cleanupEndTimestamp": "2023-08-29T00:18:49.014541929Z",

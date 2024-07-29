@@ -59,7 +59,6 @@ type svcMetric struct {
 	UUID              string             `json:"uuid"`
 	Namespace         string             `json:"namespace"`
 	Name              string             `json:"service"`
-	Metadata          interface{}        `json:"metadata,omitempty"`
 	ServiceType       corev1.ServiceType `json:"type"`
 	JobName           string             `json:"jobName,omitempty"`
 }
@@ -166,7 +165,6 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			ServiceType:       svc.Spec.Type,
 			ReadyLatency:      svcLatency,
 			UUID:              globalCfg.UUID,
-			Metadata:          factory.metadata,
 			IPAssignedLatency: ipAssignedLatency,
       JobName:           factory.jobConfig.Name,
 		})
