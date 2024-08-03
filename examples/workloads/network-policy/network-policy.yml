@@ -1,0 +1,64 @@
+---
+global:
+  gc: false
+  gcMetrics: false
+  measurements:
+    - name: netpolLatency
+      netpolTimeout: 10s
+      skipPodWait: true
+metricsEndpoints:
+  - indexer:
+      type: local
+      metricsDirectory: collected-metrics
+
+jobs:
+  - name: network-policy-pods
+    namespace: network-policy
+    jobIterations: 2
+    qps: 20
+    burst: 20
+    namespacedIterations: true
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: true
+    preLoadPeriod: 15s
+    jobPause: 30s
+    skipIndexing: true
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+
+      - objectTemplate: webserver-deployment.yml
+        replicas: 1
+
+      - objectTemplate: webserver-service.yml
+        replicas: 1
+
+      - objectTemplate: curl-deployment.yml
+        replicas: 1
+
+      - objectTemplate: np-deny-all.yml
+        replicas: 1
+
+  - name: network-policy
+    namespace: network-policy
+    jobIterations: 2
+    qps: 20
+    burst: 20
+    namespacedIterations: true
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: true
+    preLoadPeriod: 15s
+    jobPause: 30s
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+      - objectTemplate: np-allow-from-clients.yml
+        replicas: 1
