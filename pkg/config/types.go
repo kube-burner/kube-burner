@@ -178,7 +178,8 @@ type Job struct {
 	// Churn deletion strategy
 	ChurnDeletionStrategy string `yaml:"churnDeletionStrategy" json:"churnDeletionStrategy,omitempty"`
 	// Skip this job from indexing
-	SkipIndexing bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
+	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
+	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
 }
 
 type WaitOptions struct {
