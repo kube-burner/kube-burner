@@ -125,5 +125,4 @@ Or permanently imported with:
 `kube-burner completion > /etc/bash_completion.d/kube-burner`
 
 !!! note
-    the `bash-completi
     the `bash-completion` utils must be installed for the kube-burner completion script to work.
