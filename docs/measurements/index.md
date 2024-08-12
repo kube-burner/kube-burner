@@ -295,6 +295,110 @@ And the quantiles document has the structure:
 
 When there're `LoadBalancer` services, an extra document with `quantileName` as `LoadBalancer` is also generated as shown above.
 
+## Network Policy Latency
+
+Note: This measurement has requirement of having 2 jobs defined in the templates.
+
+Calculates the time taken to apply the network policy rules by the SDN through connection testing between pods specified in the network policy.
+At a high level, Kube-burner utilizes a proxy pod, `network-policy-proxy`, to distribute connection information (such as remote IP addresses) to client pods. These client pods then send requests to the specified addresses and record a timestamp once a connection is successfully established. Kube-burner retrieves these timestamps from the client pods via the proxy pod and calculates the network policy latency by comparing the recorded timestamp with the timestamp when the network policy was created.
+
+During this testing, kube-burner creates two separate jobs:
+1. **Job 1**: Creates all necessary namespaces and pods.
+2. **Job 2**: Applies network policies to the pods defined on above namespaces and tests connections by sending HTTP requests.
+
+Latency measurement is only performed during the execution of Job 2, which focuses on network policy application and connection testing.
+
+### Sequence of Events During Connection Testing:
+
+1. **Proxy Pod Initialization**:
+   Kube-burner-ocp creates the `network-policy-proxy` pod along with a route for communication. It then passes this route, along with other template configuration options, to Kube-burner.
+
+2. **Job Execution**:
+   - **Job 1**: Kube-burner creates namespaces and pods as per the configuration.
+   - **Job 2**: Kube-burner applies network policies and runs connection tests as follows:
+
+### Reason for using 2 jobs for the testing:
+
+Network policy is not applied only between the local pods. Instead, the network policy create rules between the local pods and remote pods which are hosted on remote namespaces. For example, assume if the job is creating 50 ingress and 50 egress network policies per namespace and we have 240 namespaces.
+In the first namespace, i.e network-policy-perf-0, network policy ingress-0-29 allows traffic to the local pods in the current namespace (i.e network-policy-perf-0.) from pods in remote namespaces network-policy-perf-41, network-policy-perf-42, network-policy-perf-43, network-policy-perf-44 and network-policy-perf-41.
+
+In the current implementation, pods which are already created in "network-policy-perf-41, network-policy-perf-42, network-policy-perf-43, network-policy-perf-44 and network-policy-perf-41" try to send http requests to pods in "network-policy-perf-0" even before the network policy "ingress-0-29" in network-policy-perf-0 created. But these http requests will be failing as the network policy is not yet created. Once the "ingress-0-29" network policies created and ovs flows get programmed, the http requests will be succesful.
+
+So this approach is helpful in testing connections between pods of different namespaces. Here all other resources (namespaces, pods, client app with peer addresses to send http requests) are ready and the dependency is only on the network policy creation to make the connection succesful.
+
+Also as the pods are already created, this pod latency doesn't impact the network policy latency. For example when kube-burner reports 6 seconds as network policy readiness latency, it is purely network policy creation and resulting ovs flows and not any pod readiness latency.
+
+On a summary, the advantages with this approach are -
+
+1. OVN components are dedicated for only network policy processing
+2. CPU & memory usage metrics captured are isolated for only network policy creation
+3. Network policy latency calculation doesn’t include pod readiness as pods are already existing
+4. network policy rules are applied between pods across namespaces
+
+### Steps in the Execution of Job 2:
+
+1. **Connection List Preparation**:
+   - Kube-burner parses the network policy template to prepare a list of connection details for each client pod. Each connection is defined by a remote IP address, port, and the associated network policy name.
+   - Currently, connection testing supports only the **Ingress** rule on port **8080**.
+   - Although the template may specify identical configurations for multiple network policies within a namespace, Kube-burner optimizes this process by ensuring that only unique connections are sent to the client pods (avoiding duplicate remote IP addresses).
+
+2. **Sending Connection Information**:
+   - Kube-burner passes the prepared connection information to the client pods via the `network-policy-proxy` pod and waits until the proxy pod confirms that all client pods have received the information.
+
+3. **Initial HTTP Requests**:
+   - Once the client pods receive their connection details, they begin sending HTTP requests to the specified addresses. Initially, these requests will fail because the network policies have not yet been applied.
+
+4. **Network Policy Creation**:
+   - As part of its regular workflow, Kube-burner parses the template and applies network policies for each namespace.
+   - After the network policies are applied, the previously failing HTTP requests from the client pods become successful. At this point, each client pod records the timestamp when a successful connection is established.
+
+5. **Pause for Stabilization**:
+   - After creating all network policies, Kube-burner pauses for **1 minute** (due to the `jobPause: 1m` configuration option in the template). This allows the connection tests to complete successfully within this time window.
+
+6. **Retrieving Timestamps and Calculating Latency**:
+   - Kube-burner retrieves the recorded connection timestamps from the client pods via the proxy pod.
+   - The latency is then calculated by comparing the recorded connection timestamp with the timestamp when the network policy was applied. This value represents the time taken for the SDN to enforce network policies. A network policy, when applied, tests connection between multiple client and server pods and measure the latency of each connection. We report max and min values of these connections latencies for a network policy.
+
+This measure is enabled with:
+
+```yaml
+  measurements:
+    - name: netpolLatency
+```
+
+### Metrics
+And the quantiles document has the structure:
+```json
+[
+  {
+    "quantileName": "Ready",
+    "uuid": "734adc28-c5b4-4a69-8807-ff99195bca1b",
+    "P99": 3040,
+    "P95": 3038,
+    "P50": 2077,
+    "max": 3040,
+    "avg": 2264,
+    "timestamp": "2024-10-10T10:39:29.059701196Z",
+    "metricName": "netpolLatencyQuantilesMeasurement",
+    "jobName": "network-policy-perf",
+    "metadata": {}
+  },
+  {
+    "quantileName": "minReady",
+    "uuid": "734adc28-c5b4-4a69-8807-ff99195bca1b",
+    "P99": 3025,
+    "P95": 3024,
+    "P50": 2058,
+    "max": 3025,
+    "avg": 2245,
+    "timestamp": "2024-10-10T10:39:29.059703401Z",
+    "metricName": "netpolLatencyQuantilesMeasurement",
+    "jobName": "network-policy-perf",
+    "metadata": {}
+  }
+]
+```
+
 ## pprof collection
 
 This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.

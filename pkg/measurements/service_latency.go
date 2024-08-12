@@ -27,7 +27,6 @@ import (
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	lcorev1 "k8s.io/client-go/listers/core/v1"
@@ -68,31 +67,6 @@ func init() {
 	measurementMap["serviceLatency"] = &serviceLatency{
 		metrics: sync.Map{},
 	}
-}
-
-func deployAssets() error {
-	var err error
-	if err = kutil.CreateNamespace(factory.clientSet, types.SvcLatencyNs, nil, nil); err != nil {
-		return err
-	}
-	if _, err = factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Create(context.TODO(), types.SvcLatencyCheckerPod, metav1.CreateOptions{}); err != nil {
-		if errors.IsAlreadyExists(err) {
-			log.Warn(err)
-		} else {
-			return err
-		}
-	}
-	err = wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-		pod, err := factory.clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyCheckerPod.Name, metav1.GetOptions{})
-		if err != nil {
-			return true, err
-		}
-		if pod.Status.Phase != corev1.PodRunning {
-			return false, nil
-		}
-		return true, nil
-	})
-	return err
 }
 
 func (s *serviceLatency) handleCreateSvc(obj interface{}) {
@@ -186,8 +160,8 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 	// Reset latency slices, required in multi-job benchmarks
 	s.latencyQuantiles, s.normLatencies = nil, nil
 	defer measurementWg.Done()
-	if err := deployAssets(); err != nil {
-		log.Fatal(err)
+	err := deployPodInNamespace(types.SvcLatencyNs, types.SvcLatencyCheckerName, "quay.io/cloud-bulldozer/fedora-nc:latest", []string{"sleep", "inf"})
+	if err != nil {
 		return err
 	}
 	log.Infof("Creating service latency watcher for %s", factory.jobConfig.Name)

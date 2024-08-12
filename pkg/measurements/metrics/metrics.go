@@ -32,6 +32,7 @@ type LatencyQuantiles struct {
 	P99          int         `json:"P99"`
 	P95          int         `json:"P95"`
 	P50          int         `json:"P50"`
+	Min          int         `json:"min"`
 	Max          int         `json:"max"`
 	Avg          int         `json:"avg"`
 	Timestamp    time.Time   `json:"timestamp"`
@@ -73,6 +74,8 @@ func NewLatencySummary(input []float64, name string) LatencyQuantiles {
 	latencyQuantiles.P95 = int(val)
 	val, _ = stats.Percentile(input, 99)
 	latencyQuantiles.P99 = int(val)
+	val, _ = stats.Min(input)
+	latencyQuantiles.Min = int(val)
 	val, _ = stats.Max(input)
 	latencyQuantiles.Max = int(val)
 	val, _ = stats.Mean(input)

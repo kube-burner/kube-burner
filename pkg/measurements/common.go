@@ -15,13 +15,21 @@
 package measurements
 
 import (
+	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 )
 
 func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
@@ -89,4 +97,54 @@ func getIntFromLabels(labels map[string]string, key string) int {
 		}
 	}
 	return 0
+}
+
+func deployPodInNamespace(namespace, podName, image string, command []string) error {
+	var podObj = &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+		},
+		Spec: corev1.PodSpec{
+			TerminationGracePeriodSeconds: ptr.To[int64](0),
+			Containers: []corev1.Container{
+				{
+					Image:           image,
+					Command:         command,
+					Name:            podName,
+					ImagePullPolicy: corev1.PullAlways,
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: ptr.To[bool](false),
+						Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+						RunAsNonRoot:             ptr.To[bool](true),
+						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						RunAsUser:                ptr.To[int64](1000),
+					},
+				},
+			},
+		},
+	}
+
+	var err error
+	if err = kutil.CreateNamespace(factory.clientSet, namespace, nil, nil); err != nil {
+		return err
+	}
+	if _, err = factory.clientSet.CoreV1().Pods(namespace).Create(context.TODO(), podObj, metav1.CreateOptions{}); err != nil {
+		if errors.IsAlreadyExists(err) {
+			log.Warn(err)
+		} else {
+			return err
+		}
+	}
+	err = wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+		pod, err := factory.clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			return true, err
+		}
+		if pod.Status.Phase != corev1.PodRunning {
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }
