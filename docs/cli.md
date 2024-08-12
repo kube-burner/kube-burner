@@ -1,3 +1,17 @@
+# CLI
+
+kube-burner is a tool written in Golang that can be used to stress Kubernetes clusters by creating, deleting, and patching resources at a
+given rate. The actions taken by this tool are highly customizable and their available subcommands are detailed below:
+
+```console
+$ kube-burner help
+Kube-burner 🔥
+
+Tool aimed at stressing a kubernetes cluster by creating or deleting lots of objects.
+
+Usage:
+  kube-burner [command]
+
 Available Commands:
   check-alerts Evaluate alerts for the given time range
   completion   Generates completion scripts for bash shell
@@ -111,4 +125,5 @@ Or permanently imported with:
 `kube-burner completion > /etc/bash_completion.d/kube-burner`
 
 !!! note
+    the `bash-completi
     the `bash-completion` utils must be installed for the kube-burner completion script to work.
