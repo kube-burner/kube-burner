@@ -1,17 +1,3 @@
-# CLI
-
-kube-burner is a tool written in Golang that can be used to stress Kubernetes clusters by creating, deleting, and patching resources at a
-given rate. The actions taken by this tool are highly customizable and their available subcommands are detailed below:
-
-```console
-$ kube-burner help
-Kube-burner 🔥
-
-Tool aimed at stressing a kubernetes cluster by creating or deleting lots of objects.
-
-Usage:
-  kube-burner [command]
-
 Available Commands:
   check-alerts Evaluate alerts for the given time range
   completion   Generates completion scripts for bash shell
@@ -35,8 +21,8 @@ Use "kube-burner [command] --help" for more information about a command.
 
 This is the main subcommand; it triggers a new kube-burner benchmark and it supports the these flags:
 
-- `uuid`: Benchmark ID. This is essentially an arbitrary string that is used for different purposes along the benchmark. For example, to label the objects created by kube-burner as mentioned in the [reference chapter](/kube-burner/latest/reference/configuration/#default-labels). By default, it is auto-generated.
-- `config`: Path or URL to a valid configuration file. See details about the configuration schema in the [reference chapter](/kube-burner/latest/observability/alerting/?h=configuration#configuration).
+- `uuid`: Benchmark ID. This is essentially an arbitrary string that is used for different purposes along the benchmark. For example, to label the objects created by kube-burner as mentioned in the [reference chapter](/docs/reference/configuration.md#default-labels). By default, it is auto-generated.
+- `config`: Path or URL to a valid configuration file. See details about the configuration schema in the [reference chapter](/docs/observability/alerting.md#configuration).
 - `log-level`: Logging level, one of: `debug`, `error`, `info` or `fatal`. Default `info`.
 - `prometheus-url`: Prometheus endpoint, required for metrics collection. For example: `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
 - `metrics-profile`: Path to a valid metrics profile file. The default is `metrics.yml`.
