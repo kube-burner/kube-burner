@@ -45,6 +45,7 @@ func setupCreateJob(jobConfig config.Job) Executor {
 	mapper := newRESTMapper()
 	log.Debugf("Preparing create job: %s", jobConfig.Name)
 	ex := Executor{}
+	ex.DefaultMissingKeysWithZero = jobConfig.DefaultMissingKeysWithZero
 	for _, o := range jobConfig.Objects {
 		if o.Replicas < 1 {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
@@ -220,6 +221,11 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 			copiedLabels[k] = v
 		}
 
+		templateOption := util.MissingKeyError
+		if ex.DefaultMissingKeysWithZero {
+			templateOption = util.MissingKeyZero
+		}
+
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
@@ -234,7 +240,7 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 				templateData[k] = v
 			}
 			ex.limiter.Wait(context.TODO())
-			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
+			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
 			if err != nil {
 				log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 			}

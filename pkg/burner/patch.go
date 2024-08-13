@@ -24,6 +24,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"golang.org/x/time/rate"
 )
 
 func setupPatchJob(jobConfig config.Job) Executor {
@@ -39,6 +39,7 @@ func setupPatchJob(jobConfig config.Job) Executor {
 	var err error
 	log.Debugf("Preparing patch job: %s", jobConfig.Name)
 	var ex Executor
+	ex.DefaultMissingKeysWithZero = jobConfig.DefaultMissingKeysWithZero
 	mapper := newRESTMapper()
 	for _, o := range jobConfig.Objects {
 		if o.APIVersion == "" {
@@ -143,7 +144,13 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 		for k, v := range obj.InputVars {
 			templateData[k] = v
 		}
-		renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
+
+		templateOption := util.MissingKeyError
+		if ex.DefaultMissingKeysWithZero {
+			templateOption = util.MissingKeyZero
+		}
+
+		renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
 		if err != nil {
 			log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 		}
