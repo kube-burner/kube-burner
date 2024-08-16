@@ -35,8 +35,8 @@ Use "kube-burner [command] --help" for more information about a command.
 
 This is the main subcommand; it triggers a new kube-burner benchmark and it supports the these flags:
 
-- `uuid`: Benchmark ID. This is essentially an arbitrary string that is used for different purposes along the benchmark. For example, to label the objects created by kube-burner as mentioned in the [reference chapter](/kube-burner/configuration/#default-labels). By default, it is auto-generated.
-- `config`: Path or URL to a valid configuration file. See details about the configuration schema in the [reference chapter](/kube-burner/configuration/).
+- `uuid`: Benchmark ID. This is essentially an arbitrary string that is used for different purposes along the benchmark. For example, to label the objects created by kube-burner as mentioned in the [reference chapter](/docs/reference/configuration.md#default-labels). By default, it is auto-generated.
+- `config`: Path or URL to a valid configuration file. See details about the configuration schema in the [reference chapter](/docs/observability/alerting.md#configuration).
 - `log-level`: Logging level, one of: `debug`, `error`, `info` or `fatal`. Default `info`.
 - `prometheus-url`: Prometheus endpoint, required for metrics collection. For example: `https://prometheus-k8s-openshift-monitoring.apps.rsevilla.stress.mycluster.example.com`
 - `metrics-profile`: Path to a valid metrics profile file. The default is `metrics.yml`.
