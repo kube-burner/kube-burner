@@ -33,14 +33,13 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool, indexer *indexers.Indexer) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, embedConfig bool, indexer *indexers.Indexer) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:        step,
 		UUID:        configSpec.GlobalConfig.UUID,
 		ConfigSpec:  configSpec,
 		Endpoint:    url,
-		metadata:    metadata,
 		embedConfig: embedConfig,
 		indexer:     indexer,
 	}
@@ -177,11 +176,8 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 		Timestamp:  timestamp,
 		JobName:    job.JobConfig.Name,
 	}
-	if len(p.metadata) != 0 {
-		m.Metadata = p.metadata 
-	}
 	for k, v := range labels {
-		if k != "__name__" {
+		if k != model.MetricNameLabel {
 			m.Labels[string(k)] = string(v)
 		}
 	}

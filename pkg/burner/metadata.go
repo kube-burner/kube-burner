@@ -15,6 +15,7 @@
 package burner
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -31,23 +32,30 @@ type JobSummary struct {
 	UUID                string                 `json:"uuid"`
 	MetricName          string                 `json:"metricName"`
 	JobConfig           config.Job             `json:"jobConfig"`
-	Metadata            map[string]interface{} `json:"metadata,omitempty"`
 	Version             string                 `json:"version,omitempty"`
 	Passed              bool                   `json:"passed"`
 	ExecutionErrors     string                 `json:"executionErrors,omitempty"`
+	Metadata            map[string]interface{} `json:"-"`
 }
 
 const jobSummaryMetric = "jobSummary"
 
-// indexMetadataInfo Generates and indexes a document with metadata information of the passed job
+// IndexJobSummary indexes jobSummaries Generates and indexes a document with metadata information of the passed job
 func IndexJobSummary(jobSummaries []JobSummary, indexer indexers.Indexer) {
 	log.Info("Indexing job summaries")
 	var jobSummariesInt []interface{}
+	for _, summary := range jobSummaries {
+		summaryMap := make(map[string]any)
+		j, _ := json.Marshal(summary)
+		json.Unmarshal(j, &summaryMap)
+		summaryMap["metricName"] = jobSummaryMetric
+		for k, v := range summary.Metadata {
+			summaryMap[k] = v
+		}
+		jobSummariesInt = append(jobSummariesInt, summaryMap)
+	}
 	indexingOpts := indexers.IndexingOpts{
 		MetricName: jobSummaryMetric,
-	}
-	for _, summary := range jobSummaries {
-		jobSummariesInt = append(jobSummariesInt, summary)
 	}
 	resp, err := indexer.Index(jobSummariesInt, indexingOpts)
 	if err != nil {

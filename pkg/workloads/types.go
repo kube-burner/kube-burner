@@ -34,9 +34,8 @@ type Config struct {
 
 type WorkloadHelper struct {
 	Config
-	ClusterMetadata    ocpmetadata.ClusterMetadata
 	embedConfig        embed.FS
 	kubeClientProvider *config.KubeClientProvider
 	MetadataAgent      ocpmetadata.Metadata
-	MetricsMetadata    map[string]interface{}
+	Metadata           map[string]interface{}
 }
