@@ -396,7 +396,11 @@ func (p *vmiLatency) index(jobName string, indexerList map[string]indexers.Index
 		podLatencyMeasurement:          p.normLatencies,
 		podLatencyQuantilesMeasurement: p.latencyQuantiles,
 	}
-	indexLatencyMeasurement(p.config, jobName, metricMap, indexerList)
+	IndexLatencyMeasurement(p.config, jobName, metricMap, indexerList)
+}
+
+func (p *vmiLatency) getMetrics() (sync.Map) {
+	return p.metrics
 }
 
 func (p *vmiLatency) normalizeMetrics() {

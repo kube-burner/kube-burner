@@ -7,6 +7,10 @@ global:
 {{ if .TIMESERIES_INDEXER }}
     timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}
+  - name: nodeLatency
+{{ if .TIMESERIES_INDEXER }}
+    timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
+{{ end }}
   - name: serviceLatency
     svcTimeout: 5s
 metricsEndpoints:
