@@ -1,0 +1,62 @@
+name: Execute tests on k8s - PowerPC
+on:
+  workflow_dispatch:
+
+env:
+  K8S_VERSION: "v1.31.0"
+
+jobs:
+  ocp-e2e-ci:
+    runs-on: PPC64LE
+
+    steps:
+    - name: Checkout the kube-burner repository
+      uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        architecture: 'ppc64le'
+        # Disable caching to avoid error : Cannot open: File exists
+        # https://github.com/actions/setup-go/issues/314
+        cache: false
+
+
+    - name: Install bats
+      uses: bats-core/bats-action@2.0.0
+      with:
+        bats-version: 1.11.0
+        support-install: false
+        assert-install: false
+        detik-install: false
+        file-install: false
+
+    - name: Install dependencies
+      run: sudo yum install git podman make wget jq -y
+
+    - name: Download kubectl binary
+      run: |
+        wget https://dl.k8s.io/${K8S_VERSION}/bin/linux/ppc64le/kubectl -O /tmp/kubectl --no-verbose
+        chmod +x /tmp/kubectl
+
+    - name:  Build and install kube-burner binary.
+      run: |
+        make build
+        cp bin/ppc64le/kube-burner /tmp
+
+    - name: Build container images
+      run: make images
+      env:
+        VERSION: snapshot
+
+    - name: Execute tests
+      run: |
+        export PATH=${PATH}:/tmp/
+        make test-k8s
+      env:
+        TERM: linux
+
+    - name: Clean up
+      run: |
+        rm -rf ${{ github.workspace }}/*
+        rm -rf /tmp/tmp*
+        rm /tmp/kube-burner
