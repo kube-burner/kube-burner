@@ -54,6 +54,10 @@ type Measurement struct {
 	PProfDirectory string `yaml:"pprofDirectory"`
 	// Service latency endpoint timeout
 	ServiceTimeout time.Duration `yaml:"svcTimeout"`
+	// Network Policy latency timeout
+	NetpolTimeout time.Duration `yaml:"netpolTimeout"`
+	// Akip waiting for pod readiness
+	SkipPodWait bool `yaml:"skipPodWait"`
 	// Defines the indexer for quantile metrics
 	QuantilesIndexer string `yaml:"quantilesIndexer"`
 	// Defines the indexer for timeseries

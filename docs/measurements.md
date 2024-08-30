@@ -223,6 +223,86 @@ And the quantiles document has the structure:
 
 When there're `LoadBalancer` services, an extra document with `quantileName` as `LoadBalancer` is also generated as shown above.
 
+## Network Policy latency
+
+Calculates the time taken to apply the network policy rules by the SDN for the network policy. This measurement works as follows.
+
+```mermaid
+graph LR
+A[Network Policy created] --> C{local pods ready?}
+    C -->|No| C
+    C -->|Yes| D[Save timestamp]
+    D --> F{Peer pods ready?}
+    F -->|No| F
+    F -->|Yes| G[TCP connectivity?]
+    G-->|Yes| H(Generate metric)
+    G -->|No| G
+```
+
+Where the network policy latency is the time elapsed since the local namespace pods ready till the connectivity is verified.
+
+For ingress policy, kube-burner connects to pods on peer namespaces and issue request (using 'netcat') to local namespace pods. If ingress rule doesn't specify namespace, kube-burner connects to pods defined using ingress.From.PodSelector in local namespace and send requests to other local pods specified using Spec.PodSelector. 
+
+This measure is enabled with:
+
+```yaml
+  measurements:
+  - name: netpolLatency
+    netpolTimeout: 10s
+```
+
+Where `netpolTimeout` defines the maximum amount of time the measurement will wait for a network policy connection to be ready, when this timeout is met, the metric from that network policy is **discarded**.
+
+!!! warning "Considerations"
+    - Only TCP is supported.
+    - Ingress is supported. Egress and CIDR support is in progress.
+    - All pods should have "nc" command support. Pods on which ingress is enabled should run a http server with the specified ingress ports.
+    - kube-burner starts checking service connectivity when local pods are in ready state.
+    - If the focus is on network policy testing, then the suggestion is to create all namespaces and pods in previous kube-burner job and use current job to define only network policy with these namespaces and pods. With this, we can avoid waiting for pod readiness as pods are already in read state before the network policies are created. Also set "skipIndexing: true" for the first job which creates pods and deny all network policy.
+    - Add "jobPause: 30s" to the jobs as network policy validation takes more time than network policy object creation. Jobs creation and measurements are parallel threads and Kube-burner won't wait for the completion of network policy measurements once object creation is succesful.
+
+
+### Metrics
+
+The metrics collected are network policy latency timeseries (`netpolLatencyMeasurement`) and another document that holds a summary with the different service latency quantiles (`netpolLatencyQuantilesMeasurement`). Metric documents have the following structure:
+
+```json
+  {
+    "timestamp": "2024-07-23T08:26:20Z",
+    "ready": 91468390,
+    "metricName": "netpolLatencyMeasurement",
+    "uuid": "2f40dec1-6ce0-41a8-8e02-bab2a307cf60",
+    "namespace": "network-policy-0",
+    "netpol": "allow-from-clients-1",
+    "metadata": {}
+  }
+```
+
+!!! note
+    Set "skipIndexing: true" to job if it has only deny all network policy. Otherwise, network policy latency code skips measuring latency and kube-bunrer will throw the following errors 
+```shell
+    level=error msg="Empty document list in netpolLatencyMeasurement-network-policy-pods" file="common.go:34"
+    level=error msg="Empty document list in netpolLatencyQuantilesMeasurement-network-policy-pods" file="common.go:34"
+```
+
+And the quantiles document has the structure:
+
+```json
+  {
+    "quantileName": "Ready",
+    "uuid": "f69c36dc-cf8d-41d3-a5a4-e1736d5913de",
+    "P99": 105846969,
+    "P95": 105846969,
+    "P50": 105195362,
+    "max": 106498577,
+    "avg": 105846969,
+    "timestamp": "2024-07-23T08:39:00.100211701Z",
+    "metricName": "netpolLatencyQuantilesMeasurement",
+    "metadata": {}
+  }
+```
+
+
 ## pprof collection
 
 This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
