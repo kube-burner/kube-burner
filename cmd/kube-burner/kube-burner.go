@@ -221,7 +221,7 @@ func measureCmd() *cobra.Command {
 				if err != nil {
 					log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 				}
-				indexerList[string(indexer.Alias)] = *idx
+				indexerList[indexer.Alias] = *idx
 			}
 			if userMetadata != "" {
 				metadata, err = util.ReadUserMetadata(userMetadata)

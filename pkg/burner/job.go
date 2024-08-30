@@ -64,7 +64,7 @@ type Executor struct {
 
 // returnPair is a pair of return codes for a job
 type returnPair struct {
-	innerRC int
+	innerRC         int
 	executionErrors string
 }
 
@@ -88,6 +88,8 @@ var embedFSDir string
 // Returns:
 // - error code
 // - error
+//
+//nolint:gocyclo
 func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, timeout time.Duration) (int, error) {
 	var err error
 	var rc int
@@ -285,7 +287,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 	var jobSummaries []JobSummary
 	for _, job := range executedJobs {
 		if !job.JobConfig.SkipIndexing {
-			if value, exists := returnMap[job.JobConfig.Name]; exists && !isTimeout{
+			if value, exists := returnMap[job.JobConfig.Name]; exists && !isTimeout {
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
 			}

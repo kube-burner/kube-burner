@@ -166,7 +166,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			ReadyLatency:      svcLatency,
 			UUID:              globalCfg.UUID,
 			IPAssignedLatency: ipAssignedLatency,
-      JobName:           factory.jobConfig.Name,
+			JobName:           factory.jobConfig.Name,
 		})
 	}(svc)
 }
