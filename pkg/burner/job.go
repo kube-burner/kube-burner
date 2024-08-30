@@ -207,7 +207,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Error(err.Error())
 				innerRC = 1
 			}
-			if !job.SkipIndexing {
+			if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
 				msWg.Add(1)
 				go func(jobName string) {
 					defer msWg.Done()
