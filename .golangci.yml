@@ -10,6 +10,7 @@ linters:
     - unused
     - misspell
     - ineffassign
+    - goconst
     - goimports
     - dupl
     - unparam

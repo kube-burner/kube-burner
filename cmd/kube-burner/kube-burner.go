@@ -110,7 +110,7 @@ func initCmd() *cobra.Command {
 
 			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, timeout)
 			if err != nil {
-				log.Errorf(err.Error())
+				log.Error(err.Error())
 				os.Exit(rc)
 			}
 		},

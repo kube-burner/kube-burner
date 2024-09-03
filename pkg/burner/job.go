@@ -269,7 +269,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	case rc = <-res:
 	case <-time.After(timeout):
 		err := fmt.Errorf("%v timeout reached", timeout)
-		log.Errorf(err.Error())
+		log.Error(err.Error())
 		errs = append(errs, err)
 		rc = rcTimeout
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)

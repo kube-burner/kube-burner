@@ -16,6 +16,7 @@ package alerting
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -208,7 +209,7 @@ func parseMatrix(value model.Value, description string, severity severityLevel, 
 			case sevWarn:
 				log.Warnf("🚨 %s", msg)
 			case sevError:
-				errs = append(errs, fmt.Errorf(msg))
+				errs = append(errs, errors.New(msg))
 			case sevCritical:
 				log.Fatalf("🚨 %s", msg)
 			default:
