@@ -189,7 +189,7 @@ type WaitOptions struct {
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// ForCondition wait for this condition to become true
 	ForCondition string `yaml:"forCondition" json:"forCondition,omitempty"`
-	// CustomStatusPath defines the path to the specific status field to check (e.g., [ "health", "status"]).
+	// CustomStatusPath defines the jq path to the specific status field to check (e.g., sync.status).
 	CustomStatusPath string `yaml:"customStatusPath" json:"customStatusPath,omitempty"`
 }
 
