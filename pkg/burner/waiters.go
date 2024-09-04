@@ -294,7 +294,7 @@ func verifyCondition(ns string, maxWaitTimeout time.Duration, obj object, limite
 	VERIFY:
 		for _, item := range objs.Items {
 
-			if obj.WaitOptions.CustomStatusPath != nil {
+			if len(obj.WaitOptions.CustomStatusPath) > 0 {
 				status, found, err := unstructured.NestedMap(item.Object, "status")
 				if err != nil || !found {
 					log.Errorf("Error extracting or finding status in object %s/%s: %v", item.GetKind(), item.GetName(), err)
