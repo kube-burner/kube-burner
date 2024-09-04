@@ -190,7 +190,7 @@ type WaitOptions struct {
 	// ForCondition wait for this condition to become true
 	ForCondition string `yaml:"forCondition" json:"forCondition,omitempty"`
 	// CustomStatusPath defines the path to the specific status field to check (e.g., [ "health", "status"]).
-	CustomStatusPath []string `yaml:"customStatusPath" json:"customStatusPath,omitempty"`
+	CustomStatusPath string `yaml:"customStatusPath" json:"customStatusPath,omitempty"`
 }
 
 type KubeClientProvider struct {
