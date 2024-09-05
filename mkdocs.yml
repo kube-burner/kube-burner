@@ -2,9 +2,9 @@ docs_dir: docs/
 repo_url: https://github.com/kube-burner/kube-burner
 nav:
 - Home: index.md
-- Command line: cli.md
+- Command line: cli/index.md
 - Reference: reference/configuration.md
-- Measurements: measurements.md
+- Measurements: measurements/index.md
 - Observability & Alerting: 
   - observability/index.md
   - Overview: observability/index.md
