@@ -143,7 +143,7 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, alert.Description, alert.Severity, &job.ChurnStart, &job.ChurnEnd)
+		alertData, err := parseMatrix(v, alert.Description, alert.Severity, job.ChurnStart, job.ChurnEnd)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)

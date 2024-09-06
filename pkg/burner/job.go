@@ -64,7 +64,7 @@ type Executor struct {
 
 // returnPair is a pair of return codes for a job
 type returnPair struct {
-	innerRC int
+	innerRC         int
 	executionErrors string
 }
 
@@ -163,9 +163,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Error(err.Error())
 				}
 				if job.Churn {
-					currentJob.ChurnStart = time.Now().UTC()
+					now := time.Now().UTC()
+					currentJob.ChurnStart = &now
 					job.RunCreateJobWithChurn()
-					currentJob.ChurnEnd = time.Now().UTC()
+					currentJob.ChurnEnd = &now
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
@@ -285,7 +286,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 	var jobSummaries []JobSummary
 	for _, job := range executedJobs {
 		if !job.JobConfig.SkipIndexing {
-			if value, exists := returnMap[job.JobConfig.Name]; exists && !isTimeout{
+			if value, exists := returnMap[job.JobConfig.Name]; exists && !isTimeout {
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
 			}
@@ -294,8 +295,8 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,
 				ElapsedTime:         job.End.Sub(job.Start).Round(time.Second).Seconds(),
-				ChurnStartTimestamp: &job.ChurnStart,
-				ChurnEndTimestamp:   &job.ChurnEnd,
+				ChurnStartTimestamp: job.ChurnStart,
+				ChurnEndTimestamp:   job.ChurnEnd,
 				JobConfig:           job.JobConfig,
 				Metadata:            metricsScraper.Metadata,
 				Passed:              innerRC,
