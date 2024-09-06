@@ -39,8 +39,7 @@ type measurement interface {
 	start(*sync.WaitGroup) error
 	stop() error
 	collect(*sync.WaitGroup)
-	setConfig(types.Measurement)
-	validateConfig() error
+	setConfig(types.Measurement) error
 	index(string, map[string]indexers.Indexer)
 }
 
@@ -83,8 +82,7 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 	if _, exists := mf.createFuncs[measurement.Name]; exists {
 		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
-		measurementFunc.setConfig(measurement)
-		if err := measurementFunc.validateConfig(); err != nil {
+		if err := measurementFunc.setConfig(measurement); err != nil {
 			return fmt.Errorf("%s config error: %s", measurement.Name, err)
 		}
 		mf.createFuncs[measurement.Name] = measurementFunc

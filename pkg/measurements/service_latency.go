@@ -166,16 +166,13 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			ReadyLatency:      svcLatency,
 			UUID:              globalCfg.UUID,
 			IPAssignedLatency: ipAssignedLatency,
-      JobName:           factory.jobConfig.Name,
+			JobName:           factory.jobConfig.Name,
 		})
 	}(svc)
 }
 
-func (s *serviceLatency) setConfig(cfg types.Measurement) {
+func (s *serviceLatency) setConfig(cfg types.Measurement) error {
 	s.config = cfg
-}
-
-func (s *serviceLatency) validateConfig() error {
 	if s.config.ServiceTimeout == 0 {
 		return fmt.Errorf("svcTimeout cannot be 0")
 	}
