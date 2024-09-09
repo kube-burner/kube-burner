@@ -53,30 +53,30 @@ func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
 				waitNs = ""
 			}
 			switch kind {
-				case "Deployment":
-					waitForDeployments(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "ReplicaSet":
-					waitForRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "ReplicationController":
-					waitForRC(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "StatefulSet":
-					waitForStatefulSet(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "DaemonSet":
-					waitForDS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "Pod":
-					waitForPod(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "Build", "BuildConfig":
-					waitForBuild(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "VirtualMachine":
-					waitForVM(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "VirtualMachineInstance":
-					waitForVMI(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "VirtualMachineInstanceReplicaSet":
-					waitForVMIRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "Job":
-					waitForJob(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "PersistentVolumeClaim":
-					waitForPVC(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "Deployment":
+				waitForDeployments(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "ReplicaSet":
+				waitForRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "ReplicationController":
+				waitForRC(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "StatefulSet":
+				waitForStatefulSet(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "DaemonSet":
+				waitForDS(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "Pod":
+				waitForPod(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "Build", "BuildConfig":
+				waitForBuild(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "VirtualMachine":
+				waitForVM(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "VirtualMachineInstance":
+				waitForVMI(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "VirtualMachineInstanceReplicaSet":
+				waitForVMIRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "Job":
+				waitForJob(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "PersistentVolumeClaim":
+				waitForPVC(waitNs, ex.MaxWaitTimeout, obj, limiter)
 			}
 		}
 	}
@@ -202,7 +202,7 @@ func waitForPod(ns string, maxWaitTimeout time.Duration, obj object, limiter *ra
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		// We need to paginate these requests to ensure we don't miss any pods
 		listOptions := metav1.ListOptions{
-			Limit: 1000,
+			Limit:         1000,
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		}
 		for {
