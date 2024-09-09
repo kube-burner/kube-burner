@@ -298,12 +298,11 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 			} else if kerrors.IsNotFound(err) {
 				log.Errorf("Error creating object %s/%s: %v", obj.GetKind(), obj.GetName(), err.Error())
 				return true, nil
+			}
+			if ns != "" {
+				log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
 			} else {
-				if ns != "" {
-					log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
-				} else {
-					log.Errorf("Error creating object %s/%s: %s", obj.GetKind(), obj.GetName(), err)
-				}
+				log.Errorf("Error creating object %s/%s: %s", obj.GetKind(), obj.GetName(), err)
 			}
 			log.Error("Retrying object creation")
 			return false, nil

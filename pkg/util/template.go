@@ -50,8 +50,8 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 		addrSlice := strings.Split(Addresses, " ")
 		for i := 0; i < addressesPerIteration; i++ {
 			// For example, if iteration=6 and addressesPerIteration=2, return 12th address from list.
-			// All addresses till 12th address were used in previous job iterations 
-			retAddrs = append(retAddrs, addrSlice[(iteration * addressesPerIteration) + i])
+			// All addresses till 12th address were used in previous job iterations
+			retAddrs = append(retAddrs, addrSlice[(iteration*addressesPerIteration)+i])
 		}
 		return strings.Join(retAddrs, " ")
 	}

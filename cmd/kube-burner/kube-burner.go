@@ -110,7 +110,7 @@ func initCmd() *cobra.Command {
 
 			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, timeout)
 			if err != nil {
-				log.Errorf(err.Error())
+				log.Error(err.Error())
 				os.Exit(rc)
 			}
 		},
@@ -221,7 +221,7 @@ func measureCmd() *cobra.Command {
 				if err != nil {
 					log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 				}
-				indexerList[string(indexer.Alias)] = *idx
+				indexerList[indexer.Alias] = *idx
 			}
 			if userMetadata != "" {
 				metadata, err = util.ReadUserMetadata(userMetadata)
