@@ -300,24 +300,26 @@ func verifyCondition(ns string, maxWaitTimeout time.Duration, obj object, limite
 					log.Errorf("Error extracting or finding status in object %s/%s: %v", item.GetKind(), item.GetName(), err)
 					return false, err
 				}
-				// Compile and execute the jq query
-				query, err := gojq.Parse(obj.WaitOptions.CustomStatusPath)
-				if err != nil {
-					log.Errorf("Error parsing jq path: %s", obj.WaitOptions.CustomStatusPath)
-					return false, err
-				}
-				iter := query.Run(status)
-				for {
-					v, ok := iter.Next()
-					if !ok {
-						break
-					}
-					if err, ok := v.(error); ok {
-						log.Errorf("Error evaluating jq path: %s", err)
+				if len(status) != 0 {
+					// Compile and execute the jq query
+					query, err := gojq.Parse(obj.WaitOptions.CustomStatusPath)
+					if err != nil {
+						log.Errorf("Error parsing jq path: %s", obj.WaitOptions.CustomStatusPath)
 						return false, err
 					}
-					if v == obj.WaitOptions.ForCondition {
-						continue VERIFY
+					iter := query.Run(status)
+					for {
+						v, ok := iter.Next()
+						if !ok {
+							break
+						}
+						if err, ok := v.(error); ok {
+							log.Errorf("Error evaluating jq path: %s", err)
+							return false, err
+						}
+						if v == obj.WaitOptions.ForCondition {
+							continue VERIFY
+						}
 					}
 				}
 			} else {
