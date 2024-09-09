@@ -110,6 +110,7 @@ check_custom_status_path() {
   statusPath=$3
   expectedValue=$4
   result=$(kubectl get deployment -l $label -n $namespace -o jsonpath="$statusPath")
+
   if [[ "$result" != "$expectedValue" ]]; then
     echo "Custom status path $statusPath for $resource did not match expected value: $expectedValue"
     exit 1
