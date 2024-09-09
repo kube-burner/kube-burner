@@ -1,0 +1,21 @@
+global:
+    gc: false
+jobs:
+  - name: create-deployment
+    jobIterations: 1
+    namespacedIterations: false
+    preLoadImages: true
+    namespace: namespaced
+    preLoadPeriod: 5s
+    cleanup: false
+    iterationsPerNamespace: 1
+    waitWhenFinished: true
+    verifyObjects: true
+    objects:
+      - objectTemplate: k8s/objectTemplates/deployment.yml
+        replicas: 1
+        inputVars:
+          containerImage: quay.io/cloud-bulldozer/sampleapp:latest
+        waitOptions:
+          forCondition: "Available"
+          customStatusPath: ".conditions[].type"
