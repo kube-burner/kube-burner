@@ -12,7 +12,7 @@ jobs:
     waitWhenFinished: true
     verifyObjects: true
     objects:
-      - objectTemplate: k8s/objectTemplates/deployment.yml
+      - objectTemplate: objectTemplates/deployment.yml
         replicas: 1
         inputVars:
           containerImage: quay.io/cloud-bulldozer/sampleapp:latest
