@@ -149,8 +149,9 @@ teardown_file() {
 @test "kube-burner init: waitOptions for Deployment" {
   export UUID; UUID=$(uuidgen)
   export GC=false
-  
-  run_cmd kube-burner init -c kube-burner-wait-for-condition.yaml --uuid="${UUID}" --log-level=debug
+  export WAIT_FOR_CONDITION="Available"
+  export WAIT_CUSTOM_STATUS_PATH=".conditions[].type"
+  run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_custom_status_path namespaced kube-burner-uuid="${UUID}" "{.items[*].status.conditions[].type}" Available
   kube-burner destroy --uuid "${UUID}"
 }
