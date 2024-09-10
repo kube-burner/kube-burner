@@ -115,11 +115,8 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 	}
 }
 
-func (p *podLatency) setConfig(cfg types.Measurement) {
+func (p *podLatency) setConfig(cfg types.Measurement) error {
 	p.config = cfg
-}
-
-func (p *podLatency) validateConfig() error {
 	var metricFound bool
 	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
 	for _, th := range p.config.LatencyThresholds {
