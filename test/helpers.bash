@@ -105,16 +105,23 @@ print_events() {
 }
 
 check_custom_status_path() {
-  namespace=$1
-  label=$2
-  statusPath=$3
-  expectedValue=$4
-  result=$(kubectl get deployment -l $label -n $namespace -o jsonpath="$statusPath")
+  label=$1
+  statusPath=$2
+  expectedValue=$3
 
-  if [[ "$result" != "$expectedValue" ]]; then
-    echo "Custom status path for deployment with label $label in namespace $namespace did not match expected value: $expectedValue"
-    exit 1
-  fi
+  # Get the status path for all deployments matching the label in all namespaces
+  results=$(kubectl get deployment -l "$label" -A -o jsonpath="$statusPath")
+
+  # Loop through each result and check if it matches the expected value
+  for result in $results; do
+      echo "$result"
+    if [[ "$result" != "$expectedValue" ]]; then
+      echo "Custom status path did not match expected value: $expectedValue"
+      exit 1
+    fi
+  done
+
+  echo "All status paths match the expected value: $expectedValue"
 }
 
 check_metric_value() {
