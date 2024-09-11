@@ -37,24 +37,24 @@ const (
 )
 
 type NodeMetric struct {
-	Timestamp        time.Time `json:"timestamp"`
-	NodeMemoryPressure time.Time `json:"-"`
-	NodeMemoryPressureLatency int `json:"nodeMemoryPressureLatency"`
-	NodeDiskPressure time.Time `json:"-"`
-	NodeDiskPressureLatency int `json:"nodeDiskPressureLatency"`
-	NodePIDPressure time.Time `json:"-"`
-	NodePIDPressureLatency int `json:"nodePIDPressureLatency"`
-	NodeReady        time.Time `json:"-"`
-	NodeReadyLatency int    `json:"nodeReadyLatency"`
-	MetricName       string `json:"metricName"`
-	UUID             string `json:"uuid"`
-	JobName string `json:"jobName,omitempty"`
-	Name             string `json:"nodeName"`
-	Labels           map[string]string    `json:"labels"`
+	Timestamp                 time.Time         `json:"timestamp"`
+	NodeMemoryPressure        time.Time         `json:"-"`
+	NodeMemoryPressureLatency int               `json:"nodeMemoryPressureLatency"`
+	NodeDiskPressure          time.Time         `json:"-"`
+	NodeDiskPressureLatency   int               `json:"nodeDiskPressureLatency"`
+	NodePIDPressure           time.Time         `json:"-"`
+	NodePIDPressureLatency    int               `json:"nodePIDPressureLatency"`
+	NodeReady                 time.Time         `json:"-"`
+	NodeReadyLatency          int               `json:"nodeReadyLatency"`
+	MetricName                string            `json:"metricName"`
+	UUID                      string            `json:"uuid"`
+	JobName                   string            `json:"jobName,omitempty"`
+	Name                      string            `json:"nodeName"`
+	Labels                    map[string]string `json:"labels"`
 }
 
 type nodeLatency struct {
-	config types.Measurement
+	config           types.Measurement
 	watcher          *metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
@@ -75,8 +75,8 @@ func (n *nodeLatency) handleCreateNode(obj interface{}) {
 		Name:       node.Name,
 		MetricName: nodeLatencyMeasurement,
 		UUID:       globalCfg.UUID,
-		JobName: factory.jobConfig.Name,
-		Labels: labels,
+		JobName:    factory.jobConfig.Name,
+		Labels:     labels,
 	})
 }
 
@@ -109,11 +109,8 @@ func (n *nodeLatency) handleUpdateNode(obj interface{}) {
 	}
 }
 
-func (n *nodeLatency) setConfig(cfg types.Measurement) {
+func (n *nodeLatency) setConfig(cfg types.Measurement) error {
 	n.config = cfg
-}
-
-func (n *nodeLatency) validateConfig() error {
 	var metricFound bool
 	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
 	for _, th := range n.config.LatencyThresholds {
@@ -188,16 +185,16 @@ func (n *nodeLatency) collect(measurementWg *sync.WaitGroup) {
 			}
 		}
 		n.metrics.Store(string(node.UID), NodeMetric{
-			Timestamp:  node.CreationTimestamp.Time.UTC(),
-			Name:       node.Name,
-			MetricName: nodeLatencyMeasurement,
-			UUID:       globalCfg.UUID,
+			Timestamp:          node.CreationTimestamp.Time.UTC(),
+			Name:               node.Name,
+			MetricName:         nodeLatencyMeasurement,
+			UUID:               globalCfg.UUID,
 			NodeMemoryPressure: nodeMemoryPressure,
-			NodeDiskPressure: nodeDiskPressure,
-			NodePIDPressure: nodePIDPressure,
-			NodeReady:  nodeReady,
-			JobName: factory.jobConfig.Name,
-			Labels: node.Labels,
+			NodeDiskPressure:   nodeDiskPressure,
+			NodePIDPressure:    nodePIDPressure,
+			NodeReady:          nodeReady,
+			JobName:            factory.jobConfig.Name,
+			Labels:             node.Labels,
 		})
 	}
 }
@@ -231,8 +228,8 @@ func (n *nodeLatency) index(jobName string, indexerList map[string]indexers.Inde
 	IndexLatencyMeasurement(n.config, jobName, metricMap, indexerList)
 }
 
-func (n *nodeLatency) getMetrics() (sync.Map) {
-	return n.metrics
+func (n *nodeLatency) getMetrics() *sync.Map {
+	return &n.metrics
 }
 
 func (n *nodeLatency) normalizeLatencies() {
@@ -263,22 +260,15 @@ func (n *nodeLatency) normalizeLatencies() {
 }
 
 func (n *nodeLatency) calculateQuantiles() {
-	quantileMap := map[corev1.NodeConditionType][]float64{}
-	for _, normLatency := range n.normLatencies {
-		quantileMap[corev1.NodeMemoryPressure] = append(quantileMap[corev1.NodeMemoryPressure], float64(normLatency.(NodeMetric).NodeMemoryPressureLatency))
-		quantileMap[corev1.NodeDiskPressure] = append(quantileMap[corev1.NodeDiskPressure], float64(normLatency.(NodeMetric).NodeDiskPressureLatency))
-		quantileMap[corev1.NodePIDPressure] = append(quantileMap[corev1.NodePIDPressure], float64(normLatency.(NodeMetric).NodePIDPressureLatency))
-		quantileMap[corev1.NodeReady] = append(quantileMap[corev1.NodeReady], float64(normLatency.(NodeMetric).NodeReadyLatency))
+	quantileMap := map[string][]float64{}
+	getLatency := func(normLatency interface{}) map[string]float64 {
+		nodeMetric := normLatency.(NodeMetric)
+		return map[string]float64{
+			string(corev1.NodeMemoryPressure): float64(nodeMetric.NodeMemoryPressureLatency),
+			string(corev1.NodeDiskPressure):   float64(nodeMetric.NodeDiskPressureLatency),
+			string(corev1.NodePIDPressure):    float64(nodeMetric.NodePIDPressureLatency),
+			string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
+		}
 	}
-	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
-		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = globalCfg.UUID
-		latencySummary.Metadata = factory.metadata
-		latencySummary.MetricName = nodeLatencyQuantilesMeasurement
-		latencySummary.JobName = factory.jobConfig.Name
-		return latencySummary
-	}
-	for nodeCondition, latencies := range quantileMap {
-		n.latencyQuantiles = append(n.latencyQuantiles, calcSummary(string(nodeCondition), latencies))
-	}
+	n.latencyQuantiles = calculateQuantiles(n.normLatencies, quantileMap, getLatency, nodeLatencyQuantilesMeasurement)
 }

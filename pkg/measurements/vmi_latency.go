@@ -422,8 +422,8 @@ func (p *vmiLatency) index(jobName string, indexerList map[string]indexers.Index
 	IndexLatencyMeasurement(p.config, jobName, metricMap, indexerList)
 }
 
-func (p *vmiLatency) getMetrics() (sync.Map) {
-	return p.metrics
+func (p *vmiLatency) getMetrics() *sync.Map {
+	return &p.metrics
 }
 
 func (p *vmiLatency) normalizeMetrics() {

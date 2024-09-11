@@ -279,8 +279,8 @@ func (s *serviceLatency) index(jobName string, indexerList map[string]indexers.I
 	IndexLatencyMeasurement(s.config, jobName, metricMap, indexerList)
 }
 
-func (s *serviceLatency) getMetrics() (sync.Map) {
-	return s.metrics
+func (s *serviceLatency) getMetrics() *sync.Map {
+	return &s.metrics
 }
 
 func (s *serviceLatency) waitForEndpoints(svc *corev1.Service) error {

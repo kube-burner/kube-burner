@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -51,4 +52,29 @@ func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 		}
 	}
 
+}
+
+// Common function to calculate quantiles for both node and pod latencies
+func calculateQuantiles(normLatencies []interface{}, quantileMap map[string][]float64, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
+	for _, normLatency := range normLatencies {
+		for condition, latency := range getLatency(normLatency) {
+			quantileMap[condition] = append(quantileMap[condition], latency)
+		}
+	}
+
+	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
+		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
+		latencySummary.UUID = globalCfg.UUID
+		latencySummary.Metadata = factory.metadata
+		latencySummary.MetricName = metricName
+		latencySummary.JobName = factory.jobConfig.Name
+		return latencySummary
+	}
+
+	var latencyQuantiles []interface{}
+	for condition, latencies := range quantileMap {
+		latencyQuantiles = append(latencyQuantiles, calcSummary(condition, latencies))
+	}
+
+	return latencyQuantiles
 }

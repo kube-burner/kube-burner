@@ -41,7 +41,7 @@ type measurement interface {
 	collect(*sync.WaitGroup)
 	setConfig(types.Measurement) error
 	index(string, map[string]indexers.Indexer)
-	getMetrics() sync.Map
+	getMetrics() *sync.Map
 }
 
 var factory measurementFactory
@@ -138,8 +138,8 @@ func Index(jobName string, indexerList map[string]indexers.Indexer) {
 	}
 }
 
-func GetMetrics() ([]sync.Map) {
-	var metricList []sync.Map
+func GetMetrics() []*sync.Map {
+	var metricList []*sync.Map
 	for name, measurement := range factory.createFuncs {
 		log.Infof("Fetching metrics from measurement: %s", name)
 		metricList = append(metricList, measurement.getMetrics())

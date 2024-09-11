@@ -249,8 +249,8 @@ func (p *podLatency) index(jobName string, indexerList map[string]indexers.Index
 	IndexLatencyMeasurement(p.config, jobName, metricMap, indexerList)
 }
 
-func (p *podLatency) getMetrics() (sync.Map) {
-	return p.metrics
+func (p *podLatency) getMetrics() *sync.Map {
+	return &p.metrics
 }
 
 func (p *podLatency) normalizeMetrics() float64 {
@@ -311,22 +311,15 @@ func (p *podLatency) normalizeMetrics() float64 {
 }
 
 func (p *podLatency) calcQuantiles() {
-	quantileMap := map[corev1.PodConditionType][]float64{}
-	for _, normLatency := range p.normLatencies {
-		quantileMap[corev1.PodScheduled] = append(quantileMap[corev1.PodScheduled], float64(normLatency.(podMetric).SchedulingLatency))
-		quantileMap[corev1.ContainersReady] = append(quantileMap[corev1.ContainersReady], float64(normLatency.(podMetric).ContainersReadyLatency))
-		quantileMap[corev1.PodInitialized] = append(quantileMap[corev1.PodInitialized], float64(normLatency.(podMetric).InitializedLatency))
-		quantileMap[corev1.PodReady] = append(quantileMap[corev1.PodReady], float64(normLatency.(podMetric).PodReadyLatency))
+	quantileMap := map[string][]float64{}
+	getLatency := func(normLatency interface{}) map[string]float64 {
+		podMetric := normLatency.(podMetric)
+		return map[string]float64{
+			string(corev1.PodScheduled):    float64(podMetric.SchedulingLatency),
+			string(corev1.ContainersReady): float64(podMetric.ContainersReadyLatency),
+			string(corev1.PodInitialized):  float64(podMetric.InitializedLatency),
+			string(corev1.PodReady):        float64(podMetric.PodReadyLatency),
+		}
 	}
-	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
-		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = globalCfg.UUID
-		latencySummary.Metadata = factory.metadata
-		latencySummary.MetricName = podLatencyQuantilesMeasurement
-		latencySummary.JobName = factory.jobConfig.Name
-		return latencySummary
-	}
-	for podCondition, latencies := range quantileMap {
-		p.latencyQuantiles = append(p.latencyQuantiles, calcSummary(string(podCondition), latencies))
-	}
+	p.latencyQuantiles = calculateQuantiles(p.normLatencies, quantileMap, getLatency, podLatencyQuantilesMeasurement)
 }

@@ -115,7 +115,7 @@ In case of not meeting any of the configured thresholds, like the example above,
 
 ## Node latency
 
-Collects latencies from the different node startup phases, these **latency metrics are in ms**. It can be enabled with:
+Collects latencies from the different node conditions on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
   measurements:
@@ -124,7 +124,7 @@ Collects latencies from the different node startup phases, these **latency metri
 
 ### Metrics
 
-The metrics collected are pod latency timeseries (`nodeLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`nodeLatencyQuantilesMeasurement`).
+The metrics collected are node latency timeseries (`nodeLatencyMeasurement`) and four documents holding a summary with different node latency quantiles of each node condition (`nodeLatencyQuantilesMeasurement`).
 
 One document, such as the following, is indexed per each node created by the workload that enters in `Ready` condition during the workload:
 
@@ -160,7 +160,7 @@ One document, such as the following, is indexed per each node created by the wor
 
 ---
 
-Pod latency quantile sample:
+Node latency quantile sample:
 
 ```json
 {

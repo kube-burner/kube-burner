@@ -196,8 +196,8 @@ func (p *pprof) stop() error {
 func (p *pprof) index(_ string, _ map[string]indexers.Indexer) {
 }
 
-func (p *pprof) getMetrics() (sync.Map) {
-	return sync.Map{}
+func (p *pprof) getMetrics() *sync.Map {
+	return &sync.Map{}
 }
 
 func readCerts(cert, privKey string) (string, string, error) {
