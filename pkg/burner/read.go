@@ -20,11 +20,11 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 

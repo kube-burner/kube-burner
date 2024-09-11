@@ -86,7 +86,7 @@ func (wh *WorkloadHelper) Run(workload string) {
 	})
 	rc, err = burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, wh.Timeout)
 	if err != nil {
-		log.Errorf(err.Error())
+		log.Error(err.Error())
 	}
 	log.Info("👋 Exiting kube-burner ", wh.UUID)
 	os.Exit(rc)

@@ -67,6 +67,11 @@ jobs:
       replicas: 1
       inputVars:
         containerImage: quay.io/cloud-bulldozer/sampleapp:latest
+      {{- if env "WAIT_FOR_CONDITION" }}
+      waitOptions:
+        forCondition: "{{ env `WAIT_FOR_CONDITION` }}"
+        customStatusPath: "{{ env `WAIT_CUSTOM_STATUS_PATH` }}"
+      {{- end }} 
 
     - objectTemplate: objectTemplates/pod.yml
       replicas: 1

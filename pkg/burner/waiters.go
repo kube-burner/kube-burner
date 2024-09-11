@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/itchyny/gojq"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -53,30 +54,30 @@ func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
 				waitNs = ""
 			}
 			switch kind {
-				case "Deployment":
-					waitForDeployments(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "ReplicaSet":
-					waitForRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "ReplicationController":
-					waitForRC(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "StatefulSet":
-					waitForStatefulSet(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "DaemonSet":
-					waitForDS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "Pod":
-					waitForPod(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "Build", "BuildConfig":
-					waitForBuild(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "VirtualMachine":
-					waitForVM(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "VirtualMachineInstance":
-					waitForVMI(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "VirtualMachineInstanceReplicaSet":
-					waitForVMIRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "Job":
-					waitForJob(waitNs, ex.MaxWaitTimeout, obj, limiter)
-				case "PersistentVolumeClaim":
-					waitForPVC(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "Deployment":
+				waitForDeployments(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "ReplicaSet":
+				waitForRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "ReplicationController":
+				waitForRC(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "StatefulSet":
+				waitForStatefulSet(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "DaemonSet":
+				waitForDS(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "Pod":
+				waitForPod(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "Build", "BuildConfig":
+				waitForBuild(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "VirtualMachine":
+				waitForVM(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "VirtualMachineInstance":
+				waitForVMI(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "VirtualMachineInstanceReplicaSet":
+				waitForVMIRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "Job":
+				waitForJob(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case "PersistentVolumeClaim":
+				waitForPVC(waitNs, ex.MaxWaitTimeout, obj, limiter)
 			}
 		}
 	}
@@ -202,7 +203,7 @@ func waitForPod(ns string, maxWaitTimeout time.Duration, obj object, limiter *ra
 	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		// We need to paginate these requests to ensure we don't miss any pods
 		listOptions := metav1.ListOptions{
-			Limit: 1000,
+			Limit:         1000,
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		}
 		for {
@@ -293,15 +294,45 @@ func verifyCondition(ns string, maxWaitTimeout time.Duration, obj object, limite
 		}
 	VERIFY:
 		for _, item := range objs.Items {
-			jsonBuild, err := item.MarshalJSON()
-			if err != nil {
-				log.Errorf("Error decoding object: %s", err)
-				return false, err
-			}
-			_ = json.Unmarshal(jsonBuild, &uObj)
-			for _, c := range uObj.Status.Conditions {
-				if c.Status == "True" && c.Type == obj.WaitOptions.ForCondition {
-					continue VERIFY
+			if obj.WaitOptions.CustomStatusPath != "" {
+				status, found, err := unstructured.NestedMap(item.Object, "status")
+				if err != nil || !found {
+					log.Errorf("Error extracting or finding status in object %s/%s: %v", item.GetKind(), item.GetName(), err)
+					return false, err
+				}
+				if len(status) != 0 {
+					// Compile and execute the jq query
+					query, err := gojq.Parse(obj.WaitOptions.CustomStatusPath)
+					if err != nil {
+						log.Errorf("Error parsing jq path: %s", obj.WaitOptions.CustomStatusPath)
+						return false, err
+					}
+					iter := query.Run(status)
+					for {
+						v, ok := iter.Next()
+						if !ok {
+							break
+						}
+						if err, ok := v.(error); ok {
+							log.Errorf("Error evaluating jq path: %s", err)
+							return false, err
+						}
+						if v == obj.WaitOptions.ForCondition {
+							continue VERIFY
+						}
+					}
+				}
+			} else {
+				jsonBuild, err := item.MarshalJSON()
+				if err != nil {
+					log.Errorf("Error decoding object: %s", err)
+					return false, err
+				}
+				_ = json.Unmarshal(jsonBuild, &uObj)
+				for _, c := range uObj.Status.Conditions {
+					if c.Status == "True" && c.Type == obj.WaitOptions.ForCondition {
+						continue VERIFY
+					}
 				}
 			}
 			if obj.Namespaced {

@@ -120,6 +120,7 @@ If you want to override the default waiter behaviors, you can specify wait optio
 | `kind` | Object kind to consider for wait | String | "" |
 | `labelSelector` | Objects with these labels will be considered for wait | Object | {} |
 | `forCondition` | Wait for the object condition with this name to be true | String  | "" |
+| `customStatusPath` | A jq path to the status field of the object | String  | "" |
 
 For example, the snippet below can be used to make kube-burner wait for all containers from the pod defined at `pod.yml` to be ready.
 
@@ -133,8 +134,21 @@ objects:
     forCondition: Ready
 ```
 
+Additionally, you can use `customStatusPath` to specify a custom path to check the condition of the object, for example, to wait for a deployment to be available.
+
+```yaml
+objects:
+  - kind: Deployment
+    objectTemplate: deployment.yml
+    replicas: 1
+    waitOptions:
+      forCondition: "Available"
+      customStatusPath: ".conditions[].type"
+```
+This allows kube-burner to check the status of the specified path and wait for the condition you specify in `forCondition`.
+
 !!! note
-    `waitOptions.kind` and `waitOptions.labelSelector` are fully optional. `waitOptions.kind` is used when an application has child objects to be waited & `waitOptions.labelSelector` is used when we want to wait on objects with specific labels.
+    `waitOptions.kind`, `waitOptions.customStatusPath` and `waitOptions.labelSelector` are fully optional. `waitOptions.kind` is used when an application has child objects to be waited & `waitOptions.labelSelector` is used when we want to wait on objects with specific labels.
 
 ### Default labels
 

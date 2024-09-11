@@ -104,6 +104,26 @@ print_events() {
   kubectl get events --sort-by='.lastTimestamp' -A
 }
 
+check_custom_status_path() {
+  label=$1
+  statusPath=$2
+  expectedValue=$3
+
+  # Get the status path for all deployments matching the label in all namespaces
+  results=$(kubectl get deployment -l "$label" -A -o jsonpath="$statusPath")
+
+  # Loop through each result and check if it matches the expected value
+  for result in $results; do
+      echo "$result"
+    if [[ "$result" != "$expectedValue" ]]; then
+      echo "Custom status path did not match expected value: $expectedValue"
+      exit 1
+    fi
+  done
+
+  echo "All status paths match the expected value: $expectedValue"
+}
+
 check_metric_value() {
   sleep 3s # There's some delay on the documents to show up in OpenSearch
   for metric in "${@}"; do
