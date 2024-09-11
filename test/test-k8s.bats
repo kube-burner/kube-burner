@@ -145,3 +145,13 @@ teardown_file() {
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_file_exists "kube-burner-${UUID}.log"
 }
+
+@test "kube-burner init: waitOptions for Deployment" {
+  export GC=false
+  export WAIT_FOR_CONDITION="Available"
+  export WAIT_CUSTOM_STATUS_PATH=".conditions[].type"
+  run_cmd kube-burner init -c  kube-burner.yml --uuid="${UUID}" --log-level=debug
+  check_custom_status_path kube-burner-uuid="${UUID}" "{.items[*].status.conditions[].type}" Available
+  kube-burner destroy --uuid "${UUID}"
+}
+

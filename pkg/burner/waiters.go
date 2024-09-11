@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/itchyny/gojq"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -293,15 +294,45 @@ func verifyCondition(ns string, maxWaitTimeout time.Duration, obj object, limite
 		}
 	VERIFY:
 		for _, item := range objs.Items {
-			jsonBuild, err := item.MarshalJSON()
-			if err != nil {
-				log.Errorf("Error decoding object: %s", err)
-				return false, err
-			}
-			_ = json.Unmarshal(jsonBuild, &uObj)
-			for _, c := range uObj.Status.Conditions {
-				if c.Status == "True" && c.Type == obj.WaitOptions.ForCondition {
-					continue VERIFY
+			if obj.WaitOptions.CustomStatusPath != "" {
+				status, found, err := unstructured.NestedMap(item.Object, "status")
+				if err != nil || !found {
+					log.Errorf("Error extracting or finding status in object %s/%s: %v", item.GetKind(), item.GetName(), err)
+					return false, err
+				}
+				if len(status) != 0 {
+					// Compile and execute the jq query
+					query, err := gojq.Parse(obj.WaitOptions.CustomStatusPath)
+					if err != nil {
+						log.Errorf("Error parsing jq path: %s", obj.WaitOptions.CustomStatusPath)
+						return false, err
+					}
+					iter := query.Run(status)
+					for {
+						v, ok := iter.Next()
+						if !ok {
+							break
+						}
+						if err, ok := v.(error); ok {
+							log.Errorf("Error evaluating jq path: %s", err)
+							return false, err
+						}
+						if v == obj.WaitOptions.ForCondition {
+							continue VERIFY
+						}
+					}
+				}
+			} else {
+				jsonBuild, err := item.MarshalJSON()
+				if err != nil {
+					log.Errorf("Error decoding object: %s", err)
+					return false, err
+				}
+				_ = json.Unmarshal(jsonBuild, &uObj)
+				for _, c := range uObj.Status.Conditions {
+					if c.Status == "True" && c.Type == obj.WaitOptions.ForCondition {
+						continue VERIFY
+					}
 				}
 			}
 			if obj.Namespaced {
