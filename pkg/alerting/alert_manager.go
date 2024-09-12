@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"path"
 	"strings"
 	"text/template"
@@ -41,6 +42,7 @@ const (
 	sevError        severityLevel = "error"
 	sevCritical     severityLevel = "critical"
 	alertMetricName               = "alert"
+	rcAlert                       = 3
 )
 
 // alertProfile expression list
@@ -211,7 +213,8 @@ func parseMatrix(value model.Value, description string, severity severityLevel, 
 			case sevError:
 				errs = append(errs, errors.New(msg))
 			case sevCritical:
-				log.Fatalf("🚨 %s", msg)
+				log.Errorf("🚨 %s", msg)
+				os.Exit(rcAlert)
 			default:
 				log.Infof("🚨 %s", msg)
 			}

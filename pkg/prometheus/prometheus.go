@@ -48,7 +48,7 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 	return &p, err
 }
 
-// ScrapeJobsMetrics gets all prometheus metrics required and handles them
+// ScrapeJobsMetrics fetches and indexes the configured prometheus expressions
 func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 	if p.indexer == nil {
 		log.Info("Indexer not configured, skipping metric scraping")

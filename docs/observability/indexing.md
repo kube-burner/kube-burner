@@ -101,7 +101,7 @@ This document looks like:
   "elapsedTime": 8.768932955,
   "version": "v1.10.0",
   "passed": true,
-  "executionErrors": "this is an exmample",
+  "executionErrors": "this is an example",
   "jobConfig": {                          
     "jobIterations": 1,                                                                                              
     "name": "cluster-density-v2",                                                                                    

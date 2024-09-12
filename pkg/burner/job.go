@@ -74,6 +74,8 @@ const (
 	jobIteration         = "Iteration"
 	jobUUID              = "UUID"
 	rcTimeout            = 2
+	rcAlert              = 3
+	rcMeasurement        = 4
 	garbageCollectionJob = "garbage-collection"
 )
 
@@ -208,7 +210,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if err = measurements.Stop(); err != nil {
 				errs = append(errs, err)
 				log.Error(err.Error())
-				innerRC = 1
+				innerRC = rcMeasurement
 			}
 			if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
 				msWg.Add(1)
@@ -254,7 +256,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				if err := alertM.Evaluate(job); err != nil {
 					errs = append(errs, err)
 					jobAlerts = append(jobAlerts, err)
-					innerRC = 1
+					innerRC = rcAlert
 				}
 			}
 			if len(jobAlerts) > 0 {
