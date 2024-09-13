@@ -12,12 +12,10 @@ Collects latencies from the different pod/vm/vmi startup phases, these **latency
   measurements:
   - name: podLatency
 ```
-
 or
-
 ```yaml
   measurements:
-  - name: podLatency
+  - name: vmiLatency
 ```
 
 ### Metrics
@@ -115,27 +113,95 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 
 In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
 
-### Measure subcommand CLI example
+## Node latency
 
-Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
+Collects latencies from the different node conditions on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
-```shell
-kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2 
-time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
-time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
-time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
-time="2023-11-19 17:46:06" level=info msg="Stopping measurement: podLatency" file="factory.go:118"
-time="2023-11-19 17:46:06" level=info msg="Evaluating latency thresholds" file="metrics.go:60"
-time="2023-11-19 17:46:06" level=info msg="Indexing pod latency data for job: kube-burner-measure" file="pod_latency.go:245"
-time="2023-11-19 17:46:07" level=info msg="Indexing finished in 417ms: created=4" file="pod_latency.go:262"
-time="2023-11-19 17:46:08" level=info msg="Indexing finished in 1.32s: created=50" file="pod_latency.go:262"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: PodScheduled 50th: 0 99th: 0 max: 0 avg: 0" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: ContainersReady 50th: 9000 99th: 18000 max: 18000 avg: 10680" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Initialized 50th: 0 99th: 0 max: 0 avg: 0" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Ready 50th: 9000 99th: 18000 max: 18000 avg: 10680" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="Pod latencies error rate was: 0.00" file="pod_latency.go:236"
-time="2023-11-19 17:46:08" level=info msg="👋 Exiting kube-burner vchalla" file="kube-burner.go:209"
+```yaml
+  measurements:
+  - name: nodeLatency
 ```
+
+### Metrics
+
+The metrics collected are node latency timeseries (`nodeLatencyMeasurement`) and four documents holding a summary with different node latency quantiles of each node condition (`nodeLatencyQuantilesMeasurement`).
+
+One document, such as the following, is indexed per each node created by the workload that enters in `Ready` condition during the workload:
+
+```json
+{
+  "timestamp": "2024-08-25T12:49:26Z",
+  "nodeMemoryPressureLatency": 0,
+  "nodeDiskPressureLatency": 0,
+  "nodePIDPressureLatency": 0,
+  "nodeReadyLatency": 82000,
+  "metricName": "nodeLatencyMeasurement",
+  "uuid": "4f9e462c-cacc-4695-95db-adfb841e0980",
+  "jobName": "namespaced",
+  "nodeName": "ip-10-0-34-104.us-west-2.compute.internal",
+  "labels": {
+    "beta.kubernetes.io/arch": "amd64",
+    "beta.kubernetes.io/instance-type": "m6i.xlarge",
+    "beta.kubernetes.io/os": "linux",
+    "failure-domain.beta.kubernetes.io/region": "us-west-2",
+    "failure-domain.beta.kubernetes.io/zone": "us-west-2b",
+    "kubernetes.io/arch": "amd64",
+    "kubernetes.io/hostname": "ip-10-0-34-104.us-west-2.compute.internal",
+    "kubernetes.io/os": "linux",
+    "node-role.kubernetes.io/worker": "",
+    "node.kubernetes.io/instance-type": "m6i.xlarge",
+    "node.openshift.io/os_id": "rhcos",
+    "topology.ebs.csi.aws.com/zone": "us-west-2b",
+    "topology.kubernetes.io/region": "us-west-2",
+    "topology.kubernetes.io/zone": "us-west-2b"
+  }
+}
+```
+
+---
+
+Node latency quantile sample:
+
+```json
+{
+  "quantileName": "Ready",
+  "uuid": "4f9e462c-cacc-4695-95db-adfb841e0980",
+  "P99": 163000,
+  "P95": 163000,
+  "P50": 93000,
+  "max": 163000,
+  "avg": 122500,
+  "timestamp": "2024-08-25T20:42:59.422208263Z",
+  "metricName": "nodeLatencyQuantilesMeasurement",
+  "jobName": "namespaced",
+  "metadata": {}
+},
+{
+  "quantileName": "MemoryPressure",
+  "uuid": "4f9e462c-cacc-4695-95db-adfb841e0980",
+  "P99": 0,
+  "P95": 0,
+  "P50": 0,
+  "max": 0,
+  "avg": 0,
+  "timestamp": "2024-08-25T20:42:59.422209628Z",
+  "metricName": "nodeLatencyQuantilesMeasurement",
+  "jobName": "namespaced",
+  "metadata": {}
+}
+```
+
+Where `quantileName` matches with the node conditions and can be:
+
+- `MemoryPressure`: Indicates if pressure exists on node memory.
+- `DiskPressure`: Indicates if pressure exists on node size.
+- `PIDPressure`: Indicates if pressure exists because of too many processes.
+- `Ready`: Node is ready and able to accept pods.
+
+!!! info
+    More information about the node conditions can be found at the [kubernetes documentation site](https://kubernetes.io/docs/reference/node/node-status/#condition).
+
+And the metrics, error rates, and their thresholds work the same way as in the pod latency measurement.
 
 ## Service latency
 
@@ -263,6 +329,28 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 
 !!! warning
     As mentioned before, this measurement requires the `curl` command to be available in the target pods.
+
+## Measure subcommand CLI example
+
+Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
+
+```shell
+kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2 
+time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
+time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
+time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
+time="2023-11-19 17:46:06" level=info msg="Stopping measurement: podLatency" file="factory.go:118"
+time="2023-11-19 17:46:06" level=info msg="Evaluating latency thresholds" file="metrics.go:60"
+time="2023-11-19 17:46:06" level=info msg="Indexing pod latency data for job: kube-burner-measure" file="pod_latency.go:245"
+time="2023-11-19 17:46:07" level=info msg="Indexing finished in 417ms: created=4" file="pod_latency.go:262"
+time="2023-11-19 17:46:08" level=info msg="Indexing finished in 1.32s: created=50" file="pod_latency.go:262"
+time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: PodScheduled 50th: 0 99th: 0 max: 0 avg: 0" file="pod_latency.go:233"
+time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: ContainersReady 50th: 9000 99th: 18000 max: 18000 avg: 10680" file="pod_latency.go:233"
+time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Initialized 50th: 0 99th: 0 max: 0 avg: 0" file="pod_latency.go:233"
+time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Ready 50th: 9000 99th: 18000 max: 18000 avg: 10680" file="pod_latency.go:233"
+time="2023-11-19 17:46:08" level=info msg="Pod latencies error rate was: 0.00" file="pod_latency.go:236"
+time="2023-11-19 17:46:08" level=info msg="👋 Exiting kube-burner vchalla" file="kube-burner.go:209"
+```
 
 ## Indexing in different places
 

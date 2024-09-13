@@ -276,7 +276,11 @@ func (s *serviceLatency) index(jobName string, indexerList map[string]indexers.I
 		svcLatencyMeasurement:          s.normLatencies,
 		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
 	}
-	indexLatencyMeasurement(s.config, jobName, metricMap, indexerList)
+	IndexLatencyMeasurement(s.config, jobName, metricMap, indexerList)
+}
+
+func (s *serviceLatency) getMetrics() *sync.Map {
+	return &s.metrics
 }
 
 func (s *serviceLatency) waitForEndpoints(svc *corev1.Service) error {

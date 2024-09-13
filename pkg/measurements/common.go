@@ -18,11 +18,12 @@ import (
 	"fmt"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 )
 
-func indexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
+func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
 	indexDocuments := func(indexer indexers.Indexer, metricName string, data []interface{}) {
 		log.Infof("Indexing metric %s", metricName)
 		indexingOpts := indexers.IndexingOpts{
@@ -38,10 +39,10 @@ func indexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 	}
 	for metricName, data := range metricMap {
 		// Use the configured TimeseriesIndexer or QuantilesIndexer when specified or else use all indexers
-		if config.TimeseriesIndexer != "" && (metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement) {
+		if config.TimeseriesIndexer != "" && (metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement || metricName == nodeLatencyMeasurement) {
 			indexer := indexerList[config.TimeseriesIndexer]
 			indexDocuments(indexer, metricName, data)
-		} else if config.QuantilesIndexer != "" && (metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement) {
+		} else if config.QuantilesIndexer != "" && (metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement || metricName == nodeLatencyQuantilesMeasurement) {
 			indexer := indexerList[config.QuantilesIndexer]
 			indexDocuments(indexer, metricName, data)
 		} else {
@@ -51,4 +52,29 @@ func indexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 		}
 	}
 
+}
+
+// Common function to calculate quantiles for both node and pod latencies
+func calculateQuantiles(normLatencies []interface{}, quantileMap map[string][]float64, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
+	for _, normLatency := range normLatencies {
+		for condition, latency := range getLatency(normLatency) {
+			quantileMap[condition] = append(quantileMap[condition], latency)
+		}
+	}
+
+	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
+		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
+		latencySummary.UUID = globalCfg.UUID
+		latencySummary.Metadata = factory.metadata
+		latencySummary.MetricName = metricName
+		latencySummary.JobName = factory.jobConfig.Name
+		return latencySummary
+	}
+
+	var latencyQuantiles []interface{}
+	for condition, latencies := range quantileMap {
+		latencyQuantiles = append(latencyQuantiles, calcSummary(condition, latencies))
+	}
+
+	return latencyQuantiles
 }
