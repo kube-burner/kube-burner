@@ -5,14 +5,24 @@
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
 K8S_VERSION=${K8S_VERSION:-v1.27.0}
 OCI_BIN=${OCI_BIN:-podman}
+ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
   echo "Downloading kind"
-  curl -LsS https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}"/kind-linux-amd64 -o ${KIND_FOLDER}/kind-linux-amd64
-  chmod +x ${KIND_FOLDER}/kind-linux-amd64
+  # Kind is currently unavailable for ppc64le architecture, it is required that the binary is built for usage.
+  if [[ "$ARCH" == "ppc64le" ]]
+  then
+    git clone --single-branch --filter=tree:0 --branch ${KIND_VERSION} https://github.com/kubernetes-sigs/kind.git
+    make -C kind/ install INSTALL_DIR="${KIND_FOLDER}" KIND_BINARY_NAME="kind-linux-${ARCH}"
+    IMAGE=quay.io/powercloud/kind-node:"${K8S_VERSION}"
+  else
+    curl -LsS https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}/kind-linux-${ARCH}" -o ${KIND_FOLDER}/kind-linux-${ARCH}
+    chmod +x ${KIND_FOLDER}/kind-linux-${ARCH}
+    IMAGE=kindest/node:"${K8S_VERSION}"
+  fi
   echo "Deploying cluster"
-  ${KIND_FOLDER}/kind-linux-amd64 create cluster --config kind.yml --image kindest/node:"${K8S_VERSION}" --name kind --wait 300s -v=1
+  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1
   echo "Deploying kubevirt operator"
   KUBEVIRT_VERSION=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
   kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml
@@ -24,13 +34,13 @@ setup-kind() {
 
 create_test_kubeconfig() {
   echo "Creating another kubeconfig"
-  "${KIND_FOLDER}"/kind-linux-amd64 export kubeconfig --kubeconfig "${TEST_KUBECONFIG}"
+  "${KIND_FOLDER}/kind-linux-${ARCH}" export kubeconfig --kubeconfig "${TEST_KUBECONFIG}"
   kubectl config rename-context kind-kind "${TEST_KUBECONTEXT}" --kubeconfig "${TEST_KUBECONFIG}"
 }
 
 destroy-kind() {
-  echo "Destroying kind server"
-  "${KIND_FOLDER}"/kind-linux-amd64 delete cluster
+  echo "Destroying kind cluster"
+  "${KIND_FOLDER}/kind-linux-${ARCH}" delete cluster
 }
 
 setup-prometheus() {
