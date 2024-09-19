@@ -27,7 +27,6 @@ setup-kind() {
   KUBEVIRT_VERSION=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
   kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml
   kubectl create -f objectTemplates/kubevirt-cr.yaml
-  kubectl -n kubevirt patch kubevirt kubevirt --type=merge --patch '{"spec":{"configuration":{"developerConfiguration":{"useEmulation":true}}}}'
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt
 }
