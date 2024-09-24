@@ -1,6 +1,7 @@
 name: CI tests
 on:
   workflow_call:
+  workflow_dispatch:
   pull_request_target:
     branches:
       - master
