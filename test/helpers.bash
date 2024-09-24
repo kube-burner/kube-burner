@@ -23,6 +23,12 @@ setup-kind() {
   fi
   echo "Deploying cluster"
   "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1
+  echo "Deploying kubevirt operator"
+  KUBEVIRT_VERSION=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
+  kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml
+  kubectl create -f objectTemplates/kubevirt-cr.yaml
+  kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator
+  kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt
 }
 
 create_test_kubeconfig() {
