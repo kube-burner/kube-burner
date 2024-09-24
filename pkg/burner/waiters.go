@@ -269,7 +269,7 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, obj object, limiter *
 }
 
 func waitForJob(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	if obj.WaitOptions.ForCondition != "" {
+	if obj.WaitOptions.ForCondition == "" {
 		obj.WaitOptions.ForCondition = "Complete"
 	}
 	verifyCondition(ns, maxWaitTimeout, obj, limiter)
@@ -347,14 +347,14 @@ func verifyCondition(ns string, maxWaitTimeout time.Duration, obj object, limite
 }
 
 func waitForVM(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	if obj.WaitOptions.ForCondition != "" {
+	if obj.WaitOptions.ForCondition == "" {
 		obj.WaitOptions.ForCondition = "Ready"
 	}
 	verifyCondition(ns, maxWaitTimeout, obj, limiter)
 }
 
 func waitForVMI(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	if obj.WaitOptions.ForCondition != "" {
+	if obj.WaitOptions.ForCondition == "" {
 		obj.WaitOptions.ForCondition = "Ready"
 	}
 	verifyCondition(ns, maxWaitTimeout, obj, limiter)
