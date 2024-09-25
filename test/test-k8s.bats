@@ -61,6 +61,15 @@ teardown_file() {
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
+@test "kube-burner init: os-indexing=true; local-indexing=true; vm-latency-indexing=true" {
+  export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
+  run_cmd kube-burner init -c kube-burner-virt.yml --uuid="${UUID}" --log-level=debug
+  check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
+  check_file_list ${METRICS_FOLDER}/jobSummary.json  ${METRICS_FOLDER}/vmiLatencyMeasurement-kubevirt-density.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-kubevirt-density.json
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+}
+
 @test "kube-burner init: local-indexing=true; pod-latency-metrics-indexing=true" {
   export LOCAL_INDEXING=true
   run_cmd kube-burner init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
@@ -154,4 +163,3 @@ teardown_file() {
   check_custom_status_path kube-burner-uuid="${UUID}" "{.items[*].status.conditions[].type}" Available
   kube-burner destroy --uuid "${UUID}"
 }
-
