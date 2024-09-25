@@ -71,12 +71,13 @@ type vmiMetric struct {
 	vmReady        time.Time
 	VMReadyLatency int `json:"vmReadyLatency"`
 
-	MetricName string `json:"metricName"`
-	UUID       string `json:"uuid"`
-	Namespace  string `json:"namespace"`
-	Name       string `json:"podName"`
-	NodeName   string `json:"nodeName"`
-	JobName    string `json:"jobName,omitempty"`
+	MetricName string      `json:"metricName"`
+	UUID       string      `json:"uuid"`
+	Namespace  string      `json:"namespace"`
+	Name       string      `json:"podName"`
+	NodeName   string      `json:"nodeName"`
+	JobName    string      `json:"jobName,omitempty"`
+	Metadata   interface{} `json:"metadata,omitempty"`
 }
 
 type vmiLatency struct {

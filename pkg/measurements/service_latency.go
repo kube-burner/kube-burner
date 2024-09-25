@@ -61,6 +61,7 @@ type svcMetric struct {
 	Name              string             `json:"service"`
 	ServiceType       corev1.ServiceType `json:"type"`
 	JobName           string             `json:"jobName,omitempty"`
+	Metadata          interface{}        `json:"metadata,omitempty"`
 }
 
 func init() {
@@ -167,6 +168,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			UUID:              globalCfg.UUID,
 			IPAssignedLatency: ipAssignedLatency,
 			JobName:           factory.jobConfig.Name,
+			Metadata:          factory.metadata,
 		})
 	}(svc)
 }

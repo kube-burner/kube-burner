@@ -441,7 +441,7 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, false, indexer)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, false, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -449,7 +449,7 @@ func alertCmd() *cobra.Command {
 				Start: time.Unix(start, 0),
 				End:   time.Unix(end, 0),
 			}
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, indexer); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, indexer, nil); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(job)

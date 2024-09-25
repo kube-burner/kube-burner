@@ -46,13 +46,14 @@ type podMetric struct {
 	containersReady        time.Time
 	ContainersReadyLatency int `json:"containersReadyLatency"`
 	podReady               time.Time
-	PodReadyLatency        int    `json:"podReadyLatency"`
-	MetricName             string `json:"metricName"`
-	UUID                   string `json:"uuid"`
-	JobName                string `json:"jobName,omitempty"`
-	Namespace              string `json:"namespace"`
-	Name                   string `json:"podName"`
-	NodeName               string `json:"nodeName"`
+	PodReadyLatency        int         `json:"podReadyLatency"`
+	MetricName             string      `json:"metricName"`
+	UUID                   string      `json:"uuid"`
+	JobName                string      `json:"jobName,omitempty"`
+	Namespace              string      `json:"namespace"`
+	Name                   string      `json:"podName"`
+	NodeName               string      `json:"nodeName"`
+	Metadata               interface{} `json:"metadata,omitempty"`
 }
 
 type podLatency struct {
@@ -78,6 +79,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 		MetricName: podLatencyMeasurement,
 		UUID:       globalCfg.UUID,
 		JobName:    factory.jobConfig.Name,
+		Metadata:   factory.metadata,
 	})
 }
 
@@ -311,7 +313,6 @@ func (p *podLatency) normalizeMetrics() float64 {
 }
 
 func (p *podLatency) calcQuantiles() {
-	quantileMap := map[string][]float64{}
 	getLatency := func(normLatency interface{}) map[string]float64 {
 		podMetric := normLatency.(podMetric)
 		return map[string]float64{
@@ -321,5 +322,5 @@ func (p *podLatency) calcQuantiles() {
 			string(corev1.PodReady):        float64(podMetric.PodReadyLatency),
 		}
 	}
-	p.latencyQuantiles = calculateQuantiles(p.normLatencies, quantileMap, getLatency, podLatencyQuantilesMeasurement)
+	p.latencyQuantiles = calculateQuantiles(p.normLatencies, getLatency, podLatencyQuantilesMeasurement)
 }

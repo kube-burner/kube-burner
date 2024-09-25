@@ -55,13 +55,13 @@ func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 }
 
 // Common function to calculate quantiles for both node and pod latencies
-func calculateQuantiles(normLatencies []interface{}, quantileMap map[string][]float64, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
+func calculateQuantiles(normLatencies []interface{}, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
+	quantileMap := map[string][]float64{}
 	for _, normLatency := range normLatencies {
 		for condition, latency := range getLatency(normLatency) {
 			quantileMap[condition] = append(quantileMap[condition], latency)
 		}
 	}
-
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
 		latencySummary.UUID = globalCfg.UUID
