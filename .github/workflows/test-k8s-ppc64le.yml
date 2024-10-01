@@ -54,6 +54,7 @@ jobs:
         make test-k8s
       env:
         TERM: linux
+        PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
 
     - name: Clean up
       run: |

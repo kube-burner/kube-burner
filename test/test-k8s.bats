@@ -22,7 +22,7 @@ setup_file() {
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  export ES_SERVER="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com"
+  export ES_SERVER="$PERFSCALE_PROD_ES_SERVER"
   export ES_INDEX="kube-burner"
   export METRICS_FOLDER="metrics-${UUID}"
   export ES_INDEXING=""

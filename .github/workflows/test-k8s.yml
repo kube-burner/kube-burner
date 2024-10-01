@@ -51,3 +51,4 @@ jobs:
         TERM: linux
         KIND_VERSION: v0.19.0
         K8S_VERSION: ${{matrix.k8s-version}}
+        PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
