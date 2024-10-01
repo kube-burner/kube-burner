@@ -1,14 +1,12 @@
 # test-k8s.yml
 name: Execute tests on k8s and OCP
 on:
+  workflow_dispatch:
   workflow_call:
-    secrets:
-      OPENSHIFT_SERVER:
-        required: true
-      OPENSHIFT_USER:
-        required: true
-      OPENSHIFT_PASSWORD:
-        required: true
+  pull_request_target:
+  branches:
+    - master
+    - main
 jobs:
   test-k8s:
     runs-on: ubuntu-latest
@@ -51,3 +49,4 @@ jobs:
         TERM: linux
         KIND_VERSION: v0.19.0
         K8S_VERSION: ${{matrix.k8s-version}}
+        PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}

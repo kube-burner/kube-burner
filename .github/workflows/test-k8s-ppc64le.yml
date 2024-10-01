@@ -1,6 +1,10 @@
 name: Execute tests on k8s - PowerPC
 on:
   workflow_dispatch:
+  pull_request_target:
+  branches:
+    - master
+    - main
 
 env:
   K8S_VERSION: "v1.31.0"
@@ -12,6 +16,11 @@ jobs:
     steps:
     - name: Checkout the kube-burner repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        ref: ${{ github.event.pull_request.head.sha }}
+        persist-credentials: false
+
     - uses: actions/setup-go@v5
       with:
         go-version-file: 'go.mod'
@@ -19,7 +28,6 @@ jobs:
         # Disable caching to avoid error : Cannot open: File exists
         # https://github.com/actions/setup-go/issues/314
         cache: false
-
 
     - name: Install bats
       uses: bats-core/bats-action@2.0.0
@@ -54,6 +62,7 @@ jobs:
         make test-k8s
       env:
         TERM: linux
+        PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
 
     - name: Clean up
       run: |
