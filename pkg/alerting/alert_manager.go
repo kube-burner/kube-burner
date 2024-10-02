@@ -101,18 +101,19 @@ func (a *AlertManager) readProfile(alertProfileCfg string, embedConfig bool) err
 	var f io.Reader
 	var err error
 	if embedConfig {
-		embededLocation := path.Join(path.Dir(a.prometheus.ConfigSpec.EmbedFSDir), alertProfileCfg)
-		f, err = util.ReadEmbedConfig(a.prometheus.ConfigSpec.EmbedFS, embededLocation)
+		embeddedLocation := path.Join(path.Dir(a.prometheus.ConfigSpec.EmbedFSDir), alertProfileCfg)
+		f, err = util.ReadEmbedConfig(a.prometheus.ConfigSpec.EmbedFS, embeddedLocation)
 		if err != nil {
-			log.Info("Embedded config doesn't contain alert profile. Falling back to original path")
+			log.Infof("Embedded config doesn't contain alert profile %s. Falling back to original path", embeddedLocation)
 			f, err = util.ReadConfig(alertProfileCfg)
+		} else {
+			alertProfileCfg = embeddedLocation
 		}
-		alertProfileCfg = embededLocation
 	} else {
 		f, err = util.ReadConfig(alertProfileCfg)
 	}
 	if err != nil {
-		log.Fatalf("Error reading alert profile %s: %s", alertProfileCfg, err)
+		return fmt.Errorf("error reading alert profile %s: %s", alertProfileCfg, err)
 	}
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
