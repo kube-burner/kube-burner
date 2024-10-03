@@ -33,7 +33,7 @@ func ReadEmbedConfig(embedFs embed.FS, configFile string) (io.Reader, error) {
 func ReadConfig(configFile string) (io.Reader, error) {
 	var f io.Reader
 	var err error
-	if _, err = url.ParseRequestURI(configFile); err == nil {
+	if u, err := url.ParseRequestURI(configFile); err == nil && u.Host != "" {
 		f, err = readURL(configFile, f)
 	} else {
 		f, err = os.Open(configFile)
