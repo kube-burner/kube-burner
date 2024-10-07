@@ -2,7 +2,6 @@
 name: Create a new release of project
 on:
   workflow_call:
-  workflow_dispatch:
 jobs:
   release-go:
     name: GoReleaser build

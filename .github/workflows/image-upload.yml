@@ -2,7 +2,6 @@
 name: Upload containers to Quay
 on:
   workflow_call:
-  workflow_dispatch:
     secrets:
       QUAY_USER:
         required: true

@@ -1,7 +1,6 @@
 name: Deploy docs
 on:
   workflow_call:
-  workflow_dispatch:
 jobs:
   deploy-docs:
     runs-on: ubuntu-latest

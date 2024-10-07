@@ -1,10 +1,6 @@
 name: Execute tests on k8s - PowerPC
 on:
   workflow_dispatch:
-  pull_request_target:
-  branches:
-    - master
-    - main
 
 env:
   K8S_VERSION: "v1.31.0"

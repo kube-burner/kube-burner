@@ -1,6 +1,5 @@
 name: Release Workflow
 on:
-  workflow_dispatch:
   push:
     tags:
       - "*" # triggers only if push new tag version

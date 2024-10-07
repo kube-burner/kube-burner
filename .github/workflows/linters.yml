@@ -1,7 +1,6 @@
 name: Linters
 on:
   workflow_call:
-  workflow_dispatch:
 jobs:
   linters:
     runs-on: ubuntu-latest

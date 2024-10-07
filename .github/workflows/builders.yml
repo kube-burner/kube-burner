@@ -1,7 +1,6 @@
 name: Build Binary and Images
 on:
   workflow_call:
-  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
