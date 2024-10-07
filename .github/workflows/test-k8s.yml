@@ -3,10 +3,6 @@ name: Execute tests on k8s and OCP
 on:
   workflow_dispatch:
   workflow_call:
-  pull_request_target:
-  branches:
-    - master
-    - main
 jobs:
   test-k8s:
     runs-on: ubuntu-latest
