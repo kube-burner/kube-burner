@@ -51,6 +51,7 @@ type NodeMetric struct {
 	JobName                   string            `json:"jobName,omitempty"`
 	Name                      string            `json:"nodeName"`
 	Labels                    map[string]string `json:"labels"`
+	Metadata                  interface{}       `json:"metadata,omitempty"`
 }
 
 type nodeLatency struct {
@@ -77,6 +78,7 @@ func (n *nodeLatency) handleCreateNode(obj interface{}) {
 		UUID:       globalCfg.UUID,
 		JobName:    factory.jobConfig.Name,
 		Labels:     labels,
+		Metadata:   factory.metadata,
 	})
 }
 
@@ -260,7 +262,6 @@ func (n *nodeLatency) normalizeLatencies() {
 }
 
 func (n *nodeLatency) calculateQuantiles() {
-	quantileMap := map[string][]float64{}
 	getLatency := func(normLatency interface{}) map[string]float64 {
 		nodeMetric := normLatency.(NodeMetric)
 		return map[string]float64{
@@ -270,5 +271,5 @@ func (n *nodeLatency) calculateQuantiles() {
 			string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
 		}
 	}
-	n.latencyQuantiles = calculateQuantiles(n.normLatencies, quantileMap, getLatency, nodeLatencyQuantilesMeasurement)
+	n.latencyQuantiles = calculateQuantiles(n.normLatencies, getLatency, nodeLatencyQuantilesMeasurement)
 }

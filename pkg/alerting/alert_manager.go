@@ -63,6 +63,7 @@ type alert struct {
 	Description string        `json:"description"`
 	MetricName  string        `json:"metricName"`
 	ChurnMetric bool          `json:"churnMetric,omitempty"`
+	Metadata    interface{}   `json:"metadata,omitempty"`
 }
 
 // AlertManager configuration
@@ -71,6 +72,7 @@ type AlertManager struct {
 	prometheus   *prometheus.Prometheus
 	indexer      *indexers.Indexer
 	uuid         string
+	metadata     interface{}
 }
 
 var baseTemplate = []string{
@@ -84,12 +86,13 @@ type descriptionTemplate struct {
 }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, embedConfig bool, indexer *indexers.Indexer) (*AlertManager, error) {
+func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, embedConfig bool, indexer *indexers.Indexer, metadata interface{}) (*AlertManager, error) {
 	log.Infof("🔔 Initializing alert manager for prometheus: %v", prometheusClient.Endpoint)
 	a := AlertManager{
 		prometheus: prometheusClient,
 		uuid:       uuid,
 		indexer:    indexer,
+		metadata:   metadata,
 	}
 	if err := a.readProfile(alertProfileCfg, embedConfig); err != nil {
 		return &a, err
@@ -154,6 +157,7 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 		}
 		for _, alertSet := range alertData {
 			alertSet.UUID = a.uuid
+			alertSet.Metadata = a.metadata
 			alertList = append(alertList, alertSet)
 		}
 	}

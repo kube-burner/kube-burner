@@ -39,7 +39,8 @@ func NewWorkloadHelper(config Config, embedConfig embed.FS, kubeClientProvider *
 		Config:             config,
 		embedConfig:        embedConfig,
 		kubeClientProvider: kubeClientProvider,
-		Metadata:           make(map[string]interface{}),
+		MetricsMetadata:    make(map[string]interface{}),
+		SummaryMetadata:    make(map[string]interface{}),
 	}
 	return wh
 }
@@ -80,7 +81,8 @@ func (wh *WorkloadHelper) Run(workload string) int {
 	metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 		ConfigSpec:      &ConfigSpec,
 		MetricsEndpoint: wh.MetricsEndpoint,
-		RawMetadata:     wh.Metadata,
+		SummaryMetadata: wh.SummaryMetadata,
+		MetricsMetadata: wh.MetricsMetadata,
 		EmbedConfig:     embedConfig,
 		UserMetaData:    wh.UserMetadata,
 	})

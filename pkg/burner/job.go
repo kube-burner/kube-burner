@@ -110,7 +110,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
-		measurements.NewMeasurementFactory(configSpec, metricsScraper.Metadata)
+		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
 		jobList = newExecutorList(configSpec, kubeClientProvider, uuid, timeout)
 		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
 		for _, job := range jobList {
@@ -302,7 +302,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				ChurnStartTimestamp: job.ChurnStart,
 				ChurnEndTimestamp:   job.ChurnEnd,
 				JobConfig:           job.JobConfig,
-				Metadata:            metricsScraper.Metadata,
+				Metadata:            metricsScraper.SummaryMetadata,
 				Passed:              innerRC,
 				ExecutionErrors:     executionErrors,
 				Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
