@@ -58,6 +58,8 @@ type Measurement struct {
 	QuantilesIndexer string `yaml:"quantilesIndexer"`
 	// Defines the indexer for timeseries
 	TimeseriesIndexer string `yaml:"timeseriesIndexer"`
+	// Measurement specific parameters
+	Config map[string]string `yaml:"config"`
 }
 
 // LatencyThreshold holds the thresholds configuration
