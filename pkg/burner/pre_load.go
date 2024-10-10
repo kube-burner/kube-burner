@@ -74,7 +74,7 @@ func getJobImages(job Executor) ([]string, error) {
 		}
 		yamlToUnstructured(object.ObjectTemplate, renderedObj, &unstructuredObject)
 		switch unstructuredObject.GetKind() {
-		case "Deployment", "DaemonSet", "ReplicaSet", "Job":
+		case "Deployment", "DaemonSet", "ReplicaSet", "Job", "StatefulSet":
 			var pod NestedPod
 			runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObject.UnstructuredContent(), &pod)
 			for _, i := range pod.Spec.Template.Containers {
