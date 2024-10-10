@@ -52,6 +52,17 @@ func prepareTemplate(original []byte) ([]byte, error) {
 	return original, nil
 }
 
+func setLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
+	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
+	if !found {
+		return
+	}
+	for k, v := range labels {
+		labelMap[k] = v
+	}
+	unstructured.SetNestedMap(obj.Object, labelMap, templatePath...)
+}
+
 // Helps to set metadata labels
 func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string) {
 	// Will be useful for the resources like Deployments and Replicasets. Because
@@ -59,14 +70,12 @@ func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string)
 	// objects (i.e Pods under deployment/replicastes). So this function should help
 	// us achieve that without breaking any of our labeling functionality.
 	templatePath := []string{"spec", "template", "metadata", "labels"}
-	metadata, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
-	if !found {
-		return
+	setLabels(obj, labels, templatePath)
+	if obj.GetKind() == "StatefulSet" {
+		templatePath = []string{"spec", "selector", "matchLabels"}
+		setLabels(obj, labels, templatePath)
 	}
-	for k, v := range labels {
-		metadata[k] = v
-	}
-	unstructured.SetNestedMap(obj.Object, metadata, templatePath...)
+
 }
 
 func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
