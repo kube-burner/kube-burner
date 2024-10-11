@@ -26,8 +26,10 @@ type ScraperConfig struct {
 	ConfigSpec      *config.Spec
 	MetricsEndpoint string
 	UserMetaData    string
-	SummaryMetadata map[string]interface{}
-	MetricsMetadata map[string]interface{}
+	RawMetadata     map[string]interface{}
+	MetricsProfile  string
+	AlertProfile    string
+	EmbedConfig     bool
 }
 
 // ScraperResponse holds parsed data related to scraper and target indexer
@@ -35,6 +37,5 @@ type Scraper struct {
 	PrometheusClients []*prometheus.Prometheus
 	AlertMs           []*alerting.AlertManager
 	IndexerList       map[string]indexers.Indexer
-	SummaryMetadata   map[string]interface{}
-	MetricsMetadata   map[string]interface{}
+	Metadata          map[string]interface{}
 }
