@@ -71,7 +71,7 @@ func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string)
 	// us achieve that without breaking any of our labeling functionality.
 	templatePath := []string{"spec", "template", "metadata", "labels"}
 	setLabels(obj, labels, templatePath)
-	if obj.GetKind() == "StatefulSet" {
+	if obj.GetKind() == StatefulSet {
 		templatePath = []string{"spec", "selector", "matchLabels"}
 		setLabels(obj, labels, templatePath)
 	}

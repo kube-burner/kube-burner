@@ -54,29 +54,29 @@ func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
 				waitNs = ""
 			}
 			switch kind {
-			case "Deployment":
+			case Deployment:
 				waitForDeployments(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "ReplicaSet":
+			case ReplicaSet:
 				waitForRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "ReplicationController":
+			case ReplicationController:
 				waitForRC(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "StatefulSet":
+			case StatefulSet:
 				waitForStatefulSet(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "DaemonSet":
+			case DaemonSet:
 				waitForDS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "Pod":
+			case Pod:
 				waitForPod(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "Build", "BuildConfig":
+			case Build, BuildConfig:
 				waitForBuild(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "VirtualMachine":
+			case VirtualMachine:
 				waitForVM(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "VirtualMachineInstance":
+			case VirtualMachineInstance:
 				waitForVMI(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "VirtualMachineInstanceReplicaSet":
+			case VirtualMachineInstanceReplicaSet:
 				waitForVMIRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "Job":
+			case Job:
 				waitForJob(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case "PersistentVolumeClaim":
+			case PersistentVolumeClaim:
 				waitForPVC(waitNs, ex.MaxWaitTimeout, obj, limiter)
 			}
 		}
