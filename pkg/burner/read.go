@@ -57,7 +57,7 @@ func setupReadJob(jobConfig config.Job) Executor {
 }
 
 // RunReadJob executes a reading job
-func (ex *Executor) RunReadJob(iterationStart, iterationEnd int) {
+func (ex *Executor) RunReadJob(ctx context.Context, iterationStart, iterationEnd int) {
 	var itemList *unstructured.UnstructuredList
 
 	// We have to sum 1 since the iterations start from 1
@@ -66,6 +66,9 @@ func (ex *Executor) RunReadJob(iterationStart, iterationEnd int) {
 	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
 	ex.waitForObjects("", waitRateLimiter)
 	for i := iterationStart; i < iterationEnd; i++ {
+		if ctx.Err() != nil {
+			return
+		}
 		if i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++

@@ -108,6 +108,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	executorMap := make(map[string]Executor)
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
@@ -122,6 +123,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 		// Iterate job list
 		for jobPosition, job := range jobList {
+			executedJobs = append(executedJobs, prometheus.Job{
+				Start:     time.Now().UTC(),
+				JobConfig: job.Job,
+			})
 			var waitListNamespaces []string
 			if job.QPS == 0 || job.Burst == 0 {
 				log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
@@ -134,10 +139,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
-			currentJob := prometheus.Job{
-				Start:     time.Now().UTC(),
-				JobConfig: job.Job,
-			}
 			measurements.SetJobConfig(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
 			measurements.Start()
@@ -155,7 +156,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", job.ChurnDelay)
 					log.Infof("Churn deletion strategy: %v", job.ChurnDeletionStrategy)
 				}
-				job.RunCreateJob(0, job.JobIterations, &waitListNamespaces)
+				job.RunCreateJob(ctx, 0, job.JobIterations, &waitListNamespaces)
+				if ctx.Err() != nil {
+					return
+				}
 				// If object verification is enabled
 				if job.VerifyObjects && !job.Verify() {
 					err := errors.New("object verification failed")
@@ -168,18 +172,18 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if job.Churn {
 					now := time.Now().UTC()
-					currentJob.ChurnStart = &now
-					job.RunCreateJobWithChurn()
-					currentJob.ChurnEnd = &now
+					executedJobs[len(executedJobs)-1].ChurnStart = &now
+					job.RunCreateJobWithChurn(ctx)
+					executedJobs[len(executedJobs)-1].ChurnEnd = &now
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
 			case config.DeletionJob:
-				job.RunDeleteJob()
+				job.RunDeleteJob(ctx)
 			case config.PatchJob:
-				job.RunPatchJob()
+				job.RunPatchJob(ctx)
 			case config.ReadJob:
-				job.RunReadJob(0, job.JobIterations)
+				job.RunReadJob(ctx, 0, job.JobIterations)
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
@@ -200,10 +204,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
 				time.Sleep(job.JobPause)
 			}
-			currentJob.End = time.Now().UTC()
-			executedJobs = append(executedJobs, currentJob)
+			executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 			if !globalConfig.WaitWhenFinished {
-				elapsedTime := currentJob.End.Sub(currentJob.Start).Round(time.Second)
+				elapsedTime := executedJobs[len(executedJobs)-1].End.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
 			// We stop and index measurements per job
@@ -273,6 +276,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	case <-time.After(timeout):
 		err := fmt.Errorf("%v timeout reached", timeout)
 		log.Error(err.Error())
+		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		//nolint:govet
+		gcCtx, _ := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+		for _, job := range jobList {
+			gcWg.Add(1)
+			go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
+		}
 		errs = append(errs, err)
 		rc = rcTimeout
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)

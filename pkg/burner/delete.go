@@ -58,10 +58,13 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 }
 
 // RunDeleteJob executes a deletion job
-func (ex *Executor) RunDeleteJob() {
+func (ex *Executor) RunDeleteJob(ctx context.Context) {
 	var wg sync.WaitGroup
 	var itemList *unstructured.UnstructuredList
 	for _, obj := range ex.objects {
+		if ctx.Err() != nil {
+			return
+		}
 		labelSelector := labels.Set(obj.labelSelector).String()
 		listOptions := metav1.ListOptions{
 			LabelSelector: labelSelector,
