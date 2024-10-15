@@ -106,14 +106,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 		// Iterate job list
 		for jobPosition, job := range jobList {
+			executedJobs = append(executedJobs, prometheus.Job{
+				Start:     time.Now().UTC(),
+				JobConfig: job.Job,
+			})
 			var waitListNamespaces []string
 			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
-			currentJob := prometheus.Job{
-				Start:     time.Now().UTC(),
-				JobConfig: job.Job,
-			}
 			measurements.SetJobConfig(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
 			measurements.Start()
@@ -143,9 +143,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if job.Churn {
 					now := time.Now().UTC()
-					currentJob.ChurnStart = &now
+					executedJobs[len(executedJobs)-1].ChurnStart = &now
 					job.RunCreateJobWithChurn()
-					currentJob.ChurnEnd = &now
+					executedJobs[len(executedJobs)-1].ChurnEnd = &now
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
@@ -171,10 +171,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
 				time.Sleep(job.JobPause)
 			}
-			currentJob.End = time.Now().UTC()
-			executedJobs = append(executedJobs, currentJob)
+			executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 			if !globalConfig.WaitWhenFinished {
-				elapsedTime := currentJob.End.Sub(currentJob.Start).Round(time.Second)
+				elapsedTime := executedJobs[len(executedJobs)-1].End.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
 			// We stop and index measurements per job
@@ -242,6 +241,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	select {
 	case rc = <-res:
 	case <-time.After(timeout):
+		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 		err := fmt.Errorf("%v timeout reached", timeout)
 		log.Error(err.Error())
 		errs = append(errs, err)
