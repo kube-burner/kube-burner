@@ -45,8 +45,12 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	}
 	// Combine users provided metadata with metrics and summary metadata
 	for k, v := range userMetadata {
-		scraperConfig.SummaryMetadata[k] = v
-		scraperConfig.MetricsMetadata[k] = v
+		if scraperConfig.SummaryMetadata != nil {
+			scraperConfig.SummaryMetadata[k] = v
+		}
+		if scraperConfig.MetricsMetadata != nil {
+			scraperConfig.MetricsMetadata[k] = v
+		}
 	}
 	// MetricsEndpoint has preference over the configuration file
 	if scraperConfig.MetricsEndpoint != "" {
