@@ -91,7 +91,7 @@ func (ex *Executor) setupCreateJob() {
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -120,6 +120,9 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	var namespacesCreated = make(map[string]bool)
 	var namespacesWaited = make(map[string]bool)
 	for i := iterationStart; i < iterationEnd; i++ {
+		if ctx.Err() != nil {
+			return
+		}
 		if i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
@@ -148,10 +151,10 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 				if i == 0 {
 					// this executes only once during the first iteration of an object
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
-					ex.replicaHandler(labels, obj, ns, i, &wg)
+					ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
 				}
 			} else {
-				ex.replicaHandler(labels, obj, ns, i, &wg)
+				ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
 			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
@@ -205,10 +208,13 @@ func (ex *Executor) generateNamespace(iteration int) string {
 	return fmt.Sprintf("%s-%d", ex.Namespace, nsIndex)
 }
 
-func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
+func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	for r := 1; r <= obj.Replicas; r++ {
+		if ctx.Err() != nil {
+			return
+		}
 		// make a copy of the labels map for each goroutine to prevent panic from concurrent read and write
 		copiedLabels := make(map[string]string)
 		for k, v := range labels {
@@ -257,7 +263,7 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 				if !obj.Namespaced {
 					n = ""
 				}
-				createRequest(obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
 				replicaWg.Done()
 			}(ns)
 		}(r)
@@ -265,10 +271,13 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 	wg.Wait()
 }
 
-func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
+func createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
 	util.RetryWithExponentialBackOff(func() (bool, error) {
+		if ctx.Err() != nil {
+			return true, err
+		}
 		// When the object has a namespace already specified, use it
 		if objNs := obj.GetNamespace(); objNs != "" {
 			ns = objNs
@@ -311,7 +320,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 }
 
 // RunCreateJobWithChurn executes a churn creation job
-func (ex *Executor) RunCreateJobWithChurn() {
+func (ex *Executor) RunCreateJobWithChurn(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
 	if !ex.nsRequired {
 		log.Info("No namespaces were created in this job, skipping churning stage")
 		return
@@ -372,7 +384,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		util.CleanupNamespaces(ctx, ClientSet, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(randStart, numToChurn+randStart, &[]string{})
+		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})
 		log.Infof("Sleeping for %v", ex.ChurnDelay)
 		time.Sleep(ex.ChurnDelay)
 		cyclesCount++
