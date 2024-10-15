@@ -71,10 +71,11 @@ To configure your bash shell to load completions for each session execute:
 }
 
 func initCmd() *cobra.Command {
+	var err error
 	var clientSet kubernetes.Interface
 	var kubeConfig, kubeContext string
-	var metricsEndpoint, configFile string
-	var uuid, userMetadata string
+	var metricsEndpoint, configFile , configMap, metricsProfile , alertProfile string
+	var uuid, userMetadata , namespace string
 	var skipTLSVerify bool
 	var timeout time.Duration
 	var rc int
@@ -87,6 +88,14 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			if configMap != "" {
+				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+				// We assume configFile is config.yml
+				configFile = "config.yml"
+			}
 			util.SetupLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
@@ -102,6 +111,8 @@ func initCmd() *cobra.Command {
 				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,
 				UserMetaData:    userMetadata,
+				AlertProfile:    alertProfile,
+				MetricsProfile:  metricsProfile,
 			})
 			if configSpec.GlobalConfig.ClusterHealth {
 				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
@@ -120,11 +131,13 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
+	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().SortFlags = false
-	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagsMutuallyExclusive("config","configmap")
 	return cmd
 }
 

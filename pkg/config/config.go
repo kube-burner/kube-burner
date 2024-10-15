@@ -15,6 +15,7 @@
 package config
 
 import (
+	"context"
 	"bytes"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -192,6 +194,40 @@ func (p *KubeClientProvider) ClientSet(QPS float32, burst int) (kubernetes.Inter
 	restConfig.QPS, restConfig.Burst = QPS, burst
 	restConfig.Timeout = configSpec.GlobalConfig.RequestTimeout
 	return kubernetes.NewForConfigOrDie(&restConfig), &restConfig
+}
+
+// FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
+func FetchConfigMap(configMap, namespace string) (string, string, error) {
+	log.Infof("Fetching configmap %s", configMap)
+	var kubeconfig, metricProfile, alertProfile string
+	if os.Getenv("KUBECONFIG") != "" {
+		kubeconfig = os.Getenv("KUBECONFIG")
+	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
+	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		return metricProfile, alertProfile, err
+	}
+	clientSet := kubernetes.NewForConfigOrDie(restConfig)
+	configMapData, err := clientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap, v1.GetOptions{})
+	if err != nil {
+		return metricProfile, alertProfile, err
+	}
+
+	for name, data := range configMapData.Data {
+		// We write the configMap data into the CWD
+		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
+			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
+		}
+		if name == "metrics.yml" {
+			metricProfile = "metrics.yml"
+		}
+		if name == "alerts.yml" {
+			alertProfile = "alerts.yml"
+		}
+	}
+	return metricProfile, alertProfile, nil
 }
 
 func validateDNS1123() error {

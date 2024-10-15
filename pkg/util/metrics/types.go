@@ -28,6 +28,8 @@ type ScraperConfig struct {
 	UserMetaData    string
 	SummaryMetadata map[string]interface{}
 	MetricsMetadata map[string]interface{}
+	MetricsProfile	string
+	AlertProfile	string 
 	EmbedConfig     bool
 }
 
