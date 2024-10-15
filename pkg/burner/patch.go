@@ -84,12 +84,14 @@ func setupPatchJob(jobConfig config.Job) Executor {
 }
 
 // RunPatchJob executes a patch job
-func (ex *Executor) RunPatchJob() {
+func (ex *Executor) RunPatchJob(ctx context.Context) {
 	var itemList *unstructured.UnstructuredList
 	log.Infof("Running patch job %s", ex.Name)
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
-
+		if ctx.Err() != nil {
+			return
+		}
 		labelSelector := labels.Set(obj.labelSelector).String()
 		listOptions := metav1.ListOptions{
 			LabelSelector: labelSelector,

@@ -108,6 +108,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	executorMap := make(map[string]Executor)
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
@@ -155,7 +156,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", job.ChurnDelay)
 					log.Infof("Churn deletion strategy: %v", job.ChurnDeletionStrategy)
 				}
-				job.RunCreateJob(0, job.JobIterations, &waitListNamespaces)
+				job.RunCreateJob(ctx, 0, job.JobIterations, &waitListNamespaces)
+				if ctx.Err() != nil {
+					return
+				}
 				// If object verification is enabled
 				if job.VerifyObjects && !job.Verify() {
 					err := errors.New("object verification failed")
@@ -169,17 +173,17 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				if job.Churn {
 					now := time.Now().UTC()
 					executedJobs[len(executedJobs)-1].ChurnStart = &now
-					job.RunCreateJobWithChurn()
+					job.RunCreateJobWithChurn(ctx)
 					executedJobs[len(executedJobs)-1].ChurnEnd = &now
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
 			case config.DeletionJob:
-				job.RunDeleteJob()
+				job.RunDeleteJob(ctx)
 			case config.PatchJob:
-				job.RunPatchJob()
+				job.RunPatchJob(ctx)
 			case config.ReadJob:
-				job.RunReadJob(0, job.JobIterations)
+				job.RunReadJob(ctx, 0, job.JobIterations)
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
@@ -270,9 +274,15 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	select {
 	case rc = <-res:
 	case <-time.After(timeout):
-		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 		err := fmt.Errorf("%v timeout reached", timeout)
 		log.Error(err.Error())
+		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		//nolint:govet
+		gcCtx, _ := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+		for _, job := range jobList {
+			gcWg.Add(1)
+			go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
+		}
 		errs = append(errs, err)
 		rc = rcTimeout
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
