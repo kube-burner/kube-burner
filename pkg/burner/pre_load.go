@@ -74,13 +74,13 @@ func getJobImages(job Executor) ([]string, error) {
 		}
 		yamlToUnstructured(object.ObjectTemplate, renderedObj, &unstructuredObject)
 		switch unstructuredObject.GetKind() {
-		case "Deployment", "DaemonSet", "ReplicaSet", "Job":
+		case Deployment, DaemonSet, ReplicaSet, Job, StatefulSet:
 			var pod NestedPod
 			runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObject.UnstructuredContent(), &pod)
 			for _, i := range pod.Spec.Template.Containers {
 				imageList = append(imageList, i.Image)
 			}
-		case "Pod":
+		case Pod:
 			var pod corev1.Pod
 			runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObject.UnstructuredContent(), &pod)
 			for _, i := range pod.Spec.Containers {
@@ -110,7 +110,7 @@ func createDSs(imageList []string, namespaceLabels map[string]string, namespaceA
 	dsName := "preload"
 	ds := appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "DaemonSet",
+			Kind:       DaemonSet,
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
