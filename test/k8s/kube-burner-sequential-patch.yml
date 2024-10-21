@@ -1,0 +1,52 @@
+---
+jobs:
+  - name: sequential-patch
+    jobType: create
+    jobIterations: 1
+    qps: {{ .QPS }}
+    burst: {{ .BURST }}
+    namespacedIterations: false
+    preLoadImages: false
+    cleanup: true
+    namespace: {{ .NAMESPACE }}
+    podWait: false
+    waitWhenFinished: true
+    verifyObjects: true
+    errorOnVerify: true
+    jobIterationDelay: 5s
+    maxWaitTimeout: 2m
+    objects:
+
+    - objectTemplate: objectTemplates/deployment.yml
+      replicas: {{ .REPLICAS }}
+      inputVars:
+        containerImage: quay.io/cloud-bulldozer/sampleapp:latest
+      waitOptions:
+        forCondition: Available
+        customStatusPath: ".conditions[].type"
+
+  - name: relabel
+    jobType: patch
+    patchExecutionMode: sequential
+    jobIterations: 1
+    qps: {{ .QPS }}
+    burst: {{ .BURST }}
+    maxWaitTimeout: 10s
+    objects:
+    - kind: Deployment
+      objectTemplate: objectTemplates/deployment_patch_label.yaml
+      labelSelector: {kube-burner-job: sequential-patch}
+      patchType: "application/strategic-merge-patch+json"
+      apiVersion: apps/v1
+      inputVars:
+        labelKey: {{ .LABEL_KEY }}
+        labelValue: {{ .LABEL_VALUE_START }}
+    - kind: Deployment
+      objectTemplate: objectTemplates/deployment_patch_label.yaml
+      labelSelector:
+        {{ .LABEL_KEY }}: {{ .LABEL_VALUE_START }}
+      patchType: "application/strategic-merge-patch+json"
+      apiVersion: apps/v1
+      inputVars:
+        labelKey: {{ .LABEL_KEY }}
+        labelValue: {{ .LABEL_VALUE_END }}

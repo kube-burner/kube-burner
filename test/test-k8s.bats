@@ -163,3 +163,15 @@ teardown_file() {
   check_custom_status_path kube-burner-uuid="${UUID}" "{.items[*].status.conditions[].type}" Available
   kube-burner destroy --uuid "${UUID}"
 }
+
+@test "kube-burner init: sequential patch" {
+  export NAMESPACE="sequential-patch"
+  export LABEL_KEY="sequential.patch.test"
+  export LABEL_VALUE_START="start"
+  export LABEL_VALUE_END="end"
+  export REPLICAS=50
+
+  run_cmd kube-burner init -c  kube-burner-sequential-patch.yml --uuid="${UUID}" --log-level=debug
+  check_deployment_count ${NAMESPACE} ${LABEL_KEY} ${LABEL_VALUE_END} ${REPLICAS}
+  kubectl delete ns ${NAMESPACE}
+}
