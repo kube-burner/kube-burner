@@ -280,6 +280,82 @@ jobs:
     labelSelector: {kube-burner-job: create-objects}
 ```
 
+### Kubevirt
+
+This type of job can be used to execute `virtctl` commands described in the object list. This object list has the following structure:
+
+```yaml
+objects:
+- kubeVirtOp: start
+  labelSelector: {kube-burner-job: cluster-density}
+  inputVars:
+    force: true
+```
+
+Where:
+
+- `kubeVirtOp`: virtctl operation to execute.
+- `labelSelector`: Map with the labelSelector.
+- `inputVars`: Additional command parameters
+
+#### Supported Operations
+
+##### `start`
+
+Execute `virtctl start` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `startPaused` - VM will start in `Paused` state. Default `false`
+
+##### `stop`
+
+Execute `virtctl stop` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `force` - Force stop the VM without waiting. Default `false`
+
+##### `restart`
+
+Execute `virtctl restart` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `force` - Force restart the VM without waiting. Default `false`
+
+##### `pause`
+
+Execute `virtctl pause` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+##### `unpause`
+
+Execute `virtctl unpause` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+
+##### `migrate`
+
+Execute `virtctl migrate` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+##### `add-volume`
+
+Execute `virtctl addvolume` on the VMs mapped by the `labelSelector`.
+Additional parameters should be set using the `inputVars` field:
+
+- `volumeName` - Name of the already existing volume to add. Mandatory
+- `diskType` - Type of the new volume (`disk`/`lun`). Default `disk`
+- `serial` - serial number you want to assign to the disk. Defaults to the value of `volumeName`
+- `cache` - caching options attribute control the cache mechanism. Default `''`
+- `persist` - if set, the added volume will be persisted in the VM spec (if it exists). Default `false`
+
+##### `remove-volume`
+
+Execute `virtctl removevolume` on the VMs mapped by the `labelSelector`.
+Additional parameters should be set using the `inputVars` field:
+
+- `volumeName` - Name of the volume to remove. Mandatory
+- `persist` - if set, the added volume will be persisted in the VM spec (if it exists). Default `false`
+
 ## Execution Modes
 
 Patch jobs support different execution modes
