@@ -6,7 +6,7 @@ load helpers.bash
 
 setup_file() {
   cd k8s
-  export BATS_TEST_TIMEOUT=600
+  export BATS_TEST_TIMEOUT=1800
   export JOB_ITERATIONS=4
   export QPS=3
   export BURST=3
@@ -185,4 +185,8 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c  kube-burner-sequential-patch.yml --uuid="${UUID}" --log-level=debug
   check_deployment_count ${NAMESPACE} ${LABEL_KEY} ${LABEL_VALUE_END} ${REPLICAS}
   kubectl delete ns ${NAMESPACE}
+}
+
+@test "kube-burner init: jobType kubevirt" {
+  run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid="${UUID}" --log-level=debug
 }
