@@ -93,7 +93,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	executorMap := make(map[string]Executor)
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
@@ -249,8 +250,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		err := fmt.Errorf("%v timeout reached", timeout)
 		log.Error(err.Error())
 		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
-		//nolint:govet
-		gcCtx, _ := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+		gcCtx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+		defer cancel()
 		for _, job := range jobList {
 			gcWg.Add(1)
 			go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
