@@ -12,7 +12,9 @@ Collects latencies from the different pod/vm/vmi startup phases, these **latency
   measurements:
   - name: podLatency
 ```
+
 or
+
 ```yaml
   measurements:
   - name: vmiLatency
@@ -71,6 +73,7 @@ Pod latency quantile sample:
 Where `quantileName` matches with the pod conditions and can be:
 
 - `PodScheduled`: Pod has been scheduled in to a node.
+- `PodReadyToStartContainers`: The Pod sandbox has been successfully created and networking configured.
 - `Initialized`: All init containers in the pod have started successfully
 - `ContainersReady`: Indicates whether all containers in the pod are ready.
 - `Ready`: The pod is able to service requests and should be added to the load balancing pools of all matching services.
