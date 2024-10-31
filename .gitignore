@@ -8,3 +8,7 @@
 bin
 dist
 site/
+test/k8s/kube-burner-*-*-*-*-*.log
+test/k8s/metrics-*-*-*-*-*/
+test/k8s/*/alert.json
+.vscode/
