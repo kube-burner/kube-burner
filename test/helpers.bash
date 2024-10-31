@@ -50,7 +50,7 @@ setup-prometheus() {
 
 check_ns() {
   echo "Checking the number of namespaces labeled with \"${1}\" is \"${2}\""
-  if [[ $(kubectl get ns -l "${1}" -o name | wc -l) != "${2}" ]]; then
+  if [[ $(kubectl get ns -l "${1}" -o json | jq '.items | length') != "${2}" ]]; then
     echo "Number of namespaces labeled with ${1} less than expected"
     return 1
   fi
@@ -58,7 +58,7 @@ check_ns() {
 
 check_destroyed_ns() {
   echo "Checking namespace \"${1}\" has been destroyed"
-  if [[ $(kubectl get ns -l "${1}" -o name | wc -l) != 0 ]]; then
+  if [[ $(kubectl get ns -l "${1}" -o json | jq '.items | length') != 0 ]]; then
     echo "Namespaces labeled with \"${1}\" not destroyed"
     return 1
   fi
@@ -66,14 +66,14 @@ check_destroyed_ns() {
 
 check_destroyed_pods() {
   echo "Checking pods have been destroyed in namespace ${1}"
-  if [[ $(kubectl get pod -n "${1}" -l "${2}" -o name | wc -l) != 0 ]]; then
+  if [[ $(kubectl get pod -n "${1}" -l "${2}" -o json | jq '.items | length') != 0 ]]; then
     echo "Pods in namespace ${1} not destroyed"
     return 1
   fi
 }
 
 check_running_pods() {
-  running_pods=$(kubectl get pod -A -l ${1} --field-selector=status.phase==Running --no-headers | wc -l)
+  running_pods=$(kubectl get pod -A -l ${1} --field-selector=status.phase==Running -o json | jq '.items | length')
   if [[ "${running_pods}" != "${2}" ]]; then
     echo "Running pods in cluster labeled with ${1} different from expected: Expected=${2}, observed=${running_pods}"
     return 1
@@ -81,7 +81,7 @@ check_running_pods() {
 }
 
 check_running_pods_in_ns() {
-    running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced --field-selector=status.phase==Running --no-headers | wc -l)
+    running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced --field-selector=status.phase==Running -o json | jq '.items | length')
     if [[ "${running_pods}" != "${2}" ]]; then
       echo "Running pods in namespace $1 different from expected. Expected=${2}, observed=${running_pods}"
       return 1
