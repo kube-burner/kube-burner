@@ -107,7 +107,7 @@ teardown_file() {
 
 @test "kube-burner init: crd" {
   kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/network-attachment-definition-client/master/artifacts/networks-crd.yaml
-  sleep 5s
+  sleep 5
   run_cmd kube-burner init -c kube-burner-crd.yml --uuid="${UUID}"
   kubectl delete -f objectTemplates/storageclass.yml
 }
