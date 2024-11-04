@@ -16,7 +16,6 @@ package burner
 
 import (
 	"context"
-	"io"
 	"strings"
 	"sync"
 
@@ -24,23 +23,16 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func setupPatchJob(jobConfig config.Job) Executor {
-	var f io.Reader
-	var err error
-	log.Debugf("Preparing patch job: %s", jobConfig.Name)
+func setupPatchJob(ex *Executor) {
+	log.Debugf("Preparing %s job: %s", ex.JobType, ex.Name)
 
-	ex := Executor{
-		Job:         jobConfig,
-		itemHandler: patchHandler,
-	}
+	ex.itemHandler = patchHandler
 
 	if len(ex.ExecutionMode) == 0 {
 		ex.ExecutionMode = config.ExecutionModeParallel
@@ -50,44 +42,13 @@ func setupPatchJob(jobConfig config.Job) Executor {
 	}
 
 	mapper := newRESTMapper()
-	for _, o := range jobConfig.Objects {
-		if o.APIVersion == "" {
-			o.APIVersion = "v1"
-		}
-		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		f, err = util.ReadConfig(o.ObjectTemplate)
-		if err != nil {
-			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
-		}
-		t, err := io.ReadAll(f)
-		if err != nil {
-			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
-		}
-
-		// Unlike create, we don't want to create the gvk with the entire template,
-		// because it would try to use the properties of the patch data to find
-		// the objects to patch.
-		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
-		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		if err != nil {
-			log.Fatal(err)
-		}
-		if len(o.LabelSelector) == 0 {
-			log.Fatalf("Empty labelSelectors not allowed with: %s", o.Kind)
-		}
+	for _, o := range ex.Objects {
 		if len(o.PatchType) == 0 {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
-		obj := object{
-			gvr:        mapping.Resource,
-			objectSpec: t,
-			Object:     o,
-		}
-		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-		log.Infof("Job %s: Patch %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.LabelSelector))
-		ex.objects = append(ex.objects, obj)
+		log.Infof("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
+		ex.objects = append(ex.objects, newObject(o, mapper))
 	}
-	return ex
 }
 
 func patchHandler(ex *Executor, obj object, originalItem unstructured.Unstructured, iteration int, wg *sync.WaitGroup) {

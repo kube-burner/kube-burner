@@ -41,7 +41,7 @@ type NestedPod struct {
 	} `json:"spec"`
 }
 
-func preLoadImages(job Executor) error {
+func preLoadImages(job *Executor) error {
 	log.Info("Pre-load: images from job ", job.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
@@ -64,7 +64,7 @@ func preLoadImages(job Executor) error {
 	return nil
 }
 
-func getJobImages(job Executor) ([]string, error) {
+func getJobImages(job *Executor) ([]string, error) {
 	var imageList []string
 	var unstructuredObject unstructured.Unstructured
 	for _, object := range job.objects {

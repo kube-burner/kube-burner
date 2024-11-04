@@ -21,20 +21,16 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func setupDeleteJob(jobConfig config.Job) Executor {
-	log.Debugf("Preparing delete job: %s", jobConfig.Name)
-	ex := Executor{
-		Job:         jobConfig,
-		itemHandler: deleteHandler,
-	}
+func setupDeleteJob(ex *Executor) {
+	log.Debugf("Preparing %s job: %s", ex.JobType, ex.Name)
+
+	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
 		ex.objectFinalizer = verifyDelete
 	}
@@ -45,27 +41,10 @@ func setupDeleteJob(jobConfig config.Job) Executor {
 	ex.ExecutionMode = config.ExecutionModeSequential
 
 	mapper := newRESTMapper()
-	for _, o := range jobConfig.Objects {
-		if o.APIVersion == "" {
-			o.APIVersion = "v1"
-		}
-		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
-		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		if err != nil {
-			log.Fatal(err)
-		}
-		if len(o.LabelSelector) == 0 {
-			log.Fatalf("Empty labelSelectors not allowed with: %s", o.Kind)
-		}
-		obj := object{
-			Object: o,
-			gvr:    mapping.Resource,
-		}
-		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-		log.Debugf("Job %s: Delete %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.LabelSelector))
-		ex.objects = append(ex.objects, obj)
+	for _, o := range ex.Objects {
+		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
+		ex.objects = append(ex.objects, newObject(o, mapper))
 	}
-	return ex
 }
 
 func deleteHandler(ex *Executor, obj object, item unstructured.Unstructured, iteration int, wg *sync.WaitGroup) {
