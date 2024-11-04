@@ -31,14 +31,19 @@ func ReadEmbedConfig(embedFs embed.FS, configFile string) (io.Reader, error) {
 
 // ReadConfig reads configuration from the given path or URL
 func ReadConfig(configFile string) (io.Reader, error) {
-	var f io.Reader
-	var err error
-	if _, err = url.ParseRequestURI(configFile); err == nil {
-		f, err = readURL(configFile, f)
-	} else {
-		f, err = os.Open(configFile)
+	u, err := url.Parse(configFile)
+	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+		f, err := readURL(configFile, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch config from URL %s: %w", configFile, err)
+		}
+		return f, nil
 	}
-	return f, err
+	f, err := os.Open(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open local config file %s: %w", configFile, err)
+	}
+	return f, nil
 }
 
 // readURL reads an URL and returns a reader
