@@ -20,18 +20,23 @@ import (
 	"math"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
+
+	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/util"
 )
 
 const (
@@ -153,4 +158,97 @@ func newRESTMapper() meta.RESTMapper {
 		log.Fatal(err)
 	}
 	return restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
+}
+
+func (ex *Executor) RunJob() {
+	switch ex.ExecutionMode {
+	case config.ExecutionModeParallel:
+		ex.runParallel()
+	case config.ExecutionModeSequential:
+		ex.runSequential()
+	}
+}
+
+func getItemListForObject(obj object, maxWaitTimeout time.Duration) (*unstructured.UnstructuredList, error) {
+	var itemList *unstructured.UnstructuredList
+	labelSelector := labels.Set(obj.LabelSelector).String()
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelSelector,
+	}
+
+	// Try to find the list of resources by GroupVersionResource.
+	err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
+		itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+		if err != nil {
+			log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
+			return false, nil
+		}
+		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
+		return true, nil
+	}, 1*time.Second, 3, 0, maxWaitTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return itemList, nil
+}
+
+func (ex *Executor) runSequential() {
+	for i := 0; i < ex.JobIterations; i++ {
+		for _, obj := range ex.objects {
+			itemList, err := getItemListForObject(obj, ex.MaxWaitTimeout)
+			if err != nil {
+				continue
+			}
+			var wg sync.WaitGroup
+			for _, item := range itemList.Items {
+				wg.Add(1)
+				go ex.itemHandler(ex, obj, item, i, &wg)
+			}
+			// Wait for all items in the object
+			wg.Wait()
+			waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
+			ex.waitForObjects("", waitRateLimiter)
+
+			if ex.objectFinalizer != nil {
+				ex.objectFinalizer(obj)
+			}
+			// Wait between object
+			if ex.ObjectDelay > 0 {
+				log.Infof("Sleeping between objects for %v", ex.ObjectDelay)
+				time.Sleep(ex.ObjectDelay)
+			}
+		}
+		// Wait between job iterations
+		if ex.JobIterationDelay > 0 {
+			log.Infof("Sleeping between job iterations for %v", ex.JobIterationDelay)
+			time.Sleep(ex.JobIterationDelay)
+		}
+		// Print progress every 10 iterations
+		if i%10 == 0 {
+			// Skip the first print
+			if i > 0 {
+				log.Infof("%v/%v iterations completed", i, ex.JobIterations)
+			}
+		}
+	}
+}
+
+// runParallel executes all objects for all jobs in parallel
+func (ex *Executor) runParallel() {
+	var wg sync.WaitGroup
+	for _, obj := range ex.objects {
+		itemList, err := getItemListForObject(obj, ex.MaxWaitTimeout)
+		if err != nil {
+			continue
+		}
+		for j := 0; j < ex.JobIterations; j++ {
+			for _, item := range itemList.Items {
+				wg.Add(1)
+				go ex.itemHandler(ex, obj, item, j, &wg)
+			}
+		}
+	}
+	wg.Wait()
+	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
+	ex.waitForObjects("", waitRateLimiter)
 }

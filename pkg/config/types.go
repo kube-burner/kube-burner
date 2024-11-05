@@ -180,8 +180,8 @@ type Job struct {
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
-	// Patch jobs execution mode can be either parallel or sequential. Default: parallel
-	PatchExecutionMode PatchExecutionMode `yaml:"patchExecutionMode" json:"patchExecutionMode,omitempty"`
+	// Execute objects in a job either parallel or sequential. Default: parallel
+	ExecutionMode ExecutionMode `yaml:"executionMode" json:"executionMode,omitempty"`
 	// ObjectDelay how much time to wait between objects processing in patch jobs
 	ObjectDelay time.Duration `yaml:"objectDelay" json:"objectDelay,omitempty"`
 }
@@ -202,9 +202,9 @@ type KubeClientProvider struct {
 }
 
 // Execution mode for Patch jobs
-type PatchExecutionMode string
+type ExecutionMode string
 
 const (
-	PatchExecutionModeParallel   PatchExecutionMode = "parallel"
-	PatchExecutionModeSequential PatchExecutionMode = "sequential"
+	ExecutionModeParallel   ExecutionMode = "parallel"
+	ExecutionModeSequential ExecutionMode = "sequential"
 )

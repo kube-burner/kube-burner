@@ -83,7 +83,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `churnDelay`                 | Length of time to wait between each churn period                                                                                      | Duration | 5m       |
 | `churnDeletionStrategy`      | Churn deletion strategy to apply, `default` or `gvr` (where `default` churns namespaces and `gvr` churns objects within namespaces)   | String   | default  |
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
-| `patchExecutionMode`         | Execution mode of a `patch` job. More details at [patch execution modes](#execution-modes)                                            | String   | parallel |
+| `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
 
 !!! note
@@ -280,9 +280,9 @@ jobs:
     labelSelector: {kube-burner-job: create-objects}
 ```
 
-#### Execution Modes
+## Execution Modes
 
-Valid patch job execution modes
+Patch jobs support different execution modes
 
 - `parallel` - run all steps without any waiting between objects or iterations
 - `sequential` - Run for each object before moving to the next job iteration with an optional wait between objects and/or between iterations

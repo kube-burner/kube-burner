@@ -27,7 +27,7 @@ jobs:
 
   - name: relabel
     jobType: patch
-    patchExecutionMode: sequential
+    executionMode: sequential
     jobIterations: 1
     qps: {{ .QPS }}
     burst: {{ .BURST }}
