@@ -48,6 +48,13 @@ setup-prometheus() {
   sleep 10
 }
 
+setup-opensearch() {
+  echo "Setting up open-search"
+  # Use version 1 to avoid the password requirement
+  $OCI_BIN run --rm -d --name opensearch --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
+  sleep 10
+}
+
 check_ns() {
   echo "Checking the number of namespaces labeled with \"${1}\" is \"${2}\""
   if [[ $(kubectl get ns -l "${1}" -o name | wc -l) != "${2}" ]]; then

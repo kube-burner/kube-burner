@@ -18,11 +18,14 @@ setup_file() {
   setup-kind
   create_test_kubeconfig
   setup-prometheus
+  if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
+    setup-opensearch
+  fi
 }
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  export ES_SERVER="$PERFSCALE_PROD_ES_SERVER"
+  export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
   export ES_INDEX="kube-burner"
   export METRICS_FOLDER="metrics-${UUID}"
   export ES_INDEXING=""
@@ -38,6 +41,9 @@ teardown() {
 teardown_file() {
   destroy-kind
   $OCI_BIN rm -f prometheus
+  if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
+    $OCI_BIN rm -f opensearch
+  fi
 }
 
 @test "kube-burner init: churn=true; absolute-path=true" {
