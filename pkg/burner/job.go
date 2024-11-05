@@ -92,14 +92,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
 		jobList = newExecutorList(configSpec, kubeClientProvider)
-		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
-		for _, job := range jobList {
-			if job.PreLoadImages && job.JobType == config.CreationJob {
-				if err = preLoadImages(job); err != nil {
-					log.Fatal(err.Error())
-				}
-			}
-		}
+		handlePreloadImages(jobList, kubeClientProvider)
 		// Iterate job list
 		for jobPosition, job := range jobList {
 			executedJobs = append(executedJobs, prometheus.Job{
@@ -261,6 +254,18 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		gcWg.Wait()
 	}
 	return rc, utilerrors.NewAggregate(errs)
+}
+
+// If requests, preload the images used in the test into the node
+func handlePreloadImages(executorList []Executor, kubeClientProvider *config.KubeClientProvider) {
+	clientSet, _ := kubeClientProvider.DefaultClientSet()
+	for _, executor := range executorList {
+		if executor.PreLoadImages && executor.JobType == config.CreationJob {
+			if err := preLoadImages(executor, clientSet); err != nil {
+				log.Fatal(err.Error())
+			}
+		}
+	}
 }
 
 // indexMetrics indexes metrics for the executed jobs
