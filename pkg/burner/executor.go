@@ -39,17 +39,17 @@ type Executor struct {
 	objectFinalizer ObjectFinalizer
 }
 
-func newExecutor(job config.Job, uuid, runid string) Executor {
+func newExecutor(configSpec config.Spec, job config.Job) Executor {
 	ex := Executor{
 		Job:         job,
 		limiter:     rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
-		uuid:        uuid,
-		runid:       runid,
+		uuid:        configSpec.GlobalConfig.UUID,
+		runid:       configSpec.GlobalConfig.RUNID,
 		waitLimiter: rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 	}
 	switch job.JobType {
 	case config.CreationJob:
-		ex.setupCreateJob()
+		ex.setupCreateJob(configSpec)
 	case config.DeletionJob:
 		ex.setupDeleteJob()
 	case config.PatchJob:

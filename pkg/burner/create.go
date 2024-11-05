@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *Executor) setupCreateJob() {
+func (ex *Executor) setupCreateJob(configSpec config.Spec) {
 	var err error
 	var f io.Reader
 	mapper := newRESTMapper()
@@ -50,11 +50,11 @@ func (ex *Executor) setupCreateJob() {
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
 		e := embed.FS{}
-		if embedFS == e {
+		if configSpec.EmbedFS == e {
 			f, err = util.ReadConfig(o.ObjectTemplate)
 		} else {
-			objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
-			f, err = util.ReadEmbedConfig(embedFS, objectTemplate)
+			objectTemplate := path.Join(configSpec.EmbedFSDir, o.ObjectTemplate)
+			f, err = util.ReadEmbedConfig(configSpec.EmbedFS, objectTemplate)
 		}
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
