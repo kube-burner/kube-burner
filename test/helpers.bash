@@ -172,3 +172,17 @@ check_file_exists() {
   done
   return 0
 }
+
+check_deployment_count() {
+  local NAMESPACE=${1}
+  local LABEL_KEY=${2}
+  local LABEL_VALUE=${3}
+  local EXPECTED_COUNT=${4}
+
+  ACTUAL_COUNT=$(kubectl get deployment -n ${NAMESPACE} -l ${LABEL_KEY}=${LABEL_VALUE} -o json | jq '.items | length')
+  if [[ "${ACTUAL_COUNT}" != "${EXPECTED_COUNT}" ]]; then
+    echo "Expected ${EXPECTED_COUNT} replicas to be patches with ${LABEL_KEY}=${LABEL_VALUE_END} but found only ${ACTUAL_COUNT}"
+    return 1
+  fi
+  echo "Found the expected ${EXPECTED_COUNT} deployments"
+}

@@ -180,6 +180,10 @@ type Job struct {
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
+	// Patch jobs execution mode can be either parallel or sequential. Default: parallel
+	PatchExecutionMode PatchExecutionMode `yaml:"patchExecutionMode" json:"patchExecutionMode,omitempty"`
+	// ObjectDelay how much time to wait between objects processing in patch jobs
+	ObjectDelay time.Duration `yaml:"objectDelay" json:"objectDelay,omitempty"`
 }
 
 type WaitOptions struct {
@@ -196,3 +200,11 @@ type WaitOptions struct {
 type KubeClientProvider struct {
 	restConfig *rest.Config
 }
+
+// Execution mode for Patch jobs
+type PatchExecutionMode string
+
+const (
+	PatchExecutionModeParallel   PatchExecutionMode = "parallel"
+	PatchExecutionModeSequential PatchExecutionMode = "sequential"
+)
