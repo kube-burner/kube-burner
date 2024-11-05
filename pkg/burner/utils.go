@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
 
@@ -140,7 +141,7 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 }
 
 // newMapper returns a discovery RESTMapper
-func newRESTMapper() meta.RESTMapper {
+func newRESTMapper(discoveryClient *discovery.DiscoveryClient) meta.RESTMapper {
 	apiGroupResouces, err := restmapper.GetAPIGroupResources(discoveryClient)
 	if err != nil {
 		log.Fatal(err)

@@ -21,13 +21,14 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (ex *Executor) setupDeleteJob() {
+func (ex *Executor) setupDeleteJob(mapper meta.RESTMapper) {
 	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
@@ -37,7 +38,6 @@ func (ex *Executor) setupDeleteJob() {
 	ex.JobIterations = 1
 	// Use the sequential mode
 	ex.ExecutionMode = config.ExecutionModeSequential
-	mapper := newRESTMapper()
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
 		ex.objects = append(ex.objects, newObject(o, mapper))
