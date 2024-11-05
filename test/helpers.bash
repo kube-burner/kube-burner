@@ -44,7 +44,7 @@ destroy-kind() {
 
 setup-prometheus() {
   echo "Setting up prometheus instance"
-  $OCI_BIN run --rm -d --name prometheus --network=host docker.io/prom/prometheus:latest
+  $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest
   sleep 10
 }
 
