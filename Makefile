@@ -7,6 +7,7 @@ BIN_NAME = kube-burner
 BIN_DIR = bin
 BIN_PATH = $(BIN_DIR)/$(ARCH)/$(BIN_NAME)
 CGO = 0
+TEST_BINARY ?= $(CURDIR)/$(BIN_PATH)
 
 GIT_COMMIT = $(shell git rev-parse HEAD)
 VERSION ?= $(shell hack/tag_name.sh)
@@ -77,4 +78,4 @@ manifest-build:
 test: lint test-k8s
 
 test-k8s:
-	cd test && bats -F pretty -T --print-output-on-failure test-k8s.bats
+	cd test && KUBE_BURNER=$(TEST_BINARY) bats -F pretty -T --print-output-on-failure test-k8s.bats

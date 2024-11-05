@@ -6,6 +6,7 @@ KIND_VERSION=${KIND_VERSION:-v0.19.0}
 K8S_VERSION=${K8S_VERSION:-v1.27.0}
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+KUBE_BURNER=${KUBE_BURNER:-kube-burner}
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
@@ -44,7 +45,14 @@ destroy-kind() {
 
 setup-prometheus() {
   echo "Setting up prometheus instance"
-  $OCI_BIN run --rm -d --name prometheus --network=host docker.io/prom/prometheus:latest
+  $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest
+  sleep 10
+}
+
+setup-opensearch() {
+  echo "Setting up open-search"
+  # Use version 1 to avoid the password requirement
+  $OCI_BIN run --rm -d --name opensearch --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
   sleep 10
 }
 
