@@ -39,3 +39,21 @@ Instruct Podman to communicate with the rootful Podman socket by setting the env
 ```
 CONTAINER_HOST=unix://run/podman/podman.sock make test-k8s
 ```
+
+### Running test with an External Cluster
+
+By default, the tests start a local cluster using [kind](https://kind.sigs.k8s.io/).
+Instead, you can use an already existsing cluster.
+
+#### Prerequisites
+
+Since the test suite includes KubeVirt VMs, the cluster must include the `kubevirt` operator.
+See the [Installation](https://kubevirt.io/user-guide/cluster_admin/installation/) guide for details.
+
+#### Kubeconfig
+
+Either save the kubeconfig file under `~/.kube/config` or set the environment variable `KUBECONFIG` to its location
+
+#### Run the tests
+
+In order to instruct the tests to use the existing cluster set `USE_EXISTING_CLUSTER=yes` when calling `make`.
