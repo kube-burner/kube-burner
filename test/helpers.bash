@@ -6,6 +6,7 @@ KIND_VERSION=${KIND_VERSION:-v0.19.0}
 K8S_VERSION=${K8S_VERSION:-v1.27.0}
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+KUBE_BURNER=${KUBE_BURNER:-kube-burner}
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
