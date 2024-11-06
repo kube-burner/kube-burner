@@ -34,7 +34,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
@@ -56,9 +55,7 @@ const (
 )
 
 var (
-	ClientSet     kubernetes.Interface
 	DynamicClient dynamic.Interface
-	restConfig    *rest.Config
 
 	supportedExecutionMode = map[config.ExecutionMode]struct{}{
 		config.ExecutionModeParallel:   {},
@@ -100,8 +97,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				JobConfig: job.Job,
 			})
 			var waitListNamespaces []string
-			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
-			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
+			DynamicClient = dynamic.NewForConfigOrDie(job.restConfig)
 			measurements.SetJobConfig(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
 			measurements.Start()
@@ -346,7 +342,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 		executor := executorMap[executorUUID]
 		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(restConfig.QPS))
+		sem := make(chan int, int(executor.restConfig.QPS))
 		for _, ns := range namespaces {
 			sem <- 1
 			wg.Add(1)
@@ -364,7 +360,7 @@ func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector 
 	if wg != nil {
 		defer wg.Done()
 	}
-	util.CleanupNamespaces(ctx, ClientSet, labelSelector)
+	util.CleanupNamespaces(ctx, jobExecutor.clientSet, labelSelector)
 	for _, obj := range jobExecutor.objects {
 		jobExecutor.limiter.Wait(ctx)
 		if !obj.Namespaced {

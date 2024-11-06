@@ -111,7 +111,7 @@ func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) 
 func (ex *Executor) waitForPVC(ns string, obj object) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		ex.limiter.Wait(context.TODO())
-		pvcs, err := ClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{
+		pvcs, err := ex.clientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
@@ -138,7 +138,7 @@ func (ex *Executor) waitForPod(ns string, obj object) error {
 		}
 		for {
 			ex.limiter.Wait(context.TODO())
-			pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), listOptions)
+			pods, err := ex.clientSet.CoreV1().Pods(ns).List(context.TODO(), listOptions)
 			if err != nil {
 				log.Errorf("Error listing pods in %s: %v", ns, err)
 				return false, nil

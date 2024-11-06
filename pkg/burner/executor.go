@@ -22,6 +22,8 @@ import (
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // Executor contains the information required to execute a job
@@ -38,6 +40,8 @@ type Executor struct {
 	nsRequired      bool
 	itemHandler     ItemHandler
 	objectFinalizer ObjectFinalizer
+	clientSet       kubernetes.Interface
+	restConfig      *rest.Config
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job) Executor {
@@ -49,8 +53,12 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		waitLimiter: rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 	}
 
-	_, restConfig := kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
-	mapper := newRESTMapper(discovery.NewDiscoveryClientForConfigOrDie(restConfig))
+	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
+	ex.clientSet = clientSet
+	ex.restConfig = runtimeRestConfig
+
+	_, setupRestConfig := kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
+	mapper := newRESTMapper(discovery.NewDiscoveryClientForConfigOrDie(setupRestConfig))
 
 	switch job.JobType {
 	case config.CreationJob:
