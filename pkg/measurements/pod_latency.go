@@ -62,7 +62,7 @@ type podMetric struct {
 }
 
 type podLatency struct {
-	config           types.Measurement
+	config           types.MeasurementConfig
 	watcher          *metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
@@ -130,7 +130,7 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 	}
 }
 
-func (p *podLatency) setConfig(cfg types.Measurement) error {
+func (p *podLatency) setConfig(cfg types.MeasurementConfig) error {
 	p.config = cfg
 	var metricFound bool
 	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}

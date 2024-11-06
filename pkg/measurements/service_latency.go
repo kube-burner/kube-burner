@@ -40,7 +40,7 @@ const (
 )
 
 type serviceLatency struct {
-	config           types.Measurement
+	config           types.MeasurementConfig
 	svcWatcher       *metrics.Watcher
 	epWatcher        *metrics.Watcher
 	epLister         lcorev1.EndpointsLister
@@ -147,7 +147,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 	}(svc)
 }
 
-func (s *serviceLatency) setConfig(cfg types.Measurement) error {
+func (s *serviceLatency) setConfig(cfg types.MeasurementConfig) error {
 	s.config = cfg
 	if s.config.ServiceTimeout == 0 {
 		return fmt.Errorf("svcTimeout cannot be 0")

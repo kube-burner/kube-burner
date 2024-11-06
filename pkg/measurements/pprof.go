@@ -38,7 +38,7 @@ import (
 )
 
 type pprof struct {
-	config      types.Measurement
+	config      types.MeasurementConfig
 	stopChannel chan bool
 }
 
@@ -46,7 +46,7 @@ func init() {
 	measurementMap["pprof"] = &pprof{}
 }
 
-func (p *pprof) setConfig(cfg types.Measurement) error {
+func (p *pprof) setConfig(cfg types.MeasurementConfig) error {
 	p.config = cfg
 	for _, target := range p.config.PProfTargets {
 		if target.BearerToken != "" && (target.CertFile != "" || target.Cert != "") {
