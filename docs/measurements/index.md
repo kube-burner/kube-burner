@@ -97,17 +97,18 @@ And the metrics are:
 
 ### Pod latency thresholds
 
-It is possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within this measurement:
+It is possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within in the the config of this measurement:
 
 Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
 
 ```yaml
   measurements:
   - name: podLatency
-    thresholds:
-    - conditionType: Ready
-      metric: P99
-      threshold: 2000ms
+    config:
+      thresholds:
+      - conditionType: Ready
+        metric: P99
+        threshold: 2000ms
 ```
 
 Latency thresholds are evaluated at the end of each job, showing an informative message like the following:
@@ -232,7 +233,8 @@ This measure is enabled with:
 ```yaml
   measurements:
   - name: serviceLatency
-    svcTimeout: 5s
+    config:
+      svcTimeout: 5s
 ```
 
 Where `svcTimeout`, by default `5s`, defines the maximum amount of time the measurement will wait for a service to be ready, when this timeout is met, the metric from that service is **discarded**.
@@ -433,21 +435,22 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 ```yaml
   measurements:
   - name: pprof
-    pprofInterval: 30m
-    pprofDirectory: pprof-data
-    pprofTargets:
-    - name: kube-apiserver-heap
-      namespace: "openshift-kube-apiserver"
-      labelSelector: {app: openshift-kube-apiserver}
-      bearerToken: thisIsNotAValidToken
-      url: https://localhost:6443/debug/pprof/heap
+    config:
+      pprofInterval: 30m
+      pprofDirectory: pprof-data
+      pprofTargets:
+      - name: kube-apiserver-heap
+        namespace: "openshift-kube-apiserver"
+        labelSelector: {app: openshift-kube-apiserver}
+        bearerToken: thisIsNotAValidToken
+        url: https://localhost:6443/debug/pprof/heap
 
-    - name: etcd-heap
-      namespace: "openshift-etcd"
-      labelSelector: {app: etcd}
-      certFile: etcd-peer-pert.crt
-      keyFile: etcd-peer-pert.key
-      url: https://localhost:2379/debug/pprof/heap
+      - name: etcd-heap
+        namespace: "openshift-etcd"
+        labelSelector: {app: etcd}
+        certFile: etcd-peer-pert.crt
+        keyFile: etcd-peer-pert.key
+        url: https://localhost:2379/debug/pprof/heap
 ```
 
 !!! warning
@@ -494,8 +497,9 @@ metricsEndpoints:
 global:
   measurements:
   - name: podLatency
-    timeseriesIndexer: local-indexer
-    quantilesIndexer: os-indexer
+    config:
+      timeseriesIndexer: local-indexer
+      quantilesIndexer: os-indexer
 ```
 
 With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics.
