@@ -4,15 +4,17 @@ global:
   gc: {{env "GC"}}
   measurements:
   - name: podLatency
+    config:
 {{ if .TIMESERIES_INDEXER }}
-    timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
+      timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}
   - name: nodeLatency
 {{ if .TIMESERIES_INDEXER }}
-    timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
+      timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}
   - name: serviceLatency
-    svcTimeout: 5s
+    config:
+      svcTimeout: 5s
 metricsEndpoints:
 {{ if .ES_INDEXING }}
   - endpoint: http://localhost:9090
