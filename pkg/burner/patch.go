@@ -104,11 +104,11 @@ func patchHandler(ex *Executor, obj object, originalItem unstructured.Unstructur
 	var uns *unstructured.Unstructured
 	var err error
 	if obj.Namespaced {
-		uns, err = DynamicClient.Resource(obj.gvr).Namespace(ns).
+		uns, err = ex.dynamicClient.Resource(obj.gvr).Namespace(ns).
 			Patch(context.TODO(), originalItem.GetName(),
 				types.PatchType(obj.PatchType), data, patchOptions)
 	} else {
-		uns, err = DynamicClient.Resource(obj.gvr).
+		uns, err = ex.dynamicClient.Resource(obj.gvr).
 			Patch(context.TODO(), originalItem.GetName(),
 				types.PatchType(obj.PatchType), data, patchOptions)
 	}

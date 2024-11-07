@@ -82,7 +82,7 @@ func (ex *Executor) waitForObjects(ns string) {
 func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		ex.waitLimiter.Wait(context.TODO())
-		resources, err := DynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+		resources, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
@@ -168,7 +168,7 @@ func (ex *Executor) waitForBuild(ns string, obj object) error {
 	var build types.UnstructuredContent
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		ex.limiter.Wait(context.TODO())
-		builds, err := DynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+		builds, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
@@ -210,11 +210,11 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 		var objs *unstructured.UnstructuredList
 		ex.limiter.Wait(context.TODO())
 		if obj.Namespaced {
-			objs, err = DynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+			objs, err = ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 			})
 		} else {
-			objs, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), metav1.ListOptions{
+			objs, err = ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 			})
 		}

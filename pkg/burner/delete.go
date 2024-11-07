@@ -50,23 +50,23 @@ func deleteHandler(ex *Executor, obj object, item unstructured.Unstructured, ite
 	var err error
 	if obj.Namespaced {
 		log.Debugf("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
-		err = DynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+		err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	} else {
 		log.Debugf("Removing %s/%s", item.GetKind(), item.GetName())
-		err = DynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+		err = ex.dynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}
 	if err != nil {
 		log.Errorf("Error found removing %s/%s: %s", item.GetKind(), item.GetName(), err)
 	}
 }
 
-func verifyDelete(obj object) {
+func verifyDelete(ex *Executor, obj object) {
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
 	wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		itemList, err := DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+		itemList, err := ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 		if err != nil {
 			log.Error(err.Error())
 			return false, nil

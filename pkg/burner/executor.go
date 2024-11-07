@@ -22,13 +22,14 @@ import (
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 // Executor contains the information required to execute a job
 type ItemHandler func(ex *Executor, obj object, originalItem unstructured.Unstructured, iteration int, wg *sync.WaitGroup)
-type ObjectFinalizer func(obj object)
+type ObjectFinalizer func(ex *Executor, obj object)
 
 type Executor struct {
 	config.Job
@@ -42,6 +43,7 @@ type Executor struct {
 	objectFinalizer ObjectFinalizer
 	clientSet       kubernetes.Interface
 	restConfig      *rest.Config
+	dynamicClient   *dynamic.DynamicClient
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job) Executor {
@@ -56,6 +58,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
 	ex.clientSet = clientSet
 	ex.restConfig = runtimeRestConfig
+	ex.dynamicClient = dynamic.NewForConfigOrDie(ex.restConfig)
 
 	_, setupRestConfig := kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
 	mapper := newRESTMapper(discovery.NewDiscoveryClientForConfigOrDie(setupRestConfig))

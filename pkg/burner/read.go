@@ -44,10 +44,10 @@ func readHandler(ex *Executor, obj object, item unstructured.Unstructured, itera
 	var err error
 	if obj.Namespaced {
 		log.Debugf("Reading %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
-		_, err = DynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
+		_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
 	} else {
 		log.Debugf("Reading %s/%s", item.GetKind(), item.GetName())
-		_, err = DynamicClient.Resource(obj.gvr).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
+		_, err = ex.dynamicClient.Resource(obj.gvr).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
 	}
 	if err != nil {
 		log.Errorf("Error found reading %s/%s: %s", item.GetKind(), item.GetName(), err)
