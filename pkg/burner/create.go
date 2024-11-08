@@ -66,9 +66,9 @@ func setupCreateJob(ex *Executor) {
 		}
 		// Deserialize YAML
 		uns := &unstructured.Unstructured{}
-		cleanTemplate, err := prepareTemplate(t)
+		cleanTemplate, err := util.CleanupTemplate(t)
 		if err != nil {
-			log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
+			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
 		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
 		mapping, err := mapper.RESTMapping(gvk.GroupKind())

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -53,6 +54,18 @@ func init() {
 		}
 		return strings.Join(retAddrs, " ")
 	}
+}
+
+func CleanupTemplate(original []byte) ([]byte, error) {
+	// Removing all placeholders from template.
+	// This needs to be done due to placeholders not being valid yaml
+	if strings.TrimSpace(string(original)) == "" {
+		return nil, fmt.Errorf("template is empty")
+	}
+	// Remove {{.*}}
+	r, _ := regexp.Compile(`\{\{.*\}\}`)
+	original = r.ReplaceAll(original, []byte{})
+	return original, nil
 }
 
 func AddRenderingFunction(name string, function any) {

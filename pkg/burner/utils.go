@@ -18,8 +18,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -54,20 +52,6 @@ var (
 		VirtualMachine: {commonUnderlyingObjectLabelsPath},
 	}
 )
-
-func prepareTemplate(original []byte) ([]byte, error) {
-	// Removing all placeholders from template.
-	// This needs to be done due to placeholders not being valid yaml
-	if isEmpty(original) {
-		return nil, fmt.Errorf("template is empty")
-	}
-	r, err := regexp.Compile(`\{\{.*\}\}`)
-	if err != nil {
-		return nil, fmt.Errorf("regexp creation error: %v", err)
-	}
-	original = r.ReplaceAll(original, []byte{})
-	return original, nil
-}
 
 func setLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
 	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
@@ -154,10 +138,6 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 		Steps:    steps,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
-}
-
-func isEmpty(raw []byte) bool {
-	return strings.TrimSpace(string(raw)) == ""
 }
 
 // newMapper returns a discovery RESTMapper
