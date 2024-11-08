@@ -38,24 +38,24 @@ const (
 )
 
 type podMetric struct {
-	Timestamp              time.Time `json:"timestamp"`
-	scheduled              time.Time
-	SchedulingLatency      int `json:"schedulingLatency"`
-	initialized            time.Time
-	InitializedLatency     int `json:"initializedLatency"`
-	containersReady        time.Time
-	ContainersReadyLatency int `json:"containersReadyLatency"`
-	podReady               time.Time
-	PodReadyLatency        int `json:"podReadyLatency"`
-	readyToStartContainers time.Time
-	ReadyToStartContainers int         `json:"readyToStartContainersLatency"`
-	MetricName             string      `json:"metricName"`
-	UUID                   string      `json:"uuid"`
-	JobName                string      `json:"jobName,omitempty"`
-	Namespace              string      `json:"namespace"`
-	Name                   string      `json:"podName"`
-	NodeName               string      `json:"nodeName"`
-	Metadata               interface{} `json:"metadata,omitempty"`
+	Timestamp                     time.Time `json:"timestamp"`
+	scheduled                     time.Time
+	SchedulingLatency             int `json:"schedulingLatency"`
+	initialized                   time.Time
+	InitializedLatency            int `json:"initializedLatency"`
+	containersReady               time.Time
+	ContainersReadyLatency        int `json:"containersReadyLatency"`
+	podReady                      time.Time
+	PodReadyLatency               int `json:"podReadyLatency"`
+	readyToStartContainers        time.Time
+	ReadyToStartContainersLatency int         `json:"readyToStartContainersLatency"`
+	MetricName                    string      `json:"metricName"`
+	UUID                          string      `json:"uuid"`
+	JobName                       string      `json:"jobName,omitempty"`
+	Namespace                     string      `json:"namespace"`
+	Name                          string      `json:"podName"`
+	NodeName                      string      `json:"nodeName"`
+	Metadata                      interface{} `json:"metadata,omitempty"`
 }
 
 type podLatency struct {
