@@ -56,6 +56,7 @@ teardown_file() {
   export CHURN_CYCLES=1
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  check_file_exists "kube-burner-${UUID}.log"
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
@@ -161,11 +162,6 @@ teardown_file() {
 @test "kube-burner check-alerts" {
   run_cmd ${KUBE_BURNER} check-alerts -a alerts.yml -u http://localhost:9090 --metrics-directory=alerts
   check_file_list alerts/alert.json
-}
-
-@test "kube-burner log file output" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
-  check_file_exists "kube-burner-${UUID}.log"
 }
 
 @test "kube-burner init: waitOptions for Deployment" {
