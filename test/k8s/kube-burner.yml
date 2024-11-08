@@ -9,6 +9,7 @@ global:
       timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}
   - name: nodeLatency
+    config:
 {{ if .TIMESERIES_INDEXER }}
       timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}
@@ -45,7 +46,7 @@ jobs:
     qps: {{ .QPS }}
     burst: {{ .BURST }}
     namespacedIterations: true
-    preLoadImages: true
+    preLoadImages: {{ .PRELOAD }}
     preLoadPeriod: 5s
     cleanup: true
     namespace: namespaced
