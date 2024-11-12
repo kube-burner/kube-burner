@@ -34,6 +34,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
@@ -43,23 +44,26 @@ import (
 )
 
 type object struct {
-	gvr           schema.GroupVersionResource
-	objectSpec    []byte
-	labelSelector map[string]string
-	patchType     string
-	kind          string
-	namespace     string
+	gvr        schema.GroupVersionResource
+	objectSpec []byte
+	kind       string
+	namespace  string
 	config.Object
 }
 
 // Executor contains the information required to execute a job
+type ItemHandler func(ex *Executor, obj object, originalItem unstructured.Unstructured, iteration int, wg *sync.WaitGroup)
+type ObjectFinalizer func(obj object)
+
 type Executor struct {
-	objects []object
 	config.Job
-	uuid       string
-	runid      string
-	limiter    *rate.Limiter
-	nsRequired bool
+	objects         []object
+	uuid            string
+	runid           string
+	limiter         *rate.Limiter
+	nsRequired      bool
+	itemHandler     ItemHandler
+	objectFinalizer ObjectFinalizer
 }
 
 // returnPair is a pair of return codes for a job
@@ -79,12 +83,19 @@ const (
 	garbageCollectionJob = "garbage-collection"
 )
 
-var ClientSet kubernetes.Interface
-var DynamicClient dynamic.Interface
-var discoveryClient *discovery.DiscoveryClient
-var restConfig *rest.Config
-var embedFS embed.FS
-var embedFSDir string
+var (
+	ClientSet       kubernetes.Interface
+	DynamicClient   dynamic.Interface
+	discoveryClient *discovery.DiscoveryClient
+	restConfig      *rest.Config
+	embedFS         embed.FS
+	embedFSDir      string
+
+	supportedExecutionMode = map[config.ExecutionMode]struct{}{
+		config.ExecutionModeParallel:   {},
+		config.ExecutionModeSequential: {},
+	}
+)
 
 // Runs the with the given configuration and metrics scraper, with the specified timeout.
 // Returns:
@@ -141,8 +152,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			measurements.SetJobConfig(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
 			measurements.Start()
-			switch job.JobType {
-			case config.CreationJob:
+			if job.JobType == config.CreationJob {
 				if job.Cleanup {
 					// No timeout for initial job cleanup
 					garbageCollectJob(context.TODO(), job, fmt.Sprintf("kube-burner-job=%s", job.Name), nil)
@@ -174,12 +184,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
-			case config.DeletionJob:
-				job.RunDeleteJob()
-			case config.PatchJob:
-				job.RunPatchJob()
-			case config.ReadJob:
-				job.RunReadJob(0, job.JobIterations)
+			} else {
+				job.RunJob()
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
@@ -342,20 +348,14 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 		default:
 			log.Fatalf("Unknown jobType: %s", job.JobType)
 		}
-		for _, j := range executorList {
-			if job.Name == j.Job.Name {
-				log.Fatalf("Job names must be unique: %s", job.Name)
-			}
-		}
-		if job.MaxWaitTimeout == 0 {
-			log.Debugf("job.MaxWaitTimeout is zero in %s, override by timeout: %s", job.Name, timeout)
-			job.MaxWaitTimeout = timeout
+		if ex.MaxWaitTimeout == 0 {
+			log.Debugf("job.MaxWaitTimeout is zero in %s, override by timeout: %s", ex.Name, timeout)
+			ex.MaxWaitTimeout = timeout
 		} else {
-			log.Debugf("job.MaxWaitTimeout is non zero in %s: %s", job.Name, job.MaxWaitTimeout)
+			log.Debugf("job.MaxWaitTimeout is non zero in %s: %s", ex.Name, ex.MaxWaitTimeout)
 		}
 		// Limits the number of workers to QPS and Burst
-		ex.limiter = rate.NewLimiter(rate.Limit(job.QPS), job.Burst)
-		ex.Job = job
+		ex.limiter = rate.NewLimiter(rate.Limit(ex.QPS), ex.Burst)
 		ex.uuid = uuid
 		ex.runid = configSpec.GlobalConfig.RUNID
 		executorList = append(executorList, ex)

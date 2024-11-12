@@ -44,7 +44,9 @@ func setupCreateJob(jobConfig config.Job) Executor {
 	var f io.Reader
 	mapper := newRESTMapper()
 	log.Debugf("Preparing create job: %s", jobConfig.Name)
-	ex := Executor{}
+	ex := Executor{
+		Job: jobConfig,
+	}
 	ex.DefaultMissingKeysWithZero = jobConfig.DefaultMissingKeysWithZero
 	for _, o := range jobConfig.Objects {
 		if o.Replicas < 1 {
@@ -149,7 +151,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 				"kube-burner-index": strconv.Itoa(objectIndex),
 				"kube-burner-runid": ex.runid,
 			}
-			ex.objects[objectIndex].labelSelector = labels
+			ex.objects[objectIndex].LabelSelector = labels
 			if obj.RunOnce {
 				if i == 0 {
 					// this executes only once during the first iteration of an object
