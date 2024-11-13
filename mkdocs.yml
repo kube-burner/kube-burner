@@ -17,6 +17,7 @@ nav:
     - contributing/pullrequest.md
     - contributing/release.md
   - Tests: contributing/tests.md
+- Wrappers: wrappers/index.md
 site_name: Kube-burner
 plugins:
   - search
