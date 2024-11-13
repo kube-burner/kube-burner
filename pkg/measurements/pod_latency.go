@@ -100,7 +100,7 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 							pm.NodeName = pod.Spec.NodeName
 						}
 					case corev1.PodReadyToStartContainers:
-						if pm.podReady.IsZero() {
+						if pm.readyToStartContainers.IsZero() {
 							pm.readyToStartContainers = c.LastTransitionTime.Time.UTC()
 						}
 					case corev1.PodInitialized:
@@ -327,7 +327,7 @@ func (p *podLatency) calcQuantiles() {
 			string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
 			string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
 			string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
-			string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainers),
+			string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
 		}
 	}
 	p.latencyQuantiles = calculateQuantiles(p.normLatencies, getLatency, podLatencyQuantilesMeasurement)
