@@ -43,6 +43,18 @@ const (
 	objectLimit = 500
 )
 
+var (
+	commonUnderlyingObjectLabelsPath = []string{"spec", "template", "metadata", "labels"}
+
+	kindToLabelPaths = map[string][][]string{
+		DaemonSet:      {commonUnderlyingObjectLabelsPath},
+		Deployment:     {commonUnderlyingObjectLabelsPath},
+		ReplicaSet:     {commonUnderlyingObjectLabelsPath},
+		StatefulSet:    {commonUnderlyingObjectLabelsPath, []string{"spec", "selector", "matchLabels"}},
+		VirtualMachine: {commonUnderlyingObjectLabelsPath},
+	}
+)
+
 func prepareTemplate(original []byte) ([]byte, error) {
 	// Removing all placeholders from template.
 	// This needs to be done due to placeholders not being valid yaml
@@ -60,7 +72,7 @@ func prepareTemplate(original []byte) ([]byte, error) {
 func setLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
 	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
 	if !found {
-		return
+		labelMap = make(map[string]interface{}, len(labels))
 	}
 	for k, v := range labels {
 		labelMap[k] = v
@@ -74,13 +86,10 @@ func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string)
 	// object.SetLabels(labels) doesn't actually set labels for the underlying
 	// objects (i.e Pods under deployment/replicastes). So this function should help
 	// us achieve that without breaking any of our labeling functionality.
-	templatePath := []string{"spec", "template", "metadata", "labels"}
-	setLabels(obj, labels, templatePath)
-	if obj.GetKind() == StatefulSet {
-		templatePath = []string{"spec", "selector", "matchLabels"}
-		setLabels(obj, labels, templatePath)
+	paths := kindToLabelPaths[obj.GetKind()]
+	for _, path := range paths {
+		setLabels(obj, labels, path)
 	}
-
 }
 
 func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
