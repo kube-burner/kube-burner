@@ -33,31 +33,31 @@ type Executor struct {
 	uuid            string
 	runid           string
 	limiter         *rate.Limiter
+	waitLimiter     *rate.Limiter
 	nsRequired      bool
 	itemHandler     ItemHandler
 	objectFinalizer ObjectFinalizer
 }
 
-func newExecutor(job config.Job, uuid, runid string) *Executor {
-	ex := &Executor{
-		Job:     job,
-		limiter: rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
-		uuid:    uuid,
-		runid:   runid,
+func newExecutor(job config.Job, uuid, runid string) Executor {
+	ex := Executor{
+		Job:         job,
+		limiter:     rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		uuid:        uuid,
+		runid:       runid,
+		waitLimiter: rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 	}
-
 	switch job.JobType {
 	case config.CreationJob:
-		setupCreateJob(ex)
+		ex.setupCreateJob()
 	case config.DeletionJob:
-		setupDeleteJob(ex)
+		ex.setupDeleteJob()
 	case config.PatchJob:
-		setupPatchJob(ex)
+		ex.setupPatchJob()
 	case config.ReadJob:
-		setupReadJob(ex)
+		ex.setupReadJob()
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}
-
 	return ex
 }

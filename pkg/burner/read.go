@@ -25,9 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func setupReadJob(ex *Executor) {
-	log.Debugf("Preparing %s job: %s", ex.JobType, ex.Name)
-
+func (ex *Executor) setupReadJob() {
+	log.Debugf("Preparing read job: %s", ex.Name)
 	ex.itemHandler = readHandler
 	ex.ExecutionMode = config.ExecutionModeSequential
 

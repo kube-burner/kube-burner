@@ -27,19 +27,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func setupDeleteJob(ex *Executor) {
-	log.Debugf("Preparing %s job: %s", ex.JobType, ex.Name)
-
+func (ex *Executor) setupDeleteJob() {
+	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
 		ex.objectFinalizer = verifyDelete
 	}
-
 	// Only a single iteration is supported for Delete job
 	ex.JobIterations = 1
-	// Use the sequencial mode
+	// Use the sequential mode
 	ex.ExecutionMode = config.ExecutionModeSequential
-
 	mapper := newRESTMapper()
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))

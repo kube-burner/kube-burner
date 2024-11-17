@@ -31,6 +31,7 @@ type object struct {
 	objectSpec []byte
 	kind       string
 	namespace  string
+	ready      bool
 }
 
 func newObject(obj config.Object, mapper meta.RESTMapper) object {
