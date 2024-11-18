@@ -14,7 +14,7 @@ jobs:
     - objectTemplate: objectTemplates/storageclass.yml
       replicas: 1
 
-    - objectTemplate: objectTemplates/net-attach-def.yml
+    - objectTemplate: objectTemplates/burnerTest-cr.yml
       replicas: 1
 
   - name: delete-crd
@@ -24,9 +24,9 @@ jobs:
     burst: 5
     objects:
 
-    - kind: NetworkAttachmentDefinition
+    - kind: BurnerTest
       labelSelector: {kube-burner-job: crd}
-      apiVersion: k8s.cni.cncf.io/v1
+      apiVersion: kube-burner.io/v1
 
     - kind: Namespace
       labelSelector: {kube-burner-job: crd}
