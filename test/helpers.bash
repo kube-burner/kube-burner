@@ -34,8 +34,15 @@ setup-kind() {
 
 create_test_kubeconfig() {
   echo "Creating another kubeconfig"
-  "${KIND_FOLDER}/kind-linux-${ARCH}" export kubeconfig --kubeconfig "${TEST_KUBECONFIG}"
-  kubectl config rename-context kind-kind "${TEST_KUBECONTEXT}" --kubeconfig "${TEST_KUBECONFIG}"
+  if [[ "${USE_EXISTING_CLUSTER,,}" == "yes" ]]; then
+    EXISTING_KUBECONFIG=${KUBECONFIG:-"~/.kube/config"}
+    cp ${EXISTING_KUBECONFIG} ${TEST_KUBECONFIG}
+    EXISTING_CONTEXT=$(kubectl config current-context)
+  else
+    "${KIND_FOLDER}/kind-linux-${ARCH}" export kubeconfig --kubeconfig "${TEST_KUBECONFIG}"
+    EXISTING_CONTEXT="kind-kind"
+  fi
+  kubectl config rename-context ${EXISTING_CONTEXT} "${TEST_KUBECONTEXT}" --kubeconfig "${TEST_KUBECONFIG}"
 }
 
 destroy-kind() {

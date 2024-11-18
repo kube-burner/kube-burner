@@ -15,7 +15,9 @@ setup_file() {
   export CHURN_CYCLES=100
   export TEST_KUBECONFIG; TEST_KUBECONFIG=$(mktemp -d)/kubeconfig
   export TEST_KUBECONTEXT=test-context
-  setup-kind
+  if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
+    setup-kind
+  fi
   create_test_kubeconfig
   setup-prometheus
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
@@ -39,7 +41,9 @@ teardown() {
 }
 
 teardown_file() {
-  destroy-kind
+  if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
+    destroy-kind
+  fi
   $OCI_BIN rm -f prometheus
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
     $OCI_BIN rm -f opensearch
