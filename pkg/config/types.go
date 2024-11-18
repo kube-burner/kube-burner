@@ -86,6 +86,8 @@ type GlobalConfig struct {
 	GCMetrics bool `yaml:"gcMetrics"`
 	// Boolean flag to check for cluster-health
 	ClusterHealth bool `yaml:"clusterHealth"`
+	// Global Benchmark timeout
+	Timeout time.Duration `yaml:"timeout"`
 }
 
 // Object defines an object that kube-burner will create

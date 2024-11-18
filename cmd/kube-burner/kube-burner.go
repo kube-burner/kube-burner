@@ -94,7 +94,7 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(uuid, f)
+			configSpec, err := config.Parse(uuid, timeout, f)
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
@@ -108,7 +108,7 @@ func initCmd() *cobra.Command {
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, timeout)
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(rc)
@@ -208,7 +208,7 @@ func measureCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(configFile, f)
+			configSpec, err := config.Parse(configFile, time.Hour, f)
 			if err != nil {
 				log.Fatal(err.Error())
 			}

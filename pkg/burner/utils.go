@@ -168,12 +168,12 @@ func newRESTMapper() meta.RESTMapper {
 	return restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
 }
 
-func (ex *Executor) RunJob() {
+func (ex *Executor) RunJob(ctx context.Context) {
 	switch ex.ExecutionMode {
 	case config.ExecutionModeParallel:
-		ex.runParallel()
+		ex.runParallel(ctx)
 	case config.ExecutionModeSequential:
-		ex.runSequential()
+		ex.runSequential(ctx)
 	}
 }
 
@@ -200,9 +200,12 @@ func getItemListForObject(obj object, maxWaitTimeout time.Duration) (*unstructur
 	return itemList, nil
 }
 
-func (ex *Executor) runSequential() {
+func (ex *Executor) runSequential(ctx context.Context) {
 	for i := 0; i < ex.JobIterations; i++ {
 		for _, obj := range ex.objects {
+			if ctx.Err() != nil {
+				return
+			}
 			itemList, err := getItemListForObject(obj, ex.MaxWaitTimeout)
 			if err != nil {
 				continue
@@ -241,9 +244,12 @@ func (ex *Executor) runSequential() {
 }
 
 // runParallel executes all objects for all jobs in parallel
-func (ex *Executor) runParallel() {
+func (ex *Executor) runParallel(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
+		if ctx.Err() != nil {
+			return
+		}
 		itemList, err := getItemListForObject(obj, ex.MaxWaitTimeout)
 		if err != nil {
 			continue
