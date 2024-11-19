@@ -34,19 +34,17 @@ const (
 	MissingKeyZero  templateOption = "missingkey=zero"
 )
 
-// RenderTemplate renders a go-template
-func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
-	var rendered bytes.Buffer
-	funcMap := sprig.GenericFuncMap()
-	funcMap["Binomial"] = combin.Binomial
-	funcMap["IndexToCombination"] = combin.IndexToCombination
-	funcMap["GetSubnet24"] = func(subnetIdx int) string {
+var funcMap = sprig.GenericFuncMap()
+
+func init() {
+	AddRenderingFunction("Binomial", combin.Binomial)
+	AddRenderingFunction("IndexToCombination", combin.IndexToCombination)
+	funcMap["GetSubnet24"] = func(subnetIdx int) string { // TODO Document this function
 		return netip.AddrFrom4([4]byte{byte(subnetIdx>>16 + 1), byte(subnetIdx >> 8), byte(subnetIdx), 0}).String() + "/24"
 	}
 	// This function returns number of addresses requested per iteration from the list of total provided addresses
-	funcMap["GetIPAddress"] = func(Addresses string, iteration int, addressesPerIteration int) string {
+	funcMap["GetIPAddress"] = func(Addresses string, iteration int, addressesPerIteration int) string { // TODO Move this function to kube-burner-ocp
 		var retAddrs []string
-
 		addrSlice := strings.Split(Addresses, " ")
 		for i := 0; i < addressesPerIteration; i++ {
 			// For example, if iteration=6 and addressesPerIteration=2, return 12th address from list.
@@ -55,6 +53,16 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 		}
 		return strings.Join(retAddrs, " ")
 	}
+}
+
+func AddRenderingFunction(name string, function any) {
+	log.Debugf("Importing template function: %s", name)
+	funcMap[name] = function
+}
+
+// RenderTemplate renders a go-template
+func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
+	var rendered bytes.Buffer
 	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
 		return nil, fmt.Errorf("parsing error: %s", err)
