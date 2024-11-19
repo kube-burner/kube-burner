@@ -138,7 +138,7 @@ func (ex *Executor) Verify() bool {
 			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 			success = false
 		} else {
-			log.Infof("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
+			log.Debugf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 		}
 	}
 	return success
