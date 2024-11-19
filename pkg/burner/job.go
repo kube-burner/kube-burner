@@ -255,7 +255,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 		gcCtx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 		defer cancel()
-		for _, job := range jobList {
+		for _, job := range jobList[:len(executedJobs)-1] {
 			gcWg.Add(1)
 			go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
 		}
