@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -39,16 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func setupCreateJob(jobConfig config.Job) Executor {
+func setupCreateJob(ex *Executor) {
 	var err error
 	var f io.Reader
 	mapper := newRESTMapper()
-	log.Debugf("Preparing create job: %s", jobConfig.Name)
-	ex := Executor{
-		Job: jobConfig,
-	}
-	ex.DefaultMissingKeysWithZero = jobConfig.DefaultMissingKeysWithZero
-	for _, o := range jobConfig.Objects {
+	log.Debugf("Preparing create job: %s", ex.Name)
+
+	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
@@ -91,10 +87,9 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		if obj.Namespaced && obj.namespace == "" {
 			ex.nsRequired = true
 		}
-		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
+		log.Infof("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
-	return ex
 }
 
 // RunCreateJob executes a creation job

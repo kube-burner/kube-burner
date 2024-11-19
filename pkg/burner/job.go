@@ -34,37 +34,12 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
-
-type object struct {
-	gvr        schema.GroupVersionResource
-	objectSpec []byte
-	kind       string
-	namespace  string
-	config.Object
-}
-
-// Executor contains the information required to execute a job
-type ItemHandler func(ex *Executor, obj object, originalItem unstructured.Unstructured, iteration int, wg *sync.WaitGroup)
-type ObjectFinalizer func(obj object)
-
-type Executor struct {
-	config.Job
-	objects         []object
-	uuid            string
-	runid           string
-	limiter         *rate.Limiter
-	nsRequired      bool
-	itemHandler     ItemHandler
-	objectFinalizer ObjectFinalizer
-}
 
 // returnPair is a pair of return codes for a job
 type returnPair struct {
@@ -107,7 +82,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
-	var jobList []Executor
 	var msWg, gcWg sync.WaitGroup
 	embedFS = configSpec.EmbedFS
 	embedFSDir = configSpec.EmbedFSDir
@@ -116,13 +90,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
 	globalWaitMap := make(map[string][]string)
-	executorMap := make(map[string]Executor)
+	executorMap := make(map[string]*Executor)
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
-		jobList = newExecutorList(configSpec, kubeClientProvider, uuid, timeout)
+		jobList := newExecutorList(configSpec, kubeClientProvider, timeout)
 		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
 		for _, job := range jobList {
 			if job.PreLoadImages && job.JobType == config.CreationJob {
@@ -134,14 +108,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// Iterate job list
 		for jobPosition, job := range jobList {
 			var waitListNamespaces []string
-			if job.QPS == 0 || job.Burst == 0 {
-				log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
-				job.QPS = rest.DefaultQPS
-				job.Burst = rest.DefaultBurst
-			} else {
-				log.Infof("QPS: %v", job.QPS)
-				log.Infof("Burst: %v", job.Burst)
-			}
 			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
@@ -329,42 +295,45 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 	}
 }
 
+func verifyJobTimeout(job *config.Job, defaultTimeout time.Duration) {
+	if job.MaxWaitTimeout == 0 {
+		log.Debugf("job.MaxWaitTimeout is zero in %s, override by timeout: %s", job.Name, defaultTimeout)
+		job.MaxWaitTimeout = defaultTimeout
+	} else {
+		log.Debugf("job.MaxWaitTimeout is non zero in %s: %s", job.Name, job.MaxWaitTimeout)
+	}
+}
+
+func verifyQPSBurst(job *config.Job) {
+	if job.QPS == 0 || job.Burst == 0 {
+		log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
+		job.QPS = rest.DefaultQPS
+		job.Burst = rest.DefaultBurst
+	} else {
+		log.Infof("QPS: %v", job.QPS)
+		log.Infof("Burst: %v", job.Burst)
+	}
+}
+
+func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
+	verifyJobTimeout(job, defaultTimeout)
+	verifyQPSBurst(job)
+}
+
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, uuid string, timeout time.Duration) []Executor {
-	var ex Executor
-	var executorList []Executor
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, defaultTimeout time.Duration) []*Executor {
+	var executorList []*Executor
 	_, restConfig = kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
-		switch job.JobType {
-		case config.CreationJob:
-			ex = setupCreateJob(job)
-		case config.DeletionJob:
-			ex = setupDeleteJob(job)
-		case config.PatchJob:
-			ex = setupPatchJob(job)
-		case config.ReadJob:
-			ex = setupReadJob(job)
-		default:
-			log.Fatalf("Unknown jobType: %s", job.JobType)
-		}
-		if ex.MaxWaitTimeout == 0 {
-			log.Debugf("job.MaxWaitTimeout is zero in %s, override by timeout: %s", ex.Name, timeout)
-			ex.MaxWaitTimeout = timeout
-		} else {
-			log.Debugf("job.MaxWaitTimeout is non zero in %s: %s", ex.Name, ex.MaxWaitTimeout)
-		}
-		// Limits the number of workers to QPS and Burst
-		ex.limiter = rate.NewLimiter(rate.Limit(ex.QPS), ex.Burst)
-		ex.uuid = uuid
-		ex.runid = configSpec.GlobalConfig.RUNID
-		executorList = append(executorList, ex)
+		verifyJobDefaults(&job, defaultTimeout)
+		executorList = append(executorList, newExecutor(job, configSpec.GlobalConfig.UUID, configSpec.GlobalConfig.RUNID))
 	}
 	return executorList
 }
 
 // Runs on wait list at the end of benchmark
-func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Executor) {
+func runWaitList(globalWaitMap map[string][]string, executorMap map[string]*Executor) {
 	var wg sync.WaitGroup
 	for executorUUID, namespaces := range globalWaitMap {
 		executor := executorMap[executorUUID]
@@ -384,7 +353,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 	}
 }
 
-func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector string, wg *sync.WaitGroup) {
+func garbageCollectJob(ctx context.Context, jobExecutor *Executor, labelSelector string, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
