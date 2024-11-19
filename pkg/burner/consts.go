@@ -21,18 +21,21 @@ type statusPath struct {
 	readyReplicasPath    []string
 }
 
+var pathSpecReplicas = []string{"spec", "replicas"}
+var statusReplicas = []string{"status", "readyReplicas"}
+
 var waitStatusMap map[string]statusPath = map[string]statusPath{
 	StatefulSet: {
-		expectedReplicasPath: []string{"spec", "replicas"}, readyReplicasPath: []string{"status", "readyReplicas"}},
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas},
 	Deployment: {
-		expectedReplicasPath: []string{"spec", "replicas"}, readyReplicasPath: []string{"status", "readyReplicas"}},
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas},
 	DaemonSet: {
 		expectedReplicasPath: []string{"status", "desiredNumberScheduled"}, readyReplicasPath: []string{"status", "numberReady"}},
 	ReplicaSet: {
-		expectedReplicasPath: []string{"spec", "replicas"}, readyReplicasPath: []string{"status", "readyReplicas"}},
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas},
 	ReplicationController: {
-		expectedReplicasPath: []string{"spec", "replicas"}, readyReplicasPath: []string{"status", "replicas"}},
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas},
 	VirtualMachineInstanceReplicaSet: {
-		expectedReplicasPath: []string{"spec", "replicas"}, readyReplicasPath: []string{"status", "readyReplicas"},
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas,
 	},
 }

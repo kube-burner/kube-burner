@@ -52,7 +52,7 @@ func (ex *Executor) waitForObjects(ns string) {
 			}
 			switch kind {
 			case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
-				err = ex.genericWait(ns, obj, waitStatusMap[kind])
+				err = ex.waitForReplicas(ns, obj, waitStatusMap[kind])
 			case Pod:
 				err = ex.waitForPod(ns, obj)
 			case Build, BuildConfig:
@@ -66,7 +66,7 @@ func (ex *Executor) waitForObjects(ns string) {
 			}
 		}
 		if err != nil {
-			log.Errorf("Error waiting for objects in namespace %s: %v", ns, err)
+			log.Fatalf("Error waiting for objects in namespace %s: %v", ns, err)
 		}
 		if obj.namespace != "" || obj.RunOnce {
 			obj.ready = true
@@ -79,7 +79,7 @@ func (ex *Executor) waitForObjects(ns string) {
 	}
 }
 
-func (ex *Executor) genericWait(ns string, obj object, waitPath statusPath) error {
+func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		ex.waitLimiter.Wait(context.TODO())
 		resources, err := DynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
