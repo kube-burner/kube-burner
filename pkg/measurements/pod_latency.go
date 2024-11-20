@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
@@ -52,6 +53,8 @@ type podMetric struct {
 	MetricName                    string      `json:"metricName"`
 	UUID                          string      `json:"uuid"`
 	JobName                       string      `json:"jobName,omitempty"`
+	JobIteration                  int         `json:"jobIteration"`
+	Replica                       int         `json:"replica"`
 	Namespace                     string      `json:"namespace"`
 	Name                          string      `json:"podName"`
 	NodeName                      string      `json:"nodeName"`
@@ -74,14 +77,17 @@ func init() {
 
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	pod := obj.(*corev1.Pod)
+	podLabels := pod.GetLabels()
 	p.metrics.LoadOrStore(string(pod.UID), podMetric{
-		Timestamp:  pod.CreationTimestamp.Time.UTC(),
-		Namespace:  pod.Namespace,
-		Name:       pod.Name,
-		MetricName: podLatencyMeasurement,
-		UUID:       globalCfg.UUID,
-		JobName:    factory.jobConfig.Name,
-		Metadata:   factory.metadata,
+		Timestamp:    pod.CreationTimestamp.Time.UTC(),
+		Namespace:    pod.Namespace,
+		Name:         pod.Name,
+		MetricName:   podLatencyMeasurement,
+		UUID:         globalCfg.UUID,
+		JobName:      factory.jobConfig.Name,
+		Metadata:     factory.metadata,
+		JobIteration: getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
+		Replica:      getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
 	})
 }
 
