@@ -43,6 +43,7 @@ var configSpec = Spec{
 		RequestTimeout:   60 * time.Second,
 		Measurements:     []mtypes.Measurement{},
 		WaitWhenFinished: false,
+		Timeout:          4 * time.Hour,
 	},
 }
 
@@ -115,7 +116,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Parse parses a configuration file
-func Parse(uuid string, f io.Reader) (Spec, error) {
+func Parse(uuid string, timeout time.Duration, f io.Reader) (Spec, error) {
 	cfg, err := io.ReadAll(f)
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
@@ -151,6 +152,7 @@ func Parse(uuid string, f io.Reader) (Spec, error) {
 			configSpec.Jobs[i].PreLoadImages = false
 		}
 	}
+	configSpec.GlobalConfig.Timeout = timeout
 	configSpec.GlobalConfig.UUID = uuid
 	return configSpec, nil
 }

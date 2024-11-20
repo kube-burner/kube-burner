@@ -77,10 +77,11 @@ var (
 // - error
 //
 //nolint:gocyclo
-func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, timeout time.Duration) (int, error) {
+func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper) (int, error) {
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
+	var jobList []Executor
 	var msWg, gcWg sync.WaitGroup
 	embedFS = configSpec.EmbedFS
 	embedFSDir = configSpec.EmbedFSDir
@@ -92,10 +93,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	executorMap := make(map[string]Executor)
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
+	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
+	defer cancel()
 	go func() {
 		var innerRC int
 		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
-		jobList := newExecutorList(configSpec, kubeClientProvider, timeout)
+		jobList = newExecutorList(configSpec, kubeClientProvider)
 		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
 		for _, job := range jobList {
 			if job.PreLoadImages && job.JobType == config.CreationJob {
@@ -106,14 +109,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 		// Iterate job list
 		for jobPosition, job := range jobList {
+			executedJobs = append(executedJobs, prometheus.Job{
+				Start:     time.Now().UTC(),
+				JobConfig: job.Job,
+			})
 			var waitListNamespaces []string
 			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
 			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
-			currentJob := prometheus.Job{
-				Start:     time.Now().UTC(),
-				JobConfig: job.Job,
-			}
 			measurements.SetJobConfig(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
 			measurements.Start()
@@ -130,7 +133,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", job.ChurnDelay)
 					log.Infof("Churn deletion strategy: %v", job.ChurnDeletionStrategy)
 				}
-				job.RunCreateJob(0, job.JobIterations, &waitListNamespaces)
+				job.RunCreateJob(ctx, 0, job.JobIterations, &waitListNamespaces)
+				if ctx.Err() != nil {
+					return
+				}
 				// If object verification is enabled
 				if job.VerifyObjects && !job.Verify() {
 					err := errors.New("object verification failed")
@@ -143,14 +149,17 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if job.Churn {
 					now := time.Now().UTC()
-					currentJob.ChurnStart = &now
-					job.RunCreateJobWithChurn()
-					currentJob.ChurnEnd = &now
+					executedJobs[len(executedJobs)-1].ChurnStart = &now
+					job.RunCreateJobWithChurn(ctx)
+					executedJobs[len(executedJobs)-1].ChurnEnd = &now
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
 			} else {
-				job.RunJob()
+				job.RunJob(ctx)
+				if ctx.Err() != nil {
+					return
+				}
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
@@ -171,10 +180,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
 				time.Sleep(job.JobPause)
 			}
-			currentJob.End = time.Now().UTC()
-			executedJobs = append(executedJobs, currentJob)
+			executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 			if !globalConfig.WaitWhenFinished {
-				elapsedTime := currentJob.End.Sub(currentJob.Start).Round(time.Second)
+				elapsedTime := executedJobs[len(executedJobs)-1].End.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
 			// We stop and index measurements per job
@@ -241,9 +249,16 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	}()
 	select {
 	case rc = <-res:
-	case <-time.After(timeout):
-		err := fmt.Errorf("%v timeout reached", timeout)
+	case <-time.After(configSpec.GlobalConfig.Timeout):
+		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
 		log.Error(err.Error())
+		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		gcCtx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+		defer cancel()
+		for _, job := range jobList[:len(executedJobs)-1] {
+			gcWg.Add(1)
+			go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
+		}
 		errs = append(errs, err)
 		rc = rcTimeout
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
@@ -298,8 +313,6 @@ func verifyJobTimeout(job *config.Job, defaultTimeout time.Duration) {
 	if job.MaxWaitTimeout == 0 {
 		log.Debugf("job.MaxWaitTimeout is zero in %s, override by timeout: %s", job.Name, defaultTimeout)
 		job.MaxWaitTimeout = defaultTimeout
-	} else {
-		log.Debugf("job.MaxWaitTimeout is non zero in %s: %s", job.Name, job.MaxWaitTimeout)
 	}
 }
 
@@ -320,12 +333,12 @@ func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, defaultTimeout time.Duration) []Executor {
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) []Executor {
 	var executorList []Executor
 	_, restConfig = kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
-		verifyJobDefaults(&job, defaultTimeout)
+		verifyJobDefaults(&job, configSpec.GlobalConfig.Timeout)
 		executorList = append(executorList, newExecutor(job, configSpec.GlobalConfig.UUID, configSpec.GlobalConfig.RUNID))
 	}
 	return executorList

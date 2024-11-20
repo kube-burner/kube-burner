@@ -65,7 +65,7 @@ func (wh *WorkloadHelper) Run(workload string) int {
 			log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 		}
 	}
-	ConfigSpec, err = config.Parse(wh.UUID, f)
+	ConfigSpec, err = config.Parse(wh.UUID, wh.Timeout, f)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func (wh *WorkloadHelper) Run(workload string) int {
 		EmbedConfig:     embedConfig,
 		UserMetaData:    wh.UserMetadata,
 	})
-	rc, err = burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, wh.Timeout)
+	rc, err = burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper)
 	if err != nil {
 		log.Error(err.Error())
 	}
