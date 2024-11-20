@@ -29,11 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func setupPatchJob(ex *Executor) {
-	log.Debugf("Preparing %s job: %s", ex.JobType, ex.Name)
-
+func (ex *Executor) setupPatchJob() {
+	log.Debugf("Preparing patch job: %s", ex.Name)
 	ex.itemHandler = patchHandler
-
 	if len(ex.ExecutionMode) == 0 {
 		ex.ExecutionMode = config.ExecutionModeParallel
 	}

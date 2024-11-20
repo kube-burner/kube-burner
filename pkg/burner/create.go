@@ -27,7 +27,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 
 	"github.com/kube-burner/kube-burner/pkg/util"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,12 +37,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func setupCreateJob(ex *Executor) {
+func (ex *Executor) setupCreateJob() {
 	var err error
 	var f io.Reader
 	mapper := newRESTMapper()
 	log.Debugf("Preparing create job: %s", ex.Name)
-
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
@@ -94,7 +92,6 @@ func setupCreateJob(ex *Executor) {
 
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
-	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -161,7 +158,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns, waitRateLimiter)
+				ex.waitForObjects(ns)
 				namespacesWaited[ns] = true
 			}
 		}
@@ -187,7 +184,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				ex.waitForObjects(ns, waitRateLimiter)
+				ex.waitForObjects(ns)
 				<-sem
 				wg.Done()
 			}(ns)

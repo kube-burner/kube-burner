@@ -33,7 +33,6 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -90,7 +89,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
 	globalWaitMap := make(map[string][]string)
-	executorMap := make(map[string]*Executor)
+	executorMap := make(map[string]Executor)
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	go func() {
@@ -321,8 +320,8 @@ func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, defaultTimeout time.Duration) []*Executor {
-	var executorList []*Executor
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, defaultTimeout time.Duration) []Executor {
+	var executorList []Executor
 	_, restConfig = kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
 	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
@@ -333,7 +332,7 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 }
 
 // Runs on wait list at the end of benchmark
-func runWaitList(globalWaitMap map[string][]string, executorMap map[string]*Executor) {
+func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Executor) {
 	var wg sync.WaitGroup
 	for executorUUID, namespaces := range globalWaitMap {
 		executor := executorMap[executorUUID]
@@ -344,7 +343,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]*Exec
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				executor.waitForObjects(ns, rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst))
+				executor.waitForObjects(ns)
 				<-sem
 				wg.Done()
 			}(ns)
@@ -353,7 +352,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]*Exec
 	}
 }
 
-func garbageCollectJob(ctx context.Context, jobExecutor *Executor, labelSelector string, wg *sync.WaitGroup) {
+func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector string, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}

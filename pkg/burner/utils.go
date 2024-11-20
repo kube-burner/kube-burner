@@ -24,7 +24,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -215,8 +214,7 @@ func (ex *Executor) runSequential() {
 			}
 			// Wait for all items in the object
 			wg.Wait()
-			waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
-			ex.waitForObjects("", waitRateLimiter)
+			ex.waitForObjects("")
 
 			if ex.objectFinalizer != nil {
 				ex.objectFinalizer(obj)
@@ -258,6 +256,5 @@ func (ex *Executor) runParallel() {
 		}
 	}
 	wg.Wait()
-	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
-	ex.waitForObjects("", waitRateLimiter)
+	ex.waitForObjects("")
 }

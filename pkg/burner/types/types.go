@@ -14,20 +14,6 @@
 
 package types
 
-const (
-	// OpenShift Build CRD
-	OpenShiftBuildGroup      = "build.openshift.io"
-	OpenShiftBuildAPIVersion = "v1"
-	OpenShiftBuildResource   = "builds"
-
-	// Kubevirt CRD
-	KubevirtGroup                            = "kubevirt.io"
-	KubevirtAPIVersion                       = "v1"
-	VirtualMachineResource                   = "virtualmachines"
-	VirtualMachineInstanceResource           = "virtualmachineinstances"
-	VirtualMachineInstanceReplicaSetResource = "virtualmachineinstancereplicasets"
-)
-
 // Condition contains details for the current condition of this pod.
 type Condition struct {
 	Type   string `json:"type"`
