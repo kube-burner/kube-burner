@@ -3,6 +3,11 @@ global:
   gc: true
   measurements:
    - name: podLatency
+     config:
+      thresholds:
+        - conditionType: Ready
+          metric: P99
+          threshold: 5s
 jobs:
   - name: kubelet-density
     jobIterations: 25

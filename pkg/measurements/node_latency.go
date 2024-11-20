@@ -55,7 +55,7 @@ type NodeMetric struct {
 }
 
 type nodeLatency struct {
-	config           types.Measurement
+	config           types.MeasurementConfig
 	watcher          *metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
@@ -111,7 +111,7 @@ func (n *nodeLatency) handleUpdateNode(obj interface{}) {
 	}
 }
 
-func (n *nodeLatency) setConfig(cfg types.Measurement) error {
+func (n *nodeLatency) setConfig(cfg types.MeasurementConfig) error {
 	n.config = cfg
 	var metricFound bool
 	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}

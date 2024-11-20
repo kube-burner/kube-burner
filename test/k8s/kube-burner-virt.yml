@@ -4,8 +4,9 @@ global:
   gc: {{env "GC"}}
   measurements:
   - name: vmiLatency
+    config:
 {{ if .TIMESERIES_INDEXER }}
-    timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
+      timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}
 metricsEndpoints:
 {{ if .ES_INDEXING }}

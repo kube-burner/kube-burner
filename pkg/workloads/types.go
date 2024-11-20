@@ -20,16 +20,23 @@ import (
 
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
 	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/measurements"
 )
 
+type CustomMeasurement struct {
+	Func measurements.Measurement
+	Name string
+}
+
 type Config struct {
-	UUID            string
-	Timeout         time.Duration
-	MetricsEndpoint string
-	UserMetadata    string
-	ConfigDir       string
-	PrometheusURL   string
-	PrometheusToken string
+	UUID               string
+	Timeout            time.Duration
+	MetricsEndpoint    string
+	UserMetadata       string
+	ConfigDir          string
+	PrometheusURL      string
+	PrometheusToken    string
+	CustomMeasurements []CustomMeasurement
 }
 
 type WorkloadHelper struct {

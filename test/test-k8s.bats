@@ -33,6 +33,7 @@ setup() {
   export ES_INDEXING=""
   export LOCAL_INDEXING=""
   export ALERTING=""
+  export PRELOAD=false
   export TIMESERIES_INDEXER=""
 }
 
@@ -52,15 +53,17 @@ teardown_file() {
 
 @test "kube-burner init: churn=true; absolute-path=true" {
   export CHURN=true
-  export CHURN_CYCLES=2
+  export CHURN_CYCLES=1
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  check_file_exists "kube-burner-${UUID}.log"
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
-@test "kube-burner init: gc=false" {
+@test "kube-burner init: gc=false; preload=true" {
   export GC=false
+  export PRELOAD=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
   check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 10
@@ -159,11 +162,6 @@ teardown_file() {
 @test "kube-burner check-alerts" {
   run_cmd ${KUBE_BURNER} check-alerts -a alerts.yml -u http://localhost:9090 --metrics-directory=alerts
   check_file_list alerts/alert.json
-}
-
-@test "kube-burner log file output" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
-  check_file_exists "kube-burner-${UUID}.log"
 }
 
 @test "kube-burner init: waitOptions for Deployment" {

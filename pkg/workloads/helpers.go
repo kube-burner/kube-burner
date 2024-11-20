@@ -23,6 +23,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
@@ -68,6 +69,9 @@ func (wh *WorkloadHelper) Run(workload string) int {
 	ConfigSpec, err = config.Parse(wh.UUID, wh.Timeout, f)
 	if err != nil {
 		log.Fatal(err)
+	}
+	for _, cfg := range wh.CustomMeasurements {
+		measurements.Load(cfg.Name, cfg.Func)
 	}
 	if embedConfig {
 		ConfigSpec.EmbedFS = wh.embedConfig
