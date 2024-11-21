@@ -16,6 +16,8 @@ package util
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path"
 	"runtime"
 
@@ -39,6 +41,17 @@ func SetupCmd(cmd *cobra.Command) {
 			fmt.Println("OS/Arch:", version.OsArch)
 		},
 	})
+}
+
+// Configures kube-burner's file logging
+func SetupFileLogging(uuid string) {
+	logFileName := fmt.Sprintf("kube-burner-%s.log", uuid)
+	file, err := os.Create(logFileName)
+	if err != nil {
+		log.Fatalf("Failed to create log file: %v", err)
+	}
+	mw := io.MultiWriter(os.Stdout, file)
+	log.SetOutput(mw)
 }
 
 // Configures kube-burner's logging level
