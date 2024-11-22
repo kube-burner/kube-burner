@@ -76,13 +76,12 @@ func (ex *Executor) setupCreateJob() {
 		obj := object{
 			gvr:        mapping.Resource,
 			objectSpec: t,
-			kind:       gvk.Kind,
 			Object:     o,
-			namespace:  uns.GetNamespace(),
+			uns:        *uns,
 		}
 		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
-		if obj.Namespaced && obj.namespace == "" {
+		if obj.Namespaced && obj.uns.GetNamespace() == "" {
 			ex.nsRequired = true
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)

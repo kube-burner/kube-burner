@@ -22,6 +22,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -29,6 +30,7 @@ import (
 
 type measurementFactory struct {
 	jobConfig   *config.Job
+	objects     unstructured.UnstructuredList
 	clientSet   kubernetes.Interface
 	restConfig  *rest.Config
 	createFuncs map[string]measurement
@@ -92,9 +94,10 @@ func (mf *measurementFactory) register(measurement types.Measurement, measuremen
 	return nil
 }
 
-func SetJobConfig(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider) {
+func SetJobConfig(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider, objects unstructured.UnstructuredList) {
 	factory.jobConfig = jobConfig
 	factory.clientSet, factory.restConfig = kubeClientProvider.ClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
+	factory.objects = objects
 }
 
 // Start starts registered measurements
