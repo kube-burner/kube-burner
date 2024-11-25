@@ -288,6 +288,9 @@ func prepareConnections() {
 										}
 									}
 								}
+								if len(otherIPs) == 0 {
+									continue
+								}
 								conn := connection{
 									Addresses: otherIPs,
 									Ports:     ingressPorts,
@@ -496,7 +499,9 @@ func (n *netpolLatency) start(measurementWg *sync.WaitGroup) error {
 	// Parse network policy template for each iteration and prepare connections for client pods
 	prepareConnections()
 	// send connection information to proxy to deliver to client pods
-	sendConnections()
+	if len(connections) > 0 {
+		sendConnections()
+	}
 	n.latencyQuantiles, n.normLatencies = nil, nil
 
 	// Create watchers to record network policy creation timestamp
@@ -527,7 +532,9 @@ func (n *netpolLatency) stop() error {
 			return nil
 		}
 	}
-	processResults(n)
+	if len(connections) > 0 {
+		processResults(n)
+	}
 	proxyPortForwarder.CancelPodPortForwarder()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {

@@ -297,10 +297,10 @@ When there're `LoadBalancer` services, an extra document with `quantileName` as 
 
 ## Network Policy Latency
 
-Note: This measurement has requirement of having 2 jobs defined in the templates.
+Note: This measurement has requirement of having 2 jobs defined in the templates. It doesn't report the network policy latency measurement if only one job is used.
 
 Calculates the time taken to apply the network policy rules by the SDN through connection testing between pods specified in the network policy.
-At a high level, Kube-burner utilizes a proxy pod, `network-policy-proxy`, to distribute connection information (such as remote IP addresses) to client pods. These client pods then send requests to the specified addresses and record a timestamp once a connection is successfully established. Kube-burner retrieves these timestamps from the client pods via the proxy pod and calculates the network policy latency by comparing the recorded timestamp with the timestamp when the network policy was created.
+At a high level, Kube-burner utilizes a proxy pod, `network-policy-proxy`, to distribute connection information (such as remote IP addresses) to the client pods. These client pods then send the requests to the specified addresses and record a timestamp once a connection is successfully established. Kube-burner retrieves these timestamps from the client pods via the proxy pod and calculates the network policy latency by comparing the recorded timestamp with the timestamp when the network policy was created.
 
 During this testing, kube-burner creates two separate jobs:
 1. **Job 1**: Creates all necessary namespaces and pods.
@@ -308,10 +308,23 @@ During this testing, kube-burner creates two separate jobs:
 
 Latency measurement is only performed during the execution of Job 2, which focuses on network policy application and connection testing.
 
+### Templates
+
+Use the examples/workloads/network-policy/network-policy.yml for reference.
+
+### Dependency
+
+1. 2 Jobs should be used in the template
+2. Both the jobs should use the same namespace name, example "network-policy-perf".
+3. First job should create the pods. Second job should create the network policies
+4. Label "kube-burner.io/skip-networkpolicy-latency: true" should be defined under namespaceLabels.
+5. All the pods should allow traffic from the proxy pod. Example workload uses np-deny-all.yml and np-allow-from-proxy.yml object templates for this.
+6. inputVars.namespaces for templates/ingress-np.yml object template should have same value as jobIterations
+
 ### Sequence of Events During Connection Testing:
 
 1. **Proxy Pod Initialization**:
-   Kube-burner-ocp creates the `network-policy-proxy` pod along with a route for communication. It then passes this route, along with other template configuration options, to Kube-burner.
+   Kube-burner internally creates the `network-policy-proxy` pod and uses port forwarding for communication.
 
 2. **Job Execution**:
    - **Job 1**: Kube-burner creates namespaces and pods as per the configuration.
