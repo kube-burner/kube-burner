@@ -28,6 +28,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -141,10 +142,11 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 		}
 		for objectIndex, obj := range ex.objects {
 			labels := map[string]string{
-				"kube-burner-uuid":  ex.uuid,
-				"kube-burner-job":   ex.Name,
-				"kube-burner-index": strconv.Itoa(objectIndex),
-				"kube-burner-runid": ex.runid,
+				"kube-burner-uuid":                 ex.uuid,
+				"kube-burner-job":                  ex.Name,
+				"kube-burner-index":                strconv.Itoa(objectIndex),
+				"kube-burner-runid":                ex.runid,
+				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 			}
 			ex.objects[objectIndex].LabelSelector = labels
 			if obj.RunOnce {
@@ -220,6 +222,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 		for k, v := range labels {
 			copiedLabels[k] = v
 		}
+		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
 
 		templateOption := util.MissingKeyError
 		if ex.DefaultMissingKeysWithZero {

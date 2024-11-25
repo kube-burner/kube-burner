@@ -71,13 +71,15 @@ type vmiMetric struct {
 	vmReady        time.Time
 	VMReadyLatency int `json:"vmReadyLatency"`
 
-	MetricName string      `json:"metricName"`
-	UUID       string      `json:"uuid"`
-	Namespace  string      `json:"namespace"`
-	Name       string      `json:"podName"`
-	NodeName   string      `json:"nodeName"`
-	JobName    string      `json:"jobName,omitempty"`
-	Metadata   interface{} `json:"metadata,omitempty"`
+	MetricName   string      `json:"metricName"`
+	UUID         string      `json:"uuid"`
+	Namespace    string      `json:"namespace"`
+	Name         string      `json:"podName"`
+	NodeName     string      `json:"nodeName"`
+	JobName      string      `json:"jobName,omitempty"`
+	JobIteration int         `json:"jobIteration"`
+	Replica      int         `json:"replica"`
+	Metadata     interface{} `json:"metadata,omitempty"`
 }
 
 type vmiLatency struct {
@@ -96,16 +98,19 @@ func init() {
 
 func (vmi *vmiLatency) handleCreateVM(obj interface{}) {
 	vm := obj.(*kvv1.VirtualMachine)
-	vmID := vm.Labels["kubevirt-vm"]
+	vmLabels := vm.GetLabels()
+	vmID := vmLabels["kubevirt-vm"]
 	if _, exists := vmi.metrics.Load(vmID); !exists {
 		if strings.Contains(vm.Namespace, factory.jobConfig.Namespace) {
 			vmi.metrics.Store(vmID, &vmiMetric{
-				Timestamp:  time.Now().UTC(),
-				Namespace:  vm.Namespace,
-				Name:       vm.Name,
-				MetricName: vmiLatencyMeasurement,
-				UUID:       globalCfg.UUID,
-				JobName:    factory.jobConfig.Name,
+				Timestamp:    time.Now().UTC(),
+				Namespace:    vm.Namespace,
+				Name:         vm.Name,
+				MetricName:   vmiLatencyMeasurement,
+				UUID:         globalCfg.UUID,
+				JobName:      factory.jobConfig.Name,
+				JobIteration: getIntFromLabels(vmLabels, config.KubeBurnerLabelJobIteration),
+				Replica:      getIntFromLabels(vmLabels, config.KubeBurnerLabelReplica),
 			})
 		}
 	}
@@ -132,7 +137,8 @@ func (vmi *vmiLatency) handleCreateVMI(obj interface{}) {
 	var vmID string
 	vmiObj := obj.(*kvv1.VirtualMachineInstance)
 	// in case the parent is a VM object
-	if id, exists := vmiObj.Labels["kubevirt-vm"]; exists {
+	vmiLabels := vmiObj.GetLabels()
+	if id, exists := vmiLabels["kubevirt-vm"]; exists {
 		vmID = id
 	}
 	// in case there is no parent
@@ -142,11 +148,13 @@ func (vmi *vmiLatency) handleCreateVMI(obj interface{}) {
 	if _, exists := vmi.metrics.Load(vmID); !exists {
 		if strings.Contains(vmiObj.Namespace, factory.jobConfig.Namespace) {
 			vmi.metrics.Store(vmID, &vmiMetric{
-				Timestamp:  time.Now().UTC(),
-				Namespace:  vmiObj.Namespace,
-				Name:       vmiObj.Name,
-				MetricName: vmiLatencyMeasurement,
-				UUID:       globalCfg.UUID,
+				Timestamp:    time.Now().UTC(),
+				Namespace:    vmiObj.Namespace,
+				Name:         vmiObj.Name,
+				MetricName:   vmiLatencyMeasurement,
+				UUID:         globalCfg.UUID,
+				JobIteration: getIntFromLabels(vmiLabels, "kube-burner.io/job-iteration"),
+				Replica:      getIntFromLabels(vmiLabels, "kube-burner.io/replica"),
 			})
 		}
 	}

@@ -16,6 +16,7 @@ package measurements
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
@@ -77,4 +78,15 @@ func calculateQuantiles(normLatencies []interface{}, getLatency func(interface{}
 	}
 
 	return latencyQuantiles
+}
+
+func getIntFromLabels(labels map[string]string, key string) int {
+	strVal, ok := labels[key]
+	if ok {
+		val, err := strconv.Atoi(strVal)
+		if err == nil {
+			return val
+		}
+	}
+	return 0
 }

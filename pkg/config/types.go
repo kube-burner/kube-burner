@@ -210,3 +210,8 @@ const (
 	ExecutionModeParallel   ExecutionMode = "parallel"
 	ExecutionModeSequential ExecutionMode = "sequential"
 )
+
+const (
+	KubeBurnerLabelJobIteration = "kube-burner.io/job-iteration"
+	KubeBurnerLabelReplica      = "kube-burner.io/replica"
+)

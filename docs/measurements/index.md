@@ -38,6 +38,9 @@ One document, such as the following, is indexed per each pod created by the work
   "namespace": "kubelet-density",
   "podName": "kubelet-density-13",
   "nodeName": "worker-001",
+  "jobName": "create-pods",
+	"jobIteration": "2",
+	"replica": "3",
 }
 ```
 
@@ -228,7 +231,7 @@ This measure is enabled with:
 
 ```yaml
   measurements:
-  - name: serviceLatency 
+  - name: serviceLatency
     svcTimeout: 5s
 ```
 
@@ -338,7 +341,7 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
 
 ```shell
-kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2 
+kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2
 time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
 time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
 time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
