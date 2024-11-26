@@ -269,26 +269,26 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 
 func (vmi *vmiLatency) setConfig(cfg types.Measurement) error {
 	vmi.config = cfg
-	var metricFound bool
-	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
+	supportedConditions := []string{"VMI" + string(kvv1.Pending), "VMI" + string(kvv1.Scheduling), "VMI" + string(kvv1.Scheduled), "VMI" + string(kvv1.Running)}
+	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max", "Min"}
 	for _, th := range vmi.config.LatencyThresholds {
-		if th.ConditionType == string(kvv1.Pending) ||
-			th.ConditionType == string(kvv1.Scheduling) ||
-			th.ConditionType == string(kvv1.Scheduled) ||
-			th.ConditionType == string(kvv1.Running) ||
-			th.ConditionType == string(kvv1.VirtualMachineInstanceReady) ||
-			th.ConditionType == string(kvv1.Succeeded) {
-			for _, lm := range latencyMetrics {
-				if th.Metric == lm {
-					metricFound = true
-					break
-				}
+		metricFound, conditionFound := false, false
+		for _, c := range supportedConditions {
+			if th.ConditionType == c {
+				conditionFound = true
 			}
-			if !metricFound {
-				return fmt.Errorf("unsupported metric %s in vmLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
+		}
+		for _, lm := range latencyMetrics {
+			if th.Metric == lm {
+				metricFound = true
+				break
 			}
-		} else {
-			return fmt.Errorf("unsupported vm condition type in vmLatency measurement: %s", th.ConditionType)
+		}
+		if !metricFound {
+			return fmt.Errorf("unsupported metric %s in vmiLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
+		}
+		if !conditionFound {
+			return fmt.Errorf("unsupported vmi condition type in vmiLatency measurement: %s", th.ConditionType)
 		}
 	}
 	return nil
