@@ -70,7 +70,7 @@ func waitForDeleteNamespacedResources(ctx context.Context, ex Executor, namespac
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		allDeleted := true
 		for _, obj := range objects {
-			if obj.Namespaced {
+			if obj.namespaced {
 				resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 				objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 				if err != nil {
