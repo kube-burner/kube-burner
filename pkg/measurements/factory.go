@@ -15,6 +15,7 @@
 package measurements
 
 import (
+	"embed"
 	"fmt"
 	"sync"
 
@@ -47,10 +48,14 @@ type measurement interface {
 var factory measurementFactory
 var measurementMap = make(map[string]measurement)
 var globalCfg config.GlobalConfig
+var embedFS embed.FS
+var embedFSDir string
 
 // NewMeasurementFactory initializes the measurement facture
 func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) {
 	var indexerFound bool
+	embedFS = configSpec.EmbedFS
+	embedFSDir = configSpec.EmbedFSDir
 	globalCfg = configSpec.GlobalConfig
 	factory = measurementFactory{
 		createFuncs: make(map[string]measurement),

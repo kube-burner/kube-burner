@@ -16,10 +16,6 @@ package types
 
 import (
 	"time"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -96,28 +92,3 @@ const (
 	SvcLatencyNs          = "kube-burner-service-latency"
 	SvcLatencyCheckerName = "svc-checker"
 )
-
-var SvcLatencyCheckerPod = &corev1.Pod{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      SvcLatencyCheckerName,
-		Namespace: SvcLatencyNs,
-	},
-	Spec: corev1.PodSpec{
-		TerminationGracePeriodSeconds: ptr.To[int64](0),
-		Containers: []corev1.Container{
-			{
-				Image:           "quay.io/cloud-bulldozer/fedora-nc:latest",
-				Command:         []string{"sleep", "inf"},
-				Name:            SvcLatencyCheckerName,
-				ImagePullPolicy: corev1.PullAlways,
-				SecurityContext: &corev1.SecurityContext{
-					AllowPrivilegeEscalation: ptr.To[bool](false),
-					Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-					RunAsNonRoot:             ptr.To[bool](true),
-					SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
-					RunAsUser:                ptr.To[int64](1000),
-				},
-			},
-		},
-	},
-}
