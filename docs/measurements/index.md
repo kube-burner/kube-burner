@@ -4,20 +4,13 @@ Kube-burner allows you to get further metrics using other mechanisms or data sou
 
 Measurements are enabled in the `measurements` object of the configuration file. This object contains a list of measurements with their options.
 
-## Pod and VMI latency
+## Pod latency
 
-Collects latencies from the different pod/vm/vmi startup phases, these **latency metrics are in ms**. It can be enabled with:
+Collects latencies from the different pod startup phases, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
   measurements:
   - name: podLatency
-```
-
-or
-
-```yaml
-  measurements:
-  - name: vmiLatency
 ```
 
 ### Metrics
@@ -39,8 +32,8 @@ One document, such as the following, is indexed per each pod created by the work
   "podName": "kubelet-density-13",
   "nodeName": "worker-001",
   "jobName": "create-pods",
-	"jobIteration": "2",
-	"replica": "3",
+  "jobIteration": "2",
+  "replica": "3",
 }
 ```
 
@@ -118,6 +111,122 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 ```
 
 In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
+
+## VMI latency
+
+Collects latencies from the different vm/vmi startup phases, these **latency metrics are in ms**. It can be enabled with:
+
+```yaml
+  measurements:
+  - name: vmiLatency
+```
+
+### Metrics
+
+The metrics collected are vm/vmi latency timeseries (`vmiLatencyMeasurement`) and up to 10 documents holding a summary with different vm/vmi latency quantiles of each condition (`vmiLatencyQuantilesMeasurement`).
+
+One document, such as the following, is indexed per each vm/vmi created by the workload that enters in `Running` condition during the workload:
+
+```json
+[
+  {
+    "timestamp": "2024-11-26T12:57:50Z",
+    "podCreatedLatency": 116532,
+    "podScheduledLatency": 116574,
+    "podInitializedLatency": 132511,
+    "podContainersReadyLatency": 135541,
+    "podReadyLatency": 135541,
+    "vmiCreatedLatency": 7000,
+    "vmiPendingLatency": 116401,
+    "vmiSchedulingLatency": 117106,
+    "vmiScheduledLatency": 127926,
+    "vmiRunningLatency": 138166,
+    "vmReadyLatency": 138166,
+    "metricName": "vmiLatencyMeasurement",
+    "uuid": "f7c79fd5-58e7-4719-a710-7633ffb20491",
+    "namespace": "virt-density",
+    "podName": "virt-launcher-virt-density-27-zkfdt",
+    "vmName": "virt-density-27",
+    "vmiName": "virt-density-27",
+    "nodeName": "y37-h25-000-r740xd",
+    "jobName": "virt-density",
+  },
+  {
+    "timestamp": "2024-11-26T12:57:53Z",
+    "podCreatedLatency": 125182,
+    "podScheduledLatency": 125182,
+    "podInitializedLatency": 133741,
+    "podContainersReadyLatency": 143130,
+    "podReadyLatency": 143130,
+    "vmiCreatedLatency": 10000,
+    "vmiPendingLatency": 119298,
+    "vmiSchedulingLatency": 119347,
+    "vmiScheduledLatency": 143254,
+    "vmiRunningLatency": 153506,
+    "vmReadyLatency": 153528,
+    "metricName": "vmiLatencyMeasurement",
+    "uuid": "f7c79fd5-58e7-4719-a710-7633ffb20491",
+    "namespace": "virt-density",
+    "podName": "virt-launcher-virt-density-93-82fdm",
+    "vmName": "virt-density-93",
+    "vmiName": "virt-density-93",
+    "nodeName": "y37-h25-000-r740xd",
+    "jobName": "virt-density",
+  }
+]
+```
+
+!!! info
+    The fields `vmReadyLatency` and `vmName` are only set when the VMI has a parent VM object
+
+!!! info
+    The fields prefixed by `pod`, represent the latency of the different startup phases of the pod running the actual virtual machine.
+
+---
+
+Pod latency quantile sample:
+
+```json
+[
+  {
+    "quantileName": "PodPodScheduled",
+    "uuid": "f7c79fd5-58e7-4719-a710-7633ffb20491",
+    "P99": 125183,
+    "P95": 124870,
+    "P50": 119769,
+    "max": 125313,
+    "avg": 119509,
+    "timestamp": "2024-11-26T13:00:30.713169517Z",
+    "metricName": "vmiLatencyQuantilesMeasurement",
+    "jobName": "virt-density",
+  },
+  {
+    "quantileName": "VMIScheduled",
+    "uuid": "f7c79fd5-58e7-4719-a710-7633ffb20491",
+    "P99": 144029,
+    "P95": 143255,
+    "P50": 139240,
+    "max": 144029,
+    "avg": 138699,
+    "timestamp": "2024-11-26T13:00:30.713173817Z",
+    "metricName": "vmiLatencyQuantilesMeasurement",
+    "jobName": "virt-density",
+  },
+  {
+    "quantileName": "PodContainersReady",
+    "uuid": "f7c79fd5-58e7-4719-a710-7633ffb20491",
+    "P99": 144029,
+    "P95": 143257,
+    "P50": 139466,
+    "max": 144030,
+    "avg": 139361,
+    "timestamp": "2024-11-26T13:00:30.713179584Z",
+    "metricName": "vmiLatencyQuantilesMeasurement",
+    "jobName": "virt-density",
+  },
+]
+
+```
 
 ## Node latency
 
