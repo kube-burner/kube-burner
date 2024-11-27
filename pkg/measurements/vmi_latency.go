@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -124,24 +124,17 @@ func (vmi *vmiLatency) handleUpdateVM(obj interface{}) {
 }
 
 func (vmi *vmiLatency) handleCreateVMI(obj interface{}) {
-	var mapId string
 	vmiObj := obj.(*kvv1.VirtualMachineInstance)
 	now := vmiObj.CreationTimestamp.UTC()
-	// in case the parent is a VM object
-	for _, or := range vmiObj.OwnerReferences {
-		if or.Kind == kvv1.VirtualMachineGroupVersionKind.Kind {
-			mapId = string(or.UID)
-			break
-		}
-	}
+	parentVMID := getParentVMMapID(vmiObj)
 	// in case there's a parent vm
-	if mapId != "" {
-		if vmiM, ok := vmi.metrics.Load(mapId); ok {
+	if parentVMID != "" {
+		if vmiM, ok := vmi.metrics.Load(parentVMID); ok {
 			vmiMetric := vmiM.(vmiMetric)
 			if vmiMetric.vmiCreated.IsZero() {
 				vmiMetric.vmiCreated = now
 				vmiMetric.VMIName = vmiObj.Name
-				vmi.metrics.Store(mapId, vmiMetric)
+				vmi.metrics.Store(parentVMID, vmiMetric)
 			}
 		}
 	} else {
@@ -149,23 +142,17 @@ func (vmi *vmiLatency) handleCreateVMI(obj interface{}) {
 		vmi.metrics.Store(string(vmiObj.UID), vmiMetric{
 			vmiCreated:   now,
 			VMIName:      vmiObj.Name,
-			JobIteration: getIntFromLabels(vmiLabels, "kube-burner.io/job-iteration"),
-			Replica:      getIntFromLabels(vmiLabels, "kube-burner.io/replica"),
+			JobIteration: getIntFromLabels(vmiLabels, config.KubeBurnerLabelJobIteration),
+			Replica:      getIntFromLabels(vmiLabels, config.KubeBurnerLabelReplica),
 			Timestamp:    now, // Timestamp only needs to be set when there's not a parent VM
 		})
 	}
 }
 
 func (vmi *vmiLatency) handleUpdateVMI(obj interface{}) {
-	var mapID string
 	vmiObj := obj.(*kvv1.VirtualMachineInstance)
 	// in case the parent is a VM object
-	for _, or := range vmiObj.OwnerReferences {
-		if or.Kind == kvv1.VirtualMachineGroupVersionKind.Kind {
-			mapID = string(or.UID)
-			break
-		}
-	}
+	mapID := getParentVMMapID(vmiObj)
 	// otherwise use VMI UID
 	if mapID == "" {
 		mapID = string(vmiObj.UID)
@@ -196,16 +183,10 @@ func (vmi *vmiLatency) handleUpdateVMI(obj interface{}) {
 }
 
 func (vmi *vmiLatency) handleCreateVMIPod(obj interface{}) {
-	var vmiName string
 	pod := obj.(*corev1.Pod)
-	// Check pods owner references to obtain VMI name
-	for _, or := range pod.OwnerReferences {
-		if or.Kind == kvv1.VirtualMachineInstanceGroupVersionKind.Kind {
-			vmiName = or.Name
-			break
-		}
-	}
-	if vmiName == "" {
+	vmiName, err := getParentVMIName(pod)
+	if err != nil {
+		log.Warn(err.Error())
 		return
 	}
 	// Iterate over all vmi metrics to get the one with the same VMI name
@@ -221,16 +202,10 @@ func (vmi *vmiLatency) handleCreateVMIPod(obj interface{}) {
 }
 
 func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
-	var vmiName string
 	pod := obj.(*corev1.Pod)
-	// Check pods owner references to obtain VMI name
-	for _, or := range pod.OwnerReferences {
-		if or.Kind == kvv1.VirtualMachineInstanceGroupVersionKind.Kind {
-			vmiName = or.Name
-			break
-		}
-	}
-	if vmiName == "" {
+	vmiName, err := getParentVMIName(pod)
+	if err != nil {
+		log.Warn(err.Error())
 		return
 	}
 	// Iterate over all vmi metrics to get the one with the same VMI name
@@ -269,26 +244,26 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 
 func (vmi *vmiLatency) setConfig(cfg types.Measurement) error {
 	vmi.config = cfg
-	supportedConditions := []string{"VMI" + string(kvv1.Pending), "VMI" + string(kvv1.Scheduling), "VMI" + string(kvv1.Scheduled), "VMI" + string(kvv1.Running)}
-	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max", "Min"}
+	var supportedConditions map[string]struct{} = map[string]struct{}{
+		"VMI" + string(kvv1.Pending):    {},
+		"VMI" + string(kvv1.Scheduling): {},
+		"VMI" + string(kvv1.Scheduled):  {},
+		"VMI" + string(kvv1.Running):    {},
+	}
+	var supportedLatencyMetrics map[string]struct{} = map[string]struct{}{
+		"P99": {},
+		"P95": {},
+		"P50": {},
+		"Avg": {},
+		"Max": {},
+		"Min": {},
+	}
 	for _, th := range vmi.config.LatencyThresholds {
-		metricFound, conditionFound := false, false
-		for _, c := range supportedConditions {
-			if th.ConditionType == c {
-				conditionFound = true
-			}
+		if _, ok := supportedConditions[th.ConditionType]; !ok {
+			return fmt.Errorf("unsupported vmi condition %s in vmiLatency measurement, supported are %v", th.ConditionType, maps.Keys((supportedConditions)))
 		}
-		for _, lm := range latencyMetrics {
-			if th.Metric == lm {
-				metricFound = true
-				break
-			}
-		}
-		if !metricFound {
-			return fmt.Errorf("unsupported metric %s in vmiLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
-		}
-		if !conditionFound {
-			return fmt.Errorf("unsupported vmi condition type in vmiLatency measurement: %s", th.ConditionType)
+		if _, ok := supportedLatencyMetrics[th.Metric]; !ok {
+			return fmt.Errorf("unsupported metric %s in vmiLatency measurement, supported are: %s", th.Metric, maps.Keys(supportedLatencyMetrics))
 		}
 	}
 	return nil
@@ -467,4 +442,28 @@ func (vmi *vmiLatency) calcQuantiles() {
 		}
 	}
 	vmi.latencyQuantiles = calculateQuantiles(vmi.normLatencies, getLatency, vmiLatencyQuantilesMeasurement)
+}
+
+// Returns the parent VM UID if there is one
+// otherwise returns an empty string
+func getParentVMMapID(vmiObj *kvv1.VirtualMachineInstance) string {
+	for _, or := range vmiObj.OwnerReferences {
+		// Check if kind is VirtualMachine
+		if or.Kind == kvv1.VirtualMachineGroupVersionKind.Kind {
+			return string(or.UID)
+		}
+	}
+	return ""
+}
+
+// Returns the parent VMI UID if there is one
+// otherwise returns an empty string
+func getParentVMIName(podObj *corev1.Pod) (string, error) {
+	for _, or := range podObj.OwnerReferences {
+		// Check if kind is VirtualMachineInstance
+		if or.Kind == kvv1.VirtualMachineInstanceGroupVersionKind.Kind {
+			return or.Name, nil
+		}
+	}
+	return "", fmt.Errorf("no parent VMI found for pod %s", podObj.Name)
 }
