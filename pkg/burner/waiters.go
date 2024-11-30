@@ -39,13 +39,13 @@ func (ex *Executor) waitForObjects(ns string) {
 			continue
 		}
 		// When the object has defined its own namespace, we use it
-		if obj.namespace != "" {
-			ns = obj.namespace
+		if obj.uns.GetNamespace() != "" {
+			ns = obj.uns.GetNamespace()
 		}
 		if obj.WaitOptions.ForCondition != "" {
 			ex.verifyCondition(ns, obj)
 		} else {
-			kind := obj.kind
+			kind := obj.uns.GetKind()
 			if obj.WaitOptions.Kind != "" {
 				kind = obj.WaitOptions.Kind
 				ns = corev1.NamespaceAll
@@ -68,7 +68,7 @@ func (ex *Executor) waitForObjects(ns string) {
 		if err != nil {
 			log.Fatalf("Error waiting for objects in namespace %s: %v", ns, err)
 		}
-		if obj.namespace != "" || obj.RunOnce {
+		if obj.uns.GetNamespace() != "" || obj.RunOnce {
 			obj.ready = true
 		}
 	}
@@ -86,7 +86,7 @@ func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) 
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
-			log.Errorf("Error listing %s in %s: %v", obj.kind, ns, err)
+			log.Errorf("Error listing %s in %s: %v", obj.uns.GetKind(), ns, err)
 			return false, nil
 		}
 		for _, resource := range resources.Items {
@@ -99,7 +99,7 @@ func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) 
 				return false, err
 			}
 			if replicas != readyReplicas {
-				log.Debugf("Waiting for replicas from %s in ns %s to be ready", obj.kind, ns)
+				log.Debugf("Waiting for replicas from %s in ns %s to be ready", obj.uns.GetKind(), ns)
 				return false, nil
 			}
 		}
@@ -220,9 +220,9 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 		}
 		if err != nil {
 			if ns != "" {
-				log.Errorf("Error listing %s in %s: %v", obj.kind, ns, err)
+				log.Errorf("Error listing %s in %s: %v", obj.uns.GetKind(), ns, err)
 			} else {
-				log.Errorf("Error listing %s: %v", obj.kind, err)
+				log.Errorf("Error listing %s: %v", obj.uns.GetKind(), err)
 			}
 			return false, nil
 		}

@@ -19,6 +19,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
@@ -28,9 +29,8 @@ import (
 type object struct {
 	config.Object
 	gvr        schema.GroupVersionResource
+	uns        unstructured.Unstructured
 	objectSpec []byte
-	kind       string
-	namespace  string
 	ready      bool
 }
 

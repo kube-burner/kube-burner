@@ -40,9 +40,9 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex Executor, namespacesToDel
 func CleanupNamespaceResourcesUsingGVR(ctx context.Context, obj object, namespace string, labelSelector string) {
 	resourceInterface := DynamicClient.Resource(obj.gvr).Namespace(namespace)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-	log.Infof("Deleting %ss labeled with %s in %s", obj.kind, labelSelector, namespace)
+	log.Infof("Deleting %ss labeled with %s in %s", obj.uns.GetKind(), labelSelector, namespace)
 	if err != nil {
-		log.Errorf("Unable to list %vs in %v: %v", obj.kind, namespace, err)
+		log.Errorf("Unable to list %vs in %v: %v", obj.uns.GetKind(), namespace, err)
 		return
 	}
 	for _, item := range resources.Items {
@@ -56,7 +56,7 @@ func CleanupNamespaceResourcesUsingGVR(ctx context.Context, obj object, namespac
 
 // Cleanup non-namespaced resources using executor list
 func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, object object, labelSelector string) {
-	log.Infof("Deleting non-namespace %v with selector %v", object.kind, labelSelector)
+	log.Infof("Deleting non-namespace %v with selector %v", object.uns.GetKind(), labelSelector)
 	resourceInterface := DynamicClient.Resource(object.gvr)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {

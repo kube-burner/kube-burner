@@ -34,6 +34,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -249,6 +250,7 @@ func measureCmd() *cobra.Command {
 					NamespaceAnnotations: namespaceAnnotations,
 				},
 				config.NewKubeClientProvider(kubeConfig, kubeContext),
+				unstructured.UnstructuredList{},
 			)
 			measurements.Collect()
 			if err = measurements.Stop(); err != nil {
