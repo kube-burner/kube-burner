@@ -1,0 +1,9 @@
+{{- $randomIndex := randInt 0 (len .workerHostNames) -}}
+{{- $targetWorker := index .workerHostNames $randomIndex -}}
+kind: Deployment
+apiVersion: apps/v1
+spec:
+  template:
+    spec:
+      nodeSelector:
+        "kubernetes.io/hostname": {{ $targetWorker }}
