@@ -25,11 +25,14 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/vuln/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	adminpolicy "sigs.k8s.io/network-policy-api/apis/v1alpha1"
 )
 
 func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
@@ -147,4 +150,64 @@ func deployPodInNamespace(namespace, podName, image string, command []string) er
 		return true, nil
 	})
 	return err
+}
+
+// Function to create AdminNetworkPolicy
+func createAdminNetworkPolicy(k8sClient client.Client) error {
+	// Define the AdminNetworkPolicy object
+	netObj := &adminpolicy.AdminNetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "allow-from-proxy",
+		},
+		Spec: adminpolicy.AdminNetworkPolicySpec{
+			Priority: 99,
+			Ingress: []adminpolicy.AdminNetworkPolicyIngressRule{
+				Name:   "allow-from-proxy-pod",
+				Action: adminpolicy.AdminNetworkPolicyRuleActionAllow,
+				Subject: adminpolicy.AdminNetworkPolicySubject{
+					PodSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"kubernetes.io/metadata.name": "network-policy-proxy"},
+					},
+				},
+			},
+		},
+		Status: adminpolicy.AdminNetworkPolicyStatus{},
+	}
+	// Use Kubernetes client to create the resource
+	err := k8sClient.Create(context.TODO(), netObj)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Function to create BaselineAdminNetworkPolicy
+func createBaselineAdminNetworkPolicy(k8sClient client.Client) error {
+	// Define the BaselineAdminNetworkPolicy object
+	baseNetObj := &adminpolicy.BaselineAdminNetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "deny-all"},
+		Spec: adminpolicy.BaselineAdminNetworkPolicySpec{
+			Rules: []adminpolicy.BaselineAdminNetworkPolicyRule{
+				{
+					Action: adminpolicy.BaselineAdminNetworkPolicyRuleActionDeny,
+					Subject: adminpolicy.AdminNetworkPolicySubject{
+						PodSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"kube-burner-uuid": globalCfg.UUID,
+							},
+						},
+					},
+				},
+			},
+		},
+		Status: adminpolicy.BaselineAdminNetworkPolicyStatus{},
+	}
+
+	// Use Kubernetes client to create the resource
+	err := k8sClient.Create(context.TODO(), baseNetObj)
+	if err != nil {
+		return err
+	}
+	return nil
 }
