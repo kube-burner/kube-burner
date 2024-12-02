@@ -209,7 +209,7 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
 		ex.limiter.Wait(context.TODO())
-		if obj.Namespaced {
+		if obj.namespaced {
 			objs, err = ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 			})
@@ -269,7 +269,7 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 					}
 				}
 			}
-			if obj.Namespaced {
+			if obj.namespaced {
 				log.Debugf("Waiting for %s in ns %s to be ready", obj.gvr.Resource, ns)
 			} else {
 				log.Debugf("Waiting for %s to be ready", obj.gvr.Resource)

@@ -48,7 +48,7 @@ func deleteHandler(ex *Executor, obj object, item unstructured.Unstructured, ite
 	defer wg.Done()
 	ex.limiter.Wait(context.TODO())
 	var err error
-	if obj.Namespaced {
+	if obj.namespaced {
 		log.Debugf("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
 		err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	} else {

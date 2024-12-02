@@ -79,10 +79,10 @@ func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMappe
 			kind:       gvk.Kind,
 			Object:     o,
 			namespace:  uns.GetNamespace(),
+			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 		}
-		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
-		if obj.Namespaced && obj.namespace == "" {
+		if obj.namespaced && obj.namespace == "" {
 			ex.nsRequired = true
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
@@ -262,7 +262,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 			// hasn't been created yet
 			replicaWg.Add(1)
 			go func(n string) {
-				if !obj.Namespaced {
+				if !obj.namespaced {
 					n = ""
 				}
 				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)

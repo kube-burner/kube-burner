@@ -31,6 +31,7 @@ type object struct {
 	objectSpec []byte
 	kind       string
 	namespace  string
+	namespaced bool
 	ready      bool
 }
 
@@ -48,11 +49,11 @@ func newObject(obj config.Object, mapper meta.RESTMapper) object {
 	if err != nil {
 		log.Fatal(err)
 	}
-	obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 
 	o := object{
-		Object: obj,
-		gvr:    mapping.Resource,
+		Object:     obj,
+		gvr:        mapping.Resource,
+		namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 	}
 
 	if obj.ObjectTemplate != "" {
