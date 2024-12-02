@@ -21,11 +21,15 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // Executor contains the information required to execute a job
 type ItemHandler func(ex *Executor, obj object, originalItem unstructured.Unstructured, iteration int, wg *sync.WaitGroup)
-type ObjectFinalizer func(obj object)
+type ObjectFinalizer func(ex *Executor, obj object)
 
 type Executor struct {
 	config.Job
@@ -37,25 +41,37 @@ type Executor struct {
 	nsRequired      bool
 	itemHandler     ItemHandler
 	objectFinalizer ObjectFinalizer
+	clientSet       kubernetes.Interface
+	restConfig      *rest.Config
+	dynamicClient   *dynamic.DynamicClient
 }
 
-func newExecutor(job config.Job, uuid, runid string) Executor {
+func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job) Executor {
 	ex := Executor{
 		Job:         job,
 		limiter:     rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
-		uuid:        uuid,
-		runid:       runid,
+		uuid:        configSpec.GlobalConfig.UUID,
+		runid:       configSpec.GlobalConfig.RUNID,
 		waitLimiter: rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 	}
+
+	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
+	ex.clientSet = clientSet
+	ex.restConfig = runtimeRestConfig
+	ex.dynamicClient = dynamic.NewForConfigOrDie(ex.restConfig)
+
+	_, setupRestConfig := kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
+	mapper := newRESTMapper(discovery.NewDiscoveryClientForConfigOrDie(setupRestConfig))
+
 	switch job.JobType {
 	case config.CreationJob:
-		ex.setupCreateJob()
+		ex.setupCreateJob(configSpec, mapper)
 	case config.DeletionJob:
-		ex.setupDeleteJob()
+		ex.setupDeleteJob(mapper)
 	case config.PatchJob:
-		ex.setupPatchJob()
+		ex.setupPatchJob(mapper)
 	case config.ReadJob:
-		ex.setupReadJob()
+		ex.setupReadJob(mapper)
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}

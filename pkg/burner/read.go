@@ -20,17 +20,17 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (ex *Executor) setupReadJob() {
+func (ex *Executor) setupReadJob(mapper meta.RESTMapper) {
 	log.Debugf("Preparing read job: %s", ex.Name)
 	ex.itemHandler = readHandler
 	ex.ExecutionMode = config.ExecutionModeSequential
 
-	mapper := newRESTMapper()
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
 		ex.objects = append(ex.objects, newObject(o, mapper))
@@ -44,10 +44,10 @@ func readHandler(ex *Executor, obj object, item unstructured.Unstructured, itera
 	var err error
 	if obj.Namespaced {
 		log.Debugf("Reading %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
-		_, err = DynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
+		_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
 	} else {
 		log.Debugf("Reading %s/%s", item.GetKind(), item.GetName())
-		_, err = DynamicClient.Resource(obj.gvr).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
+		_, err = ex.dynamicClient.Resource(obj.gvr).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
 	}
 	if err != nil {
 		log.Errorf("Error found reading %s/%s: %s", item.GetKind(), item.GetName(), err)

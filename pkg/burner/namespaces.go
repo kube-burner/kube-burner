@@ -31,14 +31,14 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex Executor, namespacesToDel
 	for _, namespace := range namespacesToDelete {
 		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
 		for _, obj := range ex.objects {
-			CleanupNamespaceResourcesUsingGVR(ctx, obj, namespace, labelSelector)
+			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 		}
-		waitForDeleteNamespacedResources(ctx, namespace, ex.objects, labelSelector)
+		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
 	}
 }
 
-func CleanupNamespaceResourcesUsingGVR(ctx context.Context, obj object, namespace string, labelSelector string) {
-	resourceInterface := DynamicClient.Resource(obj.gvr).Namespace(namespace)
+func CleanupNamespaceResourcesUsingGVR(ctx context.Context, ex Executor, obj object, namespace string, labelSelector string) {
+	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	log.Infof("Deleting %ss labeled with %s in %s", obj.kind, labelSelector, namespace)
 	if err != nil {
@@ -55,9 +55,9 @@ func CleanupNamespaceResourcesUsingGVR(ctx context.Context, obj object, namespac
 }
 
 // Cleanup non-namespaced resources using executor list
-func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, object object, labelSelector string) {
+func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, ex Executor, object object, labelSelector string) {
 	log.Infof("Deleting non-namespace %v with selector %v", object.kind, labelSelector)
-	resourceInterface := DynamicClient.Resource(object.gvr)
+	resourceInterface := ex.dynamicClient.Resource(object.gvr)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		log.Debugf("Unable to list resources for object: %v error: %v. Hence skipping it", object.Object, err)
@@ -66,12 +66,12 @@ func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, object object, l
 	util.DeleteNonNamespacedResources(ctx, resources, resourceInterface)
 }
 
-func waitForDeleteNamespacedResources(ctx context.Context, namespace string, objects []object, labelSelector string) {
+func waitForDeleteNamespacedResources(ctx context.Context, ex Executor, namespace string, objects []object, labelSelector string) {
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		allDeleted := true
 		for _, obj := range objects {
 			if obj.Namespaced {
-				resourceInterface := DynamicClient.Resource(obj.gvr).Namespace(namespace)
+				resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 				objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 				if err != nil {
 					return false, err

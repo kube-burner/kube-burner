@@ -38,10 +38,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *Executor) setupCreateJob() {
+func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMapper) {
 	var err error
 	var f io.Reader
-	mapper := newRESTMapper()
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
@@ -50,11 +49,11 @@ func (ex *Executor) setupCreateJob() {
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
 		e := embed.FS{}
-		if embedFS == e {
+		if configSpec.EmbedFS == e {
 			f, err = util.ReadConfig(o.ObjectTemplate)
 		} else {
-			objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
-			f, err = util.ReadEmbedConfig(embedFS, objectTemplate)
+			objectTemplate := path.Join(configSpec.EmbedFSDir, o.ObjectTemplate)
+			f, err = util.ReadEmbedConfig(configSpec.EmbedFS, objectTemplate)
 		}
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
@@ -110,7 +109,7 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	}
 	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
-		if err = util.CreateNamespace(ClientSet, ns, nsLabels, nsAnnotations); err != nil {
+		if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 			log.Fatal(err.Error())
 		}
 		*waitListNamespaces = append(*waitListNamespaces, ns)
@@ -132,7 +131,7 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
-				if err = util.CreateNamespace(ClientSet, ns, nsLabels, nsAnnotations); err != nil {
+				if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 					log.Error(err.Error())
 					continue
 				}
@@ -177,7 +176,7 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	if ex.WaitWhenFinished {
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(restConfig.QPS))
+		sem := make(chan int, int(ex.restConfig.QPS))
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.nsRequired && ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
@@ -266,7 +265,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 				if !obj.Namespaced {
 					n = ""
 				}
-				createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
 				replicaWg.Done()
 			}(ns)
 		}(r)
@@ -274,7 +273,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 	wg.Wait()
 }
 
-func createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
+func (ex *Executor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
 	util.RetryWithExponentialBackOff(func() (bool, error) {
@@ -286,9 +285,9 @@ func createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns stri
 			ns = objNs
 		}
 		if ns != "" {
-			uns, err = DynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
+			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		} else {
-			uns, err = DynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
 		}
 		if err != nil {
 			if kerrors.IsUnauthorized(err) {
@@ -370,7 +369,7 @@ func (ex *Executor) RunCreateJobWithChurn(ctx context.Context) {
 				continue
 			}
 			// Label namespaces to be deleted
-			_, err = ClientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
+			_, err = ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
 			if err != nil {
 				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
 			}
@@ -384,7 +383,7 @@ func (ex *Executor) RunCreateJobWithChurn(ctx context.Context) {
 		if ex.ChurnDeletionStrategy == "gvr" {
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		}
-		util.CleanupNamespaces(ctx, ClientSet, "churndelete=delete")
+		util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})

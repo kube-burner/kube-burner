@@ -168,13 +168,12 @@ func destroyCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
-			burner.ClientSet = clientSet
-			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
+			dynamicClient := dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
 			util.CleanupNamespaces(ctx, clientSet, labelSelector)
-			util.CleanupNonNamespacedResources(ctx, clientSet, burner.DynamicClient, labelSelector)
+			util.CleanupNonNamespacedResources(ctx, clientSet, dynamicClient, labelSelector)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
