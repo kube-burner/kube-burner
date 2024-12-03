@@ -23,15 +23,29 @@ type PodPortForwarder struct {
 // parsePort parses out the local port from the port-forward output string.
 // Example: "Forwarding from 127.0.0.1:8000 -> 4000", returns "8000".
 func parsePort(forwardAddr string) (string, error) {
-	parts := strings.Split(forwardAddr, " ")
-	if len(parts) != 5 {
-		return "", fmt.Errorf("unable to parse local port from stdout: %s", forwardAddr)
+	// Split the input into lines
+	lines := strings.Split(forwardAddr, "\n")
+	for _, line := range lines {
+		// Remove any leading/trailing whitespace
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Split the line into parts
+		parts := strings.Split(line, " ")
+		if len(parts) < 3 {
+			continue
+		}
+
+		// Attempt to parse the local port
+		_, localPort, err := net.SplitHostPort(parts[2])
+		if err == nil {
+			return localPort, nil
+		}
 	}
-	_, localPort, err := net.SplitHostPort(parts[2])
-	if err != nil {
-		return "", fmt.Errorf("unable to parse local port: %w", err)
-	}
-	return localPort, nil
+
+	return "", fmt.Errorf("unable to parse local port from stdout: %s", forwardAddr)
 }
 
 func NewPodPortForwarder(clientset kubernetes.Interface, restConfig rest.Config, remotePort, namespace, podName string) (PodPortForwarder, error) {
