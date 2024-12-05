@@ -14,6 +14,9 @@ jobs:
   build:
     uses: ./.github/workflows/builders.yml
 
+  check-docs:
+    uses: ./.github/workflows/check-docs-links.yml
+
   tests:
     needs: build
     uses: ./.github/workflows/test-k8s.yml
