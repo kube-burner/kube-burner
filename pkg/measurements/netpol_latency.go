@@ -54,7 +54,7 @@ const (
 	netpolLatencyQuantilesMeasurement = "netpolLatencyQuantilesMeasurement"
 )
 
-var proxyPortForwarder util.PodPortForwarder
+var proxyPortForwarder *util.PodPortForwarder
 var nsPodAddresses = make(map[string]map[string][]string)
 var proxyEndpoint string
 
@@ -488,13 +488,13 @@ func (n *netpolLatency) start(measurementWg *sync.WaitGroup) error {
 			return err
 		}
 	}
-	if proxyPortForwarder.LocalPort == "" {
+	if proxyPortForwarder == nil {
 		proxyPortForwarder, err = util.NewPodPortForwarder(factory.clientSet, *factory.restConfig, networkPolicyProxyPort, networkPolicyProxy, networkPolicyProxy)
 		if err != nil {
-			log.Error(err)
+			return err
 		}
 		// Use proxyEndpoint to communicate with proxy pod
-		proxyEndpoint = fmt.Sprintf("127.0.0.1:%s", proxyPortForwarder.LocalPort)
+		proxyEndpoint = fmt.Sprintf("127.0.0.1:%s", networkPolicyProxyPort)
 	}
 	// Parse network policy template for each iteration and prepare connections for client pods
 	prepareConnections()
