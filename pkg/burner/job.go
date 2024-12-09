@@ -140,7 +140,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
-				cmd := exec.Command("/bin/sh", job.BeforeCleanup)
+				cmd := exec.Command("/bin/sh", "-c", job.BeforeCleanup)
 				var outb, errb bytes.Buffer
 				cmd.Stdout = &outb
 				cmd.Stderr = &errb
