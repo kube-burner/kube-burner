@@ -90,7 +90,7 @@ func initCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			f, err := util.ReadConfig(configFile)
+			f, err := util.GetReaderForPath(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
@@ -203,7 +203,7 @@ func measureCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
-			f, err := util.ReadConfig(configFile)
+			f, err := util.GetReaderForPath(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}

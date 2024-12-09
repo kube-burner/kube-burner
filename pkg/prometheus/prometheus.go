@@ -137,12 +137,12 @@ func (p *Prometheus) ReadProfile(location string) error {
 		f, err = util.ReadEmbedConfig(p.ConfigSpec.EmbedFS, embeddedPath)
 		if err != nil {
 			log.Infof("Embedded config doesn't contain metrics profile %s. Falling back to original path", embeddedPath)
-			f, err = util.ReadConfig(location)
+			f, err = util.GetReaderForPath(location)
 		} else {
 			location = embeddedPath
 		}
 	} else {
-		f, err = util.ReadConfig(location)
+		f, err = util.GetReaderForPath(location)
 	}
 	p.profileName = location
 	if err != nil {
