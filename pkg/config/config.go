@@ -115,13 +115,40 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
+func getInputData(userDataFileReader io.Reader) (map[string]interface{}, error) {
+	inputData := make(map[string]interface{})
+	if userDataFileReader != nil {
+		userData, err := io.ReadAll(userDataFileReader)
+		if err != nil {
+			return nil, fmt.Errorf("error reading user data file: %w", err)
+		}
+		err = yaml.Unmarshal(userData, &inputData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse file: %w", err)
+		}
+	}
+	// Add all entries from map2, overriding duplicates from map1
+	for key, value := range util.EnvToMap() {
+		inputData[key] = value
+	}
+	return inputData, nil
+}
+
+func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec, error) {
+	return ParseWithUserdata(uuid, timeout, configFileReader, nil)
+}
+
 // Parse parses a configuration file
-func Parse(uuid string, timeout time.Duration, f io.Reader) (Spec, error) {
-	cfg, err := io.ReadAll(f)
+func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader) (Spec, error) {
+	cfg, err := io.ReadAll(configFileReader)
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
 	}
-	renderedCfg, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
+	inputData, err := getInputData(userDataFileReader)
+	if err != nil {
+		return configSpec, err
+	}
+	renderedCfg, err := util.RenderTemplate(cfg, inputData, util.MissingKeyError)
 	if err != nil {
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}

@@ -27,7 +27,7 @@ import (
 // Decodes metrics endpoint yaml file
 func DecodeMetricsEndpoint(metricsEndpointPath string) []config.MetricsEndpoint {
 	var metricsEndpoints []config.MetricsEndpoint
-	f, err := util.ReadConfig(metricsEndpointPath)
+	f, err := util.GetReaderForPath(metricsEndpointPath)
 	if err != nil {
 		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpointPath, err)
 	}
