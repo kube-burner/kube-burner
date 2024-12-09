@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -76,4 +77,38 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}
 	return ex
+}
+
+func (ex *Executor) renderTemplateForObject(obj object, iteration, replicaIndex int, asJson bool) []byte {
+	// Processing template
+	templateData := map[string]interface{}{
+		jobName:      ex.Name,
+		jobIteration: iteration,
+		jobUUID:      ex.uuid,
+		replica:      replicaIndex,
+	}
+	for k, v := range obj.InputVars {
+		templateData[k] = v
+	}
+
+	templateOption := util.MissingKeyError
+	if ex.DefaultMissingKeysWithZero {
+		templateOption = util.MissingKeyZero
+	}
+
+	renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
+	if err != nil {
+		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
+	}
+
+	if asJson {
+		newObject := &unstructured.Unstructured{}
+		yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
+		renderedObj, err = newObject.MarshalJSON()
+		if err != nil {
+			log.Fatalf("Error converting YAML to JSON")
+		}
+	}
+
+	return renderedObj
 }

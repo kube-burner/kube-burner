@@ -223,29 +223,12 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 		}
 		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
 
-		templateOption := util.MissingKeyError
-		if ex.DefaultMissingKeysWithZero {
-			templateOption = util.MissingKeyZero
-		}
-
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
 			var newObject = new(unstructured.Unstructured)
-			templateData := map[string]interface{}{
-				jobName:      ex.Name,
-				jobIteration: iteration,
-				jobUUID:      ex.uuid,
-				replica:      r,
-			}
-			for k, v := range obj.InputVars {
-				templateData[k] = v
-			}
 			ex.limiter.Wait(context.TODO())
-			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
-			if err != nil {
-				log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
-			}
+			renderedObj := ex.renderTemplateForObject(obj, iteration, r, false)
 			// Re-decode rendered object
 			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
 
