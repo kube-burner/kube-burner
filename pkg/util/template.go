@@ -17,6 +17,7 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/netip"
 	"os"
 	"regexp"
@@ -53,6 +54,22 @@ func init() {
 			retAddrs = append(retAddrs, addrSlice[(iteration*addressesPerIteration)+i])
 		}
 		return strings.Join(retAddrs, " ")
+	}
+	funcMap["ReadFile"] = func(filePath string) (string, error) {
+		// Open the file
+		file, err := os.Open(filePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to open file: %w", err)
+		}
+		defer file.Close()
+
+		// Read all content from the file
+		content, err := io.ReadAll(file)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file content: %w", err)
+		}
+
+		return string(content), nil
 	}
 }
 
