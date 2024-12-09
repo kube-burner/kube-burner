@@ -97,7 +97,7 @@ And the metrics are:
 
 ### Pod latency thresholds
 
-It is possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within in the the config of this measurement:
+It is possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option `thresholds` within the config of this measurement:
 
 Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
 
