@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,6 +78,7 @@ func initCmd() *cobra.Command {
 	var uuid, userMetadata string
 	var skipTLSVerify bool
 	var timeout time.Duration
+	var userDataFile string
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -90,11 +92,18 @@ func initCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			f, err := util.GetReaderForPath(configFile)
+			configFileReader, err := util.GetReaderForPath(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(uuid, timeout, f)
+			var userDataFileReader io.Reader
+			if userDataFile != "" {
+				userDataFileReader, err = util.GetReaderForPath(userDataFile)
+				if err != nil {
+					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
+				}
+			}
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader)
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
@@ -123,6 +132,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagRequired("config")
 	return cmd
