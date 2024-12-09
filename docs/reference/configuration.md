@@ -368,7 +368,19 @@ spec:
 
 ## Template functions
 
-In addition to the default [golang template semantics](https://golang.org/pkg/text/template/), kube-burner is compiled with the [sprig library](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.
+On top of the default [golang template semantics](https://golang.org/pkg/text/template/), `kube-burner` supports additional template functions.
+
+### External libraries
+
+- [sprig library](http://masterminds.github.io/sprig/) which adds over 70 template functions for Go’s template language.
+
+### Additional functions
+
+- `Binomial` - returns the binomial coefficient of (n,k)
+- `IndexToCombination` - returns the combination corresponding to the given index
+- `GetSubnet24`
+- `GetIPAddress` - returns number of addresses requested per iteration from the list of total provided addresses
+- `ReadFile` - returns the content of the file in the provided path
 
 ## RunOnce
 
