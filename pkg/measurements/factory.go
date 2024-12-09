@@ -32,21 +32,21 @@ type measurementFactory struct {
 	jobConfig   *config.Job
 	clientSet   kubernetes.Interface
 	restConfig  *rest.Config
-	createFuncs map[string]measurement
+	createFuncs map[string]Measurement
 	metadata    map[string]interface{}
 }
 
-type measurement interface {
+type Measurement interface {
 	start(*sync.WaitGroup) error
 	stop() error
 	collect(*sync.WaitGroup)
-	setConfig(types.Measurement) error
+	setConfig(types.MeasurementConfig) error
 	index(string, map[string]indexers.Indexer)
 	getMetrics() *sync.Map
 }
 
 var factory measurementFactory
-var measurementMap = make(map[string]measurement)
+var measurementMap = make(map[string]Measurement)
 var globalCfg config.GlobalConfig
 var embedFS embed.FS
 var embedFSDir string
@@ -58,14 +58,14 @@ func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface
 	embedFSDir = configSpec.EmbedFSDir
 	globalCfg = configSpec.GlobalConfig
 	factory = measurementFactory{
-		createFuncs: make(map[string]measurement),
+		createFuncs: make(map[string]Measurement),
 		metadata:    metadata,
 	}
 	for _, measurement := range globalCfg.Measurements {
 		indexerFound = false
-		if measurement.QuantilesIndexer != "" || measurement.TimeseriesIndexer != "" {
+		if measurement.Config.QuantilesIndexer != "" || measurement.Config.TimeseriesIndexer != "" {
 			for _, indexer := range configSpec.MetricsEndpoints {
-				if indexer.Alias == measurement.QuantilesIndexer || indexer.Alias == measurement.TimeseriesIndexer {
+				if indexer.Alias == measurement.Config.QuantilesIndexer || indexer.Alias == measurement.Config.TimeseriesIndexer {
 					indexerFound = true
 					break
 				}
@@ -75,7 +75,7 @@ func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface
 			}
 		}
 		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
-			if err := factory.register(measurement, measurementFunc); err != nil {
+			if err := factory.Register(measurement, measurementFunc); err != nil {
 				log.Fatal(err.Error())
 			}
 		} else {
@@ -84,11 +84,12 @@ func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface
 	}
 }
 
-func (mf *measurementFactory) register(measurement types.Measurement, measurementFunc measurement) error {
+// Registers a new measurement
+func (mf *measurementFactory) Register(measurement types.Measurement, measurementFunc Measurement) error {
 	if _, exists := mf.createFuncs[measurement.Name]; exists {
 		log.Warnf("Measurement already registered: %s", measurement.Name)
 	} else {
-		if err := measurementFunc.setConfig(measurement); err != nil {
+		if err := measurementFunc.setConfig(measurement.Config); err != nil {
 			return fmt.Errorf("%s config error: %s", measurement.Name, err)
 		}
 		mf.createFuncs[measurement.Name] = measurementFunc
@@ -150,4 +151,9 @@ func GetMetrics() []*sync.Map {
 		metricList = append(metricList, measurement.getMetrics())
 	}
 	return metricList
+}
+
+func Load(name string, measurement Measurement) {
+	log.Debugf("Loading external measurement into measurementMap: %s", name)
+	measurementMap[name] = measurement
 }
