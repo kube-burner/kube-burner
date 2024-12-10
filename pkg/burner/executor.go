@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"kubevirt.io/client-go/kubecli"
 )
 
 // Executor contains the information required to execute a job
@@ -44,6 +45,7 @@ type Executor struct {
 	clientSet       kubernetes.Interface
 	restConfig      *rest.Config
 	dynamicClient   *dynamic.DynamicClient
+	kubeVirtClient  kubecli.KubevirtClient
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job) Executor {
@@ -72,6 +74,8 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		ex.setupPatchJob(mapper)
 	case config.ReadJob:
 		ex.setupReadJob(mapper)
+	case config.KubeVirtJob:
+		ex.setupKubeVirtJob(mapper)
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}
