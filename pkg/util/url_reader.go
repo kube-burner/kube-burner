@@ -29,25 +29,25 @@ func ReadEmbedConfig(embedFs embed.FS, configFile string) (io.Reader, error) {
 	return f, err
 }
 
-// ReadConfig reads configuration from the given path or URL
-func ReadConfig(configFile string) (io.Reader, error) {
-	u, err := url.Parse(configFile)
+// GetReaderForPath reads configuration from the given path or URL
+func GetReaderForPath(path string) (io.Reader, error) {
+	u, err := url.Parse(path)
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-		f, err := readURL(configFile, nil)
+		f, err := getBodyForURL(path, nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch config from URL %s: %w", configFile, err)
+			return nil, fmt.Errorf("failed to fetch config from URL %s: %w", path, err)
 		}
 		return f, nil
 	}
-	f, err := os.Open(configFile)
+	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open local config file %s: %w", configFile, err)
+		return nil, fmt.Errorf("failed to open local config file %s: %w", path, err)
 	}
 	return f, nil
 }
 
-// readURL reads an URL and returns a reader
-func readURL(stringURL string, body io.Reader) (io.Reader, error) {
+// getBodyForURL reads an URL and returns a reader
+func getBodyForURL(stringURL string, body io.Reader) (io.Reader, error) {
 	u, err := url.ParseRequestURI(stringURL)
 	if err != nil {
 		return body, err

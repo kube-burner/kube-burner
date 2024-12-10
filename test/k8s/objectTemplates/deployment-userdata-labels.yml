@@ -1,0 +1,25 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sleep-app-{{ .Iteration }}-{{ .Replica }}-{{.JobName }}
+  labels:
+    kube-burner.io/from-file: {{ default "unset" .labelFromFile }}
+    kube-burner.io/from-env: {{ default "unset" .labelFromEnv }}
+    kube-burner.io/unset: {{ default "unset" .labelUnset }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sleep-app-{{ .Iteration }}-{{ .Replica }}
+  template:
+    metadata:
+      labels:
+        app: sleep-app-{{ .Iteration }}-{{ .Replica }}
+    spec:
+      containers:
+      - args:
+        - sleep
+        - infinity
+        image: {{.containerImage}}
+        name: ci-app
