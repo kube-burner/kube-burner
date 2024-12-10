@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -62,38 +61,14 @@ func patchHandler(ex *Executor, obj object, originalItem unstructured.Unstructur
 		}
 		data = obj.objectSpec
 	} else {
-		// Processing template
-		templateData := map[string]interface{}{
-			jobName:      ex.Name,
-			jobIteration: iteration,
-			jobUUID:      ex.uuid,
-		}
-		for k, v := range obj.InputVars {
-			templateData[k] = v
-		}
-
-		templateOption := util.MissingKeyError
-		if ex.DefaultMissingKeysWithZero {
-			templateOption = util.MissingKeyZero
-		}
-
-		renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
-		if err != nil {
-			log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
-		}
-
-		// Converting to JSON if patch type is not Apply
+		var asJson bool
 		if obj.PatchType == string(types.ApplyPatchType) {
-			data = renderedObj
 			patchOptions.FieldManager = "kube-controller-manager"
+			asJson = false
 		} else {
-			newObject := &unstructured.Unstructured{}
-			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
-			data, err = newObject.MarshalJSON()
-			if err != nil {
-				log.Errorf("Error converting patch to JSON")
-			}
+			asJson = true
 		}
+		data = ex.renderTemplateForObject(obj, iteration, 0, asJson)
 	}
 
 	ns := originalItem.GetNamespace()
