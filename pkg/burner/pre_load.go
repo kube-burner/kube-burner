@@ -21,6 +21,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,25 @@ type NestedPod struct {
 			corev1.PodSpec `json:"spec"`
 		} `json:"template"`
 	} `json:"spec"`
+}
+
+type VMorVMI struct {
+	Spec struct {
+		Template struct {
+			Spec struct {
+				Volumes []struct {
+					ContainerDisk struct {
+						Image string `yaml:"image"`
+					} `yaml:"containerDisk"`
+				} `yaml:"volumes"`
+			} `yaml:"spec"`
+		} `yaml:"template"`
+		Volumes []struct {
+			ContainerDisk struct {
+				Image string `yaml:"image"`
+			} `yaml:"containerDisk"`
+		} `yaml:"volumes"`
+	} `yaml:"spec"`
 }
 
 func preLoadImages(job Executor, clientSet kubernetes.Interface) error {
@@ -87,6 +107,19 @@ func getJobImages(job Executor) ([]string, error) {
 			for _, i := range pod.Spec.Containers {
 				if i.Image != "" {
 					imageList = append(imageList, i.Image)
+				}
+			}
+		case VirtualMachineInstance, VirtualMachine, VirtualMachineInstanceReplicaSet:
+			var vmOrVMI VMorVMI
+			yaml.Unmarshal(renderedObj, &vmOrVMI)
+			for _, volume := range vmOrVMI.Spec.Volumes {
+				if volume.ContainerDisk.Image != "" {
+					imageList = append(imageList, volume.ContainerDisk.Image)
+				}
+			}
+			for _, volume := range vmOrVMI.Spec.Template.Spec.Volumes {
+				if volume.ContainerDisk.Image != "" {
+					imageList = append(imageList, volume.ContainerDisk.Image)
 				}
 			}
 		}
