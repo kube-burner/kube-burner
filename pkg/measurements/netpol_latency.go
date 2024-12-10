@@ -358,7 +358,7 @@ func waitForCondition(url string) {
 			var response ProxyResponse
 			err = json.Unmarshal(body, &response)
 			if err != nil {
-				fmt.Println("Error decoding response:", err)
+				log.Fatalf("Error decoding response: %v", err)
 				return
 			}
 			if response.Result {
