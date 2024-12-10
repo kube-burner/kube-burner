@@ -23,23 +23,22 @@ const (
 )
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
-func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) error {
-	type rawMeasurement Measurement
-	measurement := rawMeasurement{
+func (m *MeasurementConfig) UnmarshalMeasurementConfig(unmarshal func(interface{}) error) error {
+	type rawMeasurementConfig MeasurementConfig
+	measurementCfg := rawMeasurementConfig{
 		PProfDirectory: pprofDirectory,
 		ServiceTimeout: 5 * time.Second,
 	}
-	if err := unmarshal(&measurement); err != nil {
-		return err
-	}
-	*m = Measurement(measurement)
+	*m = MeasurementConfig(measurementCfg)
 	return nil
 }
 
-// Measurement holds the measurement configuration
-type Measurement struct {
-	// Name is the name the measurement
-	Name string `yaml:"name"`
+type MeasurementConfig struct {
+	Extra map[string]any `yaml:",inline"`
+	// Defines the indexer for quantile metrics
+	QuantilesIndexer string `yaml:"quantilesIndexer"`
+	// Defines the indexer for timeseries
+	TimeseriesIndexer string `yaml:"timeseriesIndexer"`
 	// LatencyThresholds config
 	LatencyThresholds []LatencyThreshold `yaml:"thresholds"`
 	// PPRofTargets targets config
@@ -50,10 +49,14 @@ type Measurement struct {
 	PProfDirectory string `yaml:"pprofDirectory"`
 	// Service latency endpoint timeout
 	ServiceTimeout time.Duration `yaml:"svcTimeout"`
-	// Defines the indexer for quantile metrics
-	QuantilesIndexer string `yaml:"quantilesIndexer"`
-	// Defines the indexer for timeseries
-	TimeseriesIndexer string `yaml:"timeseriesIndexer"`
+}
+
+// Measurement holds the measurement configuration
+type Measurement struct {
+	// Name is the name the measurement
+	Name string `yaml:"name"`
+	// Measurement config
+	Config MeasurementConfig `yaml:"config"`
 }
 
 // LatencyThreshold holds the thresholds configuration

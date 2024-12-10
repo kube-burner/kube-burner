@@ -83,7 +83,7 @@ type vmiMetric struct {
 }
 
 type vmiLatency struct {
-	config           types.Measurement
+	config           types.MeasurementConfig
 	vmWatcher        *metrics.Watcher
 	vmiWatcher       *metrics.Watcher
 	vmiPodWatcher    *metrics.Watcher
@@ -280,7 +280,7 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 	}
 }
 
-func (vmi *vmiLatency) setConfig(cfg types.Measurement) error {
+func (vmi *vmiLatency) setConfig(cfg types.MeasurementConfig) error {
 	vmi.config = cfg
 	var metricFound bool
 	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
