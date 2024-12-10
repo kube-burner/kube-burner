@@ -42,7 +42,7 @@ func readHandler(ex *Executor, obj object, item unstructured.Unstructured, itera
 	defer wg.Done()
 	ex.limiter.Wait(context.TODO())
 	var err error
-	if obj.Namespaced {
+	if obj.namespaced {
 		log.Debugf("Reading %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
 		_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
 	} else {
