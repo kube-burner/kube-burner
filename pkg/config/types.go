@@ -35,6 +35,21 @@ const (
 	PatchJob JobType = "patch"
 	// ReadJob used to read objects
 	ReadJob JobType = "read"
+	// KubeVirtJob used to send command to the KubeVirt service
+	KubeVirtJob JobType = "kubevirt"
+)
+
+type KubeVirtOpType string
+
+const (
+	KubeVirtOpStart        KubeVirtOpType = "start"
+	KubeVirtOpStop         KubeVirtOpType = "stop"
+	KubeVirtOpRestart      KubeVirtOpType = "restart"
+	KubeVirtOpPause        KubeVirtOpType = "pause"
+	KubeVirtOpUnpause      KubeVirtOpType = "unpause"
+	KubeVirtOpMigrate      KubeVirtOpType = "migrate"
+	KubeVirtOpAddVolume    KubeVirtOpType = "add-volume"
+	KubeVirtOpRemoveVolume KubeVirtOpType = "remove-volume"
 )
 
 // Spec configuration root
@@ -113,6 +128,8 @@ type Object struct {
 	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions,omitempty"`
 	// Run Once to create the object only once incase of multiple iterative jobs
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
+	// KubeVirt Operation
+	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
 }
 
 // Job defines a kube-burner job

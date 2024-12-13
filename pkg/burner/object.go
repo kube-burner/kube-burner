@@ -35,9 +35,9 @@ type object struct {
 	ready      bool
 }
 
-func newObject(obj config.Object, mapper meta.RESTMapper) object {
+func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion string) object {
 	if obj.APIVersion == "" {
-		obj.APIVersion = "v1"
+		obj.APIVersion = defaultAPIVersion
 	}
 
 	if len(obj.LabelSelector) == 0 {

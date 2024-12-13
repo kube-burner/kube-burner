@@ -44,7 +44,7 @@ func (ex *Executor) setupPatchJob(mapper meta.RESTMapper) {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
 		log.Infof("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper))
+		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1))
 	}
 }
 

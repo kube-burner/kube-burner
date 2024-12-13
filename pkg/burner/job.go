@@ -51,6 +51,7 @@ const (
 	rcAlert              = 3
 	rcMeasurement        = 4
 	garbageCollectionJob = "garbage-collection"
+	APIVersionV1         = "v1"
 )
 
 var (
