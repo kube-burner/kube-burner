@@ -17,12 +17,10 @@ package measurements
 import (
 	"bytes"
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -439,16 +437,7 @@ func processResults(n *netpolLatency) {
 
 // Read network policy object template
 func readTemplate(o kconfig.Object) ([]byte, error) {
-	var err error
-	var f io.Reader
-
-	e := embed.FS{}
-	if embedFS == e {
-		f, err = kutil.GetReaderForPath(o.ObjectTemplate)
-	} else {
-		objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
-		f, err = kutil.ReadEmbedConfig(embedFS, objectTemplate)
-	}
+	f, err := kutil.GetReader(o.ObjectTemplate, embedFS, embedFSDir)
 	if err != nil {
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 	}

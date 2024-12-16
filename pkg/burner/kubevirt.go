@@ -51,7 +51,7 @@ var supportedOps = map[config.KubeVirtOpType]struct{}{
 	config.KubeVirtOpRemoveVolume: {},
 }
 
-func (ex *Executor) setupKubeVirtJob(mapper meta.RESTMapper) {
+func (ex *Executor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMapper) {
 	var err error
 
 	if len(ex.ExecutionMode) == 0 {
@@ -76,7 +76,7 @@ func (ex *Executor) setupKubeVirtJob(mapper meta.RESTMapper) {
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		ex.objects = append(ex.objects, newObject(o, mapper, kubeVirtAPIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, kubeVirtAPIVersionV1))
 	}
 }
 

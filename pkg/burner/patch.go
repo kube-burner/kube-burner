@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *Executor) setupPatchJob(mapper meta.RESTMapper) {
+func (ex *Executor) setupPatchJob(configSpec config.Spec, mapper meta.RESTMapper) {
 	log.Debugf("Preparing patch job: %s", ex.Name)
 	ex.itemHandler = patchHandler
 	if len(ex.ExecutionMode) == 0 {
@@ -44,7 +44,7 @@ func (ex *Executor) setupPatchJob(mapper meta.RESTMapper) {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
 		log.Infof("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, APIVersionV1))
 	}
 }
 

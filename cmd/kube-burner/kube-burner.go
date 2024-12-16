@@ -92,13 +92,13 @@ func initCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			configFileReader, err := util.GetReaderForPath(configFile)
+			configFileReader, err := util.GetReader(configFile, nil, "")
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
 			var userDataFileReader io.Reader
 			if userDataFile != "" {
-				userDataFileReader, err = util.GetReaderForPath(userDataFile)
+				userDataFileReader, err = util.GetReader(userDataFile, nil, "")
 				if err != nil {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
@@ -213,7 +213,7 @@ func measureCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
-			f, err := util.GetReaderForPath(configFile)
+			f, err := util.GetReader(configFile, nil, "")
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
@@ -450,7 +450,7 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, false, indexer)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -458,7 +458,7 @@ func alertCmd() *cobra.Command {
 				Start: time.Unix(start, 0),
 				End:   time.Unix(end, 0),
 			}
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, indexer, nil); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(job)
