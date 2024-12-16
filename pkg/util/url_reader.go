@@ -21,28 +21,35 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
+
+	log "github.com/sirupsen/logrus"
 )
 
-// ReadEmbedConfig reads configuration files from the given embed filesystem
-func ReadEmbedConfig(embedFs embed.FS, configFile string) (io.Reader, error) {
-	f, err := embedFs.Open(configFile)
-	return f, err
-}
-
-// GetReaderForPath reads configuration from the given path or URL
-func GetReaderForPath(path string) (io.Reader, error) {
-	u, err := url.Parse(path)
-	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-		f, err := getBodyForURL(path, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch config from URL %s: %w", path, err)
+func GetReader(location string, configEmbedFS *embed.FS, configEmbedFSDir string) (io.Reader, error) {
+	if configEmbedFS != nil {
+		f, err := configEmbedFS.Open(path.Join(configEmbedFSDir, location))
+		if err == nil {
+			return f, nil
+		} else {
+			log.Infof("File %s was not found in the embedded filesystemd. Falling back to original path", location)
 		}
-		return f, nil
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open local config file %s: %w", path, err)
+
+	var f io.Reader
+	u, err := url.Parse(location)
+	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+		f, err = getBodyForURL(location, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch config from URL %s: %w", location, err)
+		}
+	} else {
+		f, err = os.Open(location)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open local config file %s: %w", location, err)
+		}
 	}
+
 	return f, nil
 }
 

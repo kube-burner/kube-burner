@@ -48,7 +48,7 @@ type measurement interface {
 var factory measurementFactory
 var measurementMap = make(map[string]measurement)
 var globalCfg config.GlobalConfig
-var embedFS embed.FS
+var embedFS *embed.FS
 var embedFSDir string
 
 // NewMeasurementFactory initializes the measurement facture

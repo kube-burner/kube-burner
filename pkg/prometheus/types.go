@@ -39,7 +39,6 @@ type Prometheus struct {
 	UUID           string
 	ConfigSpec     config.Spec
 	metadata       map[string]interface{}
-	embedConfig    bool
 	indexer        *indexers.Indexer
 }
 
