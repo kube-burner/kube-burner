@@ -38,7 +38,6 @@ jobs:
 
     - name: Execute Tests
       run: |
-        export PATH=${PATH}:/tmp/
         chmod +x /tmp/kube-burner
         make test-k8s
       env:

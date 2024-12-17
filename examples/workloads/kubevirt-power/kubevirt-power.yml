@@ -1,0 +1,81 @@
+metricsEndpoints:
+  - indexer:
+      metricsDirectory: /tmp/kube-burner
+      type: local
+
+global:
+  # collect metrics from Prometheus and dump to files
+  measurements:
+  - name: vmiLatency
+
+
+jobs:
+
+  # create the VMs in stopped state
+  - name: kubevirt-power
+    jobType: create
+    jobIterations: 1
+    qps: 20
+    burst: 20
+    namespacedIterations: false
+    namespace: kubevirt-power
+    # verify object count after running each job
+    verifyObjects: true
+    errorOnVerify: true
+    # wait all VMI be in the Ready Condition
+    waitWhenFinished: true
+    # does not need to wait all pods be running since we wait for all VMIs be running
+    podWait: false
+    # timeout time after waiting for all object creation
+    maxWaitTimeout: 1h
+    jobPause: 30s
+    # cleanup cleans previous execution (not deleted or failed)
+    cleanup: true
+    objects:
+
+    - objectTemplate: templates/vm-ephemeral.yml
+      replicas: 1
+      inputVars:
+        name: kubevirt-power
+        image: quay.io/kubevirt/fedora-with-test-tooling-container-disk:v0.48.1
+        OS: fedora27
+        cpuCores: 1
+        memory: 4G
+        createVMI: true
+
+  - name: power-management
+    jobType: kubevirt
+    qps: 20
+    burst: 20
+    jobPause: 2m
+    jobIterations: 2
+    maxWaitTimeout: 1h
+    objectDelay: 2m
+    objects:
+    - kubeVirtOp: stop
+      labelSelector: {kube-burner-job: kubevirt-power}
+    - kubeVirtOp: start
+      labelSelector: {kube-burner-job: kubevirt-power}
+
+  # cleanup the experiment
+  - name: delete-vms
+    jobType: delete
+    waitForDeletion: true
+    qps: 5
+    burst: 10
+    objects:
+
+    - kind: VirtualMachine
+      labelSelector: {kube-burner-job: kubevirt-power}
+      apiVersion: kubevirt.io/v1
+
+    - kind: VirtualMachineInstance
+      labelSelector: {kube-burner-job: kubevirt-power}
+      apiVersion: kubevirt.io/v1
+
+    - kind: Pod
+      labelSelector: {kubevirt.io: virt-launcher}
+      apiVersion: v1
+
+    - kind: Namespace
+      labelSelector: {kube-burner-job: kubevirt-power}

@@ -87,14 +87,14 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupLogging(uuid)
+			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			f, err := util.ReadConfig(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(uuid, f)
+			configSpec, err := config.Parse(uuid, timeout, f)
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
@@ -108,7 +108,7 @@ func initCmd() *cobra.Command {
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, timeout)
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(rc)
@@ -141,7 +141,7 @@ func healthCheck() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			var uuid = uid.NewString()
-			util.SetupLogging(uuid)
+			util.SetupFileLogging(uuid)
 			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
 		},
@@ -165,16 +165,15 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupLogging(uuid)
+			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
-			burner.ClientSet = clientSet
-			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
+			dynamicClient := dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
 			util.CleanupNamespaces(ctx, clientSet, labelSelector)
-			util.CleanupNonNamespacedResources(ctx, clientSet, burner.DynamicClient, labelSelector)
+			util.CleanupNonNamespacedResources(ctx, clientSet, dynamicClient, labelSelector)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
@@ -203,12 +202,12 @@ func measureCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupLogging(uuid)
+			util.SetupFileLogging(uuid)
 			f, err := util.ReadConfig(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(configFile, f)
+			configSpec, err := config.Parse(configFile, time.Hour, f)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -287,7 +286,7 @@ func indexCmd() *cobra.Command {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupLogging(uuid)
+			util.SetupFileLogging(uuid)
 			configSpec.GlobalConfig.UUID = uuid
 			metricsProfiles := strings.FieldsFunc(metricsProfile, func(r rune) bool {
 				return r == ',' || r == ' '

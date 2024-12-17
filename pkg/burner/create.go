@@ -26,10 +26,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -39,25 +38,22 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func setupCreateJob(jobConfig config.Job) Executor {
+func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMapper) {
 	var err error
 	var f io.Reader
-	mapper := newRESTMapper()
-	log.Debugf("Preparing create job: %s", jobConfig.Name)
-	ex := Executor{}
-	ex.DefaultMissingKeysWithZero = jobConfig.DefaultMissingKeysWithZero
-	for _, o := range jobConfig.Objects {
+	log.Debugf("Preparing create job: %s", ex.Name)
+	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
 		e := embed.FS{}
-		if embedFS == e {
+		if configSpec.EmbedFS == e {
 			f, err = util.ReadConfig(o.ObjectTemplate)
 		} else {
-			objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
-			f, err = util.ReadEmbedConfig(embedFS, objectTemplate)
+			objectTemplate := path.Join(configSpec.EmbedFSDir, o.ObjectTemplate)
+			f, err = util.ReadEmbedConfig(configSpec.EmbedFS, objectTemplate)
 		}
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
@@ -68,9 +64,9 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		}
 		// Deserialize YAML
 		uns := &unstructured.Unstructured{}
-		cleanTemplate, err := prepareTemplate(t)
+		cleanTemplate, err := util.CleanupTemplate(t)
 		if err != nil {
-			log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
+			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
 		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
 		mapping, err := mapper.RESTMapping(gvk.GroupKind())
@@ -83,21 +79,19 @@ func setupCreateJob(jobConfig config.Job) Executor {
 			kind:       gvk.Kind,
 			Object:     o,
 			namespace:  uns.GetNamespace(),
+			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 		}
-		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
-		if obj.Namespaced && obj.namespace == "" {
+		if obj.namespaced && obj.namespace == "" {
 			ex.nsRequired = true
 		}
-		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
+		log.Infof("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
-	return ex
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
-	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
+func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -115,7 +109,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	}
 	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
-		if err = util.CreateNamespace(ClientSet, ns, nsLabels, nsAnnotations); err != nil {
+		if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 			log.Fatal(err.Error())
 		}
 		*waitListNamespaces = append(*waitListNamespaces, ns)
@@ -126,6 +120,9 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	var namespacesCreated = make(map[string]bool)
 	var namespacesWaited = make(map[string]bool)
 	for i := iterationStart; i < iterationEnd; i++ {
+		if ctx.Err() != nil {
+			return
+		}
 		if i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
@@ -134,7 +131,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
-				if err = util.CreateNamespace(ClientSet, ns, nsLabels, nsAnnotations); err != nil {
+				if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 					log.Error(err.Error())
 					continue
 				}
@@ -144,27 +141,28 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 		}
 		for objectIndex, obj := range ex.objects {
 			labels := map[string]string{
-				"kube-burner-uuid":  ex.uuid,
-				"kube-burner-job":   ex.Name,
-				"kube-burner-index": strconv.Itoa(objectIndex),
-				"kube-burner-runid": ex.runid,
+				"kube-burner-uuid":                 ex.uuid,
+				"kube-burner-job":                  ex.Name,
+				"kube-burner-index":                strconv.Itoa(objectIndex),
+				"kube-burner-runid":                ex.runid,
+				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 			}
-			ex.objects[objectIndex].labelSelector = labels
+			ex.objects[objectIndex].LabelSelector = labels
 			if obj.RunOnce {
 				if i == 0 {
 					// this executes only once during the first iteration of an object
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
-					ex.replicaHandler(labels, obj, ns, i, &wg)
+					ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
 				}
 			} else {
-				ex.replicaHandler(labels, obj, ns, i, &wg)
+				ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
 			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns, waitRateLimiter)
+				ex.waitForObjects(ns)
 				namespacesWaited[ns] = true
 			}
 		}
@@ -178,7 +176,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	if ex.WaitWhenFinished {
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(restConfig.QPS))
+		sem := make(chan int, int(ex.restConfig.QPS))
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.nsRequired && ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
@@ -190,7 +188,7 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				ex.waitForObjects(ns, waitRateLimiter)
+				ex.waitForObjects(ns)
 				<-sem
 				wg.Done()
 			}(ns)
@@ -211,39 +209,26 @@ func (ex *Executor) generateNamespace(iteration int) string {
 	return fmt.Sprintf("%s-%d", ex.Namespace, nsIndex)
 }
 
-func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
+func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	for r := 1; r <= obj.Replicas; r++ {
+		if ctx.Err() != nil {
+			return
+		}
 		// make a copy of the labels map for each goroutine to prevent panic from concurrent read and write
 		copiedLabels := make(map[string]string)
 		for k, v := range labels {
 			copiedLabels[k] = v
 		}
-
-		templateOption := util.MissingKeyError
-		if ex.DefaultMissingKeysWithZero {
-			templateOption = util.MissingKeyZero
-		}
+		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
 
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
 			var newObject = new(unstructured.Unstructured)
-			templateData := map[string]interface{}{
-				jobName:      ex.Name,
-				jobIteration: iteration,
-				jobUUID:      ex.uuid,
-				replica:      r,
-			}
-			for k, v := range obj.InputVars {
-				templateData[k] = v
-			}
 			ex.limiter.Wait(context.TODO())
-			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
-			if err != nil {
-				log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
-			}
+			renderedObj := ex.renderTemplateForObject(obj, iteration, r, false)
 			// Re-decode rendered object
 			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
 
@@ -260,10 +245,10 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 			// hasn't been created yet
 			replicaWg.Add(1)
 			go func(n string) {
-				if !obj.Namespaced {
+				if !obj.namespaced {
 					n = ""
 				}
-				createRequest(obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
 				replicaWg.Done()
 			}(ns)
 		}(r)
@@ -271,18 +256,21 @@ func (ex *Executor) replicaHandler(labels map[string]string, obj object, ns stri
 	wg.Wait()
 }
 
-func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
+func (ex *Executor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
 	util.RetryWithExponentialBackOff(func() (bool, error) {
+		if ctx.Err() != nil {
+			return true, err
+		}
 		// When the object has a namespace already specified, use it
 		if objNs := obj.GetNamespace(); objNs != "" {
 			ns = objNs
 		}
 		if ns != "" {
-			uns, err = DynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
+			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		} else {
-			uns, err = DynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
 		}
 		if err != nil {
 			if kerrors.IsUnauthorized(err) {
@@ -317,7 +305,10 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 }
 
 // RunCreateJobWithChurn executes a churn creation job
-func (ex *Executor) RunCreateJobWithChurn() {
+func (ex *Executor) RunCreateJobWithChurn(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
 	if !ex.nsRequired {
 		log.Info("No namespaces were created in this job, skipping churning stage")
 		return
@@ -361,7 +352,7 @@ func (ex *Executor) RunCreateJobWithChurn() {
 				continue
 			}
 			// Label namespaces to be deleted
-			_, err = ClientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
+			_, err = ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
 			if err != nil {
 				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
 			}
@@ -375,10 +366,10 @@ func (ex *Executor) RunCreateJobWithChurn() {
 		if ex.ChurnDeletionStrategy == "gvr" {
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		}
-		util.CleanupNamespaces(ctx, ClientSet, "churndelete=delete")
+		util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(randStart, numToChurn+randStart, &[]string{})
+		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})
 		log.Infof("Sleeping for %v", ex.ChurnDelay)
 		time.Sleep(ex.ChurnDelay)
 		cyclesCount++

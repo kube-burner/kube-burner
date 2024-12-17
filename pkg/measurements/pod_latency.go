@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
@@ -38,22 +39,26 @@ const (
 )
 
 type podMetric struct {
-	Timestamp              time.Time `json:"timestamp"`
-	scheduled              time.Time
-	SchedulingLatency      int `json:"schedulingLatency"`
-	initialized            time.Time
-	InitializedLatency     int `json:"initializedLatency"`
-	containersReady        time.Time
-	ContainersReadyLatency int `json:"containersReadyLatency"`
-	podReady               time.Time
-	PodReadyLatency        int         `json:"podReadyLatency"`
-	MetricName             string      `json:"metricName"`
-	UUID                   string      `json:"uuid"`
-	JobName                string      `json:"jobName,omitempty"`
-	Namespace              string      `json:"namespace"`
-	Name                   string      `json:"podName"`
-	NodeName               string      `json:"nodeName"`
-	Metadata               interface{} `json:"metadata,omitempty"`
+	Timestamp                     time.Time `json:"timestamp"`
+	scheduled                     time.Time
+	SchedulingLatency             int `json:"schedulingLatency"`
+	initialized                   time.Time
+	InitializedLatency            int `json:"initializedLatency"`
+	containersReady               time.Time
+	ContainersReadyLatency        int `json:"containersReadyLatency"`
+	podReady                      time.Time
+	PodReadyLatency               int `json:"podReadyLatency"`
+	readyToStartContainers        time.Time
+	ReadyToStartContainersLatency int         `json:"readyToStartContainersLatency"`
+	MetricName                    string      `json:"metricName"`
+	UUID                          string      `json:"uuid"`
+	JobName                       string      `json:"jobName,omitempty"`
+	JobIteration                  int         `json:"jobIteration"`
+	Replica                       int         `json:"replica"`
+	Namespace                     string      `json:"namespace"`
+	Name                          string      `json:"podName"`
+	NodeName                      string      `json:"nodeName"`
+	Metadata                      interface{} `json:"metadata,omitempty"`
 }
 
 type podLatency struct {
@@ -72,14 +77,17 @@ func init() {
 
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	pod := obj.(*corev1.Pod)
+	podLabels := pod.GetLabels()
 	p.metrics.LoadOrStore(string(pod.UID), podMetric{
-		Timestamp:  pod.CreationTimestamp.Time.UTC(),
-		Namespace:  pod.Namespace,
-		Name:       pod.Name,
-		MetricName: podLatencyMeasurement,
-		UUID:       globalCfg.UUID,
-		JobName:    factory.jobConfig.Name,
-		Metadata:   factory.metadata,
+		Timestamp:    pod.CreationTimestamp.Time.UTC(),
+		Namespace:    pod.Namespace,
+		Name:         pod.Name,
+		MetricName:   podLatencyMeasurement,
+		UUID:         globalCfg.UUID,
+		JobName:      factory.jobConfig.Name,
+		Metadata:     factory.metadata,
+		JobIteration: getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
+		Replica:      getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
 	})
 }
 
@@ -90,11 +98,16 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 		if pm.podReady.IsZero() {
 			for _, c := range pod.Status.Conditions {
 				if c.Status == corev1.ConditionTrue {
+					// https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
 					switch c.Type {
 					case corev1.PodScheduled:
 						if pm.scheduled.IsZero() {
 							pm.scheduled = c.LastTransitionTime.Time.UTC()
 							pm.NodeName = pod.Spec.NodeName
+						}
+					case corev1.PodReadyToStartContainers:
+						if pm.readyToStartContainers.IsZero() {
+							pm.readyToStartContainers = c.LastTransitionTime.Time.UTC()
 						}
 					case corev1.PodInitialized:
 						if pm.initialized.IsZero() {
@@ -316,10 +329,11 @@ func (p *podLatency) calcQuantiles() {
 	getLatency := func(normLatency interface{}) map[string]float64 {
 		podMetric := normLatency.(podMetric)
 		return map[string]float64{
-			string(corev1.PodScheduled):    float64(podMetric.SchedulingLatency),
-			string(corev1.ContainersReady): float64(podMetric.ContainersReadyLatency),
-			string(corev1.PodInitialized):  float64(podMetric.InitializedLatency),
-			string(corev1.PodReady):        float64(podMetric.PodReadyLatency),
+			string(corev1.PodScheduled):              float64(podMetric.SchedulingLatency),
+			string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
+			string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
+			string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
+			string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
 		}
 	}
 	p.latencyQuantiles = calculateQuantiles(p.normLatencies, getLatency, podLatencyQuantilesMeasurement)

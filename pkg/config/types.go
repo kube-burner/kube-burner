@@ -35,6 +35,21 @@ const (
 	PatchJob JobType = "patch"
 	// ReadJob used to read objects
 	ReadJob JobType = "read"
+	// KubeVirtJob used to send command to the KubeVirt service
+	KubeVirtJob JobType = "kubevirt"
+)
+
+type KubeVirtOpType string
+
+const (
+	KubeVirtOpStart        KubeVirtOpType = "start"
+	KubeVirtOpStop         KubeVirtOpType = "stop"
+	KubeVirtOpRestart      KubeVirtOpType = "restart"
+	KubeVirtOpPause        KubeVirtOpType = "pause"
+	KubeVirtOpUnpause      KubeVirtOpType = "unpause"
+	KubeVirtOpMigrate      KubeVirtOpType = "migrate"
+	KubeVirtOpAddVolume    KubeVirtOpType = "add-volume"
+	KubeVirtOpRemoveVolume KubeVirtOpType = "remove-volume"
 )
 
 // Spec configuration root
@@ -86,6 +101,8 @@ type GlobalConfig struct {
 	GCMetrics bool `yaml:"gcMetrics"`
 	// Boolean flag to check for cluster-health
 	ClusterHealth bool `yaml:"clusterHealth"`
+	// Global Benchmark timeout
+	Timeout time.Duration `yaml:"timeout"`
 }
 
 // Object defines an object that kube-burner will create
@@ -105,14 +122,14 @@ type Object struct {
 	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with this labels will be removed
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
-	// Namespaced this object is namespaced
-	Namespaced bool `yaml:"-" json:"-"`
 	// Wait for resource to be ready, it doesn't apply to all resources
 	Wait bool `yaml:"wait" json:"wait"`
 	// WaitOptions define custom behaviors when waiting for objects creation
 	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions,omitempty"`
 	// Run Once to create the object only once incase of multiple iterative jobs
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
+	// KubeVirt Operation
+	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -180,6 +197,10 @@ type Job struct {
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
+	// Execute objects in a job either parallel or sequential. Default: parallel
+	ExecutionMode ExecutionMode `yaml:"executionMode" json:"executionMode,omitempty"`
+	// ObjectDelay how much time to wait between objects processing in patch jobs
+	ObjectDelay time.Duration `yaml:"objectDelay" json:"objectDelay,omitempty"`
 }
 
 type WaitOptions struct {
@@ -196,3 +217,16 @@ type WaitOptions struct {
 type KubeClientProvider struct {
 	restConfig *rest.Config
 }
+
+// Execution mode for Patch jobs
+type ExecutionMode string
+
+const (
+	ExecutionModeParallel   ExecutionMode = "parallel"
+	ExecutionModeSequential ExecutionMode = "sequential"
+)
+
+const (
+	KubeBurnerLabelJobIteration = "kube-burner.io/job-iteration"
+	KubeBurnerLabelReplica      = "kube-burner.io/replica"
+)

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 )
 
@@ -41,7 +42,7 @@ type NestedPod struct {
 	} `json:"spec"`
 }
 
-func preLoadImages(job Executor) error {
+func preLoadImages(job Executor, clientSet kubernetes.Interface) error {
 	log.Info("Pre-load: images from job ", job.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
@@ -51,7 +52,7 @@ func preLoadImages(job Executor) error {
 		log.Infof("No images found to pre-load, continuing")
 		return nil
 	}
-	err = createDSs(imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
+	err = createDSs(clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
@@ -60,7 +61,7 @@ func preLoadImages(job Executor) error {
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	util.CleanupNamespaces(ctx, ClientSet, "kube-burner-preload=true")
+	util.CleanupNamespaces(ctx, clientSet, "kube-burner-preload=true")
 	return nil
 }
 
@@ -93,7 +94,7 @@ func getJobImages(job Executor) ([]string, error) {
 	return imageList, nil
 }
 
-func createDSs(imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
+func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
 	nsLabels := map[string]string{
 		"kube-burner-preload": "true",
 	}
@@ -104,13 +105,13 @@ func createDSs(imageList []string, namespaceLabels map[string]string, namespaceA
 	for annotation, value := range namespaceAnnotations {
 		nsAnnotations[annotation] = value
 	}
-	if err := util.CreateNamespace(ClientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
+	if err := util.CreateNamespace(clientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
 		log.Fatal(err)
 	}
 	dsName := "preload"
 	ds := appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       DaemonSet,
+			Kind:       string(DaemonSet),
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -153,7 +154,7 @@ func createDSs(imageList []string, namespaceLabels map[string]string, namespaceA
 	}
 
 	log.Infof("Pre-load: Creating DaemonSet using images %v in namespace %s", imageList, preLoadNs)
-	_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
+	_, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}

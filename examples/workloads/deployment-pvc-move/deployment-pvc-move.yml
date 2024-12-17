@@ -1,0 +1,61 @@
+---
+metricsEndpoints:
+  - indexer:
+      metricsDirectory: /tmp/kube-burner
+      type: local
+global:
+  measurements:
+    - name: podLatency
+
+jobs:
+  - name: pvc-move
+    jobIterations: 1
+    qps: 4
+    burst: 4
+    namespacedIterations: true
+    namespace: deployment-pvc-move
+    podWait: false
+    cleanup: true
+    waitWhenFinished: true
+    objects:
+      - objectTemplate: templates/pvc.yaml
+        replicas: 10
+      - objectTemplate: templates/deployment.yaml
+        inputVars:
+          workerHostNames:
+            - worker-0
+            - worker-1
+            - worker-2
+        replicas: 10
+
+  - name: deployment-pvc-move-patch
+    jobType: patch
+    jobIterations: 10
+    jobIterationDelay: 30s
+    executionMode: sequential
+    qps: 2
+    burst: 2
+    objects:
+      - kind: Deployment
+        objectTemplate: templates/deployment_patch_move_worker.yaml
+        labelSelector: {kube-burner-job: pvc-move}
+        patchType: "application/strategic-merge-patch+json"
+        apiVersion: apps/v1
+        inputVars:
+          workerHostNames:
+            - worker-0
+            - worker-1
+            - worker-2
+
+  - name: pvc-move-cleanup
+    qps: 2
+    burst: 2
+    jobType: delete
+    waitForDeletion: true
+    objects:
+      - kind: Deployment
+        labelSelector: {kube-burner-job: pvc-move}
+        apiVersion: apps/v1
+      - kind: PersistentVolumeClaim
+        labelSelector: {kube-burner-job: pvc-move}
+        apiVersion: v1

@@ -3,9 +3,10 @@
 # shellcheck disable=SC2086,SC2068
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
-K8S_VERSION=${K8S_VERSION:-v1.27.0}
+K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+KUBE_BURNER=${KUBE_BURNER:-kube-burner}
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
@@ -33,8 +34,15 @@ setup-kind() {
 
 create_test_kubeconfig() {
   echo "Creating another kubeconfig"
-  "${KIND_FOLDER}/kind-linux-${ARCH}" export kubeconfig --kubeconfig "${TEST_KUBECONFIG}"
-  kubectl config rename-context kind-kind "${TEST_KUBECONTEXT}" --kubeconfig "${TEST_KUBECONFIG}"
+  if [[ "${USE_EXISTING_CLUSTER,,}" == "yes" ]]; then
+    EXISTING_KUBECONFIG=${KUBECONFIG:-"~/.kube/config"}
+    cp ${EXISTING_KUBECONFIG} ${TEST_KUBECONFIG}
+    EXISTING_CONTEXT=$(kubectl config current-context)
+  else
+    "${KIND_FOLDER}/kind-linux-${ARCH}" export kubeconfig --kubeconfig "${TEST_KUBECONFIG}"
+    EXISTING_CONTEXT="kind-kind"
+  fi
+  kubectl config rename-context ${EXISTING_CONTEXT} "${TEST_KUBECONTEXT}" --kubeconfig "${TEST_KUBECONFIG}"
 }
 
 destroy-kind() {
@@ -44,13 +52,20 @@ destroy-kind() {
 
 setup-prometheus() {
   echo "Setting up prometheus instance"
-  $OCI_BIN run --rm -d --name prometheus --network=host docker.io/prom/prometheus:latest
+  $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest
+  sleep 10
+}
+
+setup-opensearch() {
+  echo "Setting up open-search"
+  # Use version 1 to avoid the password requirement
+  $OCI_BIN run --rm -d --name opensearch --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
   sleep 10
 }
 
 check_ns() {
   echo "Checking the number of namespaces labeled with \"${1}\" is \"${2}\""
-  if [[ $(kubectl get ns -l "${1}" -o name | wc -l) != "${2}" ]]; then
+  if [[ $(kubectl get ns -l "${1}" -o json | jq '.items | length') != "${2}" ]]; then
     echo "Number of namespaces labeled with ${1} less than expected"
     return 1
   fi
@@ -58,7 +73,7 @@ check_ns() {
 
 check_destroyed_ns() {
   echo "Checking namespace \"${1}\" has been destroyed"
-  if [[ $(kubectl get ns -l "${1}" -o name | wc -l) != 0 ]]; then
+  if [[ $(kubectl get ns -l "${1}" -o json | jq '.items | length') != 0 ]]; then
     echo "Namespaces labeled with \"${1}\" not destroyed"
     return 1
   fi
@@ -66,14 +81,14 @@ check_destroyed_ns() {
 
 check_destroyed_pods() {
   echo "Checking pods have been destroyed in namespace ${1}"
-  if [[ $(kubectl get pod -n "${1}" -l "${2}" -o name | wc -l) != 0 ]]; then
+  if [[ $(kubectl get pod -n "${1}" -l "${2}" -o json | jq '.items | length') != 0 ]]; then
     echo "Pods in namespace ${1} not destroyed"
     return 1
   fi
 }
 
 check_running_pods() {
-  running_pods=$(kubectl get pod -A -l ${1} --field-selector=status.phase==Running --no-headers | wc -l)
+  running_pods=$(kubectl get pod -A -l ${1} --field-selector=status.phase==Running -o json | jq '.items | length')
   if [[ "${running_pods}" != "${2}" ]]; then
     echo "Running pods in cluster labeled with ${1} different from expected: Expected=${2}, observed=${running_pods}"
     return 1
@@ -81,7 +96,7 @@ check_running_pods() {
 }
 
 check_running_pods_in_ns() {
-    running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced --field-selector=status.phase==Running --no-headers | wc -l)
+    running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced --field-selector=status.phase==Running -o json | jq '.items | length')
     if [[ "${running_pods}" != "${2}" ]]; then
       echo "Running pods in namespace $1 different from expected. Expected=${2}, observed=${running_pods}"
       return 1
@@ -171,4 +186,18 @@ check_file_exists() {
       fi
   done
   return 0
+}
+
+check_deployment_count() {
+  local NAMESPACE=${1}
+  local LABEL_KEY=${2}
+  local LABEL_VALUE=${3}
+  local EXPECTED_COUNT=${4}
+
+  ACTUAL_COUNT=$(kubectl get deployment -n ${NAMESPACE} -l ${LABEL_KEY}=${LABEL_VALUE} -o json | jq '.items | length')
+  if [[ "${ACTUAL_COUNT}" != "${EXPECTED_COUNT}" ]]; then
+    echo "Expected ${EXPECTED_COUNT} replicas to be patches with ${LABEL_KEY}=${LABEL_VALUE_END} but found only ${ACTUAL_COUNT}"
+    return 1
+  fi
+  echo "Found the expected ${EXPECTED_COUNT} deployments"
 }

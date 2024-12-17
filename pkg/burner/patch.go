@@ -16,113 +16,39 @@ package burner
 
 import (
 	"context"
-	"io"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func setupPatchJob(jobConfig config.Job) Executor {
-	var f io.Reader
-	var err error
-	log.Debugf("Preparing patch job: %s", jobConfig.Name)
-	var ex Executor
-	ex.DefaultMissingKeysWithZero = jobConfig.DefaultMissingKeysWithZero
-	mapper := newRESTMapper()
-	for _, o := range jobConfig.Objects {
-		if o.APIVersion == "" {
-			o.APIVersion = "v1"
-		}
-		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		f, err = util.ReadConfig(o.ObjectTemplate)
-		if err != nil {
-			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
-		}
-		t, err := io.ReadAll(f)
-		if err != nil {
-			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
-		}
+func (ex *Executor) setupPatchJob(mapper meta.RESTMapper) {
+	log.Debugf("Preparing patch job: %s", ex.Name)
+	ex.itemHandler = patchHandler
+	if len(ex.ExecutionMode) == 0 {
+		ex.ExecutionMode = config.ExecutionModeParallel
+	}
+	if _, ok := supportedExecutionMode[ex.ExecutionMode]; !ok {
+		log.Fatalf("Unsupported Execution Mode: %s", ex.ExecutionMode)
+	}
 
-		// Unlike create, we don't want to create the gvk with the entire template,
-		// because it would try to use the properties of the patch data to find
-		// the objects to patch.
-		gvk := schema.FromAPIVersionAndKind(o.APIVersion, o.Kind)
-		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		if err != nil {
-			log.Fatal(err)
-		}
-		if len(o.LabelSelector) == 0 {
-			log.Fatalf("Empty labelSelectors not allowed with: %s", o.Kind)
-		}
+	for _, o := range ex.Objects {
 		if len(o.PatchType) == 0 {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
-		obj := object{
-			gvr:           mapping.Resource,
-			objectSpec:    t,
-			Object:        o,
-			labelSelector: o.LabelSelector,
-			patchType:     o.PatchType,
-		}
-		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-		log.Infof("Job %s: Patch %s with selector %s", jobConfig.Name, gvk.Kind, labels.Set(obj.labelSelector))
-		ex.objects = append(ex.objects, obj)
+		log.Infof("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
+		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1))
 	}
-	return ex
 }
 
-// RunPatchJob executes a patch job
-func (ex *Executor) RunPatchJob() {
-	var itemList *unstructured.UnstructuredList
-	log.Infof("Running patch job %s", ex.Name)
-	var wg sync.WaitGroup
-	for _, obj := range ex.objects {
-
-		labelSelector := labels.Set(obj.labelSelector).String()
-		listOptions := metav1.ListOptions{
-			LabelSelector: labelSelector,
-		}
-
-		// Try to find the list of resources by GroupVersionResource.
-		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
-			itemList, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
-			if err != nil {
-				log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
-				return false, nil
-			}
-			return true, nil
-		}, 1*time.Second, 3, 0, ex.MaxWaitTimeout)
-		if err != nil {
-			continue
-		}
-		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
-		for i := 0; i < ex.JobIterations; i++ {
-			for _, item := range itemList.Items {
-				wg.Add(1)
-				go ex.patchHandler(obj, item, i, &wg)
-			}
-		}
-	}
-	wg.Wait()
-	waitRateLimiter := rate.NewLimiter(rate.Limit(restConfig.QPS), restConfig.Burst)
-	ex.waitForObjects("", waitRateLimiter)
-}
-
-func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructured,
-	iteration int, wg *sync.WaitGroup) {
-
+func patchHandler(ex *Executor, obj object, originalItem unstructured.Unstructured, iteration int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	// There are several patch modes. Three of them are client-side, and one
 	// of them is server-side.
@@ -130,43 +56,19 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 	patchOptions := metav1.PatchOptions{}
 
 	if strings.HasSuffix(obj.ObjectTemplate, "json") {
-		if obj.patchType == string(types.ApplyPatchType) {
+		if obj.PatchType == string(types.ApplyPatchType) {
 			log.Fatalf("Apply patch type requires YAML")
 		}
 		data = obj.objectSpec
 	} else {
-		// Processing template
-		templateData := map[string]interface{}{
-			jobName:      ex.Name,
-			jobIteration: iteration,
-			jobUUID:      ex.uuid,
-		}
-		for k, v := range obj.InputVars {
-			templateData[k] = v
-		}
-
-		templateOption := util.MissingKeyError
-		if ex.DefaultMissingKeysWithZero {
-			templateOption = util.MissingKeyZero
-		}
-
-		renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
-		if err != nil {
-			log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
-		}
-
-		// Converting to JSON if patch type is not Apply
-		if obj.patchType == string(types.ApplyPatchType) {
-			data = renderedObj
+		var asJson bool
+		if obj.PatchType == string(types.ApplyPatchType) {
 			patchOptions.FieldManager = "kube-controller-manager"
+			asJson = false
 		} else {
-			newObject := &unstructured.Unstructured{}
-			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
-			data, err = newObject.MarshalJSON()
-			if err != nil {
-				log.Errorf("Error converting patch to JSON")
-			}
+			asJson = true
 		}
+		data = ex.renderTemplateForObject(obj, iteration, 0, asJson)
 	}
 
 	ns := originalItem.GetNamespace()
@@ -176,24 +78,23 @@ func (ex *Executor) patchHandler(obj object, originalItem unstructured.Unstructu
 
 	var uns *unstructured.Unstructured
 	var err error
-	if obj.Namespaced {
-		uns, err = DynamicClient.Resource(obj.gvr).Namespace(ns).
+	if obj.namespaced {
+		uns, err = ex.dynamicClient.Resource(obj.gvr).Namespace(ns).
 			Patch(context.TODO(), originalItem.GetName(),
-				types.PatchType(obj.patchType), data, patchOptions)
+				types.PatchType(obj.PatchType), data, patchOptions)
 	} else {
-		uns, err = DynamicClient.Resource(obj.gvr).
+		uns, err = ex.dynamicClient.Resource(obj.gvr).
 			Patch(context.TODO(), originalItem.GetName(),
-				types.PatchType(obj.patchType), data, patchOptions)
+				types.PatchType(obj.PatchType), data, patchOptions)
 	}
 	if err != nil {
 		if errors.IsForbidden(err) {
 			log.Fatalf("Authorization error patching %s/%s: %s", originalItem.GetKind(), originalItem.GetName(), err)
-		} else if err != nil {
+		} else {
 			log.Errorf("Error patching object %s/%s in namespace %s: %s", originalItem.GetKind(),
 				originalItem.GetName(), ns, err)
 		}
 	} else {
 		log.Debugf("Patched %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 	}
-
 }

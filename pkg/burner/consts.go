@@ -15,3 +15,27 @@ const (
 	VirtualMachineInstanceReplicaSet = "VirtualMachineInstanceReplicaSet"
 	PersistentVolumeClaim            = "PersistentVolumeClaim"
 )
+
+type statusPath struct {
+	expectedReplicasPath []string
+	readyReplicasPath    []string
+}
+
+var pathSpecReplicas = []string{"spec", "replicas"}
+var statusReplicas = []string{"status", "readyReplicas"}
+
+var waitStatusMap map[string]statusPath = map[string]statusPath{
+	StatefulSet: {
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas},
+	Deployment: {
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas},
+	DaemonSet: {
+		expectedReplicasPath: []string{"status", "desiredNumberScheduled"}, readyReplicasPath: []string{"status", "numberReady"}},
+	ReplicaSet: {
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas},
+	ReplicationController: {
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas},
+	VirtualMachineInstanceReplicaSet: {
+		expectedReplicasPath: pathSpecReplicas, readyReplicasPath: statusReplicas,
+	},
+}

@@ -21,135 +21,102 @@ import (
 
 	"github.com/itchyny/gojq"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/kube-burner/kube-burner/pkg/burner/types"
 )
 
-func (ex *Executor) waitForObjects(ns string, limiter *rate.Limiter) {
+func (ex *Executor) waitForObjects(ns string) {
+	var err error
 	for _, obj := range ex.objects {
-		waitNs := ns
-		if !obj.Wait {
+		if !obj.Wait || obj.ready {
 			continue
 		}
 		// When the object has defined its own namespace, we use it
-		// TODO objects with a fixed namespace don't need to be waited on a per iteration basis
 		if obj.namespace != "" {
-			waitNs = obj.namespace
+			ns = obj.namespace
 		}
 		if obj.WaitOptions.ForCondition != "" {
-			verifyCondition(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			ex.verifyCondition(ns, obj)
 		} else {
 			kind := obj.kind
 			if obj.WaitOptions.Kind != "" {
 				kind = obj.WaitOptions.Kind
-				waitNs = ""
+				ns = corev1.NamespaceAll
 			}
 			switch kind {
-			case Deployment:
-				waitForDeployments(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case ReplicaSet:
-				waitForRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case ReplicationController:
-				waitForRC(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case StatefulSet:
-				waitForStatefulSet(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case DaemonSet:
-				waitForDS(waitNs, ex.MaxWaitTimeout, obj, limiter)
+			case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
+				err = ex.waitForReplicas(ns, obj, waitStatusMap[kind])
 			case Pod:
-				waitForPod(waitNs, ex.MaxWaitTimeout, obj, limiter)
+				err = ex.waitForPod(ns, obj)
 			case Build, BuildConfig:
-				waitForBuild(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case VirtualMachine:
-				waitForVM(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case VirtualMachineInstance:
-				waitForVMI(waitNs, ex.MaxWaitTimeout, obj, limiter)
-			case VirtualMachineInstanceReplicaSet:
-				waitForVMIRS(waitNs, ex.MaxWaitTimeout, obj, limiter)
+				err = ex.waitForBuild(ns, obj)
+			case VirtualMachine, VirtualMachineInstance:
+				err = ex.waitForVMorVMI(ns, obj)
 			case Job:
-				waitForJob(waitNs, ex.MaxWaitTimeout, obj, limiter)
+				err = ex.waitForJob(ns, obj)
 			case PersistentVolumeClaim:
-				waitForPVC(waitNs, ex.MaxWaitTimeout, obj, limiter)
+				err = ex.waitForPVC(ns, obj)
 			}
+		}
+		if err != nil {
+			log.Fatalf("Error waiting for objects in namespace %s: %v", ns, err)
+		}
+		if obj.namespace != "" || obj.RunOnce {
+			obj.ready = true
 		}
 	}
-	log.Infof("Actions in namespace %v completed", ns)
+	if ns != "" {
+		log.Infof("Actions in namespace %v completed", ns)
+	} else {
+		log.Info("Actions completed")
+	}
 }
 
-func waitForDeployments(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	// TODO handle errors such as timeouts
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		deps, err := ClientSet.AppsV1().Deployments(ns).List(context.TODO(), metav1.ListOptions{
+func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) error {
+	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+		ex.waitLimiter.Wait(context.TODO())
+		resources, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
-			return false, err
+			log.Errorf("Error listing %s in %s: %v", obj.kind, ns, err)
+			return false, nil
 		}
-		for _, dep := range deps.Items {
-			if *dep.Spec.Replicas != dep.Status.ReadyReplicas {
-				log.Debugf("Waiting for replicas from deployments in ns %s to be ready", ns)
+		for _, resource := range resources.Items {
+			replicas, _, err := unstructured.NestedFieldCopy(resource.Object, waitPath.expectedReplicasPath...)
+			if err != nil {
+				return false, err
+			}
+			readyReplicas, _, err := unstructured.NestedFieldCopy(resource.Object, waitPath.readyReplicasPath...)
+			if err != nil {
+				return false, err
+			}
+			if replicas != readyReplicas {
+				log.Debugf("Waiting for replicas from %s in ns %s to be ready", obj.kind, ns)
 				return false, nil
 			}
 		}
 		return true, nil
 	})
+	return err
 }
 
-func waitForRS(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		rss, err := ClientSet.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{
+func (ex *Executor) waitForPVC(ns string, obj object) error {
+	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+		ex.limiter.Wait(context.TODO())
+		pvcs, err := ex.clientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
-			return false, err
-		}
-		for _, rs := range rss.Items {
-			if *rs.Spec.Replicas != rs.Status.ReadyReplicas {
-				log.Debugf("Waiting for replicas from replicaSets in ns %s to be ready", ns)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-}
-
-func waitForStatefulSet(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		stss, err := ClientSet.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
-		})
-		if err != nil {
-			return false, err
-		}
-		for _, sts := range stss.Items {
-			if *sts.Spec.Replicas != sts.Status.ReadyReplicas {
-				log.Debugf("Waiting for replicas from statefulSets in ns %s to be ready", ns)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-}
-
-func waitForPVC(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		pvcs, err := ClientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
-		})
-		if err != nil {
-			return false, err
+			log.Errorf("Error listing PVCs in %s: %v", ns, err)
+			return false, nil
 		}
 		for _, pvc := range pvcs.Items {
 			if pvc.Status.Phase != corev1.ClaimBound {
@@ -159,56 +126,23 @@ func waitForPVC(ns string, maxWaitTimeout time.Duration, obj object, limiter *ra
 		}
 		return true, nil
 	})
+	return err
 }
 
-func waitForRC(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		rcs, err := ClientSet.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
-		})
-		if err != nil {
-			return false, err
-		}
-		for _, rc := range rcs.Items {
-			if *rc.Spec.Replicas != rc.Status.ReadyReplicas {
-				log.Debugf("Waiting for replicas from replicationControllers in ns %s to be ready", ns)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-}
-
-func waitForDS(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		dss, err := ClientSet.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
-		})
-		if err != nil {
-			return false, err
-		}
-		for _, ds := range dss.Items {
-			if ds.Status.DesiredNumberScheduled != ds.Status.NumberReady {
-				log.Debugf("Waiting for replicas from daemonsets in ns %s to be ready", ns)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-}
-
-func waitForPod(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+func (ex *Executor) waitForPod(ns string, obj object) error {
+	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		// We need to paginate these requests to ensure we don't miss any pods
 		listOptions := metav1.ListOptions{
 			Limit:         1000,
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		}
 		for {
-			limiter.Wait(context.TODO())
-			pods, err := ClientSet.CoreV1().Pods(ns).List(context.TODO(), listOptions)
+			ex.limiter.Wait(context.TODO())
+			pods, err := ex.clientSet.CoreV1().Pods(ns).List(context.TODO(), listOptions)
+			if err != nil {
+				log.Errorf("Error listing pods in %s: %v", ns, err)
+				return false, nil
+			}
 			listOptions.Continue = pods.GetContinue()
 			for _, pod := range pods.Items {
 				if pod.Status.Phase != corev1.PodRunning {
@@ -220,32 +154,26 @@ func waitForPod(ns string, maxWaitTimeout time.Duration, obj object, limiter *ra
 					}
 				}
 			}
-			if err != nil {
-				return false, err
-			}
 			if listOptions.Continue == "" {
 				break
 			}
 		}
 		return true, nil
 	})
+	return err
 }
 
-func waitForBuild(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
+func (ex *Executor) waitForBuild(ns string, obj object) error {
 	buildStatus := []string{"New", "Pending", "Running"}
 	var build types.UnstructuredContent
-	gvr := schema.GroupVersionResource{
-		Group:    types.OpenShiftBuildGroup,
-		Version:  types.OpenShiftBuildAPIVersion,
-		Resource: types.OpenShiftBuildResource,
-	}
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		builds, err := DynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+		ex.limiter.Wait(context.TODO())
+		builds, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
-			return false, err
+			log.Errorf("Error listing Builds in %s: %v", ns, err)
+			return false, nil
 		}
 		if len(builds.Items) < obj.Replicas {
 			log.Debugf("Waiting for Builds in ns %s to be completed", ns)
@@ -266,31 +194,37 @@ func waitForBuild(ns string, maxWaitTimeout time.Duration, obj object, limiter *
 		}
 		return true, nil
 	})
+	return err
 }
 
-func waitForJob(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
+func (ex *Executor) waitForJob(ns string, obj object) error {
 	if obj.WaitOptions.ForCondition == "" {
 		obj.WaitOptions.ForCondition = "Complete"
 	}
-	verifyCondition(ns, maxWaitTimeout, obj, limiter)
+	return ex.verifyCondition(ns, obj)
 }
 
-func verifyCondition(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
+func (ex *Executor) verifyCondition(ns string, obj object) error {
 	var uObj types.UnstructuredContent
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
-		limiter.Wait(context.TODO())
-		if obj.Namespaced {
-			objs, err = DynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+		ex.limiter.Wait(context.TODO())
+		if obj.namespaced {
+			objs, err = ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 			})
 		} else {
-			objs, err = DynamicClient.Resource(obj.gvr).List(context.TODO(), metav1.ListOptions{
+			objs, err = ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 			})
 		}
 		if err != nil {
-			return false, err
+			if ns != "" {
+				log.Errorf("Error listing %s in %s: %v", obj.kind, ns, err)
+			} else {
+				log.Errorf("Error listing %s: %v", obj.kind, err)
+			}
+			return false, nil
 		}
 	VERIFY:
 		for _, item := range objs.Items {
@@ -335,7 +269,7 @@ func verifyCondition(ns string, maxWaitTimeout time.Duration, obj object, limite
 					}
 				}
 			}
-			if obj.Namespaced {
+			if obj.namespaced {
 				log.Debugf("Waiting for %s in ns %s to be ready", obj.gvr.Resource, ns)
 			} else {
 				log.Debugf("Waiting for %s to be ready", obj.gvr.Resource)
@@ -344,50 +278,12 @@ func verifyCondition(ns string, maxWaitTimeout time.Duration, obj object, limite
 		}
 		return true, nil
 	})
+	return err
 }
 
-func waitForVM(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
+func (ex *Executor) waitForVMorVMI(ns string, obj object) error {
 	if obj.WaitOptions.ForCondition == "" {
 		obj.WaitOptions.ForCondition = "Ready"
 	}
-	verifyCondition(ns, maxWaitTimeout, obj, limiter)
-}
-
-func waitForVMI(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	if obj.WaitOptions.ForCondition == "" {
-		obj.WaitOptions.ForCondition = "Ready"
-	}
-	verifyCondition(ns, maxWaitTimeout, obj, limiter)
-}
-
-func waitForVMIRS(ns string, maxWaitTimeout time.Duration, obj object, limiter *rate.Limiter) {
-	var rs types.UnstructuredContent
-	vmiGVRRS := schema.GroupVersionResource{
-		Group:    types.KubevirtGroup,
-		Version:  types.KubevirtAPIVersion,
-		Resource: types.VirtualMachineInstanceReplicaSetResource,
-	}
-	wait.PollUntilContextTimeout(context.TODO(), time.Second, maxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		limiter.Wait(context.TODO())
-		objs, err := DynamicClient.Resource(vmiGVRRS).Namespace(ns).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
-		})
-		if err != nil {
-			log.Debugf("VMIRS error %v", err)
-			return false, err
-		}
-		for _, item := range objs.Items {
-			jsonBuild, err := item.MarshalJSON()
-			if err != nil {
-				log.Errorf("Error decoding VMIRS object: %s", err)
-				return false, err
-			}
-			_ = json.Unmarshal(jsonBuild, &rs)
-			if rs.Spec.Replicas != rs.Status.ReadyReplicas {
-				log.Debugf("Waiting for replicas from VMIRS in ns %s to be running", ns)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
+	return ex.verifyCondition(ns, obj)
 }

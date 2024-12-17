@@ -50,39 +50,41 @@ kube-burner connects k8s clusters using the following methods in this order:
 
 This section contains the list of jobs `kube-burner` will execute. Each job can hold the following parameters.
 
-| Option                       | Description                                                                                                                           | Type     | Default |
-|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|----------|---------|
-| `name`                       | Job name                                                                                                                              | String   | ""      |
-| `jobType`                    | Type of job to execute. More details at [job types](#job-types)                                                                       | String   | create  |
-| `jobIterations`              | How many times to execute the job                                                                                                     | Integer  | 0       |
-| `namespace`                  | Namespace base name to use                                                                                                            | String   | ""      |
-| `namespacedIterations`       | Whether to create a namespace per job iteration                                                                                       | Boolean  | true    |
-| `iterationsPerNamespace`     | The maximum number of `jobIterations` to create in a single namespace. Important for node-density workloads that create Services.     | Integer  | 1       |
-| `cleanup`                    | Cleanup clean up old namespaces                                                                                                       | Boolean  | true    |
-| `podWait`                    | Wait for all pods/jobs (including probes) to be running/completed before moving forward to the next job iteration                     | Boolean  | false   |
-| `waitWhenFinished`           | Wait for all pods/jobs (including probes) to be running/completed when all job iterations are completed                               | Boolean  | true    |
-| `maxWaitTimeout`             | Maximum wait timeout per namespace                                                                                                    | Duration | 4h      |
-| `jobIterationDelay`          | How long to wait between each job iteration. This is also the wait interval between each delete operation                             | Duration | 0s      |
-| `jobPause`                   | How long to pause after finishing the job                                                                                             | Duration | 0s      |
-| `beforeCleanup`              | Allows to run a bash script before the workload is deleted                                                                            | String   | ""      |
-| `qps`                        | Limit object creation queries per second                                                                                              | Integer  | 0       |
-| `burst`                      | Maximum burst for throttle                                                                                                            | Integer  | 0       |
-| `objects`                    | List of objects the job will create. Detailed on the [objects section](#objects)                                                      | List     | []      |
-| `verifyObjects`              | Verify object count after running each job                                                                                            | Boolean  | true    |
-| `errorOnVerify`              | Set RC to 1 when objects verification fails                                                                                           | Boolean  | true    |
-| `skipIndexing`               | Skip metric indexing on this job                                                                                                      | Boolean  | false   |
-| `preLoadImages`              | Kube-burner will create a DS before triggering the job to pull all the images of the job                                              | Boolean  |         |
-| `preLoadPeriod`              | How long to wait for the preload DaemonSet                                                                                            | Duration | 1m      |
-| `preloadNodeLabels`          | Add node selector labels for the resources created in preload stage                                                                   | Object   | {}      |
-| `namespaceLabels`            | Add custom labels to the namespaces created by kube-burner                                                                            | Object   | {}      |
-| `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}      |
-| `churn`                      | Churn the workload. Only supports namespace based workloads                                                                           | Boolean  | false   |
-| `churnCycles`                | Number of churn cycles to execute                                                                                                     | Integer  | 100     |
-| `churnPercent`               | Percentage of the jobIterations to churn each period                                                                                  | Integer  | 10      |
-| `churnDuration`              | Length of time that the job is churned for                                                                                            | Duration | 1h      |
-| `churnDelay`                 | Length of time to wait between each churn period                                                                                      | Duration | 5m      |
-| `churnDeletionStrategy`      | Churn deletion strategy to apply, `default` or `gvr` (where `default` churns namespaces and `gvr` churns objects within namespaces)   | String   | default |
-| `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false   |
+| Option                       | Description                                                                                                                           | Type     | Default  |
+|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|----------|----------|
+| `name`                       | Job name                                                                                                                              | String   | ""       |
+| `jobType`                    | Type of job to execute. More details at [job types](#job-types)                                                                       | String   | create   |
+| `jobIterations`              | How many times to execute the job                                                                                                     | Integer  | 0        |
+| `namespace`                  | Namespace base name to use                                                                                                            | String   | ""       |
+| `namespacedIterations`       | Whether to create a namespace per job iteration                                                                                       | Boolean  | true     |
+| `iterationsPerNamespace`     | The maximum number of `jobIterations` to create in a single namespace. Important for node-density workloads that create Services.     | Integer  | 1        |
+| `cleanup`                    | Cleanup clean up old namespaces                                                                                                       | Boolean  | true     |
+| `podWait`                    | Wait for all pods/jobs (including probes) to be running/completed before moving forward to the next job iteration                     | Boolean  | false    |
+| `waitWhenFinished`           | Wait for all pods/jobs (including probes) to be running/completed when all job iterations are completed                               | Boolean  | true     |
+| `maxWaitTimeout`             | Maximum wait timeout per namespace                                                                                                    | Duration | 4h       |
+| `jobIterationDelay`          | How long to wait between each job iteration. This is also the wait interval between each delete operation                             | Duration | 0s       |
+| `jobPause`                   | How long to pause after finishing the job                                                                                             | Duration | 0s       |
+| `beforeCleanup`              | Allows to run a bash script before the workload is deleted                                                                            | String   | ""       |
+| `qps`                        | Limit object creation queries per second                                                                                              | Integer  | 0        |
+| `burst`                      | Maximum burst for throttle                                                                                                            | Integer  | 0        |
+| `objects`                    | List of objects the job will create. Detailed on the [objects section](#objects)                                                      | List     | []       |
+| `verifyObjects`              | Verify object count after running each job                                                                                            | Boolean  | true     |
+| `errorOnVerify`              | Set RC to 1 when objects verification fails                                                                                           | Boolean  | true     |
+| `skipIndexing`               | Skip metric indexing on this job                                                                                                      | Boolean  | false    |
+| `preLoadImages`              | Kube-burner will create a DS before triggering the job to pull all the images of the job                                              | Boolean  |          |
+| `preLoadPeriod`              | How long to wait for the preload DaemonSet                                                                                            | Duration | 1m       |
+| `preloadNodeLabels`          | Add node selector labels for the resources created in preload stage                                                                   | Object   | {}       |
+| `namespaceLabels`            | Add custom labels to the namespaces created by kube-burner                                                                            | Object   | {}       |
+| `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}       |
+| `churn`                      | Churn the workload. Only supports namespace based workloads                                                                           | Boolean  | false    |
+| `churnCycles`                | Number of churn cycles to execute                                                                                                     | Integer  | 100      |
+| `churnPercent`               | Percentage of the jobIterations to churn each period                                                                                  | Integer  | 10       |
+| `churnDuration`              | Length of time that the job is churned for                                                                                            | Duration | 1h       |
+| `churnDelay`                 | Length of time to wait between each churn period                                                                                      | Duration | 5m       |
+| `churnDeletionStrategy`      | Churn deletion strategy to apply, `default` or `gvr` (where `default` churns namespaces and `gvr` churns objects within namespaces)   | String   | default  |
+| `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
+| `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
+| `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
@@ -277,6 +279,89 @@ jobs:
   - kind: Secret
     labelSelector: {kube-burner-job: create-objects}
 ```
+
+### Kubevirt
+
+This type of job can be used to execute `virtctl` commands described in the object list. This object list has the following structure:
+
+```yaml
+objects:
+- kubeVirtOp: start
+  labelSelector: {kube-burner-job: cluster-density}
+  inputVars:
+    force: true
+```
+
+Where:
+
+- `kubeVirtOp`: virtctl operation to execute.
+- `labelSelector`: Map with the labelSelector.
+- `inputVars`: Additional command parameters
+
+#### Supported Operations
+
+##### `start`
+
+Execute `virtctl start` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `startPaused` - VM will start in `Paused` state. Default `false`
+
+##### `stop`
+
+Execute `virtctl stop` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `force` - Force stop the VM without waiting. Default `false`
+
+##### `restart`
+
+Execute `virtctl restart` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `force` - Force restart the VM without waiting. Default `false`
+
+##### `pause`
+
+Execute `virtctl pause` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+##### `unpause`
+
+Execute `virtctl unpause` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+
+##### `migrate`
+
+Execute `virtctl migrate` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+##### `add-volume`
+
+Execute `virtctl addvolume` on the VMs mapped by the `labelSelector`.
+Additional parameters should be set using the `inputVars` field:
+
+- `volumeName` - Name of the already existing volume to add. Mandatory
+- `diskType` - Type of the new volume (`disk`/`lun`). Default `disk`
+- `serial` - serial number you want to assign to the disk. Defaults to the value of `volumeName`
+- `cache` - caching options attribute control the cache mechanism. Default `''`
+- `persist` - if set, the added volume will be persisted in the VM spec (if it exists). Default `false`
+
+##### `remove-volume`
+
+Execute `virtctl removevolume` on the VMs mapped by the `labelSelector`.
+Additional parameters should be set using the `inputVars` field:
+
+- `volumeName` - Name of the volume to remove. Mandatory
+- `persist` - if set, the added volume will be persisted in the VM spec (if it exists). Default `false`
+
+## Execution Modes
+
+Patch jobs support different execution modes
+
+- `parallel` - run all steps without any waiting between objects or iterations
+- `sequential` - Run for each object before moving to the next job iteration with an optional wait between objects and/or between iterations
 
 ## Churning Jobs
 

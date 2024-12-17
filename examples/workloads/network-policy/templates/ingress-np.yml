@@ -1,0 +1,73 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: ingress-{{.Iteration}}-{{.Replica}}
+spec:
+  {{- $lpList := list }}
+  {{- range $lp, $e := until $.local_pods }}
+    {{- $nextPod := add 1 $lp }}
+    {{- $lps := (toString $nextPod)}}
+    {{- $lpList = append $lpList $lps }}  
+  {{- end }}
+  {{- $lpNames := toJson $lpList }}
+  podSelector:   
+    matchExpressions:
+      - key: num
+        operator: In
+        values: {{$lpNames}}
+  ingress:  
+  {{- $peerPodIdx := mul $.Replica .pod_selectors .peer_namespaces}}
+  {{- $peerPodIdx = div (sub $peerPodIdx 1) $.namespaces}}
+  {{- $peerPodIdx = mul $peerPodIdx .peer_pods}}
+  {{- $peerPodList := list }}
+  {{- range $lp, $e := until $.peer_pods }}
+    {{- $nextPod := add 1 $lp $peerPodIdx }}
+    {{- if gt $nextPod $.pods_per_namespace }}
+      {{- $nextPod = add (mod $nextPod $.pods_per_namespace) 1 }}
+    {{- end }}
+    {{- $lps := (toString $nextPod)}}
+    {{- $peerPodList = append $peerPodList $lps }}  
+  {{- end }}
+  {{- $peerPodNames := toJson $peerPodList }}
+  {{- $peerNsIdx := add (mul $.Iteration .pod_selectors .netpols_per_namespace .peer_namespaces) (mul (sub $.Replica 1) .pod_selectors .peer_namespaces) 1}}
+  {{- range $ps, $e := until $.pod_selectors }}
+    {{- $nsStart := add $peerNsIdx (mul $ps $.peer_namespaces) }}
+    {{- $nsList := list }}
+    {{- range $i, $v := until $.peer_namespaces }}
+      {{- $nextNs := add $nsStart $i }}
+      {{- if ge $nextNs $.namespaces }}
+        {{- $nextNs = mod $nextNs $.namespaces }}
+      {{- end }}
+      {{- $next_namespace := print "network-policy-perf-" $nextNs }}
+      {{- $nsList = append $nsList $next_namespace }}
+    {{- end }}
+    {{- $nsNames := toJson $nsList }}
+  - from:
+    - namespaceSelector:
+        matchExpressions:
+          - key: kubernetes.io/metadata.name
+            operator: In
+            values: {{$nsNames}}
+      podSelector:
+        matchExpressions:
+          - key: num
+            operator: In
+            values: {{$peerPodNames}}
+    ports:
+    {{- $single_port := 8079 }}
+    {{- range $i, $e := until $.single_ports }}
+      {{- $single_port = add $single_port 1 }}
+      - protocol: TCP
+        port: {{$single_port}}
+    {{- end }}
+    {{- $rangeStart := 5000 }}
+    {{- range $i, $e := until $.port_ranges }}
+      {{- $rangeEnd := add $rangeStart 5 }}
+      - protocol: TCP
+        port: {{$rangeStart}}
+        endPort: {{$rangeEnd}}
+      {{ $rangeStart = add $rangeStart 10}}
+    {{- end }}        
+  {{- end }}
+  policyTypes:
+    - Ingress
