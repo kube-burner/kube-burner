@@ -70,13 +70,13 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	case config.CreationJob:
 		ex.setupCreateJob(configSpec, mapper)
 	case config.DeletionJob:
-		ex.setupDeleteJob(mapper)
+		ex.setupDeleteJob(configSpec, mapper)
 	case config.PatchJob:
-		ex.setupPatchJob(mapper)
+		ex.setupPatchJob(configSpec, mapper)
 	case config.ReadJob:
-		ex.setupReadJob(mapper)
+		ex.setupReadJob(configSpec, mapper)
 	case config.KubeVirtJob:
-		ex.setupKubeVirtJob(mapper)
+		ex.setupKubeVirtJob(configSpec, mapper)
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}

@@ -2,7 +2,13 @@
 
 All of the magic that `kube-burner` does is described in its configuration file. As previously mentioned, the location of this configuration file is provided by the flag `-c`. This flag points to a YAML-formatted file that consists of several sections.
 
-It is possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file. It is also important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, you could define the `indexers` section of your own configuration file, such as:
+## Templating the configuraion file
+
+[go-template](https://pkg.go.dev/text/template) semantics may be used within the configuration file.
+The input for the templates is taken from a user data file (using the `--user-data` parameter) and/or environment variables.
+Environment variables take precedence over those defined in the file when the same variable is defined in both.
+
+ For example, you could define the `indexers` section of your own configuration file, such as:
 
 ```yaml
 metricsEndpoints:
