@@ -77,6 +77,7 @@ func initCmd() *cobra.Command {
 	var uuid, userMetadata string
 	var skipTLSVerify bool
 	var timeout time.Duration
+	var jobPause time.Duration
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -97,6 +98,12 @@ func initCmd() *cobra.Command {
 			configSpec, err := config.Parse(uuid, timeout, f)
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
+			}
+			// Apply jobPause to all jobs if specified via CLI flag
+			if jobPause > 0 {
+				for i := range configSpec.Jobs {
+					configSpec.Jobs[i].JobPause = jobPause
+				}
 			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      &configSpec,
@@ -119,6 +126,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
+	cmd.Flags().DurationVar(&jobPause, "job-pause", 0, "Duration to pause after each job")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")

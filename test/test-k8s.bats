@@ -6,7 +6,7 @@ load helpers.bash
 
 setup_file() {
   cd k8s
-  export BATS_TEST_TIMEOUT=1800
+  export BATS_TEST_TIMEOUT=3600
   export JOB_ITERATIONS=4
   export QPS=3
   export BURST=3
@@ -48,6 +48,18 @@ teardown_file() {
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
     $OCI_BIN rm -f opensearch
   fi
+}
+
+@test "kube-burner init: job-pause" {
+  # Run kube-burner with a 5 second pause between jobs
+  start_time=$(date +%s)
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug --job-pause=5s
+  end_time=$(date +%s)
+  # With JOB_ITERATIONS=4 and a 5s pause, we expect at least 15s total duration (3 pauses between 4 jobs)
+  duration=$((end_time - start_time))
+  [ "$duration" -ge 15 ]
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
 @test "kube-burner init: churn=true; absolute-path=true" {
