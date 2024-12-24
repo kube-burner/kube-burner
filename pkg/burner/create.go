@@ -50,7 +50,7 @@ func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMappe
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
 		e := embed.FS{}
 		if configSpec.EmbedFS == e {
-			f, err = util.ReadConfig(o.ObjectTemplate)
+			f, err = util.GetReaderForPath(o.ObjectTemplate)
 		} else {
 			objectTemplate := path.Join(configSpec.EmbedFSDir, o.ObjectTemplate)
 			f, err = util.ReadEmbedConfig(configSpec.EmbedFS, objectTemplate)

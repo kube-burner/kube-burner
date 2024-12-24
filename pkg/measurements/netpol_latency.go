@@ -444,7 +444,7 @@ func readTemplate(o kconfig.Object) ([]byte, error) {
 
 	e := embed.FS{}
 	if embedFS == e {
-		f, err = kutil.ReadConfig(o.ObjectTemplate)
+		f, err = kutil.GetReaderForPath(o.ObjectTemplate)
 	} else {
 		objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
 		f, err = kutil.ReadEmbedConfig(embedFS, objectTemplate)

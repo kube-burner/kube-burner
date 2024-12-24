@@ -60,7 +60,7 @@ func (wh *WorkloadHelper) Run(workload string) int {
 		}
 	} else {
 		log.Infof("Config file %v available in the current directory, using it", configFile)
-		f, err = util.ReadConfig(configFile)
+		f, err = util.GetReaderForPath(configFile)
 		if err != nil {
 			log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 		}
