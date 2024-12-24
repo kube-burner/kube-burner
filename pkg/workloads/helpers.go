@@ -17,7 +17,6 @@ package workloads
 import (
 	"embed"
 	"fmt"
-	"io"
 	"os"
 	"path"
 
@@ -31,7 +30,7 @@ import (
 var ConfigSpec config.Spec
 
 // NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(config Config, embedConfig embed.FS, kubeClientProvider *config.KubeClientProvider) WorkloadHelper {
+func NewWorkloadHelper(config Config, embedConfig *embed.FS, kubeClientProvider *config.KubeClientProvider) WorkloadHelper {
 	if config.ConfigDir == "" {
 		log.Fatal("Config dir cannot be empty")
 	}
@@ -46,47 +45,37 @@ func NewWorkloadHelper(config Config, embedConfig embed.FS, kubeClientProvider *
 }
 
 func (wh *WorkloadHelper) Run(workload string) int {
-	var f io.Reader
-	var rc int
-	var err error
-	var embedConfig bool
-	var metricsScraper metrics.Scraper
 	configFile := fmt.Sprintf("%s.yml", workload)
+	var embedFS *embed.FS
+	var embedFSDir string
 	if _, err := os.Stat(configFile); err != nil {
-		f, err = util.ReadEmbedConfig(wh.embedConfig, path.Join(wh.ConfigDir, workload, configFile))
-		embedConfig = true
-		if err != nil {
-			log.Fatalf("Error reading configuration file: %v", err.Error())
-		}
-	} else {
-		log.Infof("Config file %v available in the current directory, using it", configFile)
-		f, err = util.GetReaderForPath(configFile)
-		if err != nil {
-			log.Fatalf("Error reading configuration file %s: %s", configFile, err)
-		}
+		embedFS = wh.embedConfig
+		embedFSDir = path.Join(wh.ConfigDir, workload)
+	}
+	f, err := util.GetReader(configFile, embedFS, embedFSDir)
+	if err != nil {
+		log.Fatalf("Error reading configuration file: %v", err.Error())
 	}
 	ConfigSpec, err = config.Parse(wh.UUID, wh.Timeout, f)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if embedConfig {
-		ConfigSpec.EmbedFS = wh.embedConfig
-		ConfigSpec.EmbedFSDir = path.Join(wh.ConfigDir, workload)
-	}
+	// Set embedFS parameters according to where the configuration file was found
+	ConfigSpec.EmbedFS = embedFS
+	ConfigSpec.EmbedFSDir = embedFSDir
 	// Overwrite credentials
 	for pos := range ConfigSpec.MetricsEndpoints {
 		ConfigSpec.MetricsEndpoints[pos].Endpoint = wh.PrometheusURL
 		ConfigSpec.MetricsEndpoints[pos].Token = wh.PrometheusToken
 	}
-	metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+	metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 		ConfigSpec:      &ConfigSpec,
 		MetricsEndpoint: wh.MetricsEndpoint,
 		SummaryMetadata: wh.SummaryMetadata,
 		MetricsMetadata: wh.MetricsMetadata,
-		EmbedConfig:     embedConfig,
 		UserMetaData:    wh.UserMetadata,
 	})
-	rc, err = burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper)
+	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper)
 	if err != nil {
 		log.Error(err.Error())
 	}

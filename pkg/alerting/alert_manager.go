@@ -18,10 +18,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"os"
-	"path"
 	"strings"
 	"text/template"
 	"time"
@@ -86,7 +84,7 @@ type descriptionTemplate struct {
 }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, embedConfig bool, indexer *indexers.Indexer, metadata interface{}) (*AlertManager, error) {
+func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, indexer *indexers.Indexer, metadata interface{}) (*AlertManager, error) {
 	log.Infof("🔔 Initializing alert manager for prometheus: %v", prometheusClient.Endpoint)
 	a := AlertManager{
 		prometheus: prometheusClient,
@@ -94,27 +92,14 @@ func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.
 		indexer:    indexer,
 		metadata:   metadata,
 	}
-	if err := a.readProfile(alertProfileCfg, embedConfig); err != nil {
+	if err := a.readProfile(alertProfileCfg); err != nil {
 		return &a, err
 	}
 	return &a, nil
 }
 
-func (a *AlertManager) readProfile(alertProfileCfg string, embedConfig bool) error {
-	var f io.Reader
-	var err error
-	if embedConfig {
-		embeddedLocation := path.Join(path.Dir(a.prometheus.ConfigSpec.EmbedFSDir), alertProfileCfg)
-		f, err = util.ReadEmbedConfig(a.prometheus.ConfigSpec.EmbedFS, embeddedLocation)
-		if err != nil {
-			log.Infof("Embedded config doesn't contain alert profile %s. Falling back to original path", embeddedLocation)
-			f, err = util.GetReaderForPath(alertProfileCfg)
-		} else {
-			alertProfileCfg = embeddedLocation
-		}
-	} else {
-		f, err = util.GetReaderForPath(alertProfileCfg)
-	}
+func (a *AlertManager) readProfile(alertProfileCfg string) error {
+	f, err := util.GetReader(alertProfileCfg, a.prometheus.ConfigSpec.EmbedFS, a.prometheus.ConfigSpec.EmbedFSDir)
 	if err != nil {
 		return fmt.Errorf("error reading alert profile %s: %s", alertProfileCfg, err)
 	}

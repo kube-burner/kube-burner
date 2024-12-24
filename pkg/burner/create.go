@@ -16,12 +16,10 @@ package burner
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
-	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -39,8 +37,6 @@ import (
 )
 
 func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMapper) {
-	var err error
-	var f io.Reader
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
@@ -48,13 +44,7 @@ func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMappe
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		e := embed.FS{}
-		if configSpec.EmbedFS == e {
-			f, err = util.GetReaderForPath(o.ObjectTemplate)
-		} else {
-			objectTemplate := path.Join(configSpec.EmbedFSDir, o.ObjectTemplate)
-			f, err = util.ReadEmbedConfig(configSpec.EmbedFS, objectTemplate)
-		}
+		f, err := util.GetReader(o.ObjectTemplate, configSpec.EmbedFS, configSpec.EmbedFSDir)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
