@@ -260,7 +260,7 @@ func (vmi *vmiLatency) setConfig(cfg types.Measurement) error {
 	}
 	for _, th := range vmi.config.LatencyThresholds {
 		if _, ok := supportedConditions[th.ConditionType]; !ok {
-			return fmt.Errorf("unsupported vmi condition %s in vmiLatency measurement, supported are %v", th.ConditionType, maps.Keys((supportedConditions)))
+			return fmt.Errorf("unsupported vmi condition %s in vmiLatency measurement, supported are %v", th.ConditionType, maps.Keys(supportedConditions))
 		}
 		if _, ok := supportedLatencyMetrics[th.Metric]; !ok {
 			return fmt.Errorf("unsupported metric %s in vmiLatency measurement, supported are: %s", th.Metric, maps.Keys(supportedLatencyMetrics))
