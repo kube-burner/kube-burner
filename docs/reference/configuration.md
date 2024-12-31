@@ -404,6 +404,7 @@ All object templates are injected with the variables below by default:
 - `Replica`: Object replica number. Keep in mind that this number is reset to 1 with each job iteration.
 - `JobName`: Job name.
 - `UUID`: Benchmark UUID.
+- `RunID`: Internal run id. Can be used to match resources for metrics collection
 
 In addition, you can also inject arbitrary variables with the option `inputVars` of the object:
 

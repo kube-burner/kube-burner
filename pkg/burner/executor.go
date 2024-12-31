@@ -89,6 +89,7 @@ func (ex *Executor) renderTemplateForObject(obj object, iteration, replicaIndex 
 		jobName:      ex.Name,
 		jobIteration: iteration,
 		jobUUID:      ex.uuid,
+		jobRunId:     ex.runid,
 		replica:      replicaIndex,
 	}
 	for k, v := range obj.InputVars {
