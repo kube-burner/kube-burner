@@ -61,7 +61,7 @@ type Spec struct {
 	// Jobs list of kube-burner jobs
 	Jobs []Job `yaml:"jobs"`
 	// EmbedFS embed filesystem instance
-	EmbedFS embed.FS
+	EmbedFS *embed.FS
 	// EmbedFSDir Directory in which the configuration files are in the embed filesystem
 	EmbedFSDir string
 }

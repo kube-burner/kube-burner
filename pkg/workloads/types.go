@@ -34,7 +34,7 @@ type Config struct {
 
 type WorkloadHelper struct {
 	Config
-	embedConfig        embed.FS
+	embedConfig        *embed.FS
 	kubeClientProvider *config.KubeClientProvider
 	MetadataAgent      ocpmetadata.Metadata
 	SummaryMetadata    map[string]interface{}
