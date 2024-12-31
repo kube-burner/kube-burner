@@ -30,6 +30,11 @@ setup-kind() {
   kubectl create -f objectTemplates/kubevirt-cr.yaml
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt
+  # Install CDI
+  CDI_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)")
+  kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml
+  kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml
+  kubectl wait --for=condition=Available --timeout=600s cdi cdi
 }
 
 create_test_kubeconfig() {
@@ -200,4 +205,32 @@ check_deployment_count() {
     return 1
   fi
   echo "Found the expected ${EXPECTED_COUNT} deployments"
+}
+
+get_default_storage_class() {
+    kubectl get sc -o json | jq -r '[.items.[] | select(.metadata.annotations."storageclass.kubernetes.io/is-default-class")][0].metadata.name'
+}
+
+check_metric_recorded() {
+  local job=$1
+  local type=$2
+  local metric=$3
+  local m
+  m=$(cat ${METRICS_FOLDER}/${type}Measurement-${job}.json | jq .[0].${metric})
+  if [[ ${m} -eq 0 ]]; then
+      echo "metric ${type}/${metric} was not recorded for ${job}"
+      return 1
+  fi
+}
+
+check_quantile_recorded() {
+  local job=$1
+  local type=$2
+  local quantileName=$3
+
+  MEASUREMENT=$(cat ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json | jq --arg name "${quantileName}" '[.[] | select(.quantileName == $name)][0].avg')
+  if [[ ${MEASUREMENT} -eq 0 ]]; then
+    echo "Quantile for ${type}/${quantileName} was not recorded for ${job}"
+    return 1
+  fi
 }

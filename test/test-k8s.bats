@@ -210,3 +210,15 @@ teardown_file() {
   check_deployment_count ${NAMESPACE} "kube-burner.io/unset" "unset" ${REPLICAS}
   kubectl delete ns ${NAMESPACE}
 }
+
+@test "kube-burner init: datavolume latency" {
+  export STORAGE_CLASS_NAME
+  STORAGE_CLASS_NAME=$(get_default_storage_class)
+  run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid="${UUID}" --log-level=debug
+
+  local jobs=("create-vm" "create-base-image-dv")
+  for job in "${jobs[@]}"; do
+    check_metric_recorded ${job} dvLatency dvReadyLatency
+    check_quantile_recorded ${job} dvLatency Ready
+  done
+}
