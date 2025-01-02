@@ -28,7 +28,7 @@ jobs:
         path: /tmp/
 
     - name: Install bats
-      uses: bats-core/bats-action@1.5.4
+      uses: bats-core/bats-action@3.0.0
       with:
         bats-version: 1.10.0
         support-install: false
