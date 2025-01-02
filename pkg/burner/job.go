@@ -47,6 +47,7 @@ const (
 	replica              = "Replica"
 	jobIteration         = "Iteration"
 	jobUUID              = "UUID"
+	jobRunId             = "RunID"
 	rcTimeout            = 2
 	rcAlert              = 3
 	rcMeasurement        = 4
