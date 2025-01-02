@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"strings"
 	"text/template"
 	"time"
@@ -99,7 +100,7 @@ func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.
 }
 
 func (a *AlertManager) readProfile(alertProfileCfg string) error {
-	f, err := util.GetReader(alertProfileCfg, a.prometheus.ConfigSpec.EmbedFS, a.prometheus.ConfigSpec.EmbedFSDir)
+	f, err := util.GetReader(alertProfileCfg, a.prometheus.ConfigSpec.EmbedFS, path.Dir(a.prometheus.ConfigSpec.EmbedFSDir))
 	if err != nil {
 		return fmt.Errorf("error reading alert profile %s: %s", alertProfileCfg, err)
 	}
