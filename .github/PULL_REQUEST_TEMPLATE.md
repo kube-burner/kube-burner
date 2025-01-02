@@ -1,10 +1,13 @@
 ## Type of change
 
-- [ ] Refactor
-- [ ] New feature
-- [ ] Bug fix
-- [ ] Optimization
-- [ ] Documentation Update
+<!-- Choose a type of change -->
+
+- Refactor
+- New feature
+- Bug fix
+- Optimization
+- Documentation
+- CI
 
 ## Description
 
