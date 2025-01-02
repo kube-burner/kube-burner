@@ -22,7 +22,7 @@ require (
 	k8s.io/client-go v0.31.0
 	k8s.io/kubectl v0.27.2
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
-	kubevirt.io/api v1.3.1
+	kubevirt.io/api v1.4.0
 	kubevirt.io/client-go v1.4.0
 )
 
