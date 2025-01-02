@@ -15,11 +15,9 @@
 package burner
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"sync"
 	"time"
@@ -142,18 +140,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
-				cmd := exec.Command("/bin/sh", job.BeforeCleanup)
-				var outb, errb bytes.Buffer
-				cmd.Stdout = &outb
-				cmd.Stderr = &errb
-				err := cmd.Run()
+				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup, configSpec.EmbedFS, configSpec.EmbedFSDir)
 				if err != nil {
 					err = fmt.Errorf("BeforeCleanup failed: %v", err)
 					log.Error(err.Error())
 					errs = append(errs, err)
 					innerRC = 1
 				}
-				log.Infof("BeforeCleanup out: %v, err: %v", outb.String(), errb.String())
+				log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 			}
 			if job.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
