@@ -1,0 +1,1780 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../../cli/">
+      
+      
+        <link rel="next" href="../../measurements/">
+      
+      
+      <link rel="icon" href="../../media/logos/kube-burner-logo-mini.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
+    
+    
+      
+        <title>Reference - Kube-burner</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.6f8fc17f.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../css/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Kube-burner" class="md-header__button md-logo" aria-label="Kube-burner" data-md-component="logo">
+      
+  <img src="../../media/logos/kube-burner-logo-mini.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Kube-burner
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label=""  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/kube-burner/kube-burner" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Kube-burner" class="md-nav__button md-logo" aria-label="Kube-burner" data-md-component="logo">
+      
+  <img src="../../media/logos/kube-burner-logo-mini.png" alt="logo">
+
+    </a>
+    Kube-burner
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/kube-burner/kube-burner" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Command line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#templating-the-configuraion-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Templating the configuraion file
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global" class="md-nav__link">
+    <span class="md-ellipsis">
+      Global
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Jobs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Jobs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      Objects
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#object-wait-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Object wait Options
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default labels
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#job-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Job types
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Job types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      Delete
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read" class="md-nav__link">
+    <span class="md-ellipsis">
+      Read
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Patch
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kubevirt" class="md-nav__link">
+    <span class="md-ellipsis">
+      Kubevirt
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kubevirt">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported Operations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supported Operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#start" class="md-nav__link">
+    <span class="md-ellipsis">
+      start
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stop
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      restart
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pause" class="md-nav__link">
+    <span class="md-ellipsis">
+      pause
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unpause" class="md-nav__link">
+    <span class="md-ellipsis">
+      unpause
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      migrate
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      add-volume
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remove-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      remove-volume
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Execution Modes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#churning-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Churning Jobs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#injected-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Injected variables
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#template-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Template functions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Template functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#external-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      External libraries
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#additional-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Additional functions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runonce" class="md-nav__link">
+    <span class="md-ellipsis">
+      RunOnce
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../measurements/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Measurements
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../observability/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Observability & Alerting
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Observability & Alerting
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Collecting metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/indexing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Indexing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/alerting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Alerting
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../contributing/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    GitHub Workflows
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            GitHub Workflows
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/pullrequest/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Pullrequest
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/release/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Release
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/tests/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tests
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../wrappers/index.md" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Wrappers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">&para;</a></h1>
+<p>All of the magic that <code>kube-burner</code> does is described in its configuration file. As previously mentioned, the location of this configuration file is provided by the flag <code>-c</code>. This flag points to a YAML-formatted file that consists of several sections.</p>
+<h2 id="templating-the-configuraion-file">Templating the configuraion file<a class="headerlink" href="#templating-the-configuraion-file" title="Permanent link">&para;</a></h2>
+<p><a href="https://pkg.go.dev/text/template">go-template</a> semantics may be used within the configuration file.
+The input for the templates is taken from a user data file (using the <code>--user-data</code> parameter) and/or environment variables.
+Environment variables take precedence over those defined in the file when the same variable is defined in both.</p>
+<p>For example, you could define the <code>indexers</code> section of your own configuration file, such as:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">metricsEndpoints</span><span class="p">:</span>
+<span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">if .OS_INDEXING</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prometheusURL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:9090</span>
+<span class="w">    </span><span class="nt">indexer</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">opensearch</span>
+<span class="w">      </span><span class="nt">esServers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">.ES_SERVER</span><span class="nv"> </span><span class="s">}}&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">defaultIndex</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">.ES_INDEX</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">end</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">if .LOCAL_INDEXING</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prometheusURL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:9090</span>
+<span class="w">    </span><span class="nt">indexer</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
+<span class="w">      </span><span class="nt">metricsDirectory</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">.METRICS_FOLDER</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">end</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+</code></pre></div>
+<p>This feature can be very useful at the time of defining secrets, such as the user and password of our indexer, or a token to use in pprof collection.</p>
+<h2 id="global">Global<a class="headerlink" href="#global" title="Permanent link">&para;</a></h2>
+<p>In this section is described global job configuration, it holds the following parameters:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+<th>Type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>measurements</code></td>
+<td>List of measurements. Detailed in the <a href="/kube-burner/latest/measurements">measurements section</a></td>
+<td>List</td>
+<td>[]</td>
+</tr>
+<tr>
+<td><code>requestTimeout</code></td>
+<td>Client-go request timeout</td>
+<td>Duration</td>
+<td>60s</td>
+</tr>
+<tr>
+<td><code>gc</code></td>
+<td>Garbage collect created namespaces</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>gcMetrics</code></td>
+<td>Flag to collect metrics during garbage collection</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>gcTimeout</code></td>
+<td>Garbage collection timeout</td>
+<td>Duration</td>
+<td>1h</td>
+</tr>
+<tr>
+<td><code>waitWhenFinished</code></td>
+<td>Wait for all pods/jobs (including probes) to be running/completed when all jobs are completed</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>clusterHealth</code></td>
+<td>Checks if all the nodes are in "Ready" state</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The precedence order to wait on resources is Global.waitWhenFinished &gt; Job.waitWhenFinished &gt; Job.podWait</p>
+</div>
+<p>kube-burner connects k8s clusters using the following methods in this order:</p>
+<ul>
+<li><code>KUBECONFIG</code> environment variable</li>
+<li><code>$HOME/.kube/config</code></li>
+<li>In-cluster config (Used when kube-burner runs inside a pod)</li>
+</ul>
+<h2 id="jobs">Jobs<a class="headerlink" href="#jobs" title="Permanent link">&para;</a></h2>
+<p>This section contains the list of jobs <code>kube-burner</code> will execute. Each job can hold the following parameters.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+<th>Type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Job name</td>
+<td>String</td>
+<td>""</td>
+</tr>
+<tr>
+<td><code>jobType</code></td>
+<td>Type of job to execute. More details at <a href="#job-types">job types</a></td>
+<td>String</td>
+<td>create</td>
+</tr>
+<tr>
+<td><code>jobIterations</code></td>
+<td>How many times to execute the job</td>
+<td>Integer</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>namespace</code></td>
+<td>Namespace base name to use</td>
+<td>String</td>
+<td>""</td>
+</tr>
+<tr>
+<td><code>namespacedIterations</code></td>
+<td>Whether to create a namespace per job iteration</td>
+<td>Boolean</td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>iterationsPerNamespace</code></td>
+<td>The maximum number of <code>jobIterations</code> to create in a single namespace. Important for node-density workloads that create Services.</td>
+<td>Integer</td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>cleanup</code></td>
+<td>Cleanup clean up old namespaces</td>
+<td>Boolean</td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>podWait</code></td>
+<td>Wait for all pods/jobs (including probes) to be running/completed before moving forward to the next job iteration</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>waitWhenFinished</code></td>
+<td>Wait for all pods/jobs (including probes) to be running/completed when all job iterations are completed</td>
+<td>Boolean</td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>maxWaitTimeout</code></td>
+<td>Maximum wait timeout per namespace</td>
+<td>Duration</td>
+<td>4h</td>
+</tr>
+<tr>
+<td><code>jobIterationDelay</code></td>
+<td>How long to wait between each job iteration. This is also the wait interval between each delete operation</td>
+<td>Duration</td>
+<td>0s</td>
+</tr>
+<tr>
+<td><code>jobPause</code></td>
+<td>How long to pause after finishing the job</td>
+<td>Duration</td>
+<td>0s</td>
+</tr>
+<tr>
+<td><code>beforeCleanup</code></td>
+<td>Allows to run a bash script before the workload is deleted</td>
+<td>String</td>
+<td>""</td>
+</tr>
+<tr>
+<td><code>qps</code></td>
+<td>Limit object creation queries per second</td>
+<td>Integer</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>burst</code></td>
+<td>Maximum burst for throttle</td>
+<td>Integer</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>objects</code></td>
+<td>List of objects the job will create. Detailed on the <a href="#objects">objects section</a></td>
+<td>List</td>
+<td>[]</td>
+</tr>
+<tr>
+<td><code>verifyObjects</code></td>
+<td>Verify object count after running each job</td>
+<td>Boolean</td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>errorOnVerify</code></td>
+<td>Set RC to 1 when objects verification fails</td>
+<td>Boolean</td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>skipIndexing</code></td>
+<td>Skip metric indexing on this job</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>preLoadImages</code></td>
+<td>Kube-burner will create a DS before triggering the job to pull all the images of the job</td>
+<td>Boolean</td>
+<td></td>
+</tr>
+<tr>
+<td><code>preLoadPeriod</code></td>
+<td>How long to wait for the preload DaemonSet</td>
+<td>Duration</td>
+<td>1m</td>
+</tr>
+<tr>
+<td><code>preloadNodeLabels</code></td>
+<td>Add node selector labels for the resources created in preload stage</td>
+<td>Object</td>
+<td>{}</td>
+</tr>
+<tr>
+<td><code>namespaceLabels</code></td>
+<td>Add custom labels to the namespaces created by kube-burner</td>
+<td>Object</td>
+<td>{}</td>
+</tr>
+<tr>
+<td><code>namespaceAnnotations</code></td>
+<td>Add custom annotations to the namespaces created by kube-burner</td>
+<td>Object</td>
+<td>{}</td>
+</tr>
+<tr>
+<td><code>churn</code></td>
+<td>Churn the workload. Only supports namespace based workloads</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>churnCycles</code></td>
+<td>Number of churn cycles to execute</td>
+<td>Integer</td>
+<td>100</td>
+</tr>
+<tr>
+<td><code>churnPercent</code></td>
+<td>Percentage of the jobIterations to churn each period</td>
+<td>Integer</td>
+<td>10</td>
+</tr>
+<tr>
+<td><code>churnDuration</code></td>
+<td>Length of time that the job is churned for</td>
+<td>Duration</td>
+<td>1h</td>
+</tr>
+<tr>
+<td><code>churnDelay</code></td>
+<td>Length of time to wait between each churn period</td>
+<td>Duration</td>
+<td>5m</td>
+</tr>
+<tr>
+<td><code>churnDeletionStrategy</code></td>
+<td>Churn deletion strategy to apply, <code>default</code> or <code>gvr</code> (where <code>default</code> churns namespaces and <code>gvr</code> churns objects within namespaces)</td>
+<td>String</td>
+<td>default</td>
+</tr>
+<tr>
+<td><code>defaultMissingKeysWithZero</code></td>
+<td>Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>executionMode</code></td>
+<td>Job execution mode. More details at <a href="#execution-modes">execution modes</a></td>
+<td>String</td>
+<td>parallel</td>
+</tr>
+<tr>
+<td><code>objectDelay</code></td>
+<td>How long to wait between each object in a job</td>
+<td>Duration</td>
+<td>0s</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Both <code>churnCycles</code> and <code>churnDuration</code> serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize <code>churnDuration</code> to control churn, they can achieve this by setting <code>churnCycles</code> to <code>0</code>. Conversely, to prioritize <code>churnCycles</code>, one should set a longer <code>churnDuration</code> accordingly.</p>
+</div>
+<p>Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the <a href="https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries"><code>Lists and Dictionaries</code></a> in YAML syntax.</p>
+<p>Examples of valid configuration files can be found in the <a href="https://github.com/kube-burner/kube-burner/tree/master/examples">examples folder</a>.</p>
+<h3 id="objects">Objects<a class="headerlink" href="#objects" title="Permanent link">&para;</a></h3>
+<p>The objects created by <code>kube-burner</code> are rendered using the default golang's <a href="https://golang.org/pkg/text/template/">template library</a>.
+Each object element supports the following parameters:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+<th>Type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>objectTemplate</code></td>
+<td>Object template file path or URL</td>
+<td>String</td>
+<td>""</td>
+</tr>
+<tr>
+<td><code>replicas</code></td>
+<td>How replicas of this object to create per job iteration</td>
+<td>Integer</td>
+<td>-</td>
+</tr>
+<tr>
+<td><code>inputVars</code></td>
+<td>Map of arbitrary input variables to inject to the object template</td>
+<td>Object</td>
+<td>-</td>
+</tr>
+<tr>
+<td><code>wait</code></td>
+<td>Wait for object to be ready</td>
+<td>Boolean</td>
+<td>true</td>
+</tr>
+<tr>
+<td><code>waitOptions</code></td>
+<td>Customize <a href="#object-wait-options">how to wait</a> for object to be ready</td>
+<td>Object</td>
+<td>{}</td>
+</tr>
+<tr>
+<td><code>runOnce</code></td>
+<td>Create or delete this object only once during the entire job</td>
+<td>Boolean</td>
+<td>false</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Kube-burner is only able to wait for a subset of resources, unless <code>waitOptions</code> are specified.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>Find more info about the waiters implementation in the <code>pkg/burner/waiters.go</code> file</p>
+</div>
+<h3 id="object-wait-options">Object wait Options<a class="headerlink" href="#object-wait-options" title="Permanent link">&para;</a></h3>
+<p>If you want to override the default waiter behaviors, you can specify wait options for your objects.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+<th>Type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td>Object kind to consider for wait</td>
+<td>String</td>
+<td>""</td>
+</tr>
+<tr>
+<td><code>labelSelector</code></td>
+<td>Objects with these labels will be considered for wait</td>
+<td>Object</td>
+<td>{}</td>
+</tr>
+<tr>
+<td><code>forCondition</code></td>
+<td>Wait for the object condition with this name to be true</td>
+<td>String</td>
+<td>""</td>
+</tr>
+<tr>
+<td><code>customStatusPath</code></td>
+<td>A jq path to the status field of the object</td>
+<td>String</td>
+<td>""</td>
+</tr>
+</tbody>
+</table>
+<p>For example, the snippet below can be used to make kube-burner wait for all containers from the pod defined at <code>pod.yml</code> to be ready.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment.yml</span>
+<span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">  </span><span class="nt">waitOptions</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span>
+<span class="w">    </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-label </span><span class="p">:</span><span class="w"> </span><span class="nv">abcd</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">forCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ready</span>
+</code></pre></div>
+<p>Additionally, you can use <code>customStatusPath</code> to specify a custom path to check the condition of the object, for example, to wait for a deployment to be available.</p>
+<p><div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="w">    </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment.yml</span>
+<span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">waitOptions</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">forCondition</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Available&quot;</span>
+<span class="w">      </span><span class="nt">customStatusPath</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;.conditions[].type&quot;</span>
+</code></pre></div>
+This allows kube-burner to check the status of the specified path and wait for the condition you specify in <code>forCondition</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code>waitOptions.kind</code>, <code>waitOptions.customStatusPath</code> and <code>waitOptions.labelSelector</code> are fully optional. <code>waitOptions.kind</code> is used when an application has child objects to be waited &amp; <code>waitOptions.labelSelector</code> is used when we want to wait on objects with specific labels.</p>
+</div>
+<h3 id="default-labels">Default labels<a class="headerlink" href="#default-labels" title="Permanent link">&para;</a></h3>
+<p>All objects created by kube-burner are labeled with <code>kube-burner-uuid=&lt;UUID&gt;,kube-burner-job=&lt;jobName&gt;,kube-burner-index=&lt;objectIndex&gt;</code>. They are used for internal purposes, but they can also be used by the users.</p>
+<h2 id="job-types">Job types<a class="headerlink" href="#job-types" title="Permanent link">&para;</a></h2>
+<p>Configured by the parameter <code>jobType</code>, kube-burner supports four types of jobs with different parameters each:</p>
+<ul>
+<li>Create</li>
+<li>Delete</li>
+<li>Read</li>
+<li>Patch</li>
+</ul>
+<h3 id="create">Create<a class="headerlink" href="#create" title="Permanent link">&para;</a></h3>
+<p>The default <code>jobType</code> is <strong>create</strong>. Creates objects listed in the <code>objects</code> list as described in the <a href="#objects">objects section</a>. The amount of objects created is configured by <code>jobIterations</code>, <code>replicas</code>. If the object is namespaced and has an empty <code>.metadata.namespace</code> field, <code>kube-burner</code> creates a new namespace with the name <code>namespace-&lt;iteration&gt;</code>, and creates the defined amount of objects in it.</p>
+<h3 id="delete">Delete<a class="headerlink" href="#delete" title="Permanent link">&para;</a></h3>
+<p>This type of job deletes objects described in the objects list. Using delete as job type the objects list would have the following structure:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p>Where:</p>
+<ul>
+<li><code>kind</code>: Object kind of the k8s object to delete.</li>
+<li><code>labelSelector</code>: Deletes the objects with the given labels.</li>
+<li><code>apiVersion</code>: API version from the k8s object.</li>
+</ul>
+<p>This type of job supports the following parameters. Described in the <a href="#jobs">jobs section</a>:</p>
+<ul>
+<li><code>waitForDeletion</code>: Wait for objects to be deleted before finishing the job. Defaults to <code>true</code>.</li>
+<li><code>name</code></li>
+<li><code>qps</code></li>
+<li><code>burst</code></li>
+<li><code>jobPause</code></li>
+<li><code>jobIterationDelay</code></li>
+</ul>
+<h3 id="read">Read<a class="headerlink" href="#read" title="Permanent link">&para;</a></h3>
+<p>This type of job reads objects described in the objects list. Using read as job type the objects list would have the following structure:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p>Where:</p>
+<ul>
+<li><code>kind</code>: Object kind of the k8s object to read.</li>
+<li><code>labelSelector</code>: Reads the objects with the given labels.</li>
+<li><code>apiVersion</code>: API version from the k8s object.</li>
+</ul>
+<p>This type of job supports the following parameters. Described in the <a href="#jobs">jobs section</a>:</p>
+<ul>
+<li><code>name</code></li>
+<li><code>qps</code></li>
+<li><code>burst</code></li>
+<li><code>jobPause</code></li>
+<li><code>jobIterationDelay</code></li>
+<li><code>jobIterations</code></li>
+</ul>
+<h3 id="patch">Patch<a class="headerlink" href="#patch" title="Permanent link">&para;</a></h3>
+<p>This type of job can be used to patch objects with the template described in the object list. This object list has the following structure:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">templates/deployment_patch_add_label.json</span>
+<span class="w">  </span><span class="nt">patchType</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;application/strategic-merge-patch+json&quot;</span>
+<span class="w">  </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+</code></pre></div>
+<p>Where:</p>
+<ul>
+<li><code>kind</code>: Object kind of the k8s object to patch.</li>
+<li><code>labelSelector</code>: Map with the labelSelector.</li>
+<li><code>objectTemplate</code>: The YAML template or JSON file to patch.</li>
+<li><code>apiVersion</code>: API version from the k8s object.</li>
+<li><code>patchType</code>: The Kubernetes request patch type (see below).</li>
+</ul>
+<p>Valid patch types:</p>
+<ul>
+<li>application/json-patch+json</li>
+<li>application/merge-patch+json</li>
+<li>application/strategic-merge-patch+json</li>
+<li>application/apply-patch+yaml (requires YAML)</li>
+</ul>
+<p>As mentioned previously, all objects created by kube-burner are labeled with <code>kube-burner-uuid=&lt;UUID&gt;,kube-burner-job=&lt;jobName&gt;,kube-burner-index=&lt;objectIndex&gt;</code>. Therefore, you can design a workload with one job to create objects and another one to patch or remove the objects created by the previous.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">jobs</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">create-objects</span>
+<span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">job-namespace</span>
+<span class="w">  </span><span class="nt">jobIterations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">objects</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment.yml</span>
+<span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service.yml</span>
+<span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">remove-objects</span>
+<span class="w">  </span><span class="nt">jobType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delete</span>
+<span class="w">  </span><span class="nt">objects</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="w">    </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">create-objects</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
+<span class="w">    </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">create-objects</span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<h3 id="kubevirt">Kubevirt<a class="headerlink" href="#kubevirt" title="Permanent link">&para;</a></h3>
+<p>This type of job can be used to execute <code>virtctl</code> commands described in the object list. This object list has the following structure:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kubeVirtOp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">start</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">inputVars</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">force</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>Where:</p>
+<ul>
+<li><code>kubeVirtOp</code>: virtctl operation to execute.</li>
+<li><code>labelSelector</code>: Map with the labelSelector.</li>
+<li><code>inputVars</code>: Additional command parameters</li>
+</ul>
+<h4 id="supported-operations">Supported Operations<a class="headerlink" href="#supported-operations" title="Permanent link">&para;</a></h4>
+<h5 id="start"><code>start</code><a class="headerlink" href="#start" title="Permanent link">&para;</a></h5>
+<p>Execute <code>virtctl start</code> on the VMs mapped by the <code>labelSelector</code>.
+Additional parameters may be set using the <code>inputVars</code> field:</p>
+<ul>
+<li><code>startPaused</code> - VM will start in <code>Paused</code> state. Default <code>false</code></li>
+</ul>
+<h5 id="stop"><code>stop</code><a class="headerlink" href="#stop" title="Permanent link">&para;</a></h5>
+<p>Execute <code>virtctl stop</code> on the VMs mapped by the <code>labelSelector</code>.
+Additional parameters may be set using the <code>inputVars</code> field:</p>
+<ul>
+<li><code>force</code> - Force stop the VM without waiting. Default <code>false</code></li>
+</ul>
+<h5 id="restart"><code>restart</code><a class="headerlink" href="#restart" title="Permanent link">&para;</a></h5>
+<p>Execute <code>virtctl restart</code> on the VMs mapped by the <code>labelSelector</code>.
+Additional parameters may be set using the <code>inputVars</code> field:</p>
+<ul>
+<li><code>force</code> - Force restart the VM without waiting. Default <code>false</code></li>
+</ul>
+<h5 id="pause"><code>pause</code><a class="headerlink" href="#pause" title="Permanent link">&para;</a></h5>
+<p>Execute <code>virtctl pause</code> on the VMs mapped by the <code>labelSelector</code>.
+No additional parametes are supported.</p>
+<h5 id="unpause"><code>unpause</code><a class="headerlink" href="#unpause" title="Permanent link">&para;</a></h5>
+<p>Execute <code>virtctl unpause</code> on the VMs mapped by the <code>labelSelector</code>.
+No additional parametes are supported.</p>
+<h5 id="migrate"><code>migrate</code><a class="headerlink" href="#migrate" title="Permanent link">&para;</a></h5>
+<p>Execute <code>virtctl migrate</code> on the VMs mapped by the <code>labelSelector</code>.
+No additional parametes are supported.</p>
+<h5 id="add-volume"><code>add-volume</code><a class="headerlink" href="#add-volume" title="Permanent link">&para;</a></h5>
+<p>Execute <code>virtctl addvolume</code> on the VMs mapped by the <code>labelSelector</code>.
+Additional parameters should be set using the <code>inputVars</code> field:</p>
+<ul>
+<li><code>volumeName</code> - Name of the already existing volume to add. Mandatory</li>
+<li><code>diskType</code> - Type of the new volume (<code>disk</code>/<code>lun</code>). Default <code>disk</code></li>
+<li><code>serial</code> - serial number you want to assign to the disk. Defaults to the value of <code>volumeName</code></li>
+<li><code>cache</code> - caching options attribute control the cache mechanism. Default <code>''</code></li>
+<li><code>persist</code> - if set, the added volume will be persisted in the VM spec (if it exists). Default <code>false</code></li>
+</ul>
+<h5 id="remove-volume"><code>remove-volume</code><a class="headerlink" href="#remove-volume" title="Permanent link">&para;</a></h5>
+<p>Execute <code>virtctl removevolume</code> on the VMs mapped by the <code>labelSelector</code>.
+Additional parameters should be set using the <code>inputVars</code> field:</p>
+<ul>
+<li><code>volumeName</code> - Name of the volume to remove. Mandatory</li>
+<li><code>persist</code> - if set, the added volume will be persisted in the VM spec (if it exists). Default <code>false</code></li>
+</ul>
+<h2 id="execution-modes">Execution Modes<a class="headerlink" href="#execution-modes" title="Permanent link">&para;</a></h2>
+<p>Patch jobs support different execution modes</p>
+<ul>
+<li><code>parallel</code> - run all steps without any waiting between objects or iterations</li>
+<li><code>sequential</code> - Run for each object before moving to the next job iteration with an optional wait between objects and/or between iterations</li>
+</ul>
+<h2 id="churning-jobs">Churning Jobs<a class="headerlink" href="#churning-jobs" title="Permanent link">&para;</a></h2>
+<p>Churn is the deletion and re-creation of objects, and is supported for namespace-based jobs only. This occurs after the job has completed
+but prior to uploading metrics, if applicable. It deletes a percentage of contiguous namespaces randomly chosen and re-creates them
+with all of the appropriate objects. It will then wait for a specified delay (or none if set to <code>0</code>) before deleting and recreating the
+next randomly chosen set. This cycle continues until the churn duration has passed.</p>
+<p>An example implementation that would churn 20% of the 100 job iterations for 2 hours with no delay between sets:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">jobs</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster-density</span>
+<span class="w">  </span><span class="nt">jobIterations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">namespacedIterations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">churning</span>
+<span class="w">  </span><span class="nt">churn</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">churnPercent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
+<span class="w">  </span><span class="nt">churnDuration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2h</span>
+<span class="w">  </span><span class="nt">churnDelay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0s</span>
+<span class="w">  </span><span class="nt">objects</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment.yml</span>
+<span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service.yml</span>
+<span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</code></pre></div>
+<h2 id="injected-variables">Injected variables<a class="headerlink" href="#injected-variables" title="Permanent link">&para;</a></h2>
+<p>All object templates are injected with the variables below by default:</p>
+<ul>
+<li><code>Iteration</code>: Job iteration number.</li>
+<li><code>Replica</code>: Object replica number. Keep in mind that this number is reset to 1 with each job iteration.</li>
+<li><code>JobName</code>: Job name.</li>
+<li><code>UUID</code>: Benchmark UUID.</li>
+<li><code>RunID</code>: Internal run id. Can be used to match resources for metrics collection</li>
+</ul>
+<p>In addition, you can also inject arbitrary variables with the option <code>inputVars</code> of the object:</p>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service.yml</span>
+<span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">  </span><span class="nt">inputVars</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80</span>
+<span class="w">    </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+</code></pre></div>
+<p>The following code snippet shows an example of a k8s service using these variables:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Service</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sleep-app-{{.Iteration}}-{{.Replica}}</span>
+<span class="w">  </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-app-{{.Iteration}}-{{.Replica}}</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sleep-app-{{.Iteration}}-{{.Replica}}</span>
+<span class="w">  </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">serviceport</span>
+<span class="w">    </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{.port}}&quot;</span>
+<span class="w">    </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{.targetPort}}&quot;</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterIP</span>
+</code></pre></div>
+<!-- markdownlint-disable -->
+<div class="admonition tip">
+<p class="admonition-title">You can also use <a href="https://golang.org/pkg/text/template/">golang template semantics</a> in your <code>objectTemplate</code> definitions</p>
+<div class="highlight"><pre><span></span><code><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ImageStream</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">image.openshift.io/v1</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="nv">.prefix</span><span class="p p-Indicator">}}</span><span class="l l-Scalar l-Scalar-Plain">-{{.Replica}}</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">if .image</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="w">  </span><span class="nt">dockerImageRepository</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="nv">.image</span><span class="p p-Indicator">}}</span>
+<span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">end</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+</code></pre></div>
+</div>
+<!-- markdownlint-restore -->
+
+<h2 id="template-functions">Template functions<a class="headerlink" href="#template-functions" title="Permanent link">&para;</a></h2>
+<p>On top of the default <a href="https://golang.org/pkg/text/template/">golang template semantics</a>, <code>kube-burner</code> supports additional template functions.</p>
+<h3 id="external-libraries">External libraries<a class="headerlink" href="#external-libraries" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="http://masterminds.github.io/sprig/">sprig library</a> which adds over 70 template functions for Go’s template language.</li>
+</ul>
+<h3 id="additional-functions">Additional functions<a class="headerlink" href="#additional-functions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>Binomial</code> - returns the binomial coefficient of (n,k)</li>
+<li><code>IndexToCombination</code> - returns the combination corresponding to the given index</li>
+<li><code>GetSubnet24</code></li>
+<li><code>GetIPAddress</code> - returns number of addresses requested per iteration from the list of total provided addresses</li>
+<li><code>ReadFile</code> - returns the content of the file in the provided path</li>
+</ul>
+<h2 id="runonce">RunOnce<a class="headerlink" href="#runonce" title="Permanent link">&para;</a></h2>
+<p>All objects within the job will iteratively run based on the JobIteration number,
+but there may be a situation if an object need to be created only once (ex. clusterrole), in such cases
+we can add an optional field as <code>runOnce</code> for that particular object to execute only once in the entire job.</p>
+<p>An example scenario as below template, a job iteration of 100 but create the clusterrole only once.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">jobs</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster-density</span>
+<span class="w">  </span><span class="nt">jobIterations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">namespacedIterations</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cluster-density</span>
+<span class="w">  </span><span class="nt">objects</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clusterrole.yml</span>
+<span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">runOnce</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clusterrolebinding.yml</span>
+<span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">runOnce</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment.yml</span>
+<span class="w">    </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <!-- Footer -->
+<footer class="md-footer">
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <!-- Copyright and theme information -->
+      <div class="md-copyright">
+        <div class="md-copyright__highlight">
+          Copyright © 2024 The kube-burner Authors</br></br>
+          <img src="../../media/logos/cncf-white.svg" alt="Cloud Native Computing Foundation" /><br /><br />
+          Kube-burner is a <a href="https://www.cncf.io/"><b>Cloud Native Computing Foundation</b></a> Sandbox project.<br /><br />
+          The Linux Foundation® (TLF) has registered trademarks and uses trademarks. For a list of TLF trademarks, see <a href="https://www.linuxfoundation.org/trademark-usage/">Trademark Usage</a>. 
+        </div>
+      </div>
+      <div class="md-social">
+        <a href="https://github.com/kube-burner/" target="_blank" rel="noopener" title="kube-burner organization on Github" class="md-social__link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
+        </a>
+        <a href="https://kubernetes.slack.com/messages/kube-burner" target="_blank" rel="noopener" title="Slack" class="md-social__link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M94.12 315.1c0 25.9-21.16 47.06-47.06 47.06S0 341 0 315.1c0-25.9 21.16-47.06 47.06-47.06h47.06v47.06zm23.72 0c0-25.9 21.16-47.06 47.06-47.06s47.06 21.16 47.06 47.06v117.84c0 25.9-21.16 47.06-47.06 47.06s-47.06-21.16-47.06-47.06V315.1zm47.06-188.98c-25.9 0-47.06-21.16-47.06-47.06S139 32 164.9 32s47.06 21.16 47.06 47.06v47.06H164.9zm0 23.72c25.9 0 47.06 21.16 47.06 47.06s-21.16 47.06-47.06 47.06H47.06C21.16 243.96 0 222.8 0 196.9s21.16-47.06 47.06-47.06H164.9zm188.98 47.06c0-25.9 21.16-47.06 47.06-47.06 25.9 0 47.06 21.16 47.06 47.06s-21.16 47.06-47.06 47.06h-47.06V196.9zm-23.72 0c0 25.9-21.16 47.06-47.06 47.06-25.9 0-47.06-21.16-47.06-47.06V79.06c0-25.9 21.16-47.06 47.06-47.06 25.9 0 47.06 21.16 47.06 47.06V196.9zM283.1 385.88c25.9 0 47.06 21.16 47.06 47.06 0 25.9-21.16 47.06-47.06 47.06-25.9 0-47.06-21.16-47.06-47.06v-47.06h47.06zm0-23.72c-25.9 0-47.06-21.16-47.06-47.06 0-25.9 21.16-47.06 47.06-47.06h117.84c25.9 0 47.06 21.16 47.06 47.06 0 25.9-21.16 47.06-47.06 47.06H283.1z"></path></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"limit": 3, "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.88dd0f4e.min.js"></script>
+      
+    
+  </body>
+</html>

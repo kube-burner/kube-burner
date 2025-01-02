@@ -1,0 +1,1531 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../reference/configuration/">
+      
+      
+        <link rel="next" href="../observability/">
+      
+      
+      <link rel="icon" href="../media/logos/kube-burner-logo-mini.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
+    
+    
+      
+        <title>Measurements - Kube-burner</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.6f8fc17f.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../css/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#measurements" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Kube-burner" class="md-header__button md-logo" aria-label="Kube-burner" data-md-component="logo">
+      
+  <img src="../media/logos/kube-burner-logo-mini.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Kube-burner
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Measurements
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label=""  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/kube-burner/kube-burner" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Kube-burner" class="md-nav__button md-logo" aria-label="Kube-burner" data-md-component="logo">
+      
+  <img src="../media/logos/kube-burner-logo-mini.png" alt="logo">
+
+    </a>
+    Kube-burner
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/kube-burner/kube-burner" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Command line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/configuration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Measurements
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Measurements
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pod-latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pod latency
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pod latency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metrics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pod-latency-thresholds" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pod latency thresholds
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vmi-latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      VMI latency
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VMI latency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metrics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metrics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#node-latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      Node latency
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Node latency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metrics_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metrics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      Service latency
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Service latency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metrics_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metrics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-policy-latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      Network Policy Latency
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Network Policy Latency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      Templates
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependency" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sequence-of-events-during-connection-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sequence of Events During Connection Testing:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reason-for-using-2-jobs-for-the-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reason for using 2 jobs for the testing:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#steps-in-the-execution-of-job-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Steps in the Execution of Job 2:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metrics_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metrics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pprof-collection" class="md-nav__link">
+    <span class="md-ellipsis">
+      pprof collection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#measure-subcommand-cli-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Measure subcommand CLI example
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indexing-in-different-places" class="md-nav__link">
+    <span class="md-ellipsis">
+      Indexing in different places
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../observability/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Observability & Alerting
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Observability & Alerting
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Collecting metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/indexing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Indexing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/alerting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Alerting
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../contributing/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    GitHub Workflows
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            GitHub Workflows
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/pullrequest/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Pullrequest
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/release/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Release
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/tests/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tests
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrappers/index.md" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Wrappers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="measurements">Measurements<a class="headerlink" href="#measurements" title="Permanent link">&para;</a></h1>
+<p>Kube-burner allows you to get further metrics using other mechanisms or data sources, such as the Kubernetes API. These mechanisms are called measurements.</p>
+<p>Measurements are enabled in the <code>measurements</code> object of the configuration file. This object contains a list of measurements with their options.</p>
+<h2 id="pod-latency">Pod latency<a class="headerlink" href="#pod-latency" title="Permanent link">&para;</a></h2>
+<p>Collects latencies from the different pod startup phases, these <strong>latency metrics are in ms</strong>. It can be enabled with:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">podLatency</span>
+</code></pre></div>
+<h3 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h3>
+<p>The metrics collected are pod latency timeseries (<code>podLatencyMeasurement</code>) and four documents holding a summary with different pod latency quantiles of each pod condition (<code>podLatencyQuantilesMeasurement</code>).</p>
+<p>One document, such as the following, is indexed per each pod created by the workload that enters in <code>Running</code> condition during the workload:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2020-11-15T20:28:59.598727718Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;schedulingLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;initializedLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;containersReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2997</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;podReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2997</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;podLatencyMeasurement&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;c40b4346-7af7-4c63-9ab4-aae7ccdd0616&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;kubelet-density&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;podName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;kubelet-density-13&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;nodeName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;worker-001&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;create-pods&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;jobIteration&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;replica&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;3&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<p>Pod latency quantile sample:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Ready&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;23c0b5fd-c17e-4326-a389-b3aebc774c82&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3774</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3510</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2897</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3774</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2876.3</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2020-11-15T22:26:51.553221077+01:00&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;podLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="p">},</span>
+<span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PodScheduled&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;23c0b5fd-c17e-4326-a389-b3aebc774c82&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">5.38</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2020-11-15T22:26:51.553225151+01:00&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;podLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Where <code>quantileName</code> matches with the pod conditions and can be:</p>
+<ul>
+<li><code>PodScheduled</code>: Pod has been scheduled in to a node.</li>
+<li><code>PodReadyToStartContainers</code>: The Pod sandbox has been successfully created and networking configured.</li>
+<li><code>Initialized</code>: All init containers in the pod have started successfully</li>
+<li><code>ContainersReady</code>: Indicates whether all containers in the pod are ready.</li>
+<li><code>Ready</code>: The pod is able to service requests and should be added to the load balancing pools of all matching services.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>We also log the errorRate of the latencies for user's understanding. It indicates the percentage of pods out of all pods in the workload that got errored during the latency calculations. Currently the threshold for the errorRate is 10% and we do not log latencies if the error is &gt; 10% which indicates a problem with environment.(i.e system under test)</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>More information about the pod conditions can be found at the <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions">kubernetes documentation site</a>.</p>
+</div>
+<p>And the metrics are:</p>
+<ul>
+<li><code>P99</code>: 99<sup>th</sup> percentile of the pod condition.</li>
+<li><code>P95</code>: 95<sup>th</sup> percentile of the pod condition.</li>
+<li><code>P50</code>: 50<sup>th</sup> percentile of the pod condition.</li>
+<li><code>Max</code>: Maximum value of the condition.</li>
+<li><code>Avg</code>: Average value of the condition.</li>
+</ul>
+<h3 id="pod-latency-thresholds">Pod latency thresholds<a class="headerlink" href="#pod-latency-thresholds" title="Permanent link">&para;</a></h3>
+<p>It is possible to establish pod latency thresholds to the different pod conditions and metrics by defining the option <code>thresholds</code> within this measurement:</p>
+<p>Establishing a threshold of 2000ms in the P99 metric of the <code>Ready</code> condition.</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">podLatency</span>
+<span class="w">    </span><span class="nt">thresholds</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">conditionType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ready</span>
+<span class="w">      </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">P99</span>
+<span class="w">      </span><span class="nt">threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000ms</span>
+</code></pre></div>
+<p>Latency thresholds are evaluated at the end of each job, showing an informative message like the following:</p>
+<div class="highlight"><pre><span></span><code><span class="go">INFO[2020-12-15 12:37:08] Evaluating latency thresholds</span>
+<span class="go">WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured threshold: 2000ms</span>
+</code></pre></div>
+<p>In case of not meeting any of the configured thresholds, like the example above, <strong>kube-burner return code will be 1</strong>.</p>
+<h2 id="vmi-latency">VMI latency<a class="headerlink" href="#vmi-latency" title="Permanent link">&para;</a></h2>
+<p>Collects latencies from the different vm/vmi startup phases, these <strong>latency metrics are in ms</strong>. It can be enabled with:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vmiLatency</span>
+</code></pre></div>
+<h3 id="metrics_1">Metrics<a class="headerlink" href="#metrics_1" title="Permanent link">&para;</a></h3>
+<p>The metrics collected are vm/vmi latency timeseries (<code>vmiLatencyMeasurement</code>) and up to 10 documents holding a summary with different vm/vmi latency quantiles of each condition (<code>vmiLatencyQuantilesMeasurement</code>).</p>
+<p>One document, such as the following, is indexed per each vm/vmi created by the workload that enters in <code>Running</code> condition during the workload:</p>
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-11-26T12:57:50Z&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podCreatedLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">116532</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podScheduledLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">116574</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podInitializedLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">132511</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podContainersReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">135541</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">135541</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiCreatedLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">7000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiPendingLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">116401</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiSchedulingLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">117106</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiScheduledLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">127926</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiRunningLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">138166</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">138166</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vmiLatencyMeasurement&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;f7c79fd5-58e7-4719-a710-7633ffb20491&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-launcher-virt-density-27-zkfdt&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density-27&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density-27&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;nodeName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;y37-h25-000-r740xd&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-11-26T12:57:53Z&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podCreatedLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">125182</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podScheduledLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">125182</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podInitializedLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">133741</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podContainersReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">143130</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">143130</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiCreatedLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiPendingLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">119298</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiSchedulingLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">119347</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiScheduledLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">143254</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiRunningLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">153506</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">153528</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vmiLatencyMeasurement&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;f7c79fd5-58e7-4719-a710-7633ffb20491&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;podName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-launcher-virt-density-93-82fdm&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density-93&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;vmiName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density-93&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;nodeName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;y37-h25-000-r740xd&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</code></pre></div>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>The fields <code>vmReadyLatency</code> and <code>vmName</code> are only set when the VMI has a parent VM object</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>The fields prefixed by <code>pod</code>, represent the latency of the different startup phases of the pod running the actual virtual machine.</p>
+</div>
+<hr />
+<p>Pod latency quantile sample:</p>
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PodPodScheduled&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;f7c79fd5-58e7-4719-a710-7633ffb20491&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">125183</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">124870</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">119769</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">125313</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">119509</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-11-26T13:00:30.713169517Z&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vmiLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;VMIScheduled&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;f7c79fd5-58e7-4719-a710-7633ffb20491&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">144029</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">143255</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">139240</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">144029</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">138699</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-11-26T13:00:30.713173817Z&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vmiLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PodContainersReady&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;f7c79fd5-58e7-4719-a710-7633ffb20491&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">144029</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">143257</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">139466</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">144030</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">139361</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-11-26T13:00:30.713179584Z&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vmiLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;virt-density&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">]</span>
+</code></pre></div>
+<h2 id="node-latency">Node latency<a class="headerlink" href="#node-latency" title="Permanent link">&para;</a></h2>
+<p>Collects latencies from the different node conditions on the cluster, these <strong>latency metrics are in ms</strong>. It can be enabled with:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nodeLatency</span>
+</code></pre></div>
+<h3 id="metrics_2">Metrics<a class="headerlink" href="#metrics_2" title="Permanent link">&para;</a></h3>
+<p>The metrics collected are node latency timeseries (<code>nodeLatencyMeasurement</code>) and four documents holding a summary with different node latency quantiles of each node condition (<code>nodeLatencyQuantilesMeasurement</code>).</p>
+<p>One document, such as the following, is indexed per each node created by the workload that enters in <code>Ready</code> condition during the workload:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-08-25T12:49:26Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;nodeMemoryPressureLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;nodeDiskPressureLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;nodePIDPressureLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;nodeReadyLatency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">82000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;nodeLatencyMeasurement&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4f9e462c-cacc-4695-95db-adfb841e0980&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;namespaced&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;nodeName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ip-10-0-34-104.us-west-2.compute.internal&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;labels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;beta.kubernetes.io/arch&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;amd64&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;beta.kubernetes.io/instance-type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;m6i.xlarge&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;beta.kubernetes.io/os&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;linux&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;failure-domain.beta.kubernetes.io/region&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;us-west-2&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;failure-domain.beta.kubernetes.io/zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;us-west-2b&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;kubernetes.io/arch&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;amd64&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;kubernetes.io/hostname&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ip-10-0-34-104.us-west-2.compute.internal&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;kubernetes.io/os&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;linux&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;node-role.kubernetes.io/worker&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;node.kubernetes.io/instance-type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;m6i.xlarge&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;node.openshift.io/os_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rhcos&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;topology.ebs.csi.aws.com/zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;us-west-2b&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;topology.kubernetes.io/region&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;us-west-2&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;topology.kubernetes.io/zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;us-west-2b&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<p>Node latency quantile sample:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Ready&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4f9e462c-cacc-4695-95db-adfb841e0980&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">163000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">163000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">93000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">163000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">122500</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-08-25T20:42:59.422208263Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;nodeLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;namespaced&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="p">},</span>
+<span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;MemoryPressure&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4f9e462c-cacc-4695-95db-adfb841e0980&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-08-25T20:42:59.422209628Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;nodeLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;namespaced&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Where <code>quantileName</code> matches with the node conditions and can be:</p>
+<ul>
+<li><code>MemoryPressure</code>: Indicates if pressure exists on node memory.</li>
+<li><code>DiskPressure</code>: Indicates if pressure exists on node size.</li>
+<li><code>PIDPressure</code>: Indicates if pressure exists because of too many processes.</li>
+<li><code>Ready</code>: Node is ready and able to accept pods.</li>
+</ul>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>More information about the node conditions can be found at the <a href="https://kubernetes.io/docs/reference/node/node-status/#condition">kubernetes documentation site</a>.</p>
+</div>
+<p>And the metrics, error rates, and their thresholds work the same way as in the pod latency measurement.</p>
+<h2 id="service-latency">Service latency<a class="headerlink" href="#service-latency" title="Permanent link">&para;</a></h2>
+<p>Calculates the time taken the services to serve requests once their endpoints are ready. This measurement works as follows.</p>
+<pre class="mermaid"><code>graph LR
+    A[Service created] --&gt; C{active endpoints?}
+    C --&gt;|No| C
+    C --&gt;|Yes| D[Save timestamp]
+    D --&gt; G{TCP connectivity?}
+    G--&gt;|Yes| F(Generate metric)
+    G --&gt;|No| G</code></pre>
+<p>Where the service latency is the time elapsed since the service has at least one endpoint ready till the connectivity is verified.</p>
+<p>The connectivity check is done through a pod running in the <code>kube-burner-service-latency</code> namespace, kube-burner connects to this pod and uses <code>netcat</code> to verify connectivity.</p>
+<p>This measure is enabled with:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">serviceLatency</span>
+<span class="w">    </span><span class="nt">svcTimeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+</code></pre></div>
+<p>Where <code>svcTimeout</code>, by default <code>5s</code>, defines the maximum amount of time the measurement will wait for a service to be ready, when this timeout is met, the metric from that service is <strong>discarded</strong>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Considerations</p>
+<ul>
+<li>Only TCP is supported.</li>
+<li>Supported services are <code>ClusterIP</code>, <code>NodePort</code> and <code>LoadBalancer</code>.</li>
+<li>kube-burner starts checking service connectivity when its endpoints object has at least one address.</li>
+<li>Make sure the endpoints of the service are correct and reachable from the pod running in the <code>kube-burner-service-latency</code>.</li>
+<li>When the service is <code>NodePort</code>, the connectivity check is done against the node where the connectivity check pods runs.</li>
+<li>By default all services created by the benchmark are tracked by this measurement, it's possible to discard service objects from tracking by annotating them with <code>kube-burner.io/service-latency=false</code>.</li>
+<li>Keep in mind that When service is <code>LoadBalancer</code> type, the provider needs to setup the load balancer, which adds some extra delay.</li>
+<li>Endpoints are pinged one after another, this can create some delay when the number of endpoints of the service is big.</li>
+</ul>
+</div>
+<h3 id="metrics_3">Metrics<a class="headerlink" href="#metrics_3" title="Permanent link">&para;</a></h3>
+<p>The metrics collected are service latency timeseries (<code>svcLatencyMeasurement</code>) and another document that holds a summary with the different service latency quantiles (<code>svcLatencyQuantilesMeasurement</code>). It is possible to skip indexing the <code>svcLatencyMeasurement</code> metric by configuring the field <code>svcLatencyMetrics</code> of this measurement to <code>quantiles</code>. Metric documents have the following structure:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2023-11-19T00:41:51Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ready&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1631880721</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;svcLatencyMeasurement&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;c4558ba8-1e29-4660-9b31-02b9f01c29bf&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;namespace&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cluster-density-v2-2&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;service&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cluster-density-1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ClusterIP&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When type is <code>LoadBalancer</code>, it includes an extra field <code>ipAssigned</code>, that reports the IP assignation latency of the service.</p>
+</div>
+<p>And the quantiles document has the structure:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Ready&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;c4558ba8-1e29-4660-9b31-02b9f01c29bf&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1867593282</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1856488440</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1723817691</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1868307027</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1722308938</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2023-11-19T00:42:26.663991359Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;svcLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="p">},</span>
+<span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LoadBalancer&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;c4558ba8-1e29-4660-9b31-02b9f01c29bf&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1467593282</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1356488440</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1323817691</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2168307027</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1822308938</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2023-11-19T00:42:26.663991359Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;svcLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>When there're <code>LoadBalancer</code> services, an extra document with <code>quantileName</code> as <code>LoadBalancer</code> is also generated as shown above.</p>
+<h2 id="network-policy-latency">Network Policy Latency<a class="headerlink" href="#network-policy-latency" title="Permanent link">&para;</a></h2>
+<p>Note: This measurement has requirement of having 2 jobs defined in the templates. It doesn't report the network policy latency measurement if only one job is used.</p>
+<p>Calculates the time taken to apply the network policy rules by the SDN through connection testing between pods specified in the network policy.
+At a high level, Kube-burner utilizes a proxy pod, <code>network-policy-proxy</code>, to distribute connection information (such as remote IP addresses) to the client pods. These client pods then send the requests to the specified addresses and record a timestamp once a connection is successfully established. Kube-burner retrieves these timestamps from the client pods via the proxy pod and calculates the network policy latency by comparing the recorded timestamp with the timestamp when the network policy was created.</p>
+<p>During this testing, kube-burner creates two separate jobs:
+1. <strong>Job 1</strong>: Creates all necessary namespaces and pods.
+2. <strong>Job 2</strong>: Applies network policies to the pods defined on above namespaces and tests connections by sending HTTP requests.</p>
+<p>Latency measurement is only performed during the execution of Job 2, which focuses on network policy application and connection testing.</p>
+<h3 id="templates">Templates<a class="headerlink" href="#templates" title="Permanent link">&para;</a></h3>
+<p>Use the examples/workloads/network-policy/network-policy.yml for reference.</p>
+<h3 id="dependency">Dependency<a class="headerlink" href="#dependency" title="Permanent link">&para;</a></h3>
+<ol>
+<li>2 Jobs should be used in the template</li>
+<li>Both the jobs should use the same namespace name, example "network-policy-perf".</li>
+<li>First job should create the pods. Second job should create the network policies</li>
+<li>Label "kube-burner.io/skip-networkpolicy-latency: true" should be defined under namespaceLabels.</li>
+<li>All the pods should allow traffic from the proxy pod. Example workload uses np-deny-all.yml and np-allow-from-proxy.yml object templates for this.</li>
+<li>inputVars.namespaces for templates/ingress-np.yml object template should have same value as jobIterations</li>
+</ol>
+<h3 id="sequence-of-events-during-connection-testing">Sequence of Events During Connection Testing:<a class="headerlink" href="#sequence-of-events-during-connection-testing" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Proxy Pod Initialization</strong>:
+   Kube-burner internally creates the <code>network-policy-proxy</code> pod and uses port forwarding for communication.</p>
+</li>
+<li>
+<p><strong>Job Execution</strong>:</p>
+</li>
+<li><strong>Job 1</strong>: Kube-burner creates namespaces and pods as per the configuration.</li>
+<li><strong>Job 2</strong>: Kube-burner applies network policies and runs connection tests as follows:</li>
+</ol>
+<h3 id="reason-for-using-2-jobs-for-the-testing">Reason for using 2 jobs for the testing:<a class="headerlink" href="#reason-for-using-2-jobs-for-the-testing" title="Permanent link">&para;</a></h3>
+<p>Network policy is not applied only between the local pods. Instead, the network policy create rules between the local pods and remote pods which are hosted on remote namespaces. For example, assume if the job is creating 50 ingress and 50 egress network policies per namespace and we have 240 namespaces.
+In the first namespace, i.e network-policy-perf-0, network policy ingress-0-29 allows traffic to the local pods in the current namespace (i.e network-policy-perf-0.) from pods in remote namespaces network-policy-perf-41, network-policy-perf-42, network-policy-perf-43, network-policy-perf-44 and network-policy-perf-41.</p>
+<p>In the current implementation, pods which are already created in "network-policy-perf-41, network-policy-perf-42, network-policy-perf-43, network-policy-perf-44 and network-policy-perf-41" try to send http requests to pods in "network-policy-perf-0" even before the network policy "ingress-0-29" in network-policy-perf-0 created. But these http requests will be failing as the network policy is not yet created. Once the "ingress-0-29" network policies created and ovs flows get programmed, the http requests will be succesful.</p>
+<p>So this approach is helpful in testing connections between pods of different namespaces. Here all other resources (namespaces, pods, client app with peer addresses to send http requests) are ready and the dependency is only on the network policy creation to make the connection succesful.</p>
+<p>Also as the pods are already created, this pod latency doesn't impact the network policy latency. For example when kube-burner reports 6 seconds as network policy readiness latency, it is purely network policy creation and resulting ovs flows and not any pod readiness latency.</p>
+<p>On a summary, the advantages with this approach are -</p>
+<ol>
+<li>OVN components are dedicated for only network policy processing</li>
+<li>CPU &amp; memory usage metrics captured are isolated for only network policy creation</li>
+<li>Network policy latency calculation doesn’t include pod readiness as pods are already existing</li>
+<li>network policy rules are applied between pods across namespaces</li>
+</ol>
+<h3 id="steps-in-the-execution-of-job-2">Steps in the Execution of Job 2:<a class="headerlink" href="#steps-in-the-execution-of-job-2" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Connection List Preparation</strong>:</li>
+<li>Kube-burner parses the network policy template to prepare a list of connection details for each client pod. Each connection is defined by a remote IP address, port, and the associated network policy name.</li>
+<li>Currently, connection testing supports only the <strong>Ingress</strong> rule on port <strong>8080</strong>.</li>
+<li>
+<p>Although the template may specify identical configurations for multiple network policies within a namespace, Kube-burner optimizes this process by ensuring that only unique connections are sent to the client pods (avoiding duplicate remote IP addresses).</p>
+</li>
+<li>
+<p><strong>Sending Connection Information</strong>:</p>
+</li>
+<li>
+<p>Kube-burner passes the prepared connection information to the client pods via the <code>network-policy-proxy</code> pod and waits until the proxy pod confirms that all client pods have received the information.</p>
+</li>
+<li>
+<p><strong>Initial HTTP Requests</strong>:</p>
+</li>
+<li>
+<p>Once the client pods receive their connection details, they begin sending HTTP requests to the specified addresses. Initially, these requests will fail because the network policies have not yet been applied.</p>
+</li>
+<li>
+<p><strong>Network Policy Creation</strong>:</p>
+</li>
+<li>As part of its regular workflow, Kube-burner parses the template and applies network policies for each namespace.</li>
+<li>
+<p>After the network policies are applied, the previously failing HTTP requests from the client pods become successful. At this point, each client pod records the timestamp when a successful connection is established.</p>
+</li>
+<li>
+<p><strong>Pause for Stabilization</strong>:</p>
+</li>
+<li>
+<p>After creating all network policies, Kube-burner pauses for <strong>1 minute</strong> (due to the <code>jobPause: 1m</code> configuration option in the template). This allows the connection tests to complete successfully within this time window.</p>
+</li>
+<li>
+<p><strong>Retrieving Timestamps and Calculating Latency</strong>:</p>
+</li>
+<li>Kube-burner retrieves the recorded connection timestamps from the client pods via the proxy pod.</li>
+<li>The latency is then calculated by comparing the recorded connection timestamp with the timestamp when the network policy was applied. This value represents the time taken for the SDN to enforce network policies. A network policy, when applied, tests connection between multiple client and server pods and measure the latency of each connection. We report max and min values of these connections latencies for a network policy.</li>
+</ol>
+<p>This measure is enabled with:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">netpolLatency</span>
+</code></pre></div>
+<h3 id="metrics_4">Metrics<a class="headerlink" href="#metrics_4" title="Permanent link">&para;</a></h3>
+<p>And the quantiles document has the structure:
+<div class="highlight"><pre><span></span><code><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Ready&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;734adc28-c5b4-4a69-8807-ff99195bca1b&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3040</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3038</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2077</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3040</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2264</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-10-10T10:39:29.059701196Z&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;netpolLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;network-policy-perf&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;quantileName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;minReady&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;uuid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;734adc28-c5b4-4a69-8807-ff99195bca1b&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3025</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3024</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;P50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2058</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3025</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;avg&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2245</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-10-10T10:39:29.059703401Z&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metricName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;netpolLatencyQuantilesMeasurement&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;jobName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;network-policy-perf&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</code></pre></div></p>
+<h2 id="pprof-collection">pprof collection<a class="headerlink" href="#pprof-collection" title="Permanent link">&para;</a></h2>
+<p>This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with <code>labelSelector</code> and running in <code>namespace</code>. This measurement uses an implementation similar to <code>kubectl exec</code>, and as soon as it connects to one pod it executes the command <code>curl &lt;pprofURL&gt;</code> to get the pprof data. pprof files are collected in a regular basis configured by the parameter <code>pprofInterval</code>, the collected pprof files are downloaded from the pods to the local directory configured by the parameter <code>pprofDirectory</code> which by default is <code>pprof</code>.</p>
+<p>As some components require authentication to get profiling information, <code>kube-burner</code> provides two different modalities to address it:</p>
+<ul>
+<li><strong>Bearer token authentication</strong>: This modality is configured by the variable <code>bearerToken</code>, which holds a valid Bearer token that will be used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components</li>
+<li><strong>Certificate Authentication</strong>: Usually valid for etcd, this method can be configured using a combination of cert/privKey files or directly using the cert/privkey content, it can be tweaked with the following variables:<ul>
+<li><code>cert</code>: Base64 encoded certificate.</li>
+<li><code>key</code>: Base64 encoded private key.</li>
+<li><code>certFile</code>: Path to a certificate file.</li>
+<li><code>keyFile</code>: Path to a private key file.</li>
+</ul>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The decoded content of the certificate and private key is written to the files /tmp/pprof.crt and /tmp/pprof.key of the remote pods respectively</p>
+</div>
+<p>An example of how to configure this measurement to collect pprof HEAP and CPU profiling data from kube-apiserver and etcd is shown below:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pprof</span>
+<span class="w">    </span><span class="nt">pprofInterval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30m</span>
+<span class="w">    </span><span class="nt">pprofDirectory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pprof-data</span>
+<span class="w">    </span><span class="nt">pprofTargets</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kube-apiserver-heap</span>
+<span class="w">      </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;openshift-kube-apiserver&quot;</span>
+<span class="w">      </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="nv">openshift-kube-apiserver</span><span class="p p-Indicator">}</span>
+<span class="w">      </span><span class="nt">bearerToken</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">thisIsNotAValidToken</span>
+<span class="w">      </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://localhost:6443/debug/pprof/heap</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">etcd-heap</span>
+<span class="w">      </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;openshift-etcd&quot;</span>
+<span class="w">      </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="nv">etcd</span><span class="p p-Indicator">}</span>
+<span class="w">      </span><span class="nt">certFile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">etcd-peer-pert.crt</span>
+<span class="w">      </span><span class="nt">keyFile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">etcd-peer-pert.key</span>
+<span class="w">      </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://localhost:2379/debug/pprof/heap</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>As mentioned before, this measurement requires the <code>curl</code> command to be available in the target pods.</p>
+</div>
+<h2 id="measure-subcommand-cli-example">Measure subcommand CLI example<a class="headerlink" href="#measure-subcommand-cli-example" title="Permanent link">&para;</a></h2>
+<p>Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.</p>
+<div class="highlight"><pre><span></span><code>kube-burner<span class="w"> </span>measure<span class="w"> </span>--uuid<span class="o">=</span>vchalla<span class="w"> </span>--namespaces<span class="o">=</span>cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4<span class="w"> </span>--selector<span class="o">=</span>kube-burner-job<span class="o">=</span>cluster-density-v2
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:05&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;📁 Creating indexer: elastic&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;kube-burner.go:226&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:05&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;map[kube-burner-job:cluster-density-v2]&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;kube-burner.go:247&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:05&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;📈 Registered measurement: podLatency&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;factory.go:85&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:06&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;Stopping measurement: podLatency&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;factory.go:118&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:06&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;Evaluating latency thresholds&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;metrics.go:60&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:06&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;Indexing pod latency data for job: kube-burner-measure&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;pod_latency.go:245&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:07&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;Indexing finished in 417ms: created=4&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;pod_latency.go:262&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:08&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;Indexing finished in 1.32s: created=50&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;pod_latency.go:262&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:08&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;kube-burner-measure: PodScheduled 50th: 0 99th: 0 max: 0 avg: 0&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;pod_latency.go:233&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:08&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;kube-burner-measure: ContainersReady 50th: 9000 99th: 18000 max: 18000 avg: 10680&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;pod_latency.go:233&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:08&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;kube-burner-measure: Initialized 50th: 0 99th: 0 max: 0 avg: 0&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;pod_latency.go:233&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:08&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;kube-burner-measure: Ready 50th: 9000 99th: 18000 max: 18000 avg: 10680&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;pod_latency.go:233&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:08&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;Pod latencies error rate was: 0.00&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;pod_latency.go:236&quot;</span>
+<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:08&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;👋 Exiting kube-burner vchalla&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;kube-burner.go:209&quot;</span>
+</code></pre></div>
+<h2 id="indexing-in-different-places">Indexing in different places<a class="headerlink" href="#indexing-in-different-places" title="Permanent link">&para;</a></h2>
+<p>The pod/vmi and service latency measurements send their metrics by default to all the indexers configured in the <code>metricsEndpoints</code> list, but it's possible to configure a different indexer for the quantile and the timeseries metrics by using the fields <code>quantilesIndexer</code> and <code>timeseriesIndexer</code>.</p>
+<p>For example</p>
+<div class="highlight"><pre><span></span><code><span class="nt">metricsEndpoints</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">indexer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
+<span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local-indexer</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">indexer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">opensearch</span>
+<span class="w">    </span><span class="nt">defaultIndex</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kube-burner</span>
+<span class="w">    </span><span class="nt">esServers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;https://opensearch.domain:9200&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">os-indexer</span>
+<span class="nt">global</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">podLatency</span>
+<span class="w">    </span><span class="nt">timeseriesIndexer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local-indexer</span>
+<span class="w">    </span><span class="nt">quantilesIndexer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">os-indexer</span>
+</code></pre></div>
+<p>With the configuration snippet above, the measurement <code>podLatency</code> would use the local indexer for timeseries metrics and opensearch for the quantile metrics.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <!-- Footer -->
+<footer class="md-footer">
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <!-- Copyright and theme information -->
+      <div class="md-copyright">
+        <div class="md-copyright__highlight">
+          Copyright © 2024 The kube-burner Authors</br></br>
+          <img src="../media/logos/cncf-white.svg" alt="Cloud Native Computing Foundation" /><br /><br />
+          Kube-burner is a <a href="https://www.cncf.io/"><b>Cloud Native Computing Foundation</b></a> Sandbox project.<br /><br />
+          The Linux Foundation® (TLF) has registered trademarks and uses trademarks. For a list of TLF trademarks, see <a href="https://www.linuxfoundation.org/trademark-usage/">Trademark Usage</a>. 
+        </div>
+      </div>
+      <div class="md-social">
+        <a href="https://github.com/kube-burner/" target="_blank" rel="noopener" title="kube-burner organization on Github" class="md-social__link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
+        </a>
+        <a href="https://kubernetes.slack.com/messages/kube-burner" target="_blank" rel="noopener" title="Slack" class="md-social__link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M94.12 315.1c0 25.9-21.16 47.06-47.06 47.06S0 341 0 315.1c0-25.9 21.16-47.06 47.06-47.06h47.06v47.06zm23.72 0c0-25.9 21.16-47.06 47.06-47.06s47.06 21.16 47.06 47.06v117.84c0 25.9-21.16 47.06-47.06 47.06s-47.06-21.16-47.06-47.06V315.1zm47.06-188.98c-25.9 0-47.06-21.16-47.06-47.06S139 32 164.9 32s47.06 21.16 47.06 47.06v47.06H164.9zm0 23.72c25.9 0 47.06 21.16 47.06 47.06s-21.16 47.06-47.06 47.06H47.06C21.16 243.96 0 222.8 0 196.9s21.16-47.06 47.06-47.06H164.9zm188.98 47.06c0-25.9 21.16-47.06 47.06-47.06 25.9 0 47.06 21.16 47.06 47.06s-21.16 47.06-47.06 47.06h-47.06V196.9zm-23.72 0c0 25.9-21.16 47.06-47.06 47.06-25.9 0-47.06-21.16-47.06-47.06V79.06c0-25.9 21.16-47.06 47.06-47.06 25.9 0 47.06 21.16 47.06 47.06V196.9zM283.1 385.88c25.9 0 47.06 21.16 47.06 47.06 0 25.9-21.16 47.06-47.06 47.06-25.9 0-47.06-21.16-47.06-47.06v-47.06h47.06zm0-23.72c-25.9 0-47.06-21.16-47.06-47.06 0-25.9 21.16-47.06 47.06-47.06h117.84c25.9 0 47.06 21.16 47.06 47.06 0 25.9-21.16 47.06-47.06 47.06H283.1z"></path></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "search.suggest", "search.highlight", "search.share", "content.code.copy"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"limit": 3, "provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
+      
+    
+  </body>
+</html>
