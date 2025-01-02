@@ -6,7 +6,7 @@ toolchain go1.23.3
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/cloud-bulldozer/go-commons v1.0.18
+	github.com/cloud-bulldozer/go-commons v1.0.19
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.16
 	github.com/montanaflynn/stats v0.7.1
