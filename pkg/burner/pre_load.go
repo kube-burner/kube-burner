@@ -43,7 +43,17 @@ type NestedPod struct {
 	} `json:"spec"`
 }
 
-type VMorVMI struct {
+type VMI struct {
+	Spec struct {
+		Volumes []struct {
+			ContainerDisk struct {
+				Image string `yaml:"image"`
+			} `yaml:"containerDisk"`
+		} `yaml:"volumes"`
+	} `yaml:"spec"`
+}
+
+type NestedVM struct {
 	Spec struct {
 		Template struct {
 			Spec struct {
@@ -54,11 +64,6 @@ type VMorVMI struct {
 				} `yaml:"volumes"`
 			} `yaml:"spec"`
 		} `yaml:"template"`
-		Volumes []struct {
-			ContainerDisk struct {
-				Image string `yaml:"image"`
-			} `yaml:"containerDisk"`
-		} `yaml:"volumes"`
 	} `yaml:"spec"`
 }
 
@@ -109,15 +114,18 @@ func getJobImages(job Executor) ([]string, error) {
 					imageList = append(imageList, i.Image)
 				}
 			}
-		case VirtualMachineInstance, VirtualMachine, VirtualMachineInstanceReplicaSet:
-			var vmOrVMI VMorVMI
-			yaml.Unmarshal(renderedObj, &vmOrVMI)
-			for _, volume := range vmOrVMI.Spec.Volumes {
+		case VirtualMachineInstance:
+			var vmi VMI
+			yaml.Unmarshal(renderedObj, &vmi)
+			for _, volume := range vmi.Spec.Volumes {
 				if volume.ContainerDisk.Image != "" {
 					imageList = append(imageList, volume.ContainerDisk.Image)
 				}
 			}
-			for _, volume := range vmOrVMI.Spec.Template.Spec.Volumes {
+		case VirtualMachine, VirtualMachineInstanceReplicaSet:
+			var nestedVM NestedVM
+			yaml.Unmarshal(renderedObj, &nestedVM)
+			for _, volume := range nestedVM.Spec.Template.Spec.Volumes {
 				if volume.ContainerDisk.Image != "" {
 					imageList = append(imageList, volume.ContainerDisk.Image)
 				}
