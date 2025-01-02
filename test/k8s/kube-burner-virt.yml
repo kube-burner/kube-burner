@@ -51,6 +51,8 @@ jobs:
     podWait: false
     maxWaitTimeout: 1h   
     cleanup: true
+    preLoadImages: true
+    preLoadPeriod: 2s
     objects:
 
     - objectTemplate: objectTemplates/vm-ephemeral.yml
