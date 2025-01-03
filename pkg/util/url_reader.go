@@ -32,7 +32,7 @@ func GetReader(location string, configEmbedFS *embed.FS, configEmbedFSDir string
 		if err == nil {
 			return f, nil
 		} else {
-			log.Infof("File %s was not found in the embedded filesystemd. Falling back to original path", location)
+			log.Infof("File %s was not found in the embedded filesystem. Falling back to original path", location)
 		}
 	}
 
