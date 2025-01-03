@@ -27,10 +27,13 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/scheme"
 
@@ -38,22 +41,31 @@ import (
 )
 
 type pprof struct {
-	config      types.Measurement
+	baseLatencyMeasurement
+
 	stopChannel chan bool
 }
 
-func init() {
-	measurementMap["pprof"] = &pprof{}
+type pprofLatencyMeasurementFactory struct {
+	baseLatencyMeasurementFactory
 }
 
-func (p *pprof) setConfig(cfg types.Measurement) error {
-	p.config = cfg
-	for _, target := range p.config.PProfTargets {
+func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+	for _, target := range measurement.PProfTargets {
 		if target.BearerToken != "" && (target.CertFile != "" || target.Cert != "") {
-			return fmt.Errorf("bearerToken and cert auth methods cannot be specified together in the same target")
+			return nil, fmt.Errorf("bearerToken and cert auth methods cannot be specified together in the same target")
 		}
 	}
-	return nil
+
+	return pprofLatencyMeasurementFactory{
+		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+	}, nil
+}
+
+func (plmf pprofLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+	return &pprof{
+		baseLatencyMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
+	}
 }
 
 func (p *pprof) start(measurementWg *sync.WaitGroup) error {
@@ -85,9 +97,9 @@ func (p *pprof) start(measurementWg *sync.WaitGroup) error {
 	return nil
 }
 
-func getPods(target types.PProftarget) []corev1.Pod {
+func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
 	labelSelector := labels.Set(target.LabelSelector).String()
-	podList, err := factory.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+	podList, err := p.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		log.Errorf("Error found listing pods labeled with %s: %s", labelSelector, err)
 	}
@@ -99,7 +111,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 	var command []string
 	for pos, target := range p.config.PProfTargets {
 		log.Infof("Collecting %s pprof", target.Name)
-		podList := getPods(target)
+		podList := p.getPods(target)
 		for _, pod := range podList {
 			var cert, privKey io.Reader
 			if target.CertFile != "" && target.KeyFile != "" && first {
@@ -136,7 +148,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				}
 				defer f.Close()
 				if cert != nil && privKey != nil && first {
-					if err = copyCertsToPod(pod, cert, privKey); err != nil {
+					if err = p.copyCertsToPod(pod, cert, privKey); err != nil {
 						log.Error(err)
 						return
 					}
@@ -148,7 +160,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				} else {
 					command = []string{"curl", "-sSLk", target.URL}
 				}
-				req := factory.clientSet.CoreV1().
+				req := p.clientSet.CoreV1().
 					RESTClient().
 					Post().
 					Resource("pods").
@@ -164,7 +176,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					Stdout:    true,
 				}, scheme.ParameterCodec)
 				log.Debugf("Executing %s in pod %s", command, pod.Name)
-				exec, err := remotecommand.NewSPDYExecutor(factory.restConfig, "POST", req.URL())
+				exec, err := remotecommand.NewSPDYExecutor(p.restConfig, "POST", req.URL())
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
 				}
@@ -205,11 +217,11 @@ func readCerts(cert, privKey string) (string, string, error) {
 	var certData, privKeyData []byte
 	certFd, err := os.Open(cert)
 	if err != nil {
-		return "", "", fmt.Errorf("Cannot read %s, skipping: %v", cert, err)
+		return "", "", fmt.Errorf("cannot read %s, skipping: %v", cert, err)
 	}
 	privKeyFd, err = os.Open(privKey)
 	if err != nil {
-		return "", "", fmt.Errorf("Cannot read %s, skipping: %v", cert, err)
+		return "", "", fmt.Errorf("cannot read %s, skipping: %v", cert, err)
 	}
 	certData, err = io.ReadAll(certFd)
 	if err != nil {
@@ -222,7 +234,7 @@ func readCerts(cert, privKey string) (string, string, error) {
 	return string(certData), string(privKeyData), nil
 }
 
-func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
+func (p *pprof) copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 	var stderr bytes.Buffer
 	log.Infof("Copying certificate and private key into %s %s", pod.Name, pod.Spec.Containers[0].Name)
 	fMap := map[string]io.Reader{
@@ -230,7 +242,7 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 		"/tmp/pprof.key": privKey,
 	}
 	for dest, f := range fMap {
-		req := factory.clientSet.CoreV1().
+		req := p.clientSet.CoreV1().
 			RESTClient().
 			Post().
 			Resource("pods").
@@ -244,9 +256,9 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 			Stderr:    true,
 			Stdout:    false,
 		}, scheme.ParameterCodec)
-		exec, err := remotecommand.NewSPDYExecutor(factory.restConfig, "POST", req.URL())
+		exec, err := remotecommand.NewSPDYExecutor(p.restConfig, "POST", req.URL())
 		if err != nil {
-			return fmt.Errorf("Failed to establish SPDYExecutor on %s: %s", pod.Name, err)
+			return fmt.Errorf("failed to establish SPDYExecutor on %s: %s", pod.Name, err)
 		}
 		err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 			Stdin:  f,
@@ -254,7 +266,7 @@ func copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 			Stderr: &stderr,
 		})
 		if err != nil || stderr.String() != "" {
-			return fmt.Errorf("Failed to copy file to %s: %s", pod.Name, stderr.Bytes())
+			return fmt.Errorf("failed to copy file to %s: %s", pod.Name, stderr.Bytes())
 		}
 	}
 	log.Infof("Certificate and private key copied into %s %s", pod.Name, pod.Spec.Containers[0].Name)

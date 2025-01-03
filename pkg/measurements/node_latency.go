@@ -16,17 +16,17 @@ package measurements
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -34,6 +34,15 @@ import (
 const (
 	nodeLatencyMeasurement          = "nodeLatencyMeasurement"
 	nodeLatencyQuantilesMeasurement = "nodeLatencyQuantilesMeasurement"
+)
+
+var (
+	supportedNodeConditions = map[string]struct{}{
+		string(corev1.NodeMemoryPressure): {},
+		string(corev1.NodeDiskPressure):   {},
+		string(corev1.NodePIDPressure):    {},
+		string(corev1.NodeReady):          {},
+	}
 )
 
 type NodeMetric struct {
@@ -55,16 +64,30 @@ type NodeMetric struct {
 }
 
 type nodeLatency struct {
-	config           types.Measurement
+	baseLatencyMeasurement
+
 	watcher          *metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
 }
 
-func init() {
-	measurementMap["nodeLatency"] = &nodeLatency{
-		metrics: sync.Map{},
+type nodeLatencyMeasurementFactory struct {
+	baseLatencyMeasurementFactory
+}
+
+func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+	if err := verifyMeasurementConfig(measurement, supportedNodeConditions); err != nil {
+		return nil, err
+	}
+	return nodeLatencyMeasurementFactory{
+		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+	}, nil
+}
+
+func (nlmf nodeLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+	return &nodeLatency{
+		baseLatencyMeasurement: nlmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
@@ -75,10 +98,10 @@ func (n *nodeLatency) handleCreateNode(obj interface{}) {
 		Timestamp:  node.CreationTimestamp.Time.UTC(),
 		Name:       node.Name,
 		MetricName: nodeLatencyMeasurement,
-		UUID:       globalCfg.UUID,
-		JobName:    factory.jobConfig.Name,
+		UUID:       n.uuid,
+		JobName:    n.jobConfig.Name,
 		Labels:     labels,
-		Metadata:   factory.metadata,
+		Metadata:   n.metadata,
 	})
 }
 
@@ -111,28 +134,6 @@ func (n *nodeLatency) handleUpdateNode(obj interface{}) {
 	}
 }
 
-func (n *nodeLatency) setConfig(cfg types.Measurement) error {
-	n.config = cfg
-	var metricFound bool
-	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
-	for _, th := range n.config.LatencyThresholds {
-		if th.ConditionType == string(corev1.NodeMemoryPressure) || th.ConditionType == string(corev1.NodeDiskPressure) || th.ConditionType == string(corev1.NodePIDPressure) || th.ConditionType == string(corev1.NodeReady) {
-			for _, lm := range latencyMetrics {
-				if th.Metric == lm {
-					metricFound = true
-					break
-				}
-			}
-			if !metricFound {
-				return fmt.Errorf("unsupported metric %s in nodeLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
-			}
-		} else {
-			return fmt.Errorf("unsupported node condition type in nodeLatency measurement: %s", th.ConditionType)
-		}
-	}
-	return nil
-}
-
 func (n *nodeLatency) start(measurementWg *sync.WaitGroup) error {
 	n.latencyQuantiles, n.normLatencies = nil, nil
 	defer measurementWg.Done()
@@ -140,9 +141,9 @@ func (n *nodeLatency) start(measurementWg *sync.WaitGroup) error {
 	wg.Add(1)
 	n.collect(&wg)
 	wg.Wait()
-	log.Infof("Creating Node latency watcher for %s", factory.jobConfig.Name)
+	log.Infof("Creating Node latency watcher for %s", n.jobConfig.Name)
 	n.watcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		n.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"nodeWatcher",
 		"nodes",
 		corev1.NamespaceAll,
@@ -165,7 +166,7 @@ func (n *nodeLatency) start(measurementWg *sync.WaitGroup) error {
 func (n *nodeLatency) collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var nodes []corev1.Node
-	nodeList, err := factory.clientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodeList, err := n.clientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Errorf("error listing nodes: %v", err)
 	}
@@ -190,12 +191,12 @@ func (n *nodeLatency) collect(measurementWg *sync.WaitGroup) {
 			Timestamp:          node.CreationTimestamp.Time.UTC(),
 			Name:               node.Name,
 			MetricName:         nodeLatencyMeasurement,
-			UUID:               globalCfg.UUID,
+			UUID:               n.uuid,
 			NodeMemoryPressure: nodeMemoryPressure,
 			NodeDiskPressure:   nodeDiskPressure,
 			NodePIDPressure:    nodePIDPressure,
 			NodeReady:          nodeReady,
-			JobName:            factory.jobConfig.Name,
+			JobName:            n.jobConfig.Name,
 			Labels:             node.Labels,
 		})
 	}
@@ -213,10 +214,10 @@ func (n *nodeLatency) stop() error {
 	if len(n.config.LatencyThresholds) > 0 {
 		err = metrics.CheckThreshold(n.config.LatencyThresholds, n.latencyQuantiles)
 	}
-	if factory.jobConfig.Name != "workers-scale" {
+	if n.jobConfig.Name != "workers-scale" {
 		for _, q := range n.latencyQuantiles {
 			nq := q.(metrics.LatencyQuantiles)
-			log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, nq.QuantileName, nq.P50, nq.P99, nq.Max, nq.Avg)
+			log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", n.jobConfig.Name, nq.QuantileName, nq.P50, nq.P99, nq.Max, nq.Avg)
 		}
 	}
 	return err
@@ -271,5 +272,5 @@ func (n *nodeLatency) calculateQuantiles() {
 			string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
 		}
 	}
-	n.latencyQuantiles = calculateQuantiles(n.normLatencies, getLatency, nodeLatencyQuantilesMeasurement)
+	n.latencyQuantiles = calculateQuantiles(n.uuid, n.jobConfig.Name, n.metadata, n.normLatencies, getLatency, nodeLatencyQuantilesMeasurement)
 }
