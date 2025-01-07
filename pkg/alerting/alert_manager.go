@@ -136,16 +136,12 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, alert.Description, alert.Severity, job.ChurnStart, job.ChurnEnd)
+		alertData, err := parseMatrix(v, a.uuid, alert.Description, a.metadata, alert.Severity, job.ChurnStart, job.ChurnEnd)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)
 		}
-		for _, alertSet := range alertData {
-			alertSet.UUID = a.uuid
-			alertSet.Metadata = a.metadata
-			alertList = append(alertList, alertSet)
-		}
+		alertList = append(alertList, alertData...)
 	}
 	if len(alertList) > 0 && a.indexer != nil {
 		a.index(alertList)
@@ -162,11 +158,11 @@ func (a *AlertManager) validateTemplates() error {
 	return nil
 }
 
-func parseMatrix(value model.Value, description string, severity severityLevel, churnStart, churnEnd *time.Time) ([]alert, error) {
+func parseMatrix(value model.Value, uuid, description string, metadata interface{}, severity severityLevel, churnStart, churnEnd *time.Time) ([]interface{}, error) {
 	var renderedDesc bytes.Buffer
 	var templateData descriptionTemplate
 	// The same query can fire multiple alerts, so we have to return an array of them
-	var alertSet []alert
+	var alertSet []interface{}
 	errs := []error{}
 	t, _ := template.New("").Parse(strings.Join(append(baseTemplate, description), ""))
 	data, ok := value.(model.Matrix)
@@ -189,6 +185,8 @@ func parseMatrix(value model.Value, description string, severity severityLevel, 
 			}
 			msg := fmt.Sprintf("alert at %v: '%s'", val.Timestamp.Time().UTC().Format(time.RFC3339), renderedDesc.String())
 			alert := alert{
+				UUID:        uuid,
+				Metadata:    metadata,
 				Timestamp:   val.Timestamp.Time().UTC(),
 				Severity:    severity,
 				Description: renderedDesc.String(),
