@@ -36,7 +36,6 @@ import (
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
-		RUNID:            uid.NewString(),
 		GC:               false,
 		GCMetrics:        false,
 		GCTimeout:        1 * time.Hour,
@@ -181,6 +180,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	}
 	configSpec.GlobalConfig.Timeout = timeout
 	configSpec.GlobalConfig.UUID = uuid
+	configSpec.GlobalConfig.RUNID = uid.NewString()
 	return configSpec, nil
 }
 

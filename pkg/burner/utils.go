@@ -92,7 +92,7 @@ func (ex *Executor) Verify() bool {
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
 		listOptions := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.Name, objectIndex),
+			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-runid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.runid, ex.Name, objectIndex),
 			Limit:         objectLimit,
 		}
 		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
