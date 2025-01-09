@@ -135,11 +135,11 @@ func getInputData(userDataFileReader io.Reader) (map[string]interface{}, error) 
 }
 
 func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec, error) {
-	return ParseWithUserdata(uuid, timeout, configFileReader, nil)
+	return ParseWithUserdata(uuid, timeout, configFileReader, nil, false)
 }
 
 // Parse parses a configuration file
-func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader) (Spec, error) {
+func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool) (Spec, error) {
 	cfg, err := io.ReadAll(configFileReader)
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
@@ -148,7 +148,11 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err != nil {
 		return configSpec, err
 	}
-	renderedCfg, err := util.RenderTemplate(cfg, inputData, util.MissingKeyError)
+	templateOptions := util.MissingKeyError
+	if allowMissingKeys {
+		templateOptions = util.MissingKeyZero
+	}
+	renderedCfg, err := util.RenderTemplate(cfg, inputData, templateOptions)
 	if err != nil {
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}

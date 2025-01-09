@@ -79,6 +79,7 @@ func initCmd() *cobra.Command {
 	var skipTLSVerify bool
 	var timeout time.Duration
 	var userDataFile string
+	var allowMissingKeys bool
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -103,7 +104,7 @@ func initCmd() *cobra.Command {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
 			}
-			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader)
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys)
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
@@ -133,6 +134,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
+	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagRequired("config")
 	return cmd
