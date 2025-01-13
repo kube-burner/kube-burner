@@ -18,19 +18,84 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 )
+
+var (
+	supportedLatencyMetricsMap = map[string]struct{}{
+		"P99": {},
+		"P95": {},
+		"P50": {},
+		"Avg": {},
+		"Max": {},
+	}
+)
+
+type baseLatencyMeasurementFactory struct {
+	config   types.Measurement
+	uuid     string
+	runid    string
+	metadata map[string]interface{}
+}
+
+type baseLatencyMeasurement struct {
+	config     types.Measurement
+	uuid       string
+	runid      string
+	jobConfig  *config.Job
+	clientSet  kubernetes.Interface
+	restConfig *rest.Config
+	metadata   map[string]interface{}
+}
+
+func newBaseLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) baseLatencyMeasurementFactory {
+	return baseLatencyMeasurementFactory{
+		config:   measurement,
+		uuid:     configSpec.GlobalConfig.UUID,
+		runid:    configSpec.GlobalConfig.RUNID,
+		metadata: metadata,
+	}
+}
+
+func (blmf baseLatencyMeasurementFactory) newBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) baseLatencyMeasurement {
+	return baseLatencyMeasurement{
+		config:     blmf.config,
+		uuid:       blmf.uuid,
+		runid:      blmf.runid,
+		jobConfig:  jobConfig,
+		clientSet:  clientSet,
+		restConfig: restConfig,
+		metadata:   blmf.metadata,
+	}
+}
+
+func verifyMeasurementConfig(config types.Measurement, supportedConditions map[string]struct{}) error {
+	for _, th := range config.LatencyThresholds {
+		if _, supported := supportedConditions[th.ConditionType]; !supported {
+			return fmt.Errorf("unsupported condition type in measurement: %s", th.ConditionType)
+		}
+		if _, supportedLatency := supportedLatencyMetricsMap[th.Metric]; !supportedLatency {
+			return fmt.Errorf("unsupported metric %s in measurement, supported are: %s", th.Metric, strings.Join(maps.Keys(supportedLatencyMetricsMap), ", "))
+		}
+	}
+	return nil
+}
 
 func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
 	indexDocuments := func(indexer indexers.Indexer, metricName string, data []interface{}) {
@@ -65,7 +130,7 @@ func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 
 // Common function to calculate quantiles for both node and pod latencies
 // Receives a list of normalized latencies and a function to get the latencies for each condition
-func calculateQuantiles(normLatencies []interface{}, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
+func calculateQuantiles(uuid, jobName string, metadata map[string]interface{}, normLatencies []interface{}, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
 	quantileMap := map[string][]float64{}
 	for _, normLatency := range normLatencies {
 		for condition, latency := range getLatency(normLatency) {
@@ -74,10 +139,10 @@ func calculateQuantiles(normLatencies []interface{}, getLatency func(interface{}
 	}
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = globalCfg.UUID
-		latencySummary.Metadata = factory.metadata
+		latencySummary.UUID = uuid
+		latencySummary.Metadata = metadata
 		latencySummary.MetricName = metricName
-		latencySummary.JobName = factory.jobConfig.Name
+		latencySummary.JobName = jobName
 		return latencySummary
 	}
 
@@ -100,7 +165,7 @@ func getIntFromLabels(labels map[string]string, key string) int {
 	return 0
 }
 
-func deployPodInNamespace(namespace, podName, image string, command []string) error {
+func deployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, image string, command []string) error {
 	var podObj = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -127,10 +192,10 @@ func deployPodInNamespace(namespace, podName, image string, command []string) er
 	}
 
 	var err error
-	if err = kutil.CreateNamespace(factory.clientSet, namespace, nil, nil); err != nil {
+	if err = kutil.CreateNamespace(clientSet, namespace, nil, nil); err != nil {
 		return err
 	}
-	if _, err = factory.clientSet.CoreV1().Pods(namespace).Create(context.TODO(), podObj, metav1.CreateOptions{}); err != nil {
+	if _, err = clientSet.CoreV1().Pods(namespace).Create(context.TODO(), podObj, metav1.CreateOptions{}); err != nil {
 		if errors.IsAlreadyExists(err) {
 			log.Warn(err)
 		} else {
@@ -138,7 +203,7 @@ func deployPodInNamespace(namespace, podName, image string, command []string) er
 		}
 	}
 	err = wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-		pod, err := factory.clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		pod, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return true, err
 		}

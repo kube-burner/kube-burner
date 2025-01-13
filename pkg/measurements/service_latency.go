@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
@@ -29,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	lcorev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -40,7 +42,8 @@ const (
 )
 
 type serviceLatency struct {
-	config           types.Measurement
+	baseLatencyMeasurement
+
 	svcWatcher       *metrics.Watcher
 	epWatcher        *metrics.Watcher
 	epLister         lcorev1.EndpointsLister
@@ -63,9 +66,23 @@ type svcMetric struct {
 	Metadata          interface{}        `json:"metadata,omitempty"`
 }
 
-func init() {
-	measurementMap["serviceLatency"] = &serviceLatency{
-		metrics: sync.Map{},
+type serviceLatencyMeasurementFactory struct {
+	baseLatencyMeasurementFactory
+}
+
+func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+	if measurement.ServiceTimeout == 0 {
+		return nil, fmt.Errorf("svcTimeout cannot be 0")
+	}
+
+	return serviceLatencyMeasurementFactory{
+		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+	}, nil
+}
+
+func (slmf serviceLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+	return &serviceLatency{
+		baseLatencyMeasurement: slmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
@@ -95,7 +112,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 		}
 		endpointsReadyTs := time.Now().UTC()
 		log.Debugf("Endpoints %v/%v ready", svc.Namespace, svc.Name)
-		svcLatencyChecker, err := util.NewSvcLatencyChecker(factory.clientSet, *factory.restConfig)
+		svcLatencyChecker, err := util.NewSvcLatencyChecker(s.clientSet, *s.restConfig)
 		if err != nil {
 			log.Error(err)
 		}
@@ -139,20 +156,12 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			MetricName:        svcLatencyMeasurement,
 			ServiceType:       svc.Spec.Type,
 			ReadyLatency:      svcLatency,
-			UUID:              globalCfg.UUID,
+			UUID:              s.uuid,
 			IPAssignedLatency: ipAssignedLatency,
-			JobName:           factory.jobConfig.Name,
-			Metadata:          factory.metadata,
+			JobName:           s.jobConfig.Name,
+			Metadata:          s.metadata,
 		})
 	}(svc)
-}
-
-func (s *serviceLatency) setConfig(cfg types.Measurement) error {
-	s.config = cfg
-	if s.config.ServiceTimeout == 0 {
-		return fmt.Errorf("svcTimeout cannot be 0")
-	}
-	return nil
 }
 
 // start service latency measurement
@@ -160,18 +169,18 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 	// Reset latency slices, required in multi-job benchmarks
 	s.latencyQuantiles, s.normLatencies = nil, nil
 	defer measurementWg.Done()
-	err := deployPodInNamespace(types.SvcLatencyNs, types.SvcLatencyCheckerName, "quay.io/cloud-bulldozer/fedora-nc:latest", []string{"sleep", "inf"})
+	err := deployPodInNamespace(s.clientSet, types.SvcLatencyNs, types.SvcLatencyCheckerName, "quay.io/cloud-bulldozer/fedora-nc:latest", []string{"sleep", "inf"})
 	if err != nil {
 		return err
 	}
-	log.Infof("Creating service latency watcher for %s", factory.jobConfig.Name)
+	log.Infof("Creating service latency watcher for %s", s.jobConfig.Name)
 	s.svcWatcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		s.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"svcWatcher",
 		"services",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", s.runid)
 		},
 		cache.Indexers{},
 	)
@@ -179,7 +188,7 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 		AddFunc: s.handleCreateSvc,
 	})
 	s.epWatcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		s.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"epWatcher",
 		"endpoints",
 		corev1.NamespaceAll,
@@ -206,12 +215,12 @@ func (s *serviceLatency) stop() error {
 		s.svcWatcher.StopWatcher()
 		s.epWatcher.StopWatcher()
 	}()
-	kutil.CleanupNamespaces(ctx, factory.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
+	kutil.CleanupNamespaces(ctx, s.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
 	for _, q := range s.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
-		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", factory.jobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
+		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", s.jobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
 	}
 	return nil
 }
@@ -232,11 +241,11 @@ func (s *serviceLatency) normalizeMetrics() {
 	})
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = globalCfg.UUID
+		latencySummary.UUID = s.uuid
 		latencySummary.Timestamp = time.Now().UTC()
-		latencySummary.Metadata = factory.metadata
+		latencySummary.Metadata = s.metadata
 		latencySummary.MetricName = svcLatencyQuantilesMeasurement
-		latencySummary.JobName = factory.jobConfig.Name
+		latencySummary.JobName = s.jobConfig.Name
 		return latencySummary
 	}
 	if sLen > 0 {

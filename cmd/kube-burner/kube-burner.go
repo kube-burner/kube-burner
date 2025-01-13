@@ -251,8 +251,7 @@ func measureCmd() *cobra.Command {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
 			log.Infof("%v", namespaceLabels)
-			measurements.NewMeasurementFactory(configSpec, metadata)
-			measurements.SetJobConfig(
+			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata).NewMeasurements(
 				&config.Job{
 					Name:                 jobName,
 					Namespace:            rawNamespaces,
@@ -261,11 +260,11 @@ func measureCmd() *cobra.Command {
 				},
 				config.NewKubeClientProvider(kubeConfig, kubeContext),
 			)
-			measurements.Collect()
-			if err = measurements.Stop(); err != nil {
+			measurementsInstance.Collect()
+			if err = measurementsInstance.Stop(); err != nil {
 				log.Error(err.Error())
 			}
-			measurements.Index(jobName, indexerList)
+			measurementsInstance.Index(jobName, indexerList)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
