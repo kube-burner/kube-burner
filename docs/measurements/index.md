@@ -354,7 +354,7 @@ One document, such as the following, is indexed per each pvc created by the work
 
 ---
 
-Node latency quantile sample:
+PVC latency quantile sample:
 
 ```json
 [
@@ -368,7 +368,7 @@ Node latency quantile sample:
     "max": 4444,
     "avg": 4444,
     "timestamp": "2025-01-10T02:51:04.611059008Z",
-    "metricName": "podLatencyQuantilesMeasurement",
+    "metricName": "pvcLatencyQuantilesMeasurement",
     "jobName": "pvc-move",
   },
   {
@@ -381,7 +381,7 @@ Node latency quantile sample:
     "max": 0,
     "avg": 0,
     "timestamp": "2025-01-10T02:51:04.611061474Z",
-    "metricName": "podLatencyQuantilesMeasurement",
+    "metricName": "pvcLatencyQuantilesMeasurement",
     "jobName": "pvc-move",
   },
   {
@@ -394,7 +394,7 @@ Node latency quantile sample:
     "max": 37,
     "avg": 37,
     "timestamp": "2025-01-10T02:51:04.611062824Z",
-    "metricName": "podLatencyQuantilesMeasurement",
+    "metricName": "pvcLatencyQuantilesMeasurement",
     "jobName": "pvc-move",
   }
 ]

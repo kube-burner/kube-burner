@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -34,6 +34,14 @@ import (
 const (
 	pvcLatencyMeasurement          = "pvcLatencyMeasurement"
 	pvcLatencyQuantilesMeasurement = "pvcLatencyQuantilesMeasurement"
+)
+
+var (
+	supportedPvcConditions = map[string]struct{}{
+		string(corev1.ClaimPending): {},
+		string(corev1.ClaimBound):   {},
+		string(corev1.ClaimLost):    {},
+	}
 )
 
 type pvcMetric struct {
@@ -57,16 +65,29 @@ type pvcMetric struct {
 }
 
 type pvcLatency struct {
-	config           types.Measurement
+	baseLatencyMeasurement
 	watcher          *metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
 }
 
-func init() {
-	measurementMap["pvcLatency"] = &pvcLatency{
-		metrics: sync.Map{},
+type pvcLatencyMeasurementFactory struct {
+	baseLatencyMeasurementFactory
+}
+
+func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+	if err := verifyMeasurementConfig(measurement, supportedPvcConditions); err != nil {
+		return nil, err
+	}
+	return pvcLatencyMeasurementFactory{
+		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+	}, nil
+}
+
+func (plmf pvcLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+	return &pvcLatency{
+		baseLatencyMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
@@ -81,9 +102,9 @@ func (p *pvcLatency) handleCreatePVC(obj interface{}) {
 		StorageClass: getStorageClassName(*pvc),
 		Size:         pvc.Spec.Resources.Requests.Storage().String(),
 		MetricName:   pvcLatencyMeasurement,
-		UUID:         globalCfg.UUID,
-		JobName:      factory.jobConfig.Name,
-		Metadata:     factory.metadata,
+		UUID:         p.uuid,
+		JobName:      p.jobConfig.Name,
+		Metadata:     p.metadata,
 		JobIteration: getIntFromLabels(pvcLabels, config.KubeBurnerLabelJobIteration),
 		Replica:      getIntFromLabels(pvcLabels, config.KubeBurnerLabelReplica),
 	})
@@ -119,45 +140,22 @@ func (p *pvcLatency) handleUpdatePVC(obj interface{}) {
 	}
 }
 
-// sets cofiguration for pvc latency
-func (p *pvcLatency) setConfig(cfg types.Measurement) error {
-	p.config = cfg
-	var metricFound bool
-	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
-	for _, th := range p.config.LatencyThresholds {
-		if th.ConditionType == string(corev1.ClaimPending) || th.ConditionType == string(corev1.ClaimBound) || th.ConditionType == string(corev1.ClaimLost) {
-			for _, lm := range latencyMetrics {
-				if th.Metric == lm {
-					metricFound = true
-					break
-				}
-			}
-			if !metricFound {
-				return fmt.Errorf("unsupported metric %s in pvcLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
-			}
-		} else {
-			return fmt.Errorf("unsupported pod condition type in pvcLatency measurement: %s", th.ConditionType)
-		}
-	}
-	return nil
-}
-
 // start pvcLatency measurement
 func (p *pvcLatency) start(measurementWg *sync.WaitGroup) error {
-	if factory.jobConfig.JobType == config.ReadJob || factory.jobConfig.JobType == config.PatchJob || factory.jobConfig.JobType == config.DeletionJob {
-		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", factory.jobConfig.JobType)
+	if p.jobConfig.JobType == config.ReadJob || p.jobConfig.JobType == config.PatchJob || p.jobConfig.JobType == config.DeletionJob {
+		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.jobConfig.JobType)
 	}
 	p.latencyQuantiles, p.normLatencies = nil, nil
 	defer measurementWg.Done()
 	p.metrics = sync.Map{}
-	log.Infof("Creating PVC latency watcher for %s", factory.jobConfig.Name)
+	log.Infof("Creating PVC latency watcher for %s", p.jobConfig.Name)
 	p.watcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		p.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"pvcWatcher",
 		"persistentvolumeclaims",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", globalCfg.RUNID)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", p.runid)
 		},
 		nil,
 	)
@@ -206,7 +204,7 @@ func (p *pvcLatency) stop() error {
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", factory.jobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %v 99th: %v max: %v avg: %v", p.jobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
 		log.Infof("PVC latencies error rate was: %.2f", errorRate)
@@ -282,5 +280,5 @@ func (p *pvcLatency) calcQuantiles() {
 			string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
 		}
 	}
-	p.latencyQuantiles = calculateQuantiles(p.normLatencies, getLatency, podLatencyQuantilesMeasurement)
+	p.latencyQuantiles = calculateQuantiles(p.uuid, p.jobConfig.Name, p.metadata, p.normLatencies, getLatency, pvcLatencyQuantilesMeasurement)
 }

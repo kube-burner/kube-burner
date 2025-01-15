@@ -6,6 +6,7 @@ metricsEndpoints:
 global:
   measurements:
     - name: podLatency
+    - name: pvcLatency
 
 jobs:
   - name: pvc-move
