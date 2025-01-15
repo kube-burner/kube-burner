@@ -84,7 +84,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	defer cancel()
 	go func() {
 		var innerRC int
-		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
+		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata)
 		jobList = newExecutorList(configSpec, kubeClientProvider)
 		handlePreloadImages(jobList, kubeClientProvider)
 		// Iterate job list
@@ -94,9 +94,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				JobConfig: job.Job,
 			})
 			var waitListNamespaces []string
-			measurements.SetJobConfig(&job.Job, kubeClientProvider)
+			measurementsInstance := measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
-			measurements.Start()
+			measurementsInstance.Start()
 			if job.JobType == config.CreationJob {
 				if job.Cleanup {
 					// No timeout for initial job cleanup
@@ -159,7 +159,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
 			// We stop and index measurements per job
-			if err = measurements.Stop(); err != nil {
+			if err = measurementsInstance.Stop(); err != nil {
 				errs = append(errs, err)
 				log.Error(err.Error())
 				innerRC = rcMeasurement
@@ -168,7 +168,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				msWg.Add(1)
 				go func(jobName string) {
 					defer msWg.Done()
-					measurements.Index(jobName, metricsScraper.IndexerList)
+					measurementsInstance.Index(jobName, metricsScraper.IndexerList)
 				}(job.Name)
 			}
 		}
