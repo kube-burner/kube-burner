@@ -57,3 +57,11 @@ Either save the kubeconfig file under `~/.kube/config` or set the environment va
 #### Run the tests
 
 In order to instruct the tests to use the existing cluster set `USE_EXISTING_CLUSTER=yes` when calling `make`.
+
+### Execute a subset of the tests
+
+The list of executed tests may be filtered by setting the environment variable `TEST_FILTER`:
+
+```bash
+TEST_FILTER="datavolume" make test-k8s
+```
