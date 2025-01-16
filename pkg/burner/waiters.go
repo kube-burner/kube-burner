@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/kube-burner/kube-burner/pkg/burner/types"
+	"github.com/kube-burner/kube-burner/pkg/config"
 )
 
 func (ex *Executor) waitForObjects(ns string) {
@@ -42,7 +43,7 @@ func (ex *Executor) waitForObjects(ns string) {
 		if obj.namespace != "" {
 			ns = obj.namespace
 		}
-		if obj.WaitOptions.ForCondition != "" {
+		if len(obj.WaitOptions.CustomStatusPaths) > 0 {
 			ex.verifyCondition(ns, obj)
 		} else {
 			kind := obj.kind
@@ -198,14 +199,22 @@ func (ex *Executor) waitForBuild(ns string, obj object) error {
 }
 
 func (ex *Executor) waitForJob(ns string, obj object) error {
-	if obj.WaitOptions.ForCondition == "" {
-		obj.WaitOptions.ForCondition = "Complete"
+	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
+		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
+			{
+				Key:   ".conditions[].type",
+				Value: "Complete",
+			},
+			{
+				Key:   ".conditions[].status",
+				Value: "True",
+			},
+		}
 	}
 	return ex.verifyCondition(ns, obj)
 }
 
 func (ex *Executor) verifyCondition(ns string, obj object) error {
-	var uObj types.UnstructuredContent
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
 		ex.limiter.Wait(context.TODO())
@@ -228,17 +237,19 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 		}
 	VERIFY:
 		for _, item := range objs.Items {
-			if obj.WaitOptions.CustomStatusPath != "" {
+			isVerified := true
+			for _, statusPath := range obj.WaitOptions.CustomStatusPaths {
 				status, found, err := unstructured.NestedMap(item.Object, "status")
 				if err != nil || !found {
 					log.Errorf("Error extracting or finding status in object %s/%s: %v", item.GetKind(), item.GetName(), err)
 					return false, err
 				}
+				isStatusValid := false
 				if len(status) != 0 {
 					// Compile and execute the jq query
-					query, err := gojq.Parse(obj.WaitOptions.CustomStatusPath)
+					query, err := gojq.Parse(statusPath.Key)
 					if err != nil {
-						log.Errorf("Error parsing jq path: %s", obj.WaitOptions.CustomStatusPath)
+						log.Errorf("Error parsing jq path: %s", statusPath.Key)
 						return false, err
 					}
 					iter := query.Run(status)
@@ -251,23 +262,16 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 							log.Errorf("Error evaluating jq path: %s", err)
 							return false, err
 						}
-						if v == obj.WaitOptions.ForCondition {
-							continue VERIFY
+						if v == statusPath.Value {
+							isStatusValid = true
+							break
 						}
 					}
 				}
-			} else {
-				jsonBuild, err := item.MarshalJSON()
-				if err != nil {
-					log.Errorf("Error decoding object: %s", err)
-					return false, err
-				}
-				_ = json.Unmarshal(jsonBuild, &uObj)
-				for _, c := range uObj.Status.Conditions {
-					if c.Status == "True" && c.Type == obj.WaitOptions.ForCondition {
-						continue VERIFY
-					}
-				}
+				isVerified = isVerified && isStatusValid
+			}
+			if isVerified {
+				continue VERIFY
 			}
 			if obj.namespaced {
 				log.Debugf("Waiting for %s in ns %s to be ready", obj.gvr.Resource, ns)
@@ -282,8 +286,17 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 }
 
 func (ex *Executor) waitForVMorVMI(ns string, obj object) error {
-	if obj.WaitOptions.ForCondition == "" {
-		obj.WaitOptions.ForCondition = "Ready"
+	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
+		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
+			{
+				Key:   ".conditions[].type",
+				Value: "Ready",
+			},
+			{
+				Key:   ".conditions[].status",
+				Value: "True",
+			},
+		}
 	}
 	return ex.verifyCondition(ns, obj)
 }

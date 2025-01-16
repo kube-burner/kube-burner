@@ -127,8 +127,7 @@ If you want to override the default waiter behaviors, you can specify wait optio
 |--------------|---------------------------------------------------------|---------|---------|
 | `kind` | Object kind to consider for wait | String | "" |
 | `labelSelector` | Objects with these labels will be considered for wait | Object | {} |
-| `forCondition` | Wait for the object condition with this name to be true | String  | "" |
-| `customStatusPath` | A jq path to the status field of the object | String  | "" |
+| `customStatusPaths` | list of jq path/values to verify readiness of the object | Object  | [] |
 
 For example, the snippet below can be used to make kube-burner wait for all containers from the pod defined at `pod.yml` to be ready.
 
@@ -139,10 +138,9 @@ objects:
   waitOptions:
     kind: Pod
     labelSelector: {kube-burner-label : abcd}
-    forCondition: Ready
 ```
 
-Additionally, you can use `customStatusPath` to specify a custom path to check the condition of the object, for example, to wait for a deployment to be available.
+Additionally, you can use `customStatusPaths` to specify custom paths to be checked for the readiness of the object. For example, to wait for a deployment to be available
 
 ```yaml
 objects:
@@ -150,13 +148,16 @@ objects:
     objectTemplate: deployment.yml
     replicas: 1
     waitOptions:
-      forCondition: "Available"
-      customStatusPath: ".conditions[].type"
+      customStatusPaths:
+        - key: ".conditions[].type"
+          value: "Available"
+        - key: ".conditions[].status"
+          value: "True"
 ```
-This allows kube-burner to check the status of the specified path and wait for the condition you specify in `forCondition`.
+This allows kube-burner to check the status at all the specified key/value pairs and verify readiness of the object. If any of them do not match then it is indicated as a failure.
 
 !!! note
-    `waitOptions.kind`, `waitOptions.customStatusPath` and `waitOptions.labelSelector` are fully optional. `waitOptions.kind` is used when an application has child objects to be waited & `waitOptions.labelSelector` is used when we want to wait on objects with specific labels.
+    `waitOptions.kind`, `waitOptions.customStatusPaths` and `waitOptions.labelSelector` are fully optional. `waitOptions.kind` is used when an application has child objects to be waited & `waitOptions.labelSelector` is used when we want to wait on objects with specific labels.
 
 ### Default labels
 
