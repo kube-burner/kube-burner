@@ -1,0 +1,21 @@
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: {{ .cloneDataVolumeName }}
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    pvc:
+      namespace: {{ .sourceNamespace }}
+      name: {{ .sourcePVCName }}
+  storage:
+    volumeMode: Filesystem
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: {{ default "5Gi" .rootVolumeSize }}
+    storageClassName: {{ .storageClassName }}
+...

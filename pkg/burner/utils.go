@@ -51,6 +51,12 @@ var (
 		StatefulSet:    {commonUnderlyingObjectLabelsPath, []string{"spec", "selector", "matchLabels"}},
 		VirtualMachine: {commonUnderlyingObjectLabelsPath},
 	}
+
+	kindToLabelPathsInArray = map[string][][][]string{
+		VirtualMachine: {[][]string{
+			{"spec", "dataVolumeTemplates"}, {"metadata", "labels"}},
+		},
+	}
 )
 
 func setLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
@@ -64,6 +70,21 @@ func setLabels(obj *unstructured.Unstructured, labels map[string]string, templat
 	unstructured.SetNestedMap(obj.Object, labelMap, templatePath...)
 }
 
+func setLabelsInArray(obj *unstructured.Unstructured, labels map[string]string, arrayPath []string, templatePath []string) {
+	array, found, _ := unstructured.NestedSlice(obj.Object, arrayPath...)
+	if !found {
+		return
+	}
+
+	for _, a := range array {
+		innerObj := unstructured.Unstructured{}
+		innerObj.SetUnstructuredContent(a.(map[string]interface{}))
+
+		setLabels(&innerObj, labels, templatePath)
+	}
+	unstructured.SetNestedSlice(obj.Object, array, arrayPath...)
+}
+
 // Helps to set metadata labels
 func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string) {
 	// Will be useful for the resources like Deployments and Replicasets. Because
@@ -73,6 +94,12 @@ func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string)
 	paths := kindToLabelPaths[obj.GetKind()]
 	for _, path := range paths {
 		setLabels(obj, labels, path)
+	}
+
+	// Do the same for elements stored in array (e.g. dataVolumeTemplates in VirtualMachine)
+	arrays := kindToLabelPathsInArray[obj.GetKind()]
+	for _, array := range arrays {
+		setLabelsInArray(obj, labels, array[0], array[1])
 	}
 }
 

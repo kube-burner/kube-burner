@@ -404,6 +404,94 @@ And the quantiles document has the structure:
 
 When there're `LoadBalancer` services, an extra document with `quantileName` as `LoadBalancer` is also generated as shown above.
 
+## DataVolume Latency
+Collects latencies from different DataVolume phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
+
+```yaml
+  measurements:
+  - name: dataVolumeLatency
+```
+### Metrics
+
+The metrics collected are data volume latency timeseries (`dataVolumeLatencyMeasurement`) and 2-3 documents holding a summary with different data volume latency quantiles of each lifecycle phase (`dataVolumeLatencyQuantilesMeasurement`).
+
+One document, such as the following, is indexed per each data volume created by the workload that enters in `Ready` condition during the workload:
+
+```json
+{
+  "timestamp": "2025-01-13T14:55:44Z",
+  "dvBoundLatency": 8000,
+  "dvRunningLatency": 0,
+  "dvReadyLatency": 8000,
+  "metricName": "dvLatencyMeasurement",
+  "uuid": "ba6afa06-d780-4306-b97e-bfcce60fb5a7",
+  "namespace": "catalog",
+  "dvName": "master-image",
+  "jobName": "create-base-image-dv",
+  "jobIteration": 0,
+  "replica": 1,
+}
+```
+
+---
+
+DataVolume latency quantile sample:
+
+```json
+[
+  {
+    "quantileName": "Bound",
+    "uuid": "59b14eb2-339a-4761-8593-195eb80943a9",
+    "P99": 39000,
+    "P95": 39000,
+    "P50": 19000,
+    "min": 4000,
+    "max": 42000,
+    "avg": 21900,
+    "timestamp": "2025-01-14T14:40:15.3046Z",
+    "metricName": "dvLatencyQuantilesMeasurement",
+    "jobName": "create-vms",
+  },
+  {
+    "quantileName": "Running",
+    "uuid": "59b14eb2-339a-4761-8593-195eb80943a9",
+    "P99": 3000,
+    "P95": 3000,
+    "P50": 2000,
+    "min": 2000,
+    "max": 3000,
+    "avg": 2000,
+    "timestamp": "2025-01-14T14:40:15.304602Z",
+    "metricName": "dvLatencyQuantilesMeasurement",
+    "jobName": "create-vms",
+  },
+  {
+    "quantileName": "Ready",
+    "uuid": "59b14eb2-339a-4761-8593-195eb80943a9",
+    "P99": 39000,
+    "P95": 39000,
+    "P50": 19000,
+    "min": 4000,
+    "max": 42000,
+    "avg": 22000,
+    "timestamp": "2025-01-14T14:40:15.304604Z",
+    "metricName": "dvLatencyQuantilesMeasurement",
+    "jobName": "create-vms",
+  }
+]
+```
+
+Where `quantileName` matches with the pvc phases and can be:
+
+- `Running`: Indicates that DV is running and being populated if needed
+- `Bound`: Indicates that DV is bound
+- `Ready`: Indicates that the DV is ready for usage
+
+!!! info
+    More information about the DataVolume condition types can be found at the [kubevirt documentation](https://github.com/kubevirt/containerized-data-importer/blob/main/doc/datavolumes.md#conditions).
+
+And the metrics, error rates, and their thresholds work the same way as in the other latency measurements.
+
 ## Network Policy Latency
 
 Note: This measurement has requirement of having 2 jobs defined in the templates. It doesn't report the network policy latency measurement if only one job is used.

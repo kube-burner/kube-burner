@@ -1,0 +1,47 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: {{ .vmName }}
+spec:
+  dataVolumeTemplates:
+  - metadata:
+      name: {{ .rootDiskVolumeName }}
+    spec:
+      source:
+        registry:
+          url: {{ .rootDiskImage }}
+      storage:
+        volumeMode: Filesystem
+        accessModes:
+        - ReadWriteOnce
+        storageClassName: {{ .storageClassName }}
+        resources:
+          requests:
+            storage: {{ default "5Gi" .rootVolumeSize }}
+  running: true
+  template:
+    spec:
+      architecture: amd64
+      domain:
+        resources:
+          requests:
+            memory: {{ default "512Mi" .vmMemory }}
+        devices:
+          disks:
+          - disk:
+              bus: virtio
+            name: rootdisk
+            bootOrder: 1
+          interfaces:
+          - name: default
+            masquerade: {}
+            bootOrder: 2
+        machine:
+          type: pc-q35-rhel9.4.0
+      networks:
+      - name: default
+        pod: {}
+      volumes:
+      - dataVolume:
+          name: "{{ .rootDiskVolumeName }}"
+        name: rootdisk
