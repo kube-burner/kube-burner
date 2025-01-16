@@ -1,0 +1,89 @@
+---
+global:
+  measurements:
+  - name: dataVolumeLatency
+  - name: pvcLatency
+
+metricsEndpoints:
+- indexer:
+    type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+
+jobs:
+
+- name: create-vm
+  jobType: create
+  jobIterations: 1
+  qps: 20
+  burst: 20
+  namespacedIterations: false
+  namespace: datavolume-latency
+  # verify object count after running each job
+  verifyObjects: true
+  errorOnVerify: true
+  # wait all VMI be in the Ready Condition
+  waitWhenFinished: false
+  podWait: true
+  # timeout time after waiting for all object creation
+  maxWaitTimeout: 1h
+  jobPause: 10s
+  # cleanup cleans previous execution (not deleted or failed)
+  cleanup: true
+  # Set missing key as empty to allow using default values
+  defaultMissingKeysWithZero: true
+  objects:
+
+  - objectTemplate: ./objectTemplates/vm-datavolume.yml
+    replicas: 1
+    inputVars:
+      vmName: base-vm
+      rootDiskVolumeName: "base-vm-rootdisk"
+      rootDiskImage: "docker://quay.io/containerdisks/fedora:latest"
+      storageClassName: {{ .STORAGE_CLASS_NAME }}
+
+- name: stop-vm
+  jobType: kubevirt
+  qps: 20
+  burst: 20
+  jobIterations: 1
+  maxWaitTimeout: 1h
+  objectDelay: 1m
+  skipIndexing: true
+  objects:
+  - kubeVirtOp: stop
+    labelSelector:
+      kube-burner-job: create-vm
+
+# Create the DV in a separate job to make sure it is ready before continuing
+- name: create-base-image-dv
+  jobType: create
+  jobIterations: 1
+  qps: 20
+  burst: 20
+  namespacedIterations: false
+  namespace: datavolume-latency
+  # verify object count after running each job
+  verifyObjects: true
+  errorOnVerify: true
+  # wait all VMI be in the Ready Condition
+  waitWhenFinished: false
+  podWait: true
+  # timeout time after waiting for all object creation
+  maxWaitTimeout: 10m
+  # wait before job completes to allow metrics collection
+  jobPause: 5m
+  # Do not clean the namespaces
+  cleanup: false
+  # Set missing key as empty to allow using default values
+  defaultMissingKeysWithZero: true
+  objects:
+  - objectTemplate: ./objectTemplates/datavolume-clone.yml
+    replicas: 1
+    inputVars:
+      cloneDataVolumeName: cloned-volume
+      storageClassName: {{ .STORAGE_CLASS_NAME }}
+      sourceNamespace: datavolume-latency
+      sourcePVCName: "base-vm-rootdisk"
+    waitOptions:
+      forCondition: Ready
+...

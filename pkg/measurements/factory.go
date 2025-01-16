@@ -49,13 +49,14 @@ type measurement interface {
 }
 
 var measurementFactoryMap = map[string]newMeasurementFactory{
-	"podLatency":     newPodLatencyMeasurementFactory,
-	"pvcLatency":     newPvcLatencyMeasurementFactory,
-	"nodeLatency":    newNodeLatencyMeasurementFactory,
-	"vmiLatency":     newVmiLatencyMeasurementFactory,
-	"serviceLatency": newServiceLatencyMeasurementFactory,
-	"pprof":          newPprofLatencyMeasurementFactory,
-	"netpolLatency":  newNetpolLatencyMeasurementFactory,
+	"podLatency":        newPodLatencyMeasurementFactory,
+	"pvcLatency":        newPvcLatencyMeasurementFactory,
+	"nodeLatency":       newNodeLatencyMeasurementFactory,
+	"vmiLatency":        newVmiLatencyMeasurementFactory,
+	"serviceLatency":    newServiceLatencyMeasurementFactory,
+	"pprof":             newPprofLatencyMeasurementFactory,
+	"netpolLatency":     newNetpolLatencyMeasurementFactory,
+	"dataVolumeLatency": newDvLatencyMeasurementFactory,
 }
 
 func isIndexerOk(configSpec config.Spec, measurement types.Measurement) bool {
