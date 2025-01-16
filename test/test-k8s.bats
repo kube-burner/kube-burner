@@ -218,7 +218,9 @@ teardown_file() {
 
   local jobs=("create-vm" "create-base-image-dv")
   for job in "${jobs[@]}"; do
-    check_metric_recorded ${job} dvLatency dvReadyLatency
+    check_metric_recorded ${job} dvLatency dvReadyLatency 
+    check_metric_recorded ${job} pvcLatency bindingLatency
     check_quantile_recorded ${job} dvLatency Ready
+    check_quantile_recorded ${job} pvcLatency Bound
   done
 }
