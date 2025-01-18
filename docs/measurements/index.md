@@ -318,6 +318,99 @@ Where `quantileName` matches with the node conditions and can be:
 
 And the metrics, error rates, and their thresholds work the same way as in the pod latency measurement.
 
+## PVC latency
+Note: This measurement is not supported for patch, read and delete jobs. Because it requires all the events from creation to reaching a stable end state to happen during a job. 
+
+Collects latencies from different pvc phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
+
+```yaml
+  measurements:
+  - name: pvcLatency
+```
+
+### Metrics
+
+The metrics collected are pvc latency timeseries (`pvcLatencyMeasurement`) and 2-3 documents holding a summary with different pvc latency quantiles of each lifecycle phase (`pvcLatencyQuantilesMeasurement`).
+
+One document, such as the following, is indexed per each pvc created by the workload that enters in `Bound/Lost` condition during the workload:
+
+```json
+{
+  "timestamp": "2025-01-10T02:50:50.247528962Z",
+  "pendingLatency": 37,
+  "bindingLatency": 4444,
+  "lostLatency": 0,
+  "uuid": "1f16ffd1-ac65-47c4-970f-a71d5f309cf5",
+  "pvcName": "deployment-pvc-move-1",
+  "jobName": "pvc-move",
+  "namespace": "deployment-pvc-move-0",
+  "metricName": "pvcLatencyMeasurement",
+  "size": "1Gi",
+  "storageClass": "gp3-csi",
+  "jobIteration": 0,
+  "replica": 1,
+}
+```
+
+---
+
+PVC latency quantile sample:
+
+```json
+[
+  {
+    "quantileName": "Bound",
+    "uuid": "1f16ffd1-ac65-47c4-970f-a71d5f309cf5",
+    "P99": 4444,
+    "P95": 4444,
+    "P50": 4444,
+    "min": 4444,
+    "max": 4444,
+    "avg": 4444,
+    "timestamp": "2025-01-10T02:51:04.611059008Z",
+    "metricName": "pvcLatencyQuantilesMeasurement",
+    "jobName": "pvc-move",
+  },
+  {
+    "quantileName": "Lost",
+    "uuid": "1f16ffd1-ac65-47c4-970f-a71d5f309cf5",
+    "P99": 0,
+    "P95": 0,
+    "P50": 0,
+    "min": 0,
+    "max": 0,
+    "avg": 0,
+    "timestamp": "2025-01-10T02:51:04.611061474Z",
+    "metricName": "pvcLatencyQuantilesMeasurement",
+    "jobName": "pvc-move",
+  },
+  {
+    "quantileName": "Pending",
+    "uuid": "1f16ffd1-ac65-47c4-970f-a71d5f309cf5",
+    "P99": 37,
+    "P95": 37,
+    "P50": 37,
+    "min": 37,
+    "max": 37,
+    "avg": 37,
+    "timestamp": "2025-01-10T02:51:04.611062824Z",
+    "metricName": "pvcLatencyQuantilesMeasurement",
+    "jobName": "pvc-move",
+  }
+]
+```
+
+Where `quantileName` matches with the pvc phases and can be:
+
+- `Pending`: Indicates that PVC is not yet bound.
+- `Bound`: Indicates that PVC is bound.
+- `Lost`: Indicates that the PVC has lost their underlying PersistentVolume.
+
+!!! info
+    More information about the PVC phases can be found at the [kubernetes api documentation](https://pkg.go.dev/k8s.io/api/core/v1#PersistentVolumeClaimPhase).
+
+And the metrics, error rates, and their thresholds work the same way as in the other latency measurements.
+
 ## Service latency
 
 Calculates the time taken the services to serve requests once their endpoints are ready. This measurement works as follows.
