@@ -31,7 +31,7 @@ jobs:
       apiVersion: kubevirt.io/v1
 
     - kind: Pod
-      labelSelector: {kubevirt.io: virt-launcher}
+      labelSelector: {kube-burner-job: kubevirt-density}
       apiVersion: v1
 
     - kind: Namespace
@@ -89,7 +89,7 @@ jobs:
       apiVersion: kubevirt.io/v1
 
     - kind: Pod
-      labelSelector: {kubevirt.io: virt-launcher}
+      labelSelector: {kube-burner-job: kubevirt-density}
       apiVersion: v1
 
     - kind: Namespace
