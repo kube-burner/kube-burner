@@ -487,11 +487,11 @@ func (n *netpolLatency) start(measurementWg *sync.WaitGroup) error {
 		if err != nil {
 			return err
 		}
-		err = createAdminNetworkPolicy
+		err = createAdminNetworkPolicy()
 		if err != nil {
 			return err
 		}
-		err = createBaselineAdminNetworkPolicy
+		err = createBaselineAdminNetworkPolicy()
 		if err != nil {
 			return err
 		}
