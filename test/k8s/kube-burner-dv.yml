@@ -26,7 +26,7 @@ jobs:
   podWait: true
   # timeout time after waiting for all object creation
   maxWaitTimeout: 1h
-  jobPause: 10s
+  jobPause: 2m
   # cleanup cleans previous execution (not deleted or failed)
   cleanup: true
   # Set missing key as empty to allow using default values
@@ -71,7 +71,7 @@ jobs:
   # timeout time after waiting for all object creation
   maxWaitTimeout: 10m
   # wait before job completes to allow metrics collection
-  jobPause: 5m
+  jobPause: 2m
   # Do not clean the namespaces
   cleanup: false
   # Set missing key as empty to allow using default values
@@ -85,5 +85,7 @@ jobs:
       sourceNamespace: datavolume-latency
       sourcePVCName: "base-vm-rootdisk"
     waitOptions:
-      forCondition: Ready
+      customStatusPaths:
+        - key: ".conditions[].type"
+          value: "Ready"
 ...
