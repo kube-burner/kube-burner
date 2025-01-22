@@ -18,6 +18,6 @@ Kube-burner is a binary application written in Golang that makes extensive usage
 
 To start tinkering with kube-burner now:
 
-- Find binaries for different CPU architectures and operating systems in the [releases section of the repository](https://github.com/kube-burner/kube-burner/releases).
+- Find binaries for differdsfent CPU architectures and operating systems in the [releases section of the repository](https://github.com/kube-burner/kube-burner/releases).
 - Use the container image repository available at [quay](https://quay.io/repository/kube-burner/kube-burner?tab=tags).
 - Reference valid examples of configuration files, metrics profiles, and Grafana dashboards in the [examples directory](https://github.com/kube-burner/kube-burner/tree/master/examples) of the repository.
