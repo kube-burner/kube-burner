@@ -45,6 +45,10 @@ func NewWorkloadHelper(config Config, embedConfig *embed.FS, kubeClientProvider 
 }
 
 func (wh *WorkloadHelper) Run(workload string) int {
+	return wh.RunWithAdditionalVars(workload, nil)
+}
+
+func (wh *WorkloadHelper) RunWithAdditionalVars(workload string, additionalVars map[string]interface{}) int {
 	configFile := fmt.Sprintf("%s.yml", workload)
 	var embedFS *embed.FS
 	var embedFSDir string
@@ -56,7 +60,7 @@ func (wh *WorkloadHelper) Run(workload string) int {
 	if err != nil {
 		log.Fatalf("Error reading configuration file: %v", err.Error())
 	}
-	ConfigSpec, err = config.Parse(wh.UUID, wh.Timeout, f)
+	ConfigSpec, err = config.ParseWithUserdata(wh.UUID, wh.Timeout, f, nil, false, additionalVars)
 	if err != nil {
 		log.Fatal(err)
 	}

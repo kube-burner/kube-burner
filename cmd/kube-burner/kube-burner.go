@@ -104,7 +104,7 @@ func initCmd() *cobra.Command {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
 			}
-			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys)
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
