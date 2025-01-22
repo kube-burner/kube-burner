@@ -16,7 +16,7 @@ jobs:
           all_tags=$(curl -s "https://hub.docker.com/v2/repositories/kindest/node/tags/?page_size=100" | jq -r '.results[].name')
 
           # Filter semantic versioning tags
-          semver_tags=$(echo "$all_tags" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$')
+          semver_tags=$(echo "$all_tags" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$')
 
           # Get the latest patch versions of the latest 3 minor versions
           latest_three=$(echo "$semver_tags" | sort -V | awk -F. '{print $1"."$2}' | uniq | tail -n 3 | while read minor; do
@@ -27,8 +27,8 @@ jobs:
           echo "$latest_three"
 
           # Convert the output to a JSON array for use in other steps
-          tags_json=$(echo "$latest_three" | jq -R -s 'split("\n") | map(select(length > 0))')
-          echo "::set-output name=tags::$tags_json"
+          tags_json=$(echo "$latest_three" | jq -c -R -s 'split("\n") | map(select(length > 0))')
+          echo "tags=$tags_json" >> "$GITHUB_OUTPUT"
 
   test-k8s:
     needs: fetch-latest-kind-node-tags
