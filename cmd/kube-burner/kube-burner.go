@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,6 +78,8 @@ func initCmd() *cobra.Command {
 	var uuid, userMetadata string
 	var skipTLSVerify bool
 	var timeout time.Duration
+	var userDataFile string
+	var allowMissingKeys bool
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -90,11 +93,18 @@ func initCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			f, err := util.ReadConfig(configFile)
+			configFileReader, err := util.GetReader(configFile, nil, "")
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(uuid, timeout, f)
+			var userDataFileReader io.Reader
+			if userDataFile != "" {
+				userDataFileReader, err = util.GetReader(userDataFile, nil, "")
+				if err != nil {
+					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
+				}
+			}
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys)
 			if err != nil {
 				log.Fatalf("Config error: %s", err.Error())
 			}
@@ -123,6 +133,8 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
+	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagRequired("config")
 	return cmd
@@ -168,13 +180,12 @@ func destroyCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
-			burner.ClientSet = clientSet
-			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
+			dynamicClient := dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
 			util.CleanupNamespaces(ctx, clientSet, labelSelector)
-			util.CleanupNonNamespacedResources(ctx, clientSet, burner.DynamicClient, labelSelector)
+			util.CleanupNonNamespacedResources(ctx, clientSet, dynamicClient, labelSelector)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
@@ -204,7 +215,7 @@ func measureCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
-			f, err := util.ReadConfig(configFile)
+			f, err := util.GetReader(configFile, nil, "")
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
@@ -240,8 +251,7 @@ func measureCmd() *cobra.Command {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
 			log.Infof("%v", namespaceLabels)
-			measurements.NewMeasurementFactory(configSpec, metadata)
-			measurements.SetJobConfig(
+			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata).NewMeasurements(
 				&config.Job{
 					Name:                 jobName,
 					Namespace:            rawNamespaces,
@@ -250,11 +260,11 @@ func measureCmd() *cobra.Command {
 				},
 				config.NewKubeClientProvider(kubeConfig, kubeContext),
 			)
-			measurements.Collect()
-			if err = measurements.Stop(); err != nil {
+			measurementsInstance.Collect()
+			if err = measurementsInstance.Stop(); err != nil {
 				log.Error(err.Error())
 			}
-			measurements.Index(jobName, indexerList)
+			measurementsInstance.Index(jobName, indexerList)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
@@ -441,7 +451,7 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, false, indexer)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -449,7 +459,7 @@ func alertCmd() *cobra.Command {
 				Start: time.Unix(start, 0),
 				End:   time.Unix(end, 0),
 			}
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, false, indexer, nil); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(job)

@@ -17,7 +17,6 @@ package prometheus
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"math"
 	"path"
 	"text/template"
@@ -33,16 +32,15 @@ import (
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, embedConfig bool, indexer *indexers.Indexer) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, indexer *indexers.Indexer) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
-		Step:        step,
-		UUID:        configSpec.GlobalConfig.UUID,
-		ConfigSpec:  configSpec,
-		Endpoint:    url,
-		embedConfig: embedConfig,
-		indexer:     indexer,
-		metadata:    metadata,
+		Step:       step,
+		UUID:       configSpec.GlobalConfig.UUID,
+		ConfigSpec: configSpec,
+		Endpoint:   url,
+		indexer:    indexer,
+		metadata:   metadata,
 	}
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
 	p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
@@ -130,24 +128,12 @@ func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.
 
 // ReadProfile reads, parses and validates metric profile configuration
 func (p *Prometheus) ReadProfile(location string) error {
-	var f io.Reader
-	var err error
-	if p.embedConfig {
-		embeddedPath := path.Join(path.Dir(p.ConfigSpec.EmbedFSDir), location)
-		f, err = util.ReadEmbedConfig(p.ConfigSpec.EmbedFS, embeddedPath)
-		if err != nil {
-			log.Infof("Embedded config doesn't contain metrics profile %s. Falling back to original path", embeddedPath)
-			f, err = util.ReadConfig(location)
-		} else {
-			location = embeddedPath
-		}
-	} else {
-		f, err = util.ReadConfig(location)
-	}
-	p.profileName = location
+	f, err := util.GetReader(location, p.ConfigSpec.EmbedFS, path.Dir(p.ConfigSpec.EmbedFSDir))
 	if err != nil {
 		return fmt.Errorf("error reading metrics profile %s: %s", location, err)
 	}
+	p.profileName = location
+
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
 	metricProfile := metricProfile{

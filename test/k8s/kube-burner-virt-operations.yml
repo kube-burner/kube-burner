@@ -1,0 +1,71 @@
+jobs:
+
+  # create the VMs in stopped state
+  - name: kubevirt-ops
+    jobType: create
+    jobIterations: 1
+    qps: 20
+    burst: 20
+    namespace: kubevirt-ops
+    verifyObjects: true
+    errorOnVerify: true
+    waitWhenFinished: true
+    jobPause: 10s
+    # cleanup cleans previous execution (not deleted or failed)
+    cleanup: true
+    objects:
+
+    - objectTemplate: objectTemplates/vm-ephemeral.yml
+      replicas: 1
+      inputVars:
+        name: kubevirt-ops
+        image: quay.io/kubevirt/fedora-with-test-tooling-container-disk:v0.48.1
+        OS: fedora27
+        cpuCores: 1
+        memory: 64Mi
+        createVMI: true
+
+  - name: power-management
+    jobType: kubevirt
+    qps: 20
+    burst: 20
+    jobIterations: 2
+    objectDelay: 1m
+    objects:
+    - kubeVirtOp: stop
+      labelSelector: {kube-burner-job: kubevirt-ops}
+    - kubeVirtOp: start
+      labelSelector: {kube-burner-job: kubevirt-ops}
+    - kubeVirtOp: restart
+      labelSelector: {kube-burner-job: kubevirt-ops}
+    - kubeVirtOp: pause
+      labelSelector: {kube-burner-job: kubevirt-ops}
+    - kubeVirtOp: unpause
+      labelSelector: {kube-burner-job: kubevirt-ops}
+    - kubeVirtOp: stop
+      labelSelector: {kube-burner-job: kubevirt-ops}
+      inputVars:
+        force: true
+    - kubeVirtOp: start
+      labelSelector: {kube-burner-job: kubevirt-ops}
+      inputVars:
+        startPaused: true
+    - kubeVirtOp: unpause
+      labelSelector: {kube-burner-job: kubevirt-ops}
+    - kubeVirtOp: migrate
+      labelSelector: {kube-burner-job: kubevirt-ops}
+
+  # cleanup the experiment
+  - name: delete-vms
+    jobType: delete
+    waitForDeletion: true
+    qps: 5
+    burst: 10
+    objects:
+
+    - kind: VirtualMachine
+      labelSelector: {kube-burner-job: kubevirt-ops}
+      apiVersion: kubevirt.io/v1
+
+    - kind: Namespace
+      labelSelector: {kube-burner-job: ops}

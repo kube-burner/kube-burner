@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"path"
@@ -86,7 +85,7 @@ type descriptionTemplate struct {
 }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, embedConfig bool, indexer *indexers.Indexer, metadata interface{}) (*AlertManager, error) {
+func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, indexer *indexers.Indexer, metadata interface{}) (*AlertManager, error) {
 	log.Infof("🔔 Initializing alert manager for prometheus: %v", prometheusClient.Endpoint)
 	a := AlertManager{
 		prometheus: prometheusClient,
@@ -94,27 +93,14 @@ func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.
 		indexer:    indexer,
 		metadata:   metadata,
 	}
-	if err := a.readProfile(alertProfileCfg, embedConfig); err != nil {
+	if err := a.readProfile(alertProfileCfg); err != nil {
 		return &a, err
 	}
 	return &a, nil
 }
 
-func (a *AlertManager) readProfile(alertProfileCfg string, embedConfig bool) error {
-	var f io.Reader
-	var err error
-	if embedConfig {
-		embeddedLocation := path.Join(path.Dir(a.prometheus.ConfigSpec.EmbedFSDir), alertProfileCfg)
-		f, err = util.ReadEmbedConfig(a.prometheus.ConfigSpec.EmbedFS, embeddedLocation)
-		if err != nil {
-			log.Infof("Embedded config doesn't contain alert profile %s. Falling back to original path", embeddedLocation)
-			f, err = util.ReadConfig(alertProfileCfg)
-		} else {
-			alertProfileCfg = embeddedLocation
-		}
-	} else {
-		f, err = util.ReadConfig(alertProfileCfg)
-	}
+func (a *AlertManager) readProfile(alertProfileCfg string) error {
+	f, err := util.GetReader(alertProfileCfg, a.prometheus.ConfigSpec.EmbedFS, path.Dir(a.prometheus.ConfigSpec.EmbedFSDir))
 	if err != nil {
 		return fmt.Errorf("error reading alert profile %s: %s", alertProfileCfg, err)
 	}
@@ -150,16 +136,12 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, alert.Description, alert.Severity, job.ChurnStart, job.ChurnEnd)
+		alertData, err := parseMatrix(v, a.uuid, alert.Description, a.metadata, alert.Severity, job.ChurnStart, job.ChurnEnd)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)
 		}
-		for _, alertSet := range alertData {
-			alertSet.UUID = a.uuid
-			alertSet.Metadata = a.metadata
-			alertList = append(alertList, alertSet)
-		}
+		alertList = append(alertList, alertData...)
 	}
 	if len(alertList) > 0 && a.indexer != nil {
 		a.index(alertList)
@@ -176,11 +158,11 @@ func (a *AlertManager) validateTemplates() error {
 	return nil
 }
 
-func parseMatrix(value model.Value, description string, severity severityLevel, churnStart, churnEnd *time.Time) ([]alert, error) {
+func parseMatrix(value model.Value, uuid, description string, metadata interface{}, severity severityLevel, churnStart, churnEnd *time.Time) ([]interface{}, error) {
 	var renderedDesc bytes.Buffer
 	var templateData descriptionTemplate
 	// The same query can fire multiple alerts, so we have to return an array of them
-	var alertSet []alert
+	var alertSet []interface{}
 	errs := []error{}
 	t, _ := template.New("").Parse(strings.Join(append(baseTemplate, description), ""))
 	data, ok := value.(model.Matrix)
@@ -203,6 +185,8 @@ func parseMatrix(value model.Value, description string, severity severityLevel, 
 			}
 			msg := fmt.Sprintf("alert at %v: '%s'", val.Timestamp.Time().UTC().Format(time.RFC3339), renderedDesc.String())
 			alert := alert{
+				UUID:        uuid,
+				Metadata:    metadata,
 				Timestamp:   val.Timestamp.Time().UTC(),
 				Severity:    severity,
 				Description: renderedDesc.String(),

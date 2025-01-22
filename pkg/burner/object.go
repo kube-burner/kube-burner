@@ -31,12 +31,13 @@ type object struct {
 	objectSpec []byte
 	kind       string
 	namespace  string
+	namespaced bool
 	ready      bool
 }
 
-func newObject(obj config.Object, mapper meta.RESTMapper) object {
+func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper, defaultAPIVersion string) object {
 	if obj.APIVersion == "" {
-		obj.APIVersion = "v1"
+		obj.APIVersion = defaultAPIVersion
 	}
 
 	if len(obj.LabelSelector) == 0 {
@@ -48,16 +49,16 @@ func newObject(obj config.Object, mapper meta.RESTMapper) object {
 	if err != nil {
 		log.Fatal(err)
 	}
-	obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 
 	o := object{
-		Object: obj,
-		gvr:    mapping.Resource,
+		Object:     obj,
+		gvr:        mapping.Resource,
+		namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 	}
 
 	if obj.ObjectTemplate != "" {
 		log.Debugf("Rendering template: %s", obj.ObjectTemplate)
-		f, err := util.ReadConfig(obj.ObjectTemplate)
+		f, err := util.GetReader(obj.ObjectTemplate, configSpec.EmbedFS, configSpec.EmbedFSDir)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
 		}

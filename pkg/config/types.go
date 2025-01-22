@@ -35,6 +35,21 @@ const (
 	PatchJob JobType = "patch"
 	// ReadJob used to read objects
 	ReadJob JobType = "read"
+	// KubeVirtJob used to send command to the KubeVirt service
+	KubeVirtJob JobType = "kubevirt"
+)
+
+type KubeVirtOpType string
+
+const (
+	KubeVirtOpStart        KubeVirtOpType = "start"
+	KubeVirtOpStop         KubeVirtOpType = "stop"
+	KubeVirtOpRestart      KubeVirtOpType = "restart"
+	KubeVirtOpPause        KubeVirtOpType = "pause"
+	KubeVirtOpUnpause      KubeVirtOpType = "unpause"
+	KubeVirtOpMigrate      KubeVirtOpType = "migrate"
+	KubeVirtOpAddVolume    KubeVirtOpType = "add-volume"
+	KubeVirtOpRemoveVolume KubeVirtOpType = "remove-volume"
 )
 
 // Spec configuration root
@@ -46,7 +61,7 @@ type Spec struct {
 	// Jobs list of kube-burner jobs
 	Jobs []Job `yaml:"jobs"`
 	// EmbedFS embed filesystem instance
-	EmbedFS embed.FS
+	EmbedFS *embed.FS
 	// EmbedFSDir Directory in which the configuration files are in the embed filesystem
 	EmbedFSDir string
 }
@@ -107,14 +122,14 @@ type Object struct {
 	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with this labels will be removed
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
-	// Namespaced this object is namespaced
-	Namespaced bool `yaml:"-" json:"-"`
 	// Wait for resource to be ready, it doesn't apply to all resources
 	Wait bool `yaml:"wait" json:"wait"`
 	// WaitOptions define custom behaviors when waiting for objects creation
 	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions,omitempty"`
 	// Run Once to create the object only once incase of multiple iterative jobs
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
+	// KubeVirt Operation
+	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
 }
 
 // Job defines a kube-burner job

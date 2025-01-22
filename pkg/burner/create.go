@@ -16,12 +16,10 @@ package burner
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
-	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -38,10 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *Executor) setupCreateJob() {
-	var err error
-	var f io.Reader
-	mapper := newRESTMapper()
+func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMapper) {
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
@@ -49,13 +44,7 @@ func (ex *Executor) setupCreateJob() {
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		e := embed.FS{}
-		if embedFS == e {
-			f, err = util.ReadConfig(o.ObjectTemplate)
-		} else {
-			objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
-			f, err = util.ReadEmbedConfig(embedFS, objectTemplate)
-		}
+		f, err := util.GetReader(o.ObjectTemplate, configSpec.EmbedFS, configSpec.EmbedFSDir)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
@@ -80,10 +69,10 @@ func (ex *Executor) setupCreateJob() {
 			kind:       gvk.Kind,
 			Object:     o,
 			namespace:  uns.GetNamespace(),
+			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 		}
-		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
-		if obj.Namespaced && obj.namespace == "" {
+		if obj.namespaced && obj.namespace == "" {
 			ex.nsRequired = true
 		}
 		log.Infof("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
@@ -110,7 +99,7 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	}
 	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
-		if err = util.CreateNamespace(ClientSet, ns, nsLabels, nsAnnotations); err != nil {
+		if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 			log.Fatal(err.Error())
 		}
 		*waitListNamespaces = append(*waitListNamespaces, ns)
@@ -132,7 +121,7 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			if !namespacesCreated[ns] {
-				if err = util.CreateNamespace(ClientSet, ns, nsLabels, nsAnnotations); err != nil {
+				if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 					log.Error(err.Error())
 					continue
 				}
@@ -177,7 +166,7 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	if ex.WaitWhenFinished {
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(restConfig.QPS))
+		sem := make(chan int, int(ex.restConfig.QPS))
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.nsRequired && ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
@@ -224,29 +213,12 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 		}
 		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
 
-		templateOption := util.MissingKeyError
-		if ex.DefaultMissingKeysWithZero {
-			templateOption = util.MissingKeyZero
-		}
-
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
 			var newObject = new(unstructured.Unstructured)
-			templateData := map[string]interface{}{
-				jobName:      ex.Name,
-				jobIteration: iteration,
-				jobUUID:      ex.uuid,
-				replica:      r,
-			}
-			for k, v := range obj.InputVars {
-				templateData[k] = v
-			}
 			ex.limiter.Wait(context.TODO())
-			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
-			if err != nil {
-				log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
-			}
+			renderedObj := ex.renderTemplateForObject(obj, iteration, r, false)
 			// Re-decode rendered object
 			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
 
@@ -263,10 +235,10 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 			// hasn't been created yet
 			replicaWg.Add(1)
 			go func(n string) {
-				if !obj.Namespaced {
+				if !obj.namespaced {
 					n = ""
 				}
-				createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
 				replicaWg.Done()
 			}(ns)
 		}(r)
@@ -274,7 +246,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 	wg.Wait()
 }
 
-func createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
+func (ex *Executor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
 	util.RetryWithExponentialBackOff(func() (bool, error) {
@@ -286,9 +258,9 @@ func createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns stri
 			ns = objNs
 		}
 		if ns != "" {
-			uns, err = DynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
+			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		} else {
-			uns, err = DynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
 		}
 		if err != nil {
 			if kerrors.IsUnauthorized(err) {
@@ -370,7 +342,7 @@ func (ex *Executor) RunCreateJobWithChurn(ctx context.Context) {
 				continue
 			}
 			// Label namespaces to be deleted
-			_, err = ClientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
+			_, err = ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
 			if err != nil {
 				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
 			}
@@ -384,7 +356,7 @@ func (ex *Executor) RunCreateJobWithChurn(ctx context.Context) {
 		if ex.ChurnDeletionStrategy == "gvr" {
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		}
-		util.CleanupNamespaces(ctx, ClientSet, "churndelete=delete")
+		util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})

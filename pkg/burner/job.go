@@ -15,12 +15,9 @@
 package burner
 
 import (
-	"bytes"
 	"context"
-	"embed"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"sync"
 	"time"
@@ -34,9 +31,6 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
@@ -51,20 +45,15 @@ const (
 	replica              = "Replica"
 	jobIteration         = "Iteration"
 	jobUUID              = "UUID"
+	jobRunId             = "RunID"
 	rcTimeout            = 2
 	rcAlert              = 3
 	rcMeasurement        = 4
 	garbageCollectionJob = "garbage-collection"
+	APIVersionV1         = "v1"
 )
 
 var (
-	ClientSet       kubernetes.Interface
-	DynamicClient   dynamic.Interface
-	discoveryClient *discovery.DiscoveryClient
-	restConfig      *rest.Config
-	embedFS         embed.FS
-	embedFSDir      string
-
 	supportedExecutionMode = map[config.ExecutionMode]struct{}{
 		config.ExecutionModeParallel:   {},
 		config.ExecutionModeSequential: {},
@@ -83,8 +72,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var executedJobs []prometheus.Job
 	var jobList []Executor
 	var msWg, gcWg sync.WaitGroup
-	embedFS = configSpec.EmbedFS
-	embedFSDir = configSpec.EmbedFSDir
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -97,16 +84,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	defer cancel()
 	go func() {
 		var innerRC int
-		measurements.NewMeasurementFactory(configSpec, metricsScraper.MetricsMetadata)
+		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata)
 		jobList = newExecutorList(configSpec, kubeClientProvider)
-		ClientSet, restConfig = kubeClientProvider.DefaultClientSet()
-		for _, job := range jobList {
-			if job.PreLoadImages && job.JobType == config.CreationJob {
-				if err = preLoadImages(job); err != nil {
-					log.Fatal(err.Error())
-				}
-			}
-		}
+		handlePreloadImages(jobList, kubeClientProvider)
 		// Iterate job list
 		for jobPosition, job := range jobList {
 			executedJobs = append(executedJobs, prometheus.Job{
@@ -114,12 +94,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				JobConfig: job.Job,
 			})
 			var waitListNamespaces []string
-			ClientSet, restConfig = kubeClientProvider.ClientSet(job.QPS, job.Burst)
-			discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
-			DynamicClient = dynamic.NewForConfigOrDie(restConfig)
-			measurements.SetJobConfig(&job.Job, kubeClientProvider)
+			measurementsInstance := measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
 			log.Infof("Triggering job: %s", job.Name)
-			measurements.Start()
+			measurementsInstance.Start()
 			if job.JobType == config.CreationJob {
 				if job.Cleanup {
 					// No timeout for initial job cleanup
@@ -163,18 +140,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
-				cmd := exec.Command("/bin/sh", job.BeforeCleanup)
-				var outb, errb bytes.Buffer
-				cmd.Stdout = &outb
-				cmd.Stderr = &errb
-				err := cmd.Run()
+				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup, configSpec.EmbedFS, configSpec.EmbedFSDir)
 				if err != nil {
 					err = fmt.Errorf("BeforeCleanup failed: %v", err)
 					log.Error(err.Error())
 					errs = append(errs, err)
 					innerRC = 1
 				}
-				log.Infof("BeforeCleanup out: %v, err: %v", outb.String(), errb.String())
+				log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 			}
 			if job.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
@@ -186,7 +159,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
 			// We stop and index measurements per job
-			if err = measurements.Stop(); err != nil {
+			if err = measurementsInstance.Stop(); err != nil {
 				errs = append(errs, err)
 				log.Error(err.Error())
 				innerRC = rcMeasurement
@@ -195,7 +168,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				msWg.Add(1)
 				go func(jobName string) {
 					defer msWg.Done()
-					measurements.Index(jobName, metricsScraper.IndexerList)
+					measurementsInstance.Index(jobName, metricsScraper.IndexerList)
 				}(job.Name)
 			}
 		}
@@ -271,6 +244,18 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	return rc, utilerrors.NewAggregate(errs)
 }
 
+// If requests, preload the images used in the test into the node
+func handlePreloadImages(executorList []Executor, kubeClientProvider *config.KubeClientProvider) {
+	clientSet, _ := kubeClientProvider.DefaultClientSet()
+	for _, executor := range executorList {
+		if executor.PreLoadImages && executor.JobType == config.CreationJob {
+			if err := preLoadImages(executor, clientSet); err != nil {
+				log.Fatal(err.Error())
+			}
+		}
+	}
+}
+
 // indexMetrics indexes metrics for the executed jobs
 func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[string]returnPair, metricsScraper metrics.Scraper, configSpec config.Spec, innerRC bool, executionErrors string, isTimeout bool) {
 	var jobSummaries []JobSummary
@@ -335,11 +320,9 @@ func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
 // newExecutorList Returns a list of executors
 func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) []Executor {
 	var executorList []Executor
-	_, restConfig = kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
-	discoveryClient = discovery.NewDiscoveryClientForConfigOrDie(restConfig)
 	for _, job := range configSpec.Jobs {
 		verifyJobDefaults(&job, configSpec.GlobalConfig.Timeout)
-		executorList = append(executorList, newExecutor(job, configSpec.GlobalConfig.UUID, configSpec.GlobalConfig.RUNID))
+		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job))
 	}
 	return executorList
 }
@@ -351,7 +334,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]Execu
 		executor := executorMap[executorUUID]
 		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(restConfig.QPS))
+		sem := make(chan int, int(executor.restConfig.QPS))
 		for _, ns := range namespaces {
 			sem <- 1
 			wg.Add(1)
@@ -369,13 +352,13 @@ func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector 
 	if wg != nil {
 		defer wg.Done()
 	}
-	util.CleanupNamespaces(ctx, ClientSet, labelSelector)
+	util.CleanupNamespaces(ctx, jobExecutor.clientSet, labelSelector)
 	for _, obj := range jobExecutor.objects {
 		jobExecutor.limiter.Wait(ctx)
-		if !obj.Namespaced {
-			CleanupNonNamespacedResourcesUsingGVR(ctx, obj, labelSelector)
+		if !obj.namespaced {
+			CleanupNonNamespacedResourcesUsingGVR(ctx, jobExecutor, obj, labelSelector)
 		} else if obj.namespace != "" { // When the object has a fixed namespace not generated by kube-burner
-			CleanupNamespaceResourcesUsingGVR(ctx, obj, obj.namespace, labelSelector)
+			CleanupNamespaceResourcesUsingGVR(ctx, jobExecutor, obj, obj.namespace, labelSelector)
 		}
 	}
 }

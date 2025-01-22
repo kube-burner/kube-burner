@@ -44,6 +44,8 @@ This is the main subcommand; it triggers a new kube-burner benchmark and it supp
 - `kubeconfig`: Path to the kubeconfig file.
 - `kube-context`: The name of the kubeconfig context to use.
 - `user-metadata`: YAML file path containing custom user-metadata to be indexed along with the `jobSummary` document.
+- `user-data`: YAML or JSON file path containing input variables for rendering the configuration file.
+- `allow-missing`: Allow missing keys in the config file. Needed when using the [`default`](https://masterminds.github.io/sprig/defaults.html) template function
 
 !!! Note "Prometheus authentication"
     Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.

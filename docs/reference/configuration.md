@@ -2,7 +2,13 @@
 
 All of the magic that `kube-burner` does is described in its configuration file. As previously mentioned, the location of this configuration file is provided by the flag `-c`. This flag points to a YAML-formatted file that consists of several sections.
 
-It is possible to use [go-template](https://pkg.go.dev/text/template) semantics within this configuration file. It is also important to note that every environment variable is passed to this template, so we can reference them using the syntax `{{.MY_ENV_VAR}}`. For example, you could define the `indexers` section of your own configuration file, such as:
+## Templating the configuraion file
+
+[go-template](https://pkg.go.dev/text/template) semantics may be used within the configuration file.
+The input for the templates is taken from a user data file (using the `--user-data` parameter) and/or environment variables.
+Environment variables take precedence over those defined in the file when the same variable is defined in both.
+
+ For example, you could define the `indexers` section of your own configuration file, such as:
 
 ```yaml
 metricsEndpoints:
@@ -280,6 +286,82 @@ jobs:
     labelSelector: {kube-burner-job: create-objects}
 ```
 
+### Kubevirt
+
+This type of job can be used to execute `virtctl` commands described in the object list. This object list has the following structure:
+
+```yaml
+objects:
+- kubeVirtOp: start
+  labelSelector: {kube-burner-job: cluster-density}
+  inputVars:
+    force: true
+```
+
+Where:
+
+- `kubeVirtOp`: virtctl operation to execute.
+- `labelSelector`: Map with the labelSelector.
+- `inputVars`: Additional command parameters
+
+#### Supported Operations
+
+##### `start`
+
+Execute `virtctl start` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `startPaused` - VM will start in `Paused` state. Default `false`
+
+##### `stop`
+
+Execute `virtctl stop` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `force` - Force stop the VM without waiting. Default `false`
+
+##### `restart`
+
+Execute `virtctl restart` on the VMs mapped by the `labelSelector`.
+Additional parameters may be set using the `inputVars` field:
+
+- `force` - Force restart the VM without waiting. Default `false`
+
+##### `pause`
+
+Execute `virtctl pause` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+##### `unpause`
+
+Execute `virtctl unpause` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+
+##### `migrate`
+
+Execute `virtctl migrate` on the VMs mapped by the `labelSelector`.
+No additional parametes are supported.
+
+##### `add-volume`
+
+Execute `virtctl addvolume` on the VMs mapped by the `labelSelector`.
+Additional parameters should be set using the `inputVars` field:
+
+- `volumeName` - Name of the already existing volume to add. Mandatory
+- `diskType` - Type of the new volume (`disk`/`lun`). Default `disk`
+- `serial` - serial number you want to assign to the disk. Defaults to the value of `volumeName`
+- `cache` - caching options attribute control the cache mechanism. Default `''`
+- `persist` - if set, the added volume will be persisted in the VM spec (if it exists). Default `false`
+
+##### `remove-volume`
+
+Execute `virtctl removevolume` on the VMs mapped by the `labelSelector`.
+Additional parameters should be set using the `inputVars` field:
+
+- `volumeName` - Name of the volume to remove. Mandatory
+- `persist` - if set, the added volume will be persisted in the VM spec (if it exists). Default `false`
+
 ## Execution Modes
 
 Patch jobs support different execution modes
@@ -322,6 +404,7 @@ All object templates are injected with the variables below by default:
 - `Replica`: Object replica number. Keep in mind that this number is reset to 1 with each job iteration.
 - `JobName`: Job name.
 - `UUID`: Benchmark UUID.
+- `RunID`: Internal run id. Can be used to match resources for metrics collection
 
 In addition, you can also inject arbitrary variables with the option `inputVars` of the object:
 
@@ -368,7 +451,19 @@ spec:
 
 ## Template functions
 
-In addition to the default [golang template semantics](https://golang.org/pkg/text/template/), kube-burner is compiled with the [sprig library](http://masterminds.github.io/sprig/), which adds over 70 template functions for Go’s template language.
+On top of the default [golang template semantics](https://golang.org/pkg/text/template/), `kube-burner` supports additional template functions.
+
+### External libraries
+
+- [sprig library](http://masterminds.github.io/sprig/) which adds over 70 template functions for Go’s template language.
+
+### Additional functions
+
+- `Binomial` - returns the binomial coefficient of (n,k)
+- `IndexToCombination` - returns the combination corresponding to the given index
+- `GetSubnet24`
+- `GetIPAddress` - returns number of addresses requested per iteration from the list of total provided addresses
+- `ReadFile` - returns the content of the file in the provided path
 
 ## RunOnce
 

@@ -15,8 +15,6 @@
 package measurements
 
 import (
-	"embed"
-	"fmt"
 	"sync"
 
 	"github.com/cloud-bulldozer/go-commons/indexers"
@@ -28,93 +26,105 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type measurementFactory struct {
-	jobConfig   *config.Job
-	clientSet   kubernetes.Interface
-	restConfig  *rest.Config
-	createFuncs map[string]measurement
-	metadata    map[string]interface{}
+type MeasurementsFactory struct {
+	metadata  map[string]interface{}
+	factories map[string]measurementFactory
 }
+
+type Measurements struct {
+	measurementsMap map[string]measurement
+}
+
+type measurementFactory interface {
+	newMeasurement(*config.Job, kubernetes.Interface, *rest.Config) measurement
+}
+type newMeasurementFactory func(config.Spec, types.Measurement, map[string]interface{}) (measurementFactory, error)
 
 type measurement interface {
 	start(*sync.WaitGroup) error
 	stop() error
 	collect(*sync.WaitGroup)
-	setConfig(types.Measurement) error
 	index(string, map[string]indexers.Indexer)
 	getMetrics() *sync.Map
 }
 
-var factory measurementFactory
-var measurementMap = make(map[string]measurement)
-var globalCfg config.GlobalConfig
-var embedFS embed.FS
-var embedFSDir string
-
-// NewMeasurementFactory initializes the measurement facture
-func NewMeasurementFactory(configSpec config.Spec, metadata map[string]interface{}) {
-	var indexerFound bool
-	embedFS = configSpec.EmbedFS
-	embedFSDir = configSpec.EmbedFSDir
-	globalCfg = configSpec.GlobalConfig
-	factory = measurementFactory{
-		createFuncs: make(map[string]measurement),
-		metadata:    metadata,
-	}
-	for _, measurement := range globalCfg.Measurements {
-		indexerFound = false
-		if measurement.QuantilesIndexer != "" || measurement.TimeseriesIndexer != "" {
-			for _, indexer := range configSpec.MetricsEndpoints {
-				if indexer.Alias == measurement.QuantilesIndexer || indexer.Alias == measurement.TimeseriesIndexer {
-					indexerFound = true
-					break
-				}
-			}
-			if !indexerFound {
-				log.Fatalf("One of the indexers for measurement %s has not been found", measurement.Name)
-			}
-		}
-		if measurementFunc, exists := measurementMap[measurement.Name]; exists {
-			if err := factory.register(measurement, measurementFunc); err != nil {
-				log.Fatal(err.Error())
-			}
-		} else {
-			log.Warnf("Measurement not found: %s", measurement.Name)
-		}
-	}
+var measurementFactoryMap = map[string]newMeasurementFactory{
+	"podLatency":        newPodLatencyMeasurementFactory,
+	"pvcLatency":        newPvcLatencyMeasurementFactory,
+	"nodeLatency":       newNodeLatencyMeasurementFactory,
+	"vmiLatency":        newVmiLatencyMeasurementFactory,
+	"serviceLatency":    newServiceLatencyMeasurementFactory,
+	"pprof":             newPprofLatencyMeasurementFactory,
+	"netpolLatency":     newNetpolLatencyMeasurementFactory,
+	"dataVolumeLatency": newDvLatencyMeasurementFactory,
 }
 
-func (mf *measurementFactory) register(measurement types.Measurement, measurementFunc measurement) error {
-	if _, exists := mf.createFuncs[measurement.Name]; exists {
-		log.Warnf("Measurement already registered: %s", measurement.Name)
-	} else {
-		if err := measurementFunc.setConfig(measurement); err != nil {
-			return fmt.Errorf("%s config error: %s", measurement.Name, err)
+func isIndexerOk(configSpec config.Spec, measurement types.Measurement) bool {
+	if measurement.QuantilesIndexer != "" || measurement.TimeseriesIndexer != "" {
+		for _, indexer := range configSpec.MetricsEndpoints {
+			if indexer.Alias == measurement.QuantilesIndexer || indexer.Alias == measurement.TimeseriesIndexer {
+				return true
+			}
 		}
-		mf.createFuncs[measurement.Name] = measurementFunc
+		return false
+	}
+	return true
+}
+
+// NewMeasurementsFactory initializes the measurement facture
+func NewMeasurementsFactory(configSpec config.Spec, metadata map[string]interface{}) *MeasurementsFactory {
+	measurementsFactory := MeasurementsFactory{
+		metadata:  metadata,
+		factories: make(map[string]measurementFactory, len(configSpec.GlobalConfig.Measurements)),
+	}
+	for _, measurement := range configSpec.GlobalConfig.Measurements {
+		if !isIndexerOk(configSpec, measurement) {
+			log.Fatalf("One of the indexers for measurement %s has not been found", measurement.Name)
+		}
+		if _, alreadyRegistered := measurementsFactory.factories[measurement.Name]; alreadyRegistered {
+			log.Warnf("Measurement [%s] is registered more than once", measurement.Name)
+			continue
+		}
+		newMeasurementFactoryFunc, exists := measurementFactoryMap[measurement.Name]
+		if !exists {
+			log.Warnf("Measurement [%s] is not supported", measurement.Name)
+			continue
+		}
+		mf, err := newMeasurementFactoryFunc(configSpec, measurement, metadata)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		measurementsFactory.factories[measurement.Name] = mf
 		log.Infof("📈 Registered measurement: %s", measurement.Name)
 	}
-	return nil
+	return &measurementsFactory
 }
 
-func SetJobConfig(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider) {
-	factory.jobConfig = jobConfig
-	factory.clientSet, factory.restConfig = kubeClientProvider.ClientSet(factory.jobConfig.QPS, factory.jobConfig.Burst)
+func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider) *Measurements {
+	ms := Measurements{
+		measurementsMap: make(map[string]measurement, len(msf.factories)),
+	}
+	clientSet, restConfig := kubeClientProvider.ClientSet(jobConfig.QPS, jobConfig.Burst)
+	for name, factory := range msf.factories {
+		ms.measurementsMap[name] = factory.newMeasurement(jobConfig, clientSet, restConfig)
+	}
+
+	return &ms
 }
 
 // Start starts registered measurements
-func Start() {
+func (ms *Measurements) Start() {
 	var wg sync.WaitGroup
-	for _, measurement := range factory.createFuncs {
+	for _, measurement := range ms.measurementsMap {
 		wg.Add(1)
 		go measurement.start(&wg)
 	}
 	wg.Wait()
 }
 
-func Collect() {
+func (ms *Measurements) Collect() {
 	var wg sync.WaitGroup
-	for _, measurement := range factory.createFuncs {
+	for _, measurement := range ms.measurementsMap {
 		wg.Add(1)
 		go measurement.collect(&wg)
 	}
@@ -123,9 +133,9 @@ func Collect() {
 
 // Stop stops registered measurements
 // returns a concatenated list of error strings with a new line between each string
-func Stop() error {
+func (ms *Measurements) Stop() error {
 	errs := []error{}
-	for name, measurement := range factory.createFuncs {
+	for name, measurement := range ms.measurementsMap {
 		log.Infof("Stopping measurement: %s", name)
 		errs = append(errs, measurement.stop())
 	}
@@ -136,16 +146,16 @@ func Stop() error {
 //
 // jobName is the name of the job to index data for.
 // indexerList is a variadic parameter of indexers.Indexer implementations.
-func Index(jobName string, indexerList map[string]indexers.Indexer) {
-	for name, measurement := range factory.createFuncs {
+func (ms *Measurements) Index(jobName string, indexerList map[string]indexers.Indexer) {
+	for name, measurement := range ms.measurementsMap {
 		log.Infof("Indexing collected data from measurement: %s", name)
 		measurement.index(jobName, indexerList)
 	}
 }
 
-func GetMetrics() []*sync.Map {
+func (ms *Measurements) GetMetrics() []*sync.Map {
 	var metricList []*sync.Map
-	for name, measurement := range factory.createFuncs {
+	for name, measurement := range ms.measurementsMap {
 		log.Infof("Fetching metrics from measurement: %s", name)
 		metricList = append(metricList, measurement.getMetrics())
 	}

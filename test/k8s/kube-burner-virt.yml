@@ -6,6 +6,10 @@ global:
   - name: vmiLatency
 {{ if .TIMESERIES_INDEXER }}
     timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
+    thresholds:
+        - conditionType: VMIRunning
+          metric: P99
+          threshold: 10s
 {{ end }}
 metricsEndpoints:
 {{ if .ES_INDEXING }}
@@ -47,6 +51,8 @@ jobs:
     podWait: false
     maxWaitTimeout: 1h   
     cleanup: true
+    preLoadImages: true
+    preLoadPeriod: 2s
     objects:
 
     - objectTemplate: objectTemplates/vm-ephemeral.yml

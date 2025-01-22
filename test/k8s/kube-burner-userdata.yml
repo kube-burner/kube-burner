@@ -1,0 +1,30 @@
+---
+jobs:
+  - name: userdata
+    jobType: create
+    jobIterations: 1
+    qps: {{ .QPS }}
+    burst: {{ .BURST }}
+    namespacedIterations: false
+    preLoadImages: false
+    cleanup: true
+    namespace: {{ .NAMESPACE }}
+    podWait: false
+    waitWhenFinished: true
+    verifyObjects: true
+    errorOnVerify: true
+    jobIterationDelay: 5s
+    maxWaitTimeout: 2m
+    # Set missing key as empty to allow using default values
+    defaultMissingKeysWithZero: true
+    objects:
+
+    - objectTemplate: objectTemplates/deployment-userdata-labels.yml
+      replicas: {{ .REPLICAS }}
+      inputVars:
+        containerImage: quay.io/cloud-bulldozer/sampleapp:latest
+        labelFromFile: {{ .deploymentLabelFromFile }}
+        labelFromEnv: {{ .deploymentLabelFromEnv }}
+      waitOptions:
+        forCondition: Available
+        customStatusPath: ".conditions[].type"

@@ -15,9 +15,11 @@
 package util
 
 import (
+	"fmt"
 	"math"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -31,4 +33,82 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 		Steps:    steps,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func GetBoolValue(m map[string]interface{}, key string) *bool {
+	var ret *bool
+	var convertedValue bool
+
+	if value, ok := m[key]; ok {
+		switch v := value.(type) {
+		case bool:
+			ret = &v
+		case string:
+			if v == "true" {
+				convertedValue = true
+			} else if v == "false" {
+				convertedValue = false
+			} else {
+				log.Fatalf("cannot convert %v to bool", v)
+			}
+			ret = &convertedValue
+		case float64:
+			convertedValue = v == 1
+			ret = &convertedValue
+		default:
+			log.Fatalf("unexpected type for '%s' field: %T", key, v)
+		}
+	}
+	return ret
+}
+
+func GetIntegerValue(m map[string]interface{}, key string) *int {
+	var ret *int
+	var intValue int
+
+	if value, ok := m[key]; ok {
+		switch v := value.(type) {
+		case int:
+			ret = &v
+		case float64:
+			intValue = int(v)
+			ret = &intValue
+		case string:
+			if _, err := fmt.Sscanf(v, "%d", &intValue); err == nil {
+				ret = &intValue
+			} else {
+				log.Fatalf("cannot convert %v to int", v)
+			}
+		default:
+			log.Fatalf("unexpected type for 'paused' field: %T", v)
+		}
+	}
+	return ret
+}
+
+func GetStringValue(m map[string]interface{}, key string) *string {
+	var ret *string
+	var strValue string
+
+	if value, ok := m[key]; ok {
+		switch v := value.(type) {
+		case string:
+			ret = &v
+		case float64:
+			// Convert float64 to string, e.g., 123.0 -> "123"
+			strValue = fmt.Sprintf("%v", v)
+			ret = &strValue
+		case bool:
+			// Convert bool to string, e.g., true -> "true"
+			if v {
+				strValue = "true"
+			} else {
+				strValue = "false"
+			}
+			ret = &strValue
+		default:
+			log.Fatalf("unexpected type for '%s' field: %T", key, v)
+		}
+	}
+	return ret
 }

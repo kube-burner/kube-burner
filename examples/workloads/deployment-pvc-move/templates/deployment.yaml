@@ -1,0 +1,33 @@
+{{- $randomIndex := randInt 0 (len .workerHostNames) -}}
+{{- $targetWorker := index .workerHostNames $randomIndex -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-pvc-move-{{.Replica}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: deployment-pvc-move-{{.Replica}}
+  template:
+    metadata:
+      labels:
+        group: load
+        name: deployment-pvc-move-{{.Replica}}
+    spec:
+      containers:
+      - image: registry.k8s.io/pause:3.1
+        name: deployment-pvc-move-{{.Replica}}
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10M
+        volumeMounts:
+          - name: pvc
+            mountPath: /var/pvc
+      volumes:
+        - name: pvc
+          persistentVolumeClaim:
+            claimName: deployment-pvc-move-{{.Replica}}
+      nodeSelector:
+        "kubernetes.io/hostname": {{ $targetWorker }}

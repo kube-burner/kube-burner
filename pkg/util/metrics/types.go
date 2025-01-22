@@ -28,7 +28,6 @@ type ScraperConfig struct {
 	UserMetaData    string
 	SummaryMetadata map[string]interface{}
 	MetricsMetadata map[string]interface{}
-	EmbedConfig     bool
 }
 
 // ScraperResponse holds parsed data related to scraper and target indexer

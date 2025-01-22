@@ -20,16 +20,16 @@ import (
 	"sync"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *Executor) setupPatchJob() {
+func (ex *Executor) setupPatchJob(configSpec config.Spec, mapper meta.RESTMapper) {
 	log.Debugf("Preparing patch job: %s", ex.Name)
 	ex.itemHandler = patchHandler
 	if len(ex.ExecutionMode) == 0 {
@@ -39,13 +39,12 @@ func (ex *Executor) setupPatchJob() {
 		log.Fatalf("Unsupported Execution Mode: %s", ex.ExecutionMode)
 	}
 
-	mapper := newRESTMapper()
 	for _, o := range ex.Objects {
 		if len(o.PatchType) == 0 {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
 		log.Infof("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper))
+		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, APIVersionV1))
 	}
 }
 
@@ -62,38 +61,14 @@ func patchHandler(ex *Executor, obj object, originalItem unstructured.Unstructur
 		}
 		data = obj.objectSpec
 	} else {
-		// Processing template
-		templateData := map[string]interface{}{
-			jobName:      ex.Name,
-			jobIteration: iteration,
-			jobUUID:      ex.uuid,
-		}
-		for k, v := range obj.InputVars {
-			templateData[k] = v
-		}
-
-		templateOption := util.MissingKeyError
-		if ex.DefaultMissingKeysWithZero {
-			templateOption = util.MissingKeyZero
-		}
-
-		renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
-		if err != nil {
-			log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
-		}
-
-		// Converting to JSON if patch type is not Apply
+		var asJson bool
 		if obj.PatchType == string(types.ApplyPatchType) {
-			data = renderedObj
 			patchOptions.FieldManager = "kube-controller-manager"
+			asJson = false
 		} else {
-			newObject := &unstructured.Unstructured{}
-			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
-			data, err = newObject.MarshalJSON()
-			if err != nil {
-				log.Errorf("Error converting patch to JSON")
-			}
+			asJson = true
 		}
+		data = ex.renderTemplateForObject(obj, iteration, 0, asJson)
 	}
 
 	ns := originalItem.GetNamespace()
@@ -103,12 +78,12 @@ func patchHandler(ex *Executor, obj object, originalItem unstructured.Unstructur
 
 	var uns *unstructured.Unstructured
 	var err error
-	if obj.Namespaced {
-		uns, err = DynamicClient.Resource(obj.gvr).Namespace(ns).
+	if obj.namespaced {
+		uns, err = ex.dynamicClient.Resource(obj.gvr).Namespace(ns).
 			Patch(context.TODO(), originalItem.GetName(),
 				types.PatchType(obj.PatchType), data, patchOptions)
 	} else {
-		uns, err = DynamicClient.Resource(obj.gvr).
+		uns, err = ex.dynamicClient.Resource(obj.gvr).
 			Patch(context.TODO(), originalItem.GetName(),
 				types.PatchType(obj.PatchType), data, patchOptions)
 	}

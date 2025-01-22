@@ -21,13 +21,14 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (ex *Executor) setupDeleteJob() {
+func (ex *Executor) setupDeleteJob(configSpec config.Spec, mapper meta.RESTMapper) {
 	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
@@ -37,10 +38,9 @@ func (ex *Executor) setupDeleteJob() {
 	ex.JobIterations = 1
 	// Use the sequential mode
 	ex.ExecutionMode = config.ExecutionModeSequential
-	mapper := newRESTMapper()
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper))
+		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, APIVersionV1))
 	}
 }
 
@@ -48,25 +48,25 @@ func deleteHandler(ex *Executor, obj object, item unstructured.Unstructured, ite
 	defer wg.Done()
 	ex.limiter.Wait(context.TODO())
 	var err error
-	if obj.Namespaced {
+	if obj.namespaced {
 		log.Debugf("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
-		err = DynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+		err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	} else {
 		log.Debugf("Removing %s/%s", item.GetKind(), item.GetName())
-		err = DynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+		err = ex.dynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}
 	if err != nil {
 		log.Errorf("Error found removing %s/%s: %s", item.GetKind(), item.GetName(), err)
 	}
 }
 
-func verifyDelete(obj object) {
+func verifyDelete(ex *Executor, obj object) {
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
 	wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		itemList, err := DynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+		itemList, err := ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
 		if err != nil {
 			log.Error(err.Error())
 			return false, nil

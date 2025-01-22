@@ -6,7 +6,7 @@ load helpers.bash
 
 setup_file() {
   cd k8s
-  export BATS_TEST_TIMEOUT=600
+  export BATS_TEST_TIMEOUT=1800
   export JOB_ITERATIONS=4
   export QPS=3
   export BURST=3
@@ -185,4 +185,42 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c  kube-burner-sequential-patch.yml --uuid="${UUID}" --log-level=debug
   check_deployment_count ${NAMESPACE} ${LABEL_KEY} ${LABEL_VALUE_END} ${REPLICAS}
   kubectl delete ns ${NAMESPACE}
+}
+
+@test "kube-burner init: jobType kubevirt" {
+  run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid="${UUID}" --log-level=debug
+}
+
+@test "kube-burner init: user data file" {
+  export NAMESPACE="userdata"
+  export deploymentLabelFromEnv="from-env"
+  export REPLICAS=5
+
+  run_cmd ${KUBE_BURNER} init -c kube-burner-userdata.yml --user-data=objectTemplates/userdata-test.yml --uuid="${UUID}" --log-level=debug
+  # Verify that both labels were set
+  check_deployment_count ${NAMESPACE} "kube-burner.io/from-file" "unset" 0
+  check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "unset" 0
+  # Verify that the from-file label was set from the user-data file
+  check_deployment_count ${NAMESPACE} "kube-burner.io/from-file" "from-file" ${REPLICAS}
+  # Verify that the from-env label was NOT set from the user-data file
+  check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "from-file" 0
+  # Verify that the from-env label was set from the environment variable
+  check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "from-env" ${REPLICAS}
+  # Verify that the default value is used when the variable is not set
+  check_deployment_count ${NAMESPACE} "kube-burner.io/unset" "unset" ${REPLICAS}
+  kubectl delete ns ${NAMESPACE}
+}
+
+@test "kube-burner init: datavolume latency" {
+  export STORAGE_CLASS_NAME
+  STORAGE_CLASS_NAME=$(get_default_storage_class)
+  run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid="${UUID}" --log-level=debug
+
+  local jobs=("create-vm" "create-base-image-dv")
+  for job in "${jobs[@]}"; do
+    check_metric_recorded ${job} dvLatency dvReadyLatency 
+    check_metric_recorded ${job} pvcLatency bindingLatency
+    check_quantile_recorded ${job} dvLatency Ready
+    check_quantile_recorded ${job} pvcLatency Bound
+  done
 }
