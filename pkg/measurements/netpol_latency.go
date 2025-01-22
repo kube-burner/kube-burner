@@ -492,6 +492,14 @@ func (n *netpolLatency) start(measurementWg *sync.WaitGroup) error {
 		if err != nil {
 			return err
 		}
+		err = createAdminNetworkPolicy()
+		if err != nil {
+			return err
+		}
+		err = createBaselineAdminNetworkPolicy()
+		if err != nil {
+			return err
+		}
 	}
 	if proxyPortForwarder == nil {
 		proxyPortForwarder, err = util.NewPodPortForwarder(n.clientSet, *n.restConfig, networkPolicyProxyPort, networkPolicyProxy, networkPolicyProxy)

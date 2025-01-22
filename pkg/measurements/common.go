@@ -32,11 +32,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
+
+	adminpolicy "sigs.k8s.io/network-policy-api/apis/v1alpha1"
+	"sigs.k8s.io/network-policy-api/pkg/client/clientset/versioned/typed/apis/v1alpha1"
 )
 
+var DynamicClient dynamic.Interface
 var (
 	supportedLatencyMetricsMap = map[string]struct{}{
 		"P99": {},
@@ -213,4 +218,89 @@ func deployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, im
 		return true, nil
 	})
 	return err
+}
+
+// Function to create AdminNetworkPolicy
+func createAdminNetworkPolicy() error {
+	alphaClientSet, err := v1alpha1.NewForConfig(factory.restConfig)
+	if err != nil {
+		log.Debugf("Error %v while getting clientset in AdminNetwork Policy", err)
+		return err
+	}
+
+	// Define the AdminNetworkPolicy object
+	netObj := &adminpolicy.AdminNetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "allow-from-proxy",
+		},
+		Spec: adminpolicy.AdminNetworkPolicySpec{
+			Priority: 99,
+			Subject: adminpolicy.AdminNetworkPolicySubject{
+				Namespaces: &metav1.LabelSelector{},
+			},
+			Ingress: []adminpolicy.AdminNetworkPolicyIngressRule{
+				{
+					Name:   "allow-from-proxy-pod",
+					Action: adminpolicy.AdminNetworkPolicyRuleActionAllow,
+					From: []adminpolicy.AdminNetworkPolicyIngressPeer{
+						{
+							Namespaces: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"kubernetes.io/metadata.name": "network-policy-proxy"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err = alphaClientSet.AdminNetworkPolicies().Create(context.TODO(), netObj, metav1.CreateOptions{})
+	// Use Kubernetes client to create the resource
+	if err != nil {
+		log.Debugf("Error %v while creating Admin Network Policy ", err)
+		return err
+	}
+
+	return nil
+}
+
+// Function to create Baseline AdminNetworkPolicy
+func createBaselineAdminNetworkPolicy() error {
+	alphaClientSet, err := v1alpha1.NewForConfig(factory.restConfig)
+	if err != nil {
+		log.Debugf("Error %v while getting clientset in BaselineAdminNetwork Policy", err)
+		return err
+	}
+
+	// Define the Baseline AdminNetworkPolicy object
+	basenetObj := &adminpolicy.BaselineAdminNetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+		Spec: adminpolicy.BaselineAdminNetworkPolicySpec{
+			Subject: adminpolicy.AdminNetworkPolicySubject{
+				Namespaces: &metav1.LabelSelector{},
+			},
+			Ingress: []adminpolicy.BaselineAdminNetworkPolicyIngressRule{
+				{
+					Name:   "default-deny",
+					Action: adminpolicy.BaselineAdminNetworkPolicyRuleActionDeny,
+					From: []adminpolicy.AdminNetworkPolicyIngressPeer{
+						{
+							Namespaces: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"kube-burner-uuid": globalCfg.UUID},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err = alphaClientSet.BaselineAdminNetworkPolicies().Create(context.TODO(), basenetObj, metav1.CreateOptions{})
+	// Use Kubernetes client to create the resource
+	if err != nil {
+		log.Debugf("Error %v while creating BANP ", err)
+		return err
+	}
+
+	return nil
 }
