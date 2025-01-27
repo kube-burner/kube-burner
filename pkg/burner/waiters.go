@@ -207,11 +207,7 @@ func (ex *Executor) waitForJob(ns string, obj object) error {
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
 		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
 			{
-				Key:   ".conditions[].type",
-				Value: "Complete",
-			},
-			{
-				Key:   ".conditions[].status",
+				Key:   "(.conditions.[] | select(.type == \"Complete\")).status",
 				Value: "True",
 			},
 		}
@@ -295,11 +291,7 @@ func (ex *Executor) waitForVMorVMI(ns string, obj object) error {
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
 		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
 			{
-				Key:   ".conditions[].type",
-				Value: "Ready",
-			},
-			{
-				Key:   ".conditions[].status",
+				Key:   "(.conditions.[] | select(.type == \"Ready\")).status",
 				Value: "True",
 			},
 		}

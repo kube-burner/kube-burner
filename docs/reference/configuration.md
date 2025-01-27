@@ -149,12 +149,21 @@ objects:
     replicas: 1
     waitOptions:
       customStatusPaths:
-        - key: ".conditions[].type"
-          value: "Available"
-        - key: ".conditions[].status"
+        - key: '(.conditions.[] | select(.type == "Available")).status'
           value: "True"
 ```
 This allows kube-burner to check the status at all the specified key/value pairs and verify readiness of the object. If any of them do not match then it is indicated as a failure.
+
+!!! note
+  Currently, the `value` field expects only strings.
+  In order to test other types make sure to convert the result to a string in the `key`.
+
+  For example, to verify that a `VolumeSnapshot` is `readyToUse` set the `customStatusPaths` to:
+  ```yaml
+  customStatusPaths:
+    - key: '(.conditions.[] | select(.type == "Ready")).status'
+      value: "True"
+  ```
 
 !!! note
     `waitOptions.kind`, `waitOptions.customStatusPaths` and `waitOptions.labelSelector` are fully optional. `waitOptions.kind` is used when an application has child objects to be waited & `waitOptions.labelSelector` is used when we want to wait on objects with specific labels.

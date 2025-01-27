@@ -27,5 +27,5 @@ jobs:
         labelFromEnv: {{ .deploymentLabelFromEnv }}
       waitOptions:
         customStatusPaths:
-        - key: ".conditions[].type"
-          value: "Available"
+        - key: '(.conditions.[] | select(.type == "Available")).status'
+          value: "True"
