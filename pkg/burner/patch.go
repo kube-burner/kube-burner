@@ -48,7 +48,7 @@ func (ex *Executor) setupPatchJob(configSpec config.Spec, mapper meta.RESTMapper
 	}
 }
 
-func patchHandler(ex *Executor, obj object, originalItem unstructured.Unstructured, iteration int, wg *sync.WaitGroup) {
+func patchHandler(ex *Executor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 	// There are several patch modes. Three of them are client-side, and one
 	// of them is server-side.
@@ -68,7 +68,7 @@ func patchHandler(ex *Executor, obj object, originalItem unstructured.Unstructur
 		} else {
 			asJson = true
 		}
-		data = ex.renderTemplateForObject(obj, iteration, 0, asJson)
+		data = ex.renderTemplateForObject(*obj, iteration, 0, asJson)
 	}
 
 	ns := originalItem.GetNamespace()

@@ -373,6 +373,22 @@ Additional parameters should be set using the `inputVars` field:
 - `volumeName` - Name of the volume to remove. Mandatory
 - `persist` - if set, the added volume will be persisted in the VM spec (if it exists). Default `false`
 
+#### Wait for completion
+
+Wait is supported for the following operations:
+
+- `start` - Wait for the `Ready` state of the `VirtualMachine`  to become `True`
+- `stop` - Wait for the  `Ready` state of the `VirtualMachine` state to become `False` with `reason` equal to `VMINotExists`
+- `restart` - Wait for the `Ready` state of the `VirtualMachine`  to become `True`
+- `pause` - Wait for the `Paused` state of the `VirtualMachine`  to become `True`
+- `unpause` - Wait for the `Ready` state of the `VirtualMachine`  to become `True`
+- `migrate` - Wait for the `Ready` state of the `VirtualMachine`  to become `True`
+
+!!! note
+    The waiter makes sure that the `lastTransitionTime` of the condition is after the time of the command.
+    This requires that the timestamps on the cluster side are in UTC
+
+
 ## Execution Modes
 
 Patch jobs support different execution modes

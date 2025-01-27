@@ -44,7 +44,7 @@ func (ex *Executor) setupDeleteJob(configSpec config.Spec, mapper meta.RESTMappe
 	}
 }
 
-func deleteHandler(ex *Executor, obj object, item unstructured.Unstructured, iteration int, wg *sync.WaitGroup) {
+func deleteHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 	ex.limiter.Wait(context.TODO())
 	var err error
