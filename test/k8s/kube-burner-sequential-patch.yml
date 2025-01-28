@@ -23,8 +23,8 @@ jobs:
         containerImage: quay.io/cloud-bulldozer/sampleapp:latest
       waitOptions:
         customStatusPaths:
-        - key: ".conditions[].type"
-          value: "Available"
+        - key: '(.conditions.[] | select(.type == "Available")).status'
+          value: "True"
 
   - name: relabel
     jobType: patch

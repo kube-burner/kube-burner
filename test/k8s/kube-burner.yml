@@ -27,7 +27,7 @@ metricsEndpoints:
 {{ end }}
 {{ if .LOCAL_INDEXING }}
   - endpoint: http://localhost:9090
-    indexer: 
+    indexer:
       type: local
       metricsDirectory: {{ .METRICS_FOLDER }}
     metrics: [metrics-profile.yaml]
@@ -70,9 +70,9 @@ jobs:
       {{- if env "WAIT_FOR_CONDITION" }}
       waitOptions:
         customStatusPaths:
-        - key: "{{ env `WAIT_CUSTOM_STATUS_PATH` }}"
-          value: "{{ env `WAIT_FOR_CONDITION` }}"
-      {{- end }} 
+        - key: '{{ env `WAIT_CUSTOM_STATUS_PATH` }}'
+          value: '{{ env `WAIT_FOR_CONDITION` }}'
+      {{- end }}
 
     - objectTemplate: objectTemplates/pod.yml
       replicas: 1
