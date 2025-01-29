@@ -353,10 +353,15 @@ func (ex *Executor) RunCreateJobWithChurn(ctx context.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
 		// Cleanup namespaces based on the labels we added
-		if ex.ChurnDeletionStrategy == "gvr" {
-			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
+		if ex.JobIterations < ex.IterationsPerNamespace && len(namespacesToDelete) == 1 {
+			log.Infof("Churning through iterations: %d to %d in namespace: %s", randStart, numToChurn+randStart, namespacesToDelete[0])
+			CleanupIterations(ctx, *ex, randStart, numToChurn+randStart, namespacesToDelete[0])
+		} else {
+			if ex.ChurnDeletionStrategy == "gvr" {
+				CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
+			}
+			util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
 		}
-		util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})
