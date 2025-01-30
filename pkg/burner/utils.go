@@ -225,7 +225,11 @@ func (ex *Executor) runSequential(ctx context.Context) {
 			}
 			// Wait for all items in the object
 			wg.Wait()
-			ex.waitForObjects("")
+
+			// If requested, wait for the completion of the specific object
+			if ex.ObjectWait {
+				ex.waitForObject("", &obj)
+			}
 
 			if ex.objectFinalizer != nil {
 				ex.objectFinalizer(ex, obj)
@@ -235,6 +239,9 @@ func (ex *Executor) runSequential(ctx context.Context) {
 				log.Infof("Sleeping between objects for %v", ex.ObjectDelay)
 				time.Sleep(ex.ObjectDelay)
 			}
+		}
+		if ex.WaitWhenFinished {
+			ex.waitForObjects("")
 		}
 		// Wait between job iterations
 		if ex.JobIterationDelay > 0 {

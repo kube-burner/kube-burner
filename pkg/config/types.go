@@ -201,6 +201,8 @@ type Job struct {
 	ExecutionMode ExecutionMode `yaml:"executionMode" json:"executionMode,omitempty"`
 	// ObjectDelay how much time to wait between objects processing in patch jobs
 	ObjectDelay time.Duration `yaml:"objectDelay" json:"objectDelay,omitempty"`
+	// ObjectWait wait for each object to complete before processing the next one
+	ObjectWait bool `yaml:"objectWait" json:"objectWait,omitempty"`
 }
 
 type WaitOptions struct {

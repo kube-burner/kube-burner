@@ -31,29 +31,88 @@ jobs:
     burst: 20
     jobIterations: 2
     objectDelay: 1m
+    objectWait: true
+    waitWhenFinished: false
     objects:
     - kubeVirtOp: stop
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
+      waitOptions:
+        labelSelector:
+          kube-burner-job: kubevirt-ops
+        customStatusPaths:
+        - key:   "(.conditions.[] | select(.type == \"Ready\")).status"
+          value: "False"
     - kubeVirtOp: start
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
+      waitOptions:
+        labelSelector:
+          kube-burner-job: kubevirt-ops
+        customStatusPaths:
+        - key:   "(.conditions.[] | select(.type == \"Ready\")).status"
+          value: "True"
     - kubeVirtOp: restart
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
+      # Do not wait for the completion as there is currently no way to check it
+      wait: false
     - kubeVirtOp: pause
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
+      waitOptions:
+        labelSelector:
+          kube-burner-job: kubevirt-ops
+        customStatusPaths:
+        - key:   "(.conditions.[] | select(.type == \"Paused\")).status"
+          value: "True"
     - kubeVirtOp: unpause
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
+      waitOptions:
+        labelSelector:
+          kube-burner-job: kubevirt-ops
+        customStatusPaths:
+        - key:   "(.conditions.[] | select(.type == \"Ready\")).status"
+          value: "True"
     - kubeVirtOp: stop
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
       inputVars:
         force: true
+      waitOptions:
+        labelSelector:
+          kube-burner-job: kubevirt-ops
+        customStatusPaths:
+        - key:   "(.conditions.[] | select(.type == \"Ready\")).status"
+          value: "False"
     - kubeVirtOp: start
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
       inputVars:
         startPaused: true
+      waitOptions:
+        labelSelector:
+          kube-burner-job: kubevirt-ops
+        customStatusPaths:
+        - key:   "(.conditions.[] | select(.type == \"Paused\")).status"
+          value: "True"
     - kubeVirtOp: unpause
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
+      inputVars:
+        force: true
+      waitOptions:
+        labelSelector:
+          kube-burner-job: kubevirt-ops
+        customStatusPaths:
+        - key:   "(.conditions.[] | select(.type == \"Ready\")).status"
+          value: "True"
     - kubeVirtOp: migrate
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector:
+        kube-burner-job: kubevirt-ops
+      # Do not wait for the completion as there is currently no way to check it
+      wait: false
 
   # cleanup the experiment
   - name: delete-vms
@@ -68,4 +127,4 @@ jobs:
       apiVersion: kubevirt.io/v1
 
     - kind: Namespace
-      labelSelector: {kube-burner-job: ops}
+      labelSelector: {kube-burner-job: kubevirt-ops}
