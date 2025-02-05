@@ -35,53 +35,58 @@ import (
 )
 
 func (ex *Executor) waitForObjects(ns string) {
-	var err error
 	for _, obj := range ex.objects {
-		if !obj.Wait || obj.ready {
-			continue
-		}
-		// When the object has defined its own namespace, we use it
-		if obj.namespace != "" {
-			ns = obj.namespace
-		}
-		if len(obj.WaitOptions.CustomStatusPaths) > 0 {
-			err = ex.verifyCondition(ns, obj)
-		} else {
-			kind := obj.kind
-			if obj.WaitOptions.Kind != "" {
-				kind = obj.WaitOptions.Kind
-				ns = corev1.NamespaceAll
-			}
-			switch kind {
-			case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
-				err = ex.waitForReplicas(ns, obj, waitStatusMap[kind])
-			case Pod:
-				err = ex.waitForPod(ns, obj)
-			case Build, BuildConfig:
-				err = ex.waitForBuild(ns, obj)
-			case VirtualMachine, VirtualMachineInstance:
-				err = ex.waitForVMorVMI(ns, obj)
-			case Job:
-				err = ex.waitForJob(ns, obj)
-			case PersistentVolumeClaim:
-				err = ex.waitForPVC(ns, obj)
-			}
-		}
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				log.Fatalf("Timeout occurred while waiting for objects in namespace %s: %v", ns, err)
-			} else {
-				log.Fatalf("Error waiting for objects in namespace %s: %v", ns, err)
-			}
-		}
-		if obj.namespace != "" || obj.RunOnce {
-			obj.ready = true
-		}
+		ex.waitForObject(ns, &obj)
+
 	}
 	if ns != "" {
 		log.Infof("Actions in namespace %v completed", ns)
 	} else {
 		log.Info("Actions completed")
+	}
+}
+
+func (ex *Executor) waitForObject(ns string, obj *object) {
+	if !obj.Wait || obj.ready {
+		return
+	}
+	// When the object has defined its own namespace, we use it
+	if obj.namespace != "" {
+		ns = obj.namespace
+	}
+	var err error
+	if len(obj.WaitOptions.CustomStatusPaths) > 0 {
+		err = ex.verifyCondition(ns, *obj)
+	} else {
+		kind := obj.kind
+		if obj.WaitOptions.Kind != "" {
+			kind = obj.WaitOptions.Kind
+			ns = corev1.NamespaceAll
+		}
+		switch kind {
+		case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
+			err = ex.waitForReplicas(ns, *obj, waitStatusMap[kind])
+		case Pod:
+			err = ex.waitForPod(ns, *obj)
+		case Build, BuildConfig:
+			err = ex.waitForBuild(ns, *obj)
+		case VirtualMachine, VirtualMachineInstance:
+			err = ex.waitForVMorVMI(ns, *obj)
+		case Job:
+			err = ex.waitForJob(ns, *obj)
+		case PersistentVolumeClaim:
+			err = ex.waitForPVC(ns, *obj)
+		}
+	}
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Fatalf("Timeout occurred while waiting for objects in namespace %s: %v", ns, err)
+		} else {
+			log.Fatalf("Error waiting for objects in namespace %s: %v", ns, err)
+		}
+	}
+	if obj.namespace != "" || obj.RunOnce {
+		obj.ready = true
 	}
 }
 
