@@ -265,8 +265,8 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 							break
 						}
 						if err, ok := v.(error); ok {
-							log.Errorf("Error evaluating jq path: %s", err)
-							return false, err
+							log.Warnf("Error evaluating jq path: [%s]: %s", statusPath.Key, err)
+							break
 						}
 						if v == statusPath.Value {
 							isStatusValid = true
