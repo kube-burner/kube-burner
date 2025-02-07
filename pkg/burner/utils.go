@@ -219,9 +219,10 @@ func (ex *Executor) runSequential(ctx context.Context) {
 				continue
 			}
 			var wg sync.WaitGroup
+			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, obj, item, i, &wg)
+				go ex.itemHandler(ex, &obj, item, i, objectTimeUTC, &wg)
 			}
 			// Wait for all items in the object
 			wg.Wait()
@@ -270,9 +271,10 @@ func (ex *Executor) runParallel(ctx context.Context) {
 			continue
 		}
 		for j := 0; j < ex.JobIterations; j++ {
+			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, obj, item, j, &wg)
+				go ex.itemHandler(ex, &obj, item, j, objectTimeUTC, &wg)
 			}
 		}
 	}
