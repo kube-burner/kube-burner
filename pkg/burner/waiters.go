@@ -282,7 +282,7 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 				log.Debugf("Waiting for %s to be ready", obj.gvr.Resource)
 			}
 			if isVerified {
-				log.Infof("Status verified for object %s/%s", item.GetKind(), item.GetName())
+				log.Debugf("Status verified for object %s/%s", item.GetKind(), item.GetName())
 				continue VERIFY
 			}
 			return false, err
