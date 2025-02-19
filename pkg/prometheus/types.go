@@ -17,8 +17,8 @@ package prometheus
 import (
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/go-commons/prometheus"
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
+	"github.com/cloud-bulldozer/go-commons/v2/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/config"
 )
 
