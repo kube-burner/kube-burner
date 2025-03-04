@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/util"
@@ -114,19 +114,28 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func getInputData(userDataFileReader io.Reader) (map[string]interface{}, error) {
+func getInputData(userDataFileReader io.Reader, additionalVars map[string]interface{}) (map[string]interface{}, error) {
 	inputData := make(map[string]interface{})
+	// First copy from additionalVars
+	for key, value := range additionalVars {
+		inputData[key] = value
+	}
+	// If a userDataFileReader was provided use it to override values
 	if userDataFileReader != nil {
+		userDataFileVars := make(map[string]interface{})
 		userData, err := io.ReadAll(userDataFileReader)
 		if err != nil {
 			return nil, fmt.Errorf("error reading user data file: %w", err)
 		}
-		err = yaml.Unmarshal(userData, &inputData)
+		err = yaml.Unmarshal(userData, &userDataFileVars)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse file: %w", err)
 		}
+		for key, value := range userDataFileVars {
+			inputData[key] = value
+		}
 	}
-	// Add all entries from map2, overriding duplicates from map1
+	// Add all entries from environment variables, overriding duplicates
 	for key, value := range util.EnvToMap() {
 		inputData[key] = value
 	}
@@ -134,16 +143,16 @@ func getInputData(userDataFileReader io.Reader) (map[string]interface{}, error) 
 }
 
 func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec, error) {
-	return ParseWithUserdata(uuid, timeout, configFileReader, nil, false)
+	return ParseWithUserdata(uuid, timeout, configFileReader, nil, false, nil)
 }
 
 // Parse parses a configuration file
-func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool) (Spec, error) {
+func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]interface{}) (Spec, error) {
 	cfg, err := io.ReadAll(configFileReader)
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
 	}
-	inputData, err := getInputData(userDataFileReader)
+	inputData, err := getInputData(userDataFileReader, additionalVars)
 	if err != nil {
 		return configSpec, err
 	}

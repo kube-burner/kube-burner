@@ -40,15 +40,54 @@ const (
 	concurrentError      = "the server rejected our request due to an error in our request"
 )
 
-var supportedOps = map[config.KubeVirtOpType]struct{}{
-	config.KubeVirtOpStart:        {},
-	config.KubeVirtOpStop:         {},
-	config.KubeVirtOpRestart:      {},
-	config.KubeVirtOpPause:        {},
-	config.KubeVirtOpUnpause:      {},
-	config.KubeVirtOpMigrate:      {},
-	config.KubeVirtOpAddVolume:    {},
-	config.KubeVirtOpRemoveVolume: {},
+type OperationConfig struct {
+	conditionCheckConfig ConditionCheckConfig
+}
+
+var conditionCheckParamStatusTrue = newConditionCheckParam(conditionFieldStatus, "True")
+
+var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
+	config.KubeVirtOpStart: {
+		conditionCheckConfig: ConditionCheckConfig{
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+		},
+	},
+	config.KubeVirtOpStop: {
+		conditionCheckConfig: ConditionCheckConfig{
+			conditionType: conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{
+				newConditionCheckParam(conditionFieldStatus, "False"),
+				newConditionCheckParam(conditionFieldReason, "VMINotExists"),
+			},
+		},
+	},
+	config.KubeVirtOpRestart: {
+		conditionCheckConfig: ConditionCheckConfig{
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+		},
+	},
+	config.KubeVirtOpPause: {
+		conditionCheckConfig: ConditionCheckConfig{
+			conditionType:        conditionTypePaused,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+		},
+	},
+	config.KubeVirtOpUnpause: {
+		conditionCheckConfig: ConditionCheckConfig{
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+		},
+	},
+	config.KubeVirtOpMigrate: {
+		conditionCheckConfig: ConditionCheckConfig{
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+		},
+	},
+	config.KubeVirtOpAddVolume:    nil,
+	config.KubeVirtOpRemoveVolume: nil,
 }
 
 func (ex *Executor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMapper) {
@@ -80,8 +119,20 @@ func (ex *Executor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMap
 	}
 }
 
-func kubeOpHandler(ex *Executor, obj object, item unstructured.Unstructured, iteration int, wg *sync.WaitGroup) {
+func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	// Use predefined status paths are not set by the user
+	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
+		operationConfig := supportedOps[obj.KubeVirtOp]
+		if operationConfig != nil {
+			obj.WaitOptions.CustomStatusPaths = operationConfig.conditionCheckConfig.toStatusPaths(objectTimeUTC)
+		}
+	}
+	// If LabelSelector was not set at the wait block, use the same selector used for the operation
+	if len(obj.WaitOptions.LabelSelector) == 0 {
+		obj.WaitOptions.LabelSelector = obj.LabelSelector
+	}
 
 	var err error
 	switch obj.KubeVirtOp {

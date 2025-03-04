@@ -18,7 +18,7 @@ import (
 	"embed"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"k8s.io/client-go/rest"
 )
@@ -201,6 +201,8 @@ type Job struct {
 	ExecutionMode ExecutionMode `yaml:"executionMode" json:"executionMode,omitempty"`
 	// ObjectDelay how much time to wait between objects processing in patch jobs
 	ObjectDelay time.Duration `yaml:"objectDelay" json:"objectDelay,omitempty"`
+	// ObjectWait wait for each object to complete before processing the next one
+	ObjectWait bool `yaml:"objectWait" json:"objectWait,omitempty"`
 }
 
 type WaitOptions struct {
@@ -208,10 +210,14 @@ type WaitOptions struct {
 	Kind string `yaml:"kind" json:"kind,omitempty"`
 	// LabelSelector objects with these labels will be considered
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
-	// ForCondition wait for this condition to become true
-	ForCondition string `yaml:"forCondition" json:"forCondition,omitempty"`
-	// CustomStatusPath defines the jq path to the specific status field to check (e.g., sync.status).
-	CustomStatusPath string `yaml:"customStatusPath" json:"customStatusPath,omitempty"`
+	// CustomStatusPaths defines the list of jq path specific status fields to check (e.g., [{"key":".[]conditions.type","value":"Available"}]).
+	CustomStatusPaths []StatusPath `yaml:"customStatusPaths" json:"customStatusPaths,omitempty"`
+}
+
+// StatusPath defines the structure for each key-value pair in CustomStatusPath.
+type StatusPath struct {
+	Key   string `yaml:"key" json:"key"`
+	Value string `yaml:"value" json:"value"`
 }
 
 type KubeClientProvider struct {

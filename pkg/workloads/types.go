@@ -18,7 +18,7 @@ import (
 	"embed"
 	"time"
 
-	ocpmetadata "github.com/cloud-bulldozer/go-commons/ocp-metadata"
+	ocpmetadata "github.com/cloud-bulldozer/go-commons/v2/ocp-metadata"
 	"github.com/kube-burner/kube-burner/pkg/config"
 )
 

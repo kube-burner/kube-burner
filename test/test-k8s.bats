@@ -168,8 +168,8 @@ teardown_file() {
 
 @test "kube-burner init: waitOptions for Deployment" {
   export GC=false
-  export WAIT_FOR_CONDITION="Available"
-  export WAIT_CUSTOM_STATUS_PATH=".conditions[].type"
+  export WAIT_FOR_CONDITION="True"
+  export WAIT_CUSTOM_STATUS_PATH='(.conditions.[] | select(.type == "Available")).status'
   run_cmd ${KUBE_BURNER} init -c  kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_custom_status_path kube-burner-uuid="${UUID}" "{.items[*].status.conditions[].type}" Available
   ${KUBE_BURNER} destroy --uuid "${UUID}"
@@ -218,7 +218,7 @@ teardown_file() {
 
   local jobs=("create-vm" "create-base-image-dv")
   for job in "${jobs[@]}"; do
-    check_metric_recorded ${job} dvLatency dvReadyLatency 
+    check_metric_recorded ${job} dvLatency dvReadyLatency
     check_metric_recorded ${job} pvcLatency bindingLatency
     check_quantile_recorded ${job} dvLatency Ready
     check_quantile_recorded ${job} pvcLatency Bound

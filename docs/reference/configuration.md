@@ -91,6 +91,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
 | `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
+| `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | 0s       |
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
@@ -127,8 +128,7 @@ If you want to override the default waiter behaviors, you can specify wait optio
 |--------------|---------------------------------------------------------|---------|---------|
 | `kind` | Object kind to consider for wait | String | "" |
 | `labelSelector` | Objects with these labels will be considered for wait | Object | {} |
-| `forCondition` | Wait for the object condition with this name to be true | String  | "" |
-| `customStatusPath` | A jq path to the status field of the object | String  | "" |
+| `customStatusPaths` | list of jq path/values to verify readiness of the object | Object  | [] |
 
 For example, the snippet below can be used to make kube-burner wait for all containers from the pod defined at `pod.yml` to be ready.
 
@@ -139,10 +139,9 @@ objects:
   waitOptions:
     kind: Pod
     labelSelector: {kube-burner-label : abcd}
-    forCondition: Ready
 ```
 
-Additionally, you can use `customStatusPath` to specify a custom path to check the condition of the object, for example, to wait for a deployment to be available.
+Additionally, you can use `customStatusPaths` to specify custom paths to be checked for the readiness of the object. For example, to wait for a deployment to be available
 
 ```yaml
 objects:
@@ -150,13 +149,25 @@ objects:
     objectTemplate: deployment.yml
     replicas: 1
     waitOptions:
-      forCondition: "Available"
-      customStatusPath: ".conditions[].type"
+      customStatusPaths:
+        - key: '(.conditions.[] | select(.type == "Available")).status'
+          value: "True"
 ```
-This allows kube-burner to check the status of the specified path and wait for the condition you specify in `forCondition`.
+This allows kube-burner to check the status at all the specified key/value pairs and verify readiness of the object. If any of them do not match then it is indicated as a failure.
 
 !!! note
-    `waitOptions.kind`, `waitOptions.customStatusPath` and `waitOptions.labelSelector` are fully optional. `waitOptions.kind` is used when an application has child objects to be waited & `waitOptions.labelSelector` is used when we want to wait on objects with specific labels.
+  Currently, the `value` field expects only strings.
+  In order to test other types make sure to convert the result to a string in the `key`.
+
+  For example, to verify that a `VolumeSnapshot` is `readyToUse` set the `customStatusPaths` to:
+  ```yaml
+  customStatusPaths:
+    - key: '(.conditions.[] | select(.type == "Ready")).status'
+      value: "True"
+  ```
+
+!!! note
+    `waitOptions.kind`, `waitOptions.customStatusPaths` and `waitOptions.labelSelector` are fully optional. `waitOptions.kind` is used when an application has child objects to be waited & `waitOptions.labelSelector` is used when we want to wait on objects with specific labels.
 
 ### Default labels
 
@@ -361,6 +372,22 @@ Additional parameters should be set using the `inputVars` field:
 
 - `volumeName` - Name of the volume to remove. Mandatory
 - `persist` - if set, the added volume will be persisted in the VM spec (if it exists). Default `false`
+
+#### Wait for completion
+
+Wait is supported for the following operations:
+
+- `start` - Wait for the `Ready` state of the `VirtualMachine`  to become `True`
+- `stop` - Wait for the  `Ready` state of the `VirtualMachine` state to become `False` with `reason` equal to `VMINotExists`
+- `restart` - Wait for the `Ready` state of the `VirtualMachine`  to become `True`
+- `pause` - Wait for the `Paused` state of the `VirtualMachine`  to become `True`
+- `unpause` - Wait for the `Ready` state of the `VirtualMachine`  to become `True`
+- `migrate` - Wait for the `Ready` state of the `VirtualMachine`  to become `True`
+
+!!! note
+    The waiter makes sure that the `lastTransitionTime` of the condition is after the time of the command.
+    This requires that the timestamps on the cluster side are in UTC
+
 
 ## Execution Modes
 

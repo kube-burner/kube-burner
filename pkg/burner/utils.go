@@ -219,13 +219,18 @@ func (ex *Executor) runSequential(ctx context.Context) {
 				continue
 			}
 			var wg sync.WaitGroup
+			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, obj, item, i, &wg)
+				go ex.itemHandler(ex, &obj, item, i, objectTimeUTC, &wg)
 			}
 			// Wait for all items in the object
 			wg.Wait()
-			ex.waitForObjects("")
+
+			// If requested, wait for the completion of the specific object
+			if ex.ObjectWait {
+				ex.waitForObject("", &obj)
+			}
 
 			if ex.objectFinalizer != nil {
 				ex.objectFinalizer(ex, obj)
@@ -235,6 +240,9 @@ func (ex *Executor) runSequential(ctx context.Context) {
 				log.Infof("Sleeping between objects for %v", ex.ObjectDelay)
 				time.Sleep(ex.ObjectDelay)
 			}
+		}
+		if ex.WaitWhenFinished {
+			ex.waitForObjects("")
 		}
 		// Wait between job iterations
 		if ex.JobIterationDelay > 0 {
@@ -263,9 +271,10 @@ func (ex *Executor) runParallel(ctx context.Context) {
 			continue
 		}
 		for j := 0; j < ex.JobIterations; j++ {
+			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, obj, item, j, &wg)
+				go ex.itemHandler(ex, &obj, item, j, objectTimeUTC, &wg)
 			}
 		}
 	}

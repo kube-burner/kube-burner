@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/go-commons/version"
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
+	"github.com/cloud-bulldozer/go-commons/v2/version"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"

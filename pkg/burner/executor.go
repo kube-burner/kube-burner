@@ -30,7 +30,7 @@ import (
 )
 
 // Executor contains the information required to execute a job
-type ItemHandler func(ex *Executor, obj object, originalItem unstructured.Unstructured, iteration int, wg *sync.WaitGroup)
+type ItemHandler func(ex *Executor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup)
 type ObjectFinalizer func(ex *Executor, obj object)
 
 type Executor struct {

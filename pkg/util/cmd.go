@@ -21,7 +21,7 @@ import (
 	"path"
 	"runtime"
 
-	"github.com/cloud-bulldozer/go-commons/version"
+	"github.com/cloud-bulldozer/go-commons/v2/version"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"

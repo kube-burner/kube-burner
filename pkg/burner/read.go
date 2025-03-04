@@ -38,7 +38,7 @@ func (ex *Executor) setupReadJob(configSpec config.Spec, mapper meta.RESTMapper)
 	log.Infof("Job %s: %d iterations", ex.Name, ex.JobIterations)
 }
 
-func readHandler(ex *Executor, obj object, item unstructured.Unstructured, iteration int, wg *sync.WaitGroup) {
+func readHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 	ex.limiter.Wait(context.TODO())
 	var err error

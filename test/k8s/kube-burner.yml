@@ -27,7 +27,7 @@ metricsEndpoints:
 {{ end }}
 {{ if .LOCAL_INDEXING }}
   - endpoint: http://localhost:9090
-    indexer: 
+    indexer:
       type: local
       metricsDirectory: {{ .METRICS_FOLDER }}
     metrics: [metrics-profile.yaml]
@@ -69,9 +69,10 @@ jobs:
         containerImage: quay.io/cloud-bulldozer/sampleapp:latest
       {{- if env "WAIT_FOR_CONDITION" }}
       waitOptions:
-        forCondition: "{{ env `WAIT_FOR_CONDITION` }}"
-        customStatusPath: "{{ env `WAIT_CUSTOM_STATUS_PATH` }}"
-      {{- end }} 
+        customStatusPaths:
+        - key: '{{ env `WAIT_CUSTOM_STATUS_PATH` }}'
+          value: '{{ env `WAIT_FOR_CONDITION` }}'
+      {{- end }}
 
     - objectTemplate: objectTemplates/pod.yml
       replicas: 1

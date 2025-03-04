@@ -13,7 +13,7 @@ GIT_COMMIT = $(shell git rev-parse HEAD)
 VERSION ?= $(shell hack/tag_name.sh)
 SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
-KUBE_BURNER_VERSION= github.com/cloud-bulldozer/go-commons/version
+KUBE_BURNER_VERSION= github.com/cloud-bulldozer/go-commons/v2/version
 
 # Containers
 ENGINE ?= podman
@@ -78,4 +78,4 @@ manifest-build:
 test: lint test-k8s
 
 test-k8s:
-	cd test && KUBE_BURNER=$(TEST_BINARY) bats -F pretty -T --print-output-on-failure test-k8s.bats
+	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats
