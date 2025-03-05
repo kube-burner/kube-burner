@@ -8,6 +8,9 @@ on:
       - main
 
 jobs:
+  codeql:
+    uses: ./.github/workflows/codeql.yml
+
   lint:
     uses: ./.github/workflows/linters.yml
 
