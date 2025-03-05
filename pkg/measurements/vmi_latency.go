@@ -26,6 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -323,7 +324,12 @@ func (vmi *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 		"pods",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vmi.runid)
+			options.LabelSelector = labels.Set(
+				map[string]string{
+					"kubevirt.io":       "virt-launcher",
+					"kube-burner-runid": vmi.runid,
+				},
+			).String()
 		},
 		nil,
 	)
