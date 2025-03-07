@@ -34,7 +34,7 @@ setup-kind() {
   CDI_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)")
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml
-  kubectl wait --for=condition=Available --timeout=600s cdi cdi
+  kubectl wait --for=condition=Available --timeout=600s cdi cdi 
 }
 
 create_test_kubeconfig() {
@@ -61,11 +61,58 @@ setup-prometheus() {
   sleep 10
 }
 
+setup-shared-network() {
+  echo "Setting up shared network for monitoring"
+  $OCI_BIN network create monitoring
+}
+
 setup-opensearch() {
   echo "Setting up open-search"
   # Use version 1 to avoid the password requirement
-  $OCI_BIN run --rm -d --name opensearch --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
+  $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
   sleep 10
+}
+
+setup-grafana() {
+  export GRAFANA_URL="http://localhost:3000"
+  export GRAFANA_ROLE="admin"
+  echo "Setting up Grafana"
+  $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
+    --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
+    docker.io/grafana/grafana:latest
+  sleep 10
+  echo "Grafana is running at $GRAFANA_URL"
+}
+
+configure-grafana-datasource() {
+  echo "Configuring Elasticsearch as Grafana Data Source"
+  curl -X POST "$GRAFANA_URL/api/datasources" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Basic $(echo -n "$GRAFANA_ROLE:$GRAFANA_ROLE" | base64)" \
+    --data "{
+      \"name\": \"kube-burner elasticsearch\",
+      \"type\": \"elasticsearch\",
+      \"url\": \"http://opensearch:9200\",
+      \"access\": \"proxy\",
+      \"database\": \"${ES_INDEX}\",
+      \"jsonData\": {
+        \"timeField\": \"timestamp\"
+      }
+    }"
+}
+
+deploy-grafana-dashboards() {
+  echo "Deploying Grafana dashboards from JSON files"
+  for json_file in ../grafana/*.json; do
+    dashboard_json=$(cat "$json_file")
+    curl -s -X POST "$GRAFANA_URL/api/dashboards/db" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Basic $(echo -n "$GRAFANA_ROLE:$GRAFANA_ROLE" | base64)" \
+      --data "{
+        \"dashboard\": $dashboard_json,
+        \"overwrite\": true
+      }"
+  done
 }
 
 check_ns() {
