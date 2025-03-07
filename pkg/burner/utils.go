@@ -144,7 +144,12 @@ func (ex *Executor) Verify() bool {
 			success = false
 			continue
 		}
-		objectsExpected := ex.JobIterations * obj.Replicas
+		var objectsExpected int
+		if obj.RunOnce {
+			objectsExpected = obj.Replicas
+		} else {
+			objectsExpected = obj.Replicas * ex.JobIterations
+		}
 		if replicas != objectsExpected {
 			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 			success = false
