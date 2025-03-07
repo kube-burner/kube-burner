@@ -99,7 +99,7 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			util.SetupLogging(uuid)
+			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			configFileReader, err := util.GetReader(configFile, nil, "")

@@ -15,8 +15,8 @@
 package config
 
 import (
-	"context"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -29,9 +29,9 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
