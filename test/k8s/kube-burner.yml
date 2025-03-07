@@ -79,3 +79,7 @@ jobs:
 
     - objectTemplate: objectTemplates/service.yml
       replicas: 1
+
+    - objectTemplate: objectTemplates/secret.yml
+      replicas: 1
+      runOnce: true
