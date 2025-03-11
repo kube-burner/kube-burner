@@ -88,15 +88,20 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		jobList = newExecutorList(configSpec, kubeClientProvider)
 		handlePreloadImages(jobList, kubeClientProvider)
 		// Iterate job list
+		var measurementsInstance *measurements.Measurements
+		var measurementsJobName string
 		for jobPosition, job := range jobList {
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
 			})
 			var waitListNamespaces []string
-			measurementsInstance := measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
+			if measurementsInstance == nil {
+				measurementsJobName = job.Name
+				measurementsInstance = measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
+				measurementsInstance.Start()
+			}
 			log.Infof("Triggering job: %s", job.Name)
-			measurementsInstance.Start()
 			if job.JobType == config.CreationJob {
 				if job.Cleanup {
 					// No timeout for initial job cleanup
@@ -158,18 +163,21 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				elapsedTime := executedJobs[len(executedJobs)-1].End.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
-			// We stop and index measurements per job
-			if err = measurementsInstance.Stop(); err != nil {
-				errs = append(errs, err)
-				log.Error(err.Error())
-				innerRC = rcMeasurement
-			}
-			if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
-				msWg.Add(1)
-				go func(jobName string) {
-					defer msWg.Done()
-					measurementsInstance.Index(jobName, metricsScraper.IndexerList)
-				}(job.Name)
+			if !job.MetricsAggregate {
+				// We stop and index measurements per job
+				if err = measurementsInstance.Stop(); err != nil {
+					errs = append(errs, err)
+					log.Error(err.Error())
+					innerRC = rcMeasurement
+				}
+				if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
+					msWg.Add(1)
+					go func(msi *measurements.Measurements, jobName string) {
+						defer msWg.Done()
+						msi.Index(jobName, metricsScraper.IndexerList)
+					}(measurementsInstance, measurementsJobName)
+				}
+				measurementsInstance = nil
 			}
 		}
 		if globalConfig.WaitWhenFinished {
