@@ -31,11 +31,11 @@ import (
 
 // Executor contains the information required to execute a job
 type ItemHandler func(ex *Executor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup)
-type ObjectFinalizer func(ex *Executor, obj object)
+type ObjectFinalizer func(ex *Executor, obj *object)
 
 type Executor struct {
 	config.Job
-	objects         []object
+	objects         []*object
 	uuid            string
 	runid           string
 	limiter         *rate.Limiter
@@ -83,7 +83,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	return ex
 }
 
-func (ex *Executor) renderTemplateForObject(obj object, iteration, replicaIndex int, asJson bool) []byte {
+func (ex *Executor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {
 	// Processing template
 	templateData := map[string]interface{}{
 		jobName:      ex.Name,
