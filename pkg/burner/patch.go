@@ -68,7 +68,7 @@ func patchHandler(ex *Executor, obj *object, originalItem unstructured.Unstructu
 		} else {
 			asJson = true
 		}
-		data = ex.renderTemplateForObject(*obj, iteration, 0, asJson)
+		data = ex.renderTemplateForObject(obj, iteration, 0, asJson)
 	}
 
 	ns := originalItem.GetNamespace()
