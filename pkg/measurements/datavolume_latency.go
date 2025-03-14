@@ -162,7 +162,7 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 				}
 			case cdiv1beta1.DataVolumeReady:
 				if dvm.dvReady.IsZero() {
-					log.Infof("Updated ready time for dataVolume [%s]", dataVolume.Name)
+					log.Debugf("Updated ready time for dataVolume [%s]", dataVolume.Name)
 					dvm.dvReady = c.LastTransitionTime.Time.UTC()
 				}
 			}
