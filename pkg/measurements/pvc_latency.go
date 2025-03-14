@@ -94,6 +94,7 @@ func (plmf pvcLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, c
 // creates pvc metric
 func (p *pvcLatency) handleCreatePVC(obj interface{}) {
 	pvc := obj.(*corev1.PersistentVolumeClaim)
+	log.Tracef("handleCreatePVC: %s", pvc.Name)
 	pvcLabels := pvc.GetLabels()
 	p.metrics.LoadOrStore(string(pvc.UID), pvcMetric{
 		Timestamp:    time.Now().UTC(),
@@ -113,8 +114,10 @@ func (p *pvcLatency) handleCreatePVC(obj interface{}) {
 // handles pvc update
 func (p *pvcLatency) handleUpdatePVC(obj interface{}) {
 	pvc := obj.(*corev1.PersistentVolumeClaim)
+	log.Tracef("handleUpdatePVC: %s", pvc.Name)
 	if value, exists := p.metrics.Load(string(pvc.UID)); exists {
 		pm := value.(pvcMetric)
+		log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
 		if pm.bound == 0 || pm.lost == 0 {
 			// https://pkg.go.dev/k8s.io/api/core/v1#PersistentVolumeClaimPhase
 			if pvc.Status.Phase == corev1.ClaimPending {
@@ -136,6 +139,8 @@ func (p *pvcLatency) handleUpdatePVC(obj interface{}) {
 				}
 			}
 			p.metrics.Store(string(pvc.UID), pm)
+		} else {
+			log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
 		}
 	}
 }
@@ -242,7 +247,9 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 		m.PendingLatency = int(m.pending - m.Timestamp.UnixMilli())
 		if m.PendingLatency < 0 {
 			log.Tracef("PendingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
+			if m.pending < 0 {
+				errorFlag = 1
+			}
 			m.PendingLatency = 0
 		}
 
