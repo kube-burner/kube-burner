@@ -16,6 +16,6 @@ spec:
     - ReadWriteOnce
     resources:
       requests:
-        storage: {{ default "5Gi" .rootVolumeSize }}
+        storage: "6Gi"
     storageClassName: {{ .storageClassName }}
 ...
