@@ -22,7 +22,7 @@ import (
 
 const (
 	jqQueryConditionStringFieldPattern        = "(.conditions.[] | select(.type == \"%s\")).%s"
-	jqQueryConditionLastTransitionTimePattern = "(.conditions.[] | select(.type == \"%s\")).lastTransitionTime | strptime(\"%%Y-%%m-%%dT%%H:%%M:%%SZ\") | mktime >= %d | tostring"
+	jqQueryConditionLastTransitionTimePattern = "(.conditions.[] | select(.type == \"%s\")).lastTransitionTime | strptime(\"%%Y-%%m-%%dT%%H:%%M:%%SZ\") | mktime %s %d | tostring"
 )
 
 type ConditionField string
@@ -58,12 +58,17 @@ func (ccp *ConditionCheckParam) toStatusPath(conditionType ConditionType) config
 type ConditionCheckConfig struct {
 	conditionType        ConditionType
 	conditionCheckParams []ConditionCheckParam
+	timeGreaterThan      bool
 }
 
 func (ccc *ConditionCheckConfig) toStatusPaths(timeUTC int64) []config.StatusPath {
+	timeComparator := ">="
+	if ccc.timeGreaterThan {
+		timeComparator = ">"
+	}
 	statusPath := []config.StatusPath{
 		{
-			Key:   fmt.Sprintf(jqQueryConditionLastTransitionTimePattern, ccc.conditionType, timeUTC),
+			Key:   fmt.Sprintf(jqQueryConditionLastTransitionTimePattern, ccc.conditionType, timeComparator, timeUTC),
 			Value: "true",
 		},
 	}
