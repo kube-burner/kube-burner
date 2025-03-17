@@ -36,7 +36,7 @@ import (
 
 func (ex *Executor) waitForObjects(ns string) {
 	for _, obj := range ex.objects {
-		ex.waitForObject(ns, &obj)
+		ex.waitForObject(ns, obj)
 
 	}
 	if ns != "" {
@@ -58,7 +58,7 @@ func (ex *Executor) waitForObject(ns string, obj *object) {
 	if len(obj.WaitOptions.CustomStatusPaths) > 0 {
 		err = ex.verifyCondition(ns, *obj)
 	} else {
-		kind := obj.kind
+		kind := obj.Kind
 		if obj.WaitOptions.Kind != "" {
 			kind = obj.WaitOptions.Kind
 			ns = corev1.NamespaceAll
@@ -97,7 +97,7 @@ func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) 
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
-			log.Errorf("Error listing %s in %s: %v", obj.kind, ns, err)
+			log.Errorf("Error listing %s in %s: %v", obj.Kind, ns, err)
 			return false, nil
 		}
 		for _, resource := range resources.Items {
@@ -110,7 +110,7 @@ func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) 
 				return false, err
 			}
 			if replicas != readyReplicas {
-				log.Debugf("Waiting for replicas from %s in ns %s to be ready", obj.kind, ns)
+				log.Debugf("Waiting for replicas from %s in ns %s to be ready", obj.Kind, ns)
 				return false, nil
 			}
 		}
@@ -235,9 +235,9 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 		}
 		if err != nil {
 			if ns != "" {
-				log.Errorf("Error listing %s in %s: %v", obj.kind, ns, err)
+				log.Errorf("Error listing %s in %s: %v", obj.Kind, ns, err)
 			} else {
-				log.Errorf("Error listing %s: %v", obj.kind, err)
+				log.Errorf("Error listing %s: %v", obj.Kind, err)
 			}
 			return false, nil
 		}

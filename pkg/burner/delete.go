@@ -60,7 +60,7 @@ func deleteHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 	}
 }
 
-func verifyDelete(ex *Executor, obj object) {
+func verifyDelete(ex *Executor, obj *object) {
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,

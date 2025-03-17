@@ -30,7 +30,7 @@ jobs:
     qps: 20
     burst: 20
     jobIterations: 2
-    objectDelay: 10s
+    objectDelay: 20s
     jobIterationDelay: 1m
     objectWait: true
     waitWhenFinished: false
