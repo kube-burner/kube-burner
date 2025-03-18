@@ -51,6 +51,7 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 		conditionCheckConfig: ConditionCheckConfig{
 			conditionType:        conditionTypeReady,
 			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
 		},
 	},
 	config.KubeVirtOpStop: {
@@ -60,30 +61,35 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 				newConditionCheckParam(conditionFieldStatus, "False"),
 				newConditionCheckParam(conditionFieldReason, "VMINotExists"),
 			},
+			timeGreaterThan: false,
 		},
 	},
 	config.KubeVirtOpRestart: {
 		conditionCheckConfig: ConditionCheckConfig{
 			conditionType:        conditionTypeReady,
 			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      true,
 		},
 	},
 	config.KubeVirtOpPause: {
 		conditionCheckConfig: ConditionCheckConfig{
 			conditionType:        conditionTypePaused,
 			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
 		},
 	},
 	config.KubeVirtOpUnpause: {
 		conditionCheckConfig: ConditionCheckConfig{
 			conditionType:        conditionTypeReady,
 			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
 		},
 	},
 	config.KubeVirtOpMigrate: {
 		conditionCheckConfig: ConditionCheckConfig{
 			conditionType:        conditionTypeReady,
 			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      true,
 		},
 	},
 	config.KubeVirtOpAddVolume:    nil,
@@ -122,18 +128,12 @@ func (ex *Executor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMap
 func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	// Use predefined status paths are not set by the user
-	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
-		operationConfig := supportedOps[obj.KubeVirtOp]
-		if operationConfig != nil {
-			obj.WaitOptions.CustomStatusPaths = operationConfig.conditionCheckConfig.toStatusPaths(objectTimeUTC)
-		}
-	}
 	// If LabelSelector was not set at the wait block, use the same selector used for the operation
 	if len(obj.WaitOptions.LabelSelector) == 0 {
 		obj.WaitOptions.LabelSelector = obj.LabelSelector
 	}
 
+	operationConfig := supportedOps[obj.KubeVirtOp]
 	var err error
 	switch obj.KubeVirtOp {
 	case config.KubeVirtOpStart:
@@ -141,6 +141,7 @@ func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 		startPaused := util.GetBoolValue(obj.InputVars, "startPaused")
 		if startPaused != nil {
 			options.Paused = *startPaused
+			operationConfig = supportedOps[config.KubeVirtOpPause]
 		}
 		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Start(context.Background(), item.GetName(), &options)
 	case config.KubeVirtOpStop:
@@ -175,6 +176,11 @@ func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 		log.Errorf("Failed to execute op [%s] on the VM [%s]: %v", obj.KubeVirtOp, item.GetName(), err)
 	} else {
 		log.Debugf("Successfully executed op [%s] on the VM [%s]", obj.KubeVirtOp, item.GetName())
+	}
+
+	// Use predefined status paths when not set by the user
+	if len(obj.WaitOptions.CustomStatusPaths) == 0 && operationConfig != nil {
+		obj.WaitOptions.CustomStatusPaths = operationConfig.conditionCheckConfig.toStatusPaths(objectTimeUTC)
 	}
 }
 
