@@ -203,6 +203,8 @@ type Job struct {
 	ObjectDelay time.Duration `yaml:"objectDelay" json:"objectDelay,omitempty"`
 	// ObjectWait wait for each object to complete before processing the next one
 	ObjectWait bool `yaml:"objectWait" json:"objectWait,omitempty"`
+	// MetricsAggregate aggregate the metrics of this job with the next one
+	MetricsAggregate bool `yaml:"metricsAggregate" json:"metricsAggregate,omitempty"`
 }
 
 type WaitOptions struct {

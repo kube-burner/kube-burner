@@ -237,3 +237,20 @@ teardown_file() {
     check_quantile_recorded ${job} pvcLatency Bound
   done
 }
+
+@test "kube-burner init: metrics aggregation" {
+  export STORAGE_CLASS_NAME
+  STORAGE_CLASS_NAME=$(get_default_storage_class)
+  run_cmd ${KUBE_BURNER} init -c kube-burner-metrics-aggregate.yml --uuid="${UUID}" --log-level=debug
+
+  local aggr_job="create-vms"
+  local metric="vmiLatency"
+  check_metric_recorded ${aggr_job} ${metric} vmReadyLatency
+  check_quantile_recorded ${aggr_job} ${metric} VMReady
+
+  local skipped_jobs=("start-vm" "wait-running")
+  for job in "${skipped_jobs[@]}"; do
+    check_metrics_not_created_for_job ${job} ${metric}
+    check_metrics_not_created_for_job ${job} ${metric}
+  done
+}
