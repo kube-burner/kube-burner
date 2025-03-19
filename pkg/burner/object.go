@@ -29,13 +29,12 @@ type object struct {
 	config.Object
 	gvr        schema.GroupVersionResource
 	objectSpec []byte
-	kind       string
 	namespace  string
 	namespaced bool
 	ready      bool
 }
 
-func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper, defaultAPIVersion string) object {
+func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper, defaultAPIVersion string) *object {
 	if obj.APIVersion == "" {
 		obj.APIVersion = defaultAPIVersion
 	}
@@ -69,5 +68,5 @@ func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper
 		o.objectSpec = t
 	}
 
-	return o
+	return &o
 }

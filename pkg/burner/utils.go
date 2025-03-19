@@ -190,7 +190,7 @@ func (ex *Executor) RunJob(ctx context.Context) {
 	}
 }
 
-func (ex *Executor) getItemListForObject(obj object) (*unstructured.UnstructuredList, error) {
+func (ex *Executor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
 	var itemList *unstructured.UnstructuredList
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
@@ -227,14 +227,14 @@ func (ex *Executor) runSequential(ctx context.Context) {
 			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, &obj, item, i, objectTimeUTC, &wg)
+				go ex.itemHandler(ex, obj, item, i, objectTimeUTC, &wg)
 			}
 			// Wait for all items in the object
 			wg.Wait()
 
 			// If requested, wait for the completion of the specific object
 			if ex.ObjectWait {
-				ex.waitForObject("", &obj)
+				ex.waitForObject("", obj)
 			}
 
 			if ex.objectFinalizer != nil {
@@ -279,7 +279,7 @@ func (ex *Executor) runParallel(ctx context.Context) {
 			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, &obj, item, j, objectTimeUTC, &wg)
+				go ex.itemHandler(ex, obj, item, j, objectTimeUTC, &wg)
 			}
 		}
 	}

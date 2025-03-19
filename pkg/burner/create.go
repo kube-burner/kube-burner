@@ -63,14 +63,14 @@ func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMappe
 		if err != nil {
 			log.Fatal(err)
 		}
-		obj := object{
+		obj := &object{
 			gvr:        mapping.Resource,
 			objectSpec: t,
-			kind:       gvk.Kind,
 			Object:     o,
 			namespace:  uns.GetNamespace(),
 			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 		}
+		obj.Kind = gvk.Kind
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
 		if obj.namespaced && obj.namespace == "" {
 			ex.nsRequired = true
@@ -199,7 +199,7 @@ func (ex *Executor) generateNamespace(iteration int) string {
 	return fmt.Sprintf("%s-%d", ex.Namespace, nsIndex)
 }
 
-func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
+func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string, obj *object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	for r := 1; r <= obj.Replicas; r++ {
