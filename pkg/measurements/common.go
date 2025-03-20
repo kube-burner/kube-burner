@@ -113,10 +113,10 @@ func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 	}
 	for metricName, data := range metricMap {
 		// Use the configured TimeseriesIndexer or QuantilesIndexer when specified or else use all indexers
-		if config.TimeseriesIndexer != "" && (metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement || metricName == nodeLatencyMeasurement || metricName == pvcLatencyMeasurement) {
+		if config.TimeseriesIndexer != "" && (metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement || metricName == nodeLatencyMeasurement || metricName == pvcLatencyMeasurement || metricName == raLatencyMeasurement) {
 			indexer := indexerList[config.TimeseriesIndexer]
 			indexDocuments(indexer, metricName, data)
-		} else if config.QuantilesIndexer != "" && (metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement || metricName == nodeLatencyQuantilesMeasurement || metricName == pvcLatencyQuantilesMeasurement) {
+		} else if config.QuantilesIndexer != "" && (metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement || metricName == nodeLatencyQuantilesMeasurement || metricName == pvcLatencyQuantilesMeasurement || metricName == raLatencyQuantilesMeasurement) {
 			indexer := indexerList[config.QuantilesIndexer]
 			indexDocuments(indexer, metricName, data)
 		} else {
