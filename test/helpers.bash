@@ -35,6 +35,30 @@ setup-kind() {
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml
   kubectl wait --for=condition=Available --timeout=600s cdi cdi
+  # Install Snapshot CRDs and Controller
+  SNAPSHOTTER_VERSION=$(curl -s https://api.github.com/repos/kubernetes-csi/external-snapshotter/releases/latest | jq -r .tag_name)
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
+  # Add Host Path CSI Driver and StorageClass
+  CSI_DRIVER_HOST_PATH_DIR=$(mktemp -d)
+  git clone https://github.com/kubernetes-csi/csi-driver-host-path.git ${CSI_DRIVER_HOST_PATH_DIR}
+  ${CSI_DRIVER_HOST_PATH_DIR}/deploy/kubernetes-latest/deploy.sh
+  kubectl apply -f ${CSI_DRIVER_HOST_PATH_DIR}/examples/csi-storageclass.yaml
+  # Install Helm
+  HELM_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/helm/helm/releases/latest)")
+  curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz
+  tar xzvf ${KIND_FOLDER}/helm.tgz -C ${KIND_FOLDER}
+  HELM_EXEC=${KIND_FOLDER}/linux-${ARCH}/helm
+  chmod +x ${HELM_EXEC}
+  # Install K10
+  ${HELM_EXEC} repo add kasten https://charts.kasten.io/
+  kubectl create ns kasten-io
+  ${HELM_EXEC} install k10 kasten/k10 --namespace=kasten-io
+  export STORAGE_CLASS_WITH_SNAPSHOT_NAME="csi-hostpath-sc"
+  export VOLUME_SNAPSHOT_CLASS_NAME="csi-hostpath-snapclass"
 }
 
 create_test_kubeconfig() {

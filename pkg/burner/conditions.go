@@ -35,8 +35,9 @@ const (
 type ConditionType string
 
 const (
-	conditionTypeReady  ConditionType = "Ready"
-	conditionTypePaused ConditionType = "Paused"
+	conditionTypeReady    ConditionType = "Ready"
+	conditionTypePaused   ConditionType = "Paused"
+	conditionTypeComplete ConditionType = "Complete"
 )
 
 type ConditionCheckParam struct {
@@ -62,21 +63,33 @@ type ConditionCheckConfig struct {
 }
 
 func (ccc *ConditionCheckConfig) toStatusPaths(timeUTC int64) []config.StatusPath {
-	timeComparator := ">="
-	if ccc.timeGreaterThan {
-		timeComparator = ">"
+	var statusPath []config.StatusPath
+
+	if timeUTC > 0 {
+		timeComparator := ">="
+		if ccc.timeGreaterThan {
+			timeComparator = ">"
+		}
+		statusPath = append(
+			statusPath,
+			config.StatusPath{
+				Key:   fmt.Sprintf(jqQueryConditionLastTransitionTimePattern, ccc.conditionType, timeComparator, timeUTC),
+				Value: "true",
+			},
+		)
 	}
-	statusPath := []config.StatusPath{
-		{
-			Key:   fmt.Sprintf(jqQueryConditionLastTransitionTimePattern, ccc.conditionType, timeComparator, timeUTC),
-			Value: "true",
-		},
-	}
+
 	for _, cpp := range ccc.conditionCheckParams {
 		statusPath = append(
 			statusPath,
 			cpp.toStatusPath(ccc.conditionType),
 		)
 	}
+
 	return statusPath
 }
+
+// Helper reusable variables
+var (
+	conditionCheckParamStatusTrue = newConditionCheckParam(conditionFieldStatus, "True")
+)

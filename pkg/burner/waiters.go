@@ -34,6 +34,31 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 )
 
+var (
+	waitersConditionPaths = map[string]ConditionCheckConfig{
+		Job: {
+			conditionType:        conditionTypeComplete,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+		VirtualMachine: {
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+		VirtualMachineInstance: {
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+		DataVolume: {
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+	}
+)
+
 func (ex *Executor) waitForObjects(ns string) {
 	for _, obj := range ex.objects {
 		ex.waitForObject(ns, obj)
@@ -63,19 +88,22 @@ func (ex *Executor) waitForObject(ns string, obj *object) {
 			kind = obj.WaitOptions.Kind
 			ns = corev1.NamespaceAll
 		}
-		switch kind {
-		case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
-			err = ex.waitForReplicas(ns, *obj, waitStatusMap[kind])
-		case Pod:
-			err = ex.waitForPod(ns, *obj)
-		case Build, BuildConfig:
-			err = ex.waitForBuild(ns, *obj)
-		case VirtualMachine, VirtualMachineInstance:
-			err = ex.waitForVMorVMI(ns, *obj)
-		case Job:
-			err = ex.waitForJob(ns, *obj)
-		case PersistentVolumeClaim:
-			err = ex.waitForPVC(ns, *obj)
+		if waiterConditionPath, ok := waitersConditionPaths[kind]; ok {
+			obj.WaitOptions.CustomStatusPaths = waiterConditionPath.toStatusPaths(0)
+			err = ex.verifyCondition(ns, *obj)
+		} else {
+			switch kind {
+			case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
+				err = ex.waitForReplicas(ns, *obj, waitStatusMap[kind])
+			case Pod:
+				err = ex.waitForPod(ns, *obj)
+			case Build, BuildConfig:
+				err = ex.waitForBuild(ns, *obj)
+			case PersistentVolumeClaim:
+				err = ex.waitForPVC(ns, *obj)
+			case VolumeSnapshot:
+				err = ex.waitForVolumeSnapshot(ns, *obj)
+			}
 		}
 	}
 	if err != nil {
@@ -208,18 +236,6 @@ func (ex *Executor) waitForBuild(ns string, obj object) error {
 	return err
 }
 
-func (ex *Executor) waitForJob(ns string, obj object) error {
-	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
-		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
-			{
-				Key:   "(.conditions.[] | select(.type == \"Complete\")).status",
-				Value: "True",
-			},
-		}
-	}
-	return ex.verifyCondition(ns, obj)
-}
-
 func (ex *Executor) verifyCondition(ns string, obj object) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
@@ -292,12 +308,12 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 	return err
 }
 
-func (ex *Executor) waitForVMorVMI(ns string, obj object) error {
+func (ex *Executor) waitForVolumeSnapshot(ns string, obj object) error {
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
 		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
 			{
-				Key:   "(.conditions.[] | select(.type == \"Ready\")).status",
-				Value: "True",
+				Key:   ".readyToUse | tostring | ascii_downcase",
+				Value: "true",
 			},
 		}
 	}

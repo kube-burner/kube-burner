@@ -9,6 +9,7 @@ require (
 	github.com/cloud-bulldozer/go-commons/v2 v2.1.1
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.16
+	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.2.0
 	github.com/montanaflynn/stats v0.7.1
 	github.com/prometheus/common v0.62.0
 	github.com/sirupsen/logrus v1.9.3
