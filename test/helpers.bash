@@ -34,7 +34,7 @@ setup-kind() {
   CDI_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)")
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml
-  kubectl wait --for=condition=Available --timeout=600s cdi cdi 
+  kubectl wait --for=condition=Available --timeout=600s cdi cdi
 }
 
 create_test_kubeconfig() {
@@ -278,6 +278,24 @@ check_quantile_recorded() {
   MEASUREMENT=$(cat ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json | jq --arg name "${quantileName}" '[.[] | select(.quantileName == $name)][0].avg')
   if [[ ${MEASUREMENT} -eq 0 ]]; then
     echo "Quantile for ${type}/${quantileName} was not recorded for ${job}"
+    return 1
+  fi
+}
+
+check_metrics_not_created_for_job() {
+  local job=$1
+  local type=$2
+
+  METRICS_FILE=${METRICS_FOLDER}/${type}Measurement-${job}.json
+  QUANTILE_FILE=${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json
+
+  if [ -f "${METRICS_FILE}" ]; then
+    echo "Metrics file for ${job} was created"
+    return 1
+  fi
+
+  if [ -f "${QUANTILE_FILE}" ]; then
+    echo "Quantile file for ${job} was created"
     return 1
   fi
 }
