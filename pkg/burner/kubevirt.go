@@ -44,8 +44,6 @@ type OperationConfig struct {
 	conditionCheckConfig ConditionCheckConfig
 }
 
-var conditionCheckParamStatusTrue = newConditionCheckParam(conditionFieldStatus, "True")
-
 var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 	config.KubeVirtOpStart: {
 		conditionCheckConfig: ConditionCheckConfig{

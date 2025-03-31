@@ -26,8 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -102,28 +100,6 @@ func (dvlmf dvLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, c
 	}
 }
 
-func getCDIClient(restConfig *rest.Config) *rest.RESTClient {
-	scheme := runtime.NewScheme()
-	codecs := serializer.NewCodecFactory(scheme)
-
-	// Add CDI objects to the scheme
-	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	scheme.AddKnownTypes(cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{})
-
-	shallowCopy := *restConfig
-	shallowCopy.ContentConfig.GroupVersion = &cdiv1beta1.SchemeGroupVersion
-
-	shallowCopy.APIPath = "/apis"
-	shallowCopy.NegotiatedSerializer = codecs.WithoutConversion()
-	shallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
-
-	cdiClient, err := rest.RESTClientFor(&shallowCopy)
-	if err != nil {
-		log.Fatalf("failed to create CDI Client - %v", err)
-	}
-	return cdiClient
-}
-
 func (dv *dvLatency) handleCreateDV(obj interface{}) {
 	dataVolume := obj.(*cdiv1beta1.DataVolume)
 	dvLabels := dataVolume.GetLabels()
@@ -178,7 +154,7 @@ func (dv *dvLatency) start(measurementWg *sync.WaitGroup) error {
 	dv.metrics = sync.Map{}
 	log.Infof("Creating Data Volume latency watcher for %s", dv.jobConfig.Name)
 	dv.watcher = metrics.NewWatcher(
-		getCDIClient(dv.restConfig),
+		getGroupVersionClient(dv.restConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
 		"dvWatcher",
 		"datavolumes",
 		corev1.NamespaceAll,

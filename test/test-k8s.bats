@@ -225,10 +225,19 @@ teardown_file() {
 }
 
 @test "kube-burner init: datavolume latency" {
-  export STORAGE_CLASS_NAME
-  STORAGE_CLASS_NAME=$(get_default_storage_class)
+  if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
+    echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
+  if [[ -z "$STORAGE_CLASS_NAME" ]]; then
+    echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+
   run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid="${UUID}" --log-level=debug
 
+  # Verify metrics for PVC and DV were collected
   local jobs=("create-vm" "create-base-image-dv")
   for job in "${jobs[@]}"; do
     check_metric_recorded ${job} dvLatency dvReadyLatency
@@ -236,6 +245,10 @@ teardown_file() {
     check_quantile_recorded ${job} dvLatency Ready
     check_quantile_recorded ${job} pvcLatency Bound
   done
+
+  # Verify that metrics for VolumeSnapshot was collected
+  check_metric_recorded create-snapshot volumeSnapshotLatency vsReadyLatency
+  check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
 }
 
 @test "kube-burner init: metrics aggregation" {
