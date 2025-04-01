@@ -26,7 +26,7 @@ jobs:
         cache: false
 
     - name: Install bats
-      uses: bats-core/bats-action@3.0.0
+      uses: bats-core/bats-action@3.0.1
       with:
         bats-version: 1.11.0
         support-install: false
