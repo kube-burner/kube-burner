@@ -216,7 +216,7 @@ func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig
 	for k, v := range obj.InputVars {
 		templateData[k] = v
 	}
-	renderedObj, err := kutil.RenderTemplate(objectSpec, templateData, kutil.MissingKeyError)
+	renderedObj, err := kutil.RenderTemplate(objectSpec, templateData, kutil.MissingKeyError, []string{})
 	if err != nil {
 		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 	}

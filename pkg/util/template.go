@@ -91,11 +91,17 @@ func AddRenderingFunction(name string, function any) {
 }
 
 // RenderTemplate renders a go-template
-func RenderTemplate(original []byte, inputData interface{}, options templateOption) ([]byte, error) {
+func RenderTemplate(original []byte, inputData interface{}, options templateOption, functionTemplates []string) ([]byte, error) {
 	var rendered bytes.Buffer
 	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
 		return nil, fmt.Errorf("parsing error: %s", err)
+	}
+	if len(functionTemplates) > 0 {
+		t, err = t.ParseFiles(functionTemplates...)
+		if err != nil {
+			return nil, fmt.Errorf("subtemplate parsing error: %s", err)
+		}
 	}
 	err = t.Execute(&rendered, inputData)
 	if err != nil {
