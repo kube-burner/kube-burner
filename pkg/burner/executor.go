@@ -35,27 +35,29 @@ type ObjectFinalizer func(ex *Executor, obj *object)
 
 type Executor struct {
 	config.Job
-	objects         []*object
-	uuid            string
-	runid           string
-	limiter         *rate.Limiter
-	waitLimiter     *rate.Limiter
-	nsRequired      bool
-	itemHandler     ItemHandler
-	objectFinalizer ObjectFinalizer
-	clientSet       kubernetes.Interface
-	restConfig      *rest.Config
-	dynamicClient   *dynamic.DynamicClient
-	kubeVirtClient  kubecli.KubevirtClient
+	objects           []*object
+	uuid              string
+	runid             string
+	limiter           *rate.Limiter
+	waitLimiter       *rate.Limiter
+	nsRequired        bool
+	itemHandler       ItemHandler
+	objectFinalizer   ObjectFinalizer
+	clientSet         kubernetes.Interface
+	restConfig        *rest.Config
+	dynamicClient     *dynamic.DynamicClient
+	kubeVirtClient    kubecli.KubevirtClient
+	functionTemplates []string
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job) Executor {
 	ex := Executor{
-		Job:         job,
-		limiter:     rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
-		uuid:        configSpec.GlobalConfig.UUID,
-		runid:       configSpec.GlobalConfig.RUNID,
-		waitLimiter: rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		Job:               job,
+		limiter:           rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		uuid:              configSpec.GlobalConfig.UUID,
+		runid:             configSpec.GlobalConfig.RUNID,
+		waitLimiter:       rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
@@ -101,7 +103,7 @@ func (ex *Executor) renderTemplateForObject(obj *object, iteration, replicaIndex
 		templateOption = util.MissingKeyZero
 	}
 
-	renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
+	renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption, ex.functionTemplates)
 	if err != nil {
 		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 	}
