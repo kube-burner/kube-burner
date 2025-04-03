@@ -38,6 +38,8 @@ func (ex *Executor) setupDeleteJob(configSpec config.Spec, mapper meta.RESTMappe
 	ex.JobIterations = 1
 	// Use the sequential mode
 	ex.ExecutionMode = config.ExecutionModeSequential
+	// WaitWhenFinished expects the resources to exists. For this reason wait is handled by WaitForDeletion
+	ex.WaitWhenFinished = false
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
 		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, APIVersionV1))
