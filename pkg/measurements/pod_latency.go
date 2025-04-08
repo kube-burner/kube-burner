@@ -72,7 +72,7 @@ type podMetric struct {
 }
 
 type podLatency struct {
-	baseLatencyMeasurement
+	baseMeasurement
 
 	watcher          *metrics.Watcher
 	metrics          sync.Map
@@ -81,7 +81,7 @@ type podLatency struct {
 }
 
 type podLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 }
 
 func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
@@ -89,13 +89,13 @@ func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.M
 		return nil, err
 	}
 	return podLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
 func (plmf podLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &podLatency{
-		baseLatencyMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		baseMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 

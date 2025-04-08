@@ -50,14 +50,14 @@ var (
 	}
 )
 
-type baseLatencyMeasurementFactory struct {
+type baseMeasurementFactory struct {
 	config   types.Measurement
 	uuid     string
 	runid    string
 	metadata map[string]interface{}
 }
 
-type baseLatencyMeasurement struct {
+type baseMeasurement struct {
 	config     types.Measurement
 	uuid       string
 	runid      string
@@ -67,8 +67,8 @@ type baseLatencyMeasurement struct {
 	metadata   map[string]interface{}
 }
 
-func newBaseLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) baseLatencyMeasurementFactory {
-	return baseLatencyMeasurementFactory{
+func newBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) baseMeasurementFactory {
+	return baseMeasurementFactory{
 		config:   measurement,
 		uuid:     configSpec.GlobalConfig.UUID,
 		runid:    configSpec.GlobalConfig.RUNID,
@@ -76,15 +76,15 @@ func newBaseLatencyMeasurementFactory(configSpec config.Spec, measurement types.
 	}
 }
 
-func (blmf baseLatencyMeasurementFactory) newBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) baseLatencyMeasurement {
-	return baseLatencyMeasurement{
-		config:     blmf.config,
-		uuid:       blmf.uuid,
-		runid:      blmf.runid,
+func (bmf baseMeasurementFactory) newBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) baseMeasurement {
+	return baseMeasurement{
+		config:     bmf.config,
+		uuid:       bmf.uuid,
+		runid:      bmf.runid,
 		jobConfig:  jobConfig,
 		clientSet:  clientSet,
 		restConfig: restConfig,
-		metadata:   blmf.metadata,
+		metadata:   bmf.metadata,
 	}
 }
 

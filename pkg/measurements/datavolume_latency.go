@@ -73,7 +73,7 @@ type dvMetric struct {
 }
 
 type dvLatency struct {
-	baseLatencyMeasurement
+	baseMeasurement
 
 	watcher          *metrics.Watcher
 	metrics          sync.Map
@@ -82,7 +82,7 @@ type dvLatency struct {
 }
 
 type dvLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 }
 
 func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
@@ -90,13 +90,13 @@ func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Me
 		return nil, err
 	}
 	return dvLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
 func (dvlmf dvLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &dvLatency{
-		baseLatencyMeasurement: dvlmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		baseMeasurement: dvlmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 

@@ -65,7 +65,7 @@ type pvcMetric struct {
 }
 
 type pvcLatency struct {
-	baseLatencyMeasurement
+	baseMeasurement
 	watcher          *metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
@@ -73,7 +73,7 @@ type pvcLatency struct {
 }
 
 type pvcLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 }
 
 func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
@@ -81,13 +81,13 @@ func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.M
 		return nil, err
 	}
 	return pvcLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
 func (plmf pvcLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &pvcLatency{
-		baseLatencyMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		baseMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 

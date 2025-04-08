@@ -90,7 +90,7 @@ type vmiMetric struct {
 }
 
 type vmiLatency struct {
-	baseLatencyMeasurement
+	baseMeasurement
 
 	vmWatcher        *metrics.Watcher
 	vmiWatcher       *metrics.Watcher
@@ -101,7 +101,7 @@ type vmiLatency struct {
 }
 
 type vmiLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 }
 
 func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
@@ -109,13 +109,13 @@ func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.M
 		return nil, err
 	}
 	return vmiLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
 func (vmilmf vmiLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &vmiLatency{
-		baseLatencyMeasurement: vmilmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		baseMeasurement: vmilmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 

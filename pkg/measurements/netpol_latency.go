@@ -85,7 +85,7 @@ type ProxyResponse struct {
 }
 
 type netpolLatency struct {
-	baseLatencyMeasurement
+	baseMeasurement
 	embedFS    *embed.FS
 	embedFSDir string
 
@@ -108,24 +108,24 @@ type netpolMetric struct {
 }
 
 type netpolLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 	embedFS    *embed.FS
 	embedFSDir string
 }
 
 func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
 	return netpolLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
-		embedFS:                       configSpec.EmbedFS,
-		embedFSDir:                    configSpec.EmbedFSDir,
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
+		embedFS:                configSpec.EmbedFS,
+		embedFSDir:             configSpec.EmbedFSDir,
 	}, nil
 }
 
 func (nplmf netpolLatencyMeasurementFactory) newMeasurement(jobConfig *kconfig.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &netpolLatency{
-		baseLatencyMeasurement: nplmf.newBaseLatency(jobConfig, clientSet, restConfig),
-		embedFS:                nplmf.embedFS,
-		embedFSDir:             nplmf.embedFSDir,
+		baseMeasurement: nplmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		embedFS:         nplmf.embedFS,
+		embedFSDir:      nplmf.embedFSDir,
 	}
 }
 

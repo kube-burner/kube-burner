@@ -41,13 +41,13 @@ import (
 )
 
 type pprof struct {
-	baseLatencyMeasurement
+	baseMeasurement
 
 	stopChannel chan bool
 }
 
 type pprofLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 }
 
 func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
@@ -58,13 +58,13 @@ func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types
 	}
 
 	return pprofLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
 func (plmf pprofLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &pprof{
-		baseLatencyMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		baseMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
