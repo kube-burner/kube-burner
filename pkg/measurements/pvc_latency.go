@@ -201,7 +201,7 @@ func (p *pvcLatency) stop() error {
 	errorRate := p.normalizeMetrics()
 	if errorRate > 10.00 {
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("Something is wrong with system under test. PVC latencies error rate was: %.2f", errorRate)
+		return fmt.Errorf("something is wrong with system under test. PVC latencies error rate was: %.2f", errorRate)
 	}
 	p.calcQuantiles()
 	if len(p.config.LatencyThresholds) > 0 {
