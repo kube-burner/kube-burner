@@ -844,3 +844,22 @@ global:
 ```
 
 With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics.
+
+## Additional Custom Measurements
+
+kube-burner already implements core measurements. Additionally the `measurements` package exports interfaces, helper functions, and struct types to allow external consumers to implement custom measurements, interact with the measurement framework, and reuse common components.
+
+Additional measurement code has to:
+
+1. Implement the Measurement interface
+2. Create a new measurement factory with the previous and pass it as argument to RunWithAdditionalVars.
+
+
+```yaml
+var additionalMeasurementFactoryMap = map[string]measurements.NewMeasurementFactory{
+        "exampleLatency": NewExampleLatencyMeasurementFactory,
+}
+
+wh = workloads.NewWorkloadHelper(workloadConfig, &config, kubeClientProvider)
+rc = wh.RunWithAdditionalVars(workload, nil, additionalMeasurementFactoryMap)
+```

@@ -42,7 +42,7 @@ const (
 )
 
 type serviceLatency struct {
-	baseMeasurement
+	BaseMeasurement
 
 	svcWatcher       *metrics.Watcher
 	epWatcher        *metrics.Watcher
@@ -67,22 +67,22 @@ type svcMetric struct {
 }
 
 type serviceLatencyMeasurementFactory struct {
-	baseMeasurementFactory
+	BaseMeasurementFactory
 }
 
-func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
 	if measurement.ServiceTimeout == 0 {
 		return nil, fmt.Errorf("svcTimeout cannot be 0")
 	}
 
 	return serviceLatencyMeasurementFactory{
-		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (slmf serviceLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+func (slmf serviceLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &serviceLatency{
-		baseMeasurement: slmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: slmf.NewBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
@@ -112,7 +112,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 		}
 		endpointsReadyTs := time.Now().UTC()
 		log.Debugf("Endpoints %v/%v ready", svc.Namespace, svc.Name)
-		svcLatencyChecker, err := util.NewSvcLatencyChecker(s.clientSet, *s.restConfig)
+		svcLatencyChecker, err := util.NewSvcLatencyChecker(s.ClientSet, *s.RestConfig)
 		if err != nil {
 			log.Error(err)
 		}
@@ -139,7 +139,7 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 					return
 				}
 				for _, ip := range ips {
-					err = svcLatencyChecker.Ping(ip, port, s.config.ServiceTimeout)
+					err = svcLatencyChecker.Ping(ip, port, s.Config.ServiceTimeout)
 					if err != nil {
 						log.Error(err)
 						return
@@ -156,31 +156,31 @@ func (s *serviceLatency) handleCreateSvc(obj interface{}) {
 			MetricName:        svcLatencyMeasurement,
 			ServiceType:       svc.Spec.Type,
 			ReadyLatency:      svcLatency,
-			UUID:              s.uuid,
+			UUID:              s.Uuid,
 			IPAssignedLatency: ipAssignedLatency,
-			JobName:           s.jobConfig.Name,
-			Metadata:          s.metadata,
+			JobName:           s.JobConfig.Name,
+			Metadata:          s.Metadata,
 		})
 	}(svc)
 }
 
 // start service latency measurement
-func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
+func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	// Reset latency slices, required in multi-job benchmarks
 	s.latencyQuantiles, s.normLatencies = nil, nil
 	defer measurementWg.Done()
-	err := deployPodInNamespace(s.clientSet, types.SvcLatencyNs, types.SvcLatencyCheckerName, "quay.io/cloud-bulldozer/fedora-nc:latest", []string{"sleep", "inf"})
+	err := deployPodInNamespace(s.ClientSet, types.SvcLatencyNs, types.SvcLatencyCheckerName, "quay.io/cloud-bulldozer/fedora-nc:latest", []string{"sleep", "inf"})
 	if err != nil {
 		return err
 	}
-	log.Infof("Creating service latency watcher for %s", s.jobConfig.Name)
+	log.Infof("Creating service latency watcher for %s", s.JobConfig.Name)
 	s.svcWatcher = metrics.NewWatcher(
-		s.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"svcWatcher",
 		"services",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", s.runid)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", s.Runid)
 		},
 		cache.Indexers{},
 	)
@@ -188,7 +188,7 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 		AddFunc: s.handleCreateSvc,
 	})
 	s.epWatcher = metrics.NewWatcher(
-		s.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"epWatcher",
 		"endpoints",
 		corev1.NamespaceAll,
@@ -207,7 +207,7 @@ func (s *serviceLatency) start(measurementWg *sync.WaitGroup) error {
 	return nil
 }
 
-func (s *serviceLatency) stop() error {
+func (s *serviceLatency) Stop() error {
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
@@ -215,12 +215,12 @@ func (s *serviceLatency) stop() error {
 		s.svcWatcher.StopWatcher()
 		s.epWatcher.StopWatcher()
 	}()
-	kutil.CleanupNamespaces(ctx, s.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
+	kutil.CleanupNamespaces(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
 	for _, q := range s.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
-		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", s.jobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
+		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", s.JobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
 	}
 	return nil
 }
@@ -241,11 +241,11 @@ func (s *serviceLatency) normalizeMetrics() {
 	})
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = s.uuid
+		latencySummary.UUID = s.Uuid
 		latencySummary.Timestamp = time.Now().UTC()
-		latencySummary.Metadata = s.metadata
+		latencySummary.Metadata = s.Metadata
 		latencySummary.MetricName = svcLatencyQuantilesMeasurement
-		latencySummary.JobName = s.jobConfig.Name
+		latencySummary.JobName = s.JobConfig.Name
 		return latencySummary
 	}
 	if sLen > 0 {
@@ -256,15 +256,15 @@ func (s *serviceLatency) normalizeMetrics() {
 	}
 }
 
-func (s *serviceLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
+func (s *serviceLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]interface{}{
 		svcLatencyMeasurement:          s.normLatencies,
 		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
 	}
-	IndexLatencyMeasurement(s.config, jobName, metricMap, indexerList)
+	IndexLatencyMeasurement(s.Config, jobName, metricMap, indexerList)
 }
 
-func (s *serviceLatency) getMetrics() *sync.Map {
+func (s *serviceLatency) GetMetrics() *sync.Map {
 	return &s.metrics
 }
 
@@ -298,6 +298,6 @@ func (s *serviceLatency) waitForIngress(svc *corev1.Service) error {
 	return err
 }
 
-func (s *serviceLatency) collect(measurementWg *sync.WaitGroup) {
+func (s *serviceLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 }

@@ -90,7 +90,7 @@ type vmiMetric struct {
 }
 
 type vmiLatency struct {
-	baseMeasurement
+	BaseMeasurement
 
 	vmWatcher        *metrics.Watcher
 	vmiWatcher       *metrics.Watcher
@@ -101,21 +101,21 @@ type vmiLatency struct {
 }
 
 type vmiLatencyMeasurementFactory struct {
-	baseMeasurementFactory
+	BaseMeasurementFactory
 }
 
-func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
-	if err := verifyMeasurementConfig(measurement, supportedVMIConditions); err != nil {
+func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+	if err := VerifyMeasurementConfig(measurement, supportedVMIConditions); err != nil {
 		return nil, err
 	}
 	return vmiLatencyMeasurementFactory{
-		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (vmilmf vmiLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+func (vmilmf vmiLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &vmiLatency{
-		baseMeasurement: vmilmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: vmilmf.NewBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
@@ -269,20 +269,20 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 }
 
 // Start starts vmiLatency measurement
-func (vmi *vmiLatency) start(measurementWg *sync.WaitGroup) error {
+func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	// Reset latency slices, required in multi-job benchmarks
 	vmi.latencyQuantiles, vmi.normLatencies = nil, nil
 	vmi.metrics = sync.Map{}
-	log.Infof("Creating VM latency watcher for %s", vmi.jobConfig.Name)
-	restClient := newRESTClientWithRegisteredKubevirtResource(vmi.restConfig)
+	log.Infof("Creating VM latency watcher for %s", vmi.JobConfig.Name)
+	restClient := newRESTClientWithRegisteredKubevirtResource(vmi.RestConfig)
 	vmi.vmWatcher = metrics.NewWatcher(
 		restClient,
 		"vmWatcher",
 		"virtualmachines",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vmi.runid)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vmi.Runid)
 		},
 		nil,
 	)
@@ -296,14 +296,14 @@ func (vmi *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 		return fmt.Errorf("VMI Latency measurement error: %s", err)
 	}
 
-	log.Infof("Creating VMI latency watcher for %s", vmi.jobConfig.Name)
+	log.Infof("Creating VMI latency watcher for %s", vmi.JobConfig.Name)
 	vmi.vmiWatcher = metrics.NewWatcher(
 		restClient,
 		"vmiWatcher",
 		"virtualmachineinstances",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vmi.runid)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vmi.Runid)
 		},
 		nil,
 	)
@@ -317,9 +317,9 @@ func (vmi *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 		return fmt.Errorf("VMI Latency measurement error: %s", err)
 	}
 
-	log.Infof("Creating VMI Pod latency watcher for %s", vmi.jobConfig.Name)
+	log.Infof("Creating VMI Pod latency watcher for %s", vmi.JobConfig.Name)
 	vmi.vmiPodWatcher = metrics.NewWatcher(
-		vmi.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		vmi.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"podWatcher",
 		"pods",
 		corev1.NamespaceAll,
@@ -327,7 +327,7 @@ func (vmi *vmiLatency) start(measurementWg *sync.WaitGroup) error {
 			options.LabelSelector = labels.Set(
 				map[string]string{
 					"kubevirt.io":       "virt-launcher",
-					"kube-burner-runid": vmi.runid,
+					"kube-burner-runid": vmi.Runid,
 				},
 			).String()
 		},
@@ -368,38 +368,38 @@ func setConfigDefaults(config *rest.Config) {
 	config.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: codecs}
 }
 
-func (vmi *vmiLatency) collect(measurementWg *sync.WaitGroup) {
+func (vmi *vmiLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 }
 
 // Stop stops vmiLatency measurement
-func (vmi *vmiLatency) stop() error {
+func (vmi *vmiLatency) Stop() error {
 	vmi.vmWatcher.StopWatcher()
 	vmi.vmiWatcher.StopWatcher()
 	vmi.vmiPodWatcher.StopWatcher()
-	if vmi.jobConfig.JobType == config.DeletionJob {
+	if vmi.JobConfig.JobType == config.DeletionJob {
 		return nil
 	}
 	vmi.normalizeMetrics()
 	vmi.calcQuantiles()
-	err := metrics.CheckThreshold(vmi.config.LatencyThresholds, vmi.latencyQuantiles)
+	err := metrics.CheckThreshold(vmi.Config.LatencyThresholds, vmi.latencyQuantiles)
 	for _, q := range vmi.latencyQuantiles {
 		vmiq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", vmi.jobConfig.Name, vmiq.QuantileName, vmiq.P99, vmiq.Max, vmiq.Avg)
+		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", vmi.JobConfig.Name, vmiq.QuantileName, vmiq.P99, vmiq.Max, vmiq.Avg)
 	}
 	return err
 }
 
 // index sends metrics to the configured indexer
-func (vmi *vmiLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
+func (vmi *vmiLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]interface{}{
 		vmiLatencyMeasurement:          vmi.normLatencies,
 		vmiLatencyQuantilesMeasurement: vmi.latencyQuantiles,
 	}
-	IndexLatencyMeasurement(vmi.config, jobName, metricMap, indexerList)
+	IndexLatencyMeasurement(vmi.Config, jobName, metricMap, indexerList)
 }
 
-func (vmi *vmiLatency) getMetrics() *sync.Map {
+func (vmi *vmiLatency) GetMetrics() *sync.Map {
 	return &vmi.metrics
 }
 
@@ -421,9 +421,9 @@ func (vmi *vmiLatency) normalizeMetrics() {
 		m.PodInitializedLatency = m.podInitialized.Sub(m.Timestamp).Milliseconds()
 		m.PodContainersReadyLatency = m.podContainersReady.Sub(m.Timestamp).Milliseconds()
 		m.PodReadyLatency = m.podReady.Sub(m.Timestamp).Milliseconds()
-		m.UUID = vmi.uuid
-		m.JobName = vmi.jobConfig.Name
-		m.Metadata = vmi.metadata
+		m.UUID = vmi.Uuid
+		m.JobName = vmi.JobConfig.Name
+		m.Metadata = vmi.Metadata
 		vmi.normLatencies = append(vmi.normLatencies, m)
 		return true
 	})
@@ -445,7 +445,7 @@ func (vmi *vmiLatency) calcQuantiles() {
 			"Pod" + string(corev1.ContainersReady):  float64(vmiMetric.PodContainersReadyLatency),
 		}
 	}
-	vmi.latencyQuantiles = calculateQuantiles(vmi.uuid, vmi.jobConfig.Name, vmi.metadata, vmi.normLatencies, getLatency, vmiLatencyQuantilesMeasurement)
+	vmi.latencyQuantiles = CalculateQuantiles(vmi.Uuid, vmi.JobConfig.Name, vmi.Metadata, vmi.normLatencies, getLatency, vmiLatencyQuantilesMeasurement)
 }
 
 // Returns the parent VM UID if there is one

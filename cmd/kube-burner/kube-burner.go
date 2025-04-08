@@ -118,7 +118,7 @@ func initCmd() *cobra.Command {
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper)
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(rc)
@@ -251,7 +251,7 @@ func measureCmd() *cobra.Command {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
 			log.Infof("%v", namespaceLabels)
-			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata).NewMeasurements(
+			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
 				&config.Job{
 					Name:                 jobName,
 					Namespace:            rawNamespaces,

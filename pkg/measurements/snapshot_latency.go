@@ -68,7 +68,7 @@ type volumeSnapshotMetric struct {
 }
 
 type volumeSnapshotLatency struct {
-	baseMeasurement
+	BaseMeasurement
 
 	watcher          *metrics.Watcher
 	metrics          sync.Map
@@ -77,21 +77,21 @@ type volumeSnapshotLatency struct {
 }
 
 type volumeSnapshotLatencyMeasurementFactory struct {
-	baseMeasurementFactory
+	BaseMeasurementFactory
 }
 
-func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (measurementFactory, error) {
-	if err := verifyMeasurementConfig(measurement, supportedVolumeSnapshotConditions); err != nil {
+func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+	if err := VerifyMeasurementConfig(measurement, supportedVolumeSnapshotConditions); err != nil {
 		return nil, err
 	}
 	return volumeSnapshotLatencyMeasurementFactory{
-		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (vslmf volumeSnapshotLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+func (vslmf volumeSnapshotLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &volumeSnapshotLatency{
-		baseMeasurement: vslmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: vslmf.NewBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
@@ -103,9 +103,9 @@ func (vsl *volumeSnapshotLatency) handleCreateVolumeSnapshot(obj any) {
 		Namespace:    volumeSnapshot.Namespace,
 		Name:         volumeSnapshot.Name,
 		MetricName:   volumeSnapshotLatencyMeasurement,
-		UUID:         vsl.uuid,
-		JobName:      vsl.jobConfig.Name,
-		Metadata:     vsl.metadata,
+		UUID:         vsl.Uuid,
+		JobName:      vsl.JobConfig.Name,
+		Metadata:     vsl.Metadata,
 		JobIteration: getIntFromLabels(vsLabels, config.KubeBurnerLabelJobIteration),
 		Replica:      getIntFromLabels(vsLabels, config.KubeBurnerLabelReplica),
 	})
@@ -125,19 +125,19 @@ func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
 	}
 }
 
-func (vsl *volumeSnapshotLatency) start(measurementWg *sync.WaitGroup) error {
+func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	// Reset latency slices, required in multi-job benchmarks
 	vsl.latencyQuantiles, vsl.normLatencies = nil, nil
 	vsl.metrics = sync.Map{}
-	log.Infof("Creating Data Volume latency watcher for %s", vsl.jobConfig.Name)
+	log.Infof("Creating Data Volume latency watcher for %s", vsl.JobConfig.Name)
 	vsl.watcher = metrics.NewWatcher(
-		getGroupVersionClient(vsl.restConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
+		getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
 		"vsWatcher",
 		"volumesnapshots",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vsl.runid)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vsl.Runid)
 		},
 		nil,
 	)
@@ -154,7 +154,7 @@ func (vsl *volumeSnapshotLatency) start(measurementWg *sync.WaitGroup) error {
 	return nil
 }
 
-func (vsl *volumeSnapshotLatency) stop() error {
+func (vsl *volumeSnapshotLatency) Stop() error {
 	var err error
 	defer func() {
 		if vsl.watcher != nil {
@@ -167,12 +167,12 @@ func (vsl *volumeSnapshotLatency) stop() error {
 		return fmt.Errorf("something is wrong with system under test. VolumeSnapshot latencies error rate was: %.2f", errorRate)
 	}
 	vsl.calcQuantiles()
-	if len(vsl.config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(vsl.config.LatencyThresholds, vsl.latencyQuantiles)
+	if len(vsl.Config.LatencyThresholds) > 0 {
+		err = metrics.CheckThreshold(vsl.Config.LatencyThresholds, vsl.latencyQuantiles)
 	}
 	for _, q := range vsl.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", vsl.jobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %v 99th: %v max: %v avg: %v", vsl.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
 		log.Infof("DataVolume latencies error rate was: %.2f", errorRate)
@@ -180,18 +180,18 @@ func (vsl *volumeSnapshotLatency) stop() error {
 	return err
 }
 
-func (vsl *volumeSnapshotLatency) collect(measurementWg *sync.WaitGroup) {
+func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var volumeSnapshots []volumesnapshotv1.VolumeSnapshot
-	labelSelector := labels.SelectorFromSet(vsl.jobConfig.NamespaceLabels)
+	labelSelector := labels.SelectorFromSet(vsl.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
-	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(vsl.restConfig)
+	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(vsl.RestConfig)
 	if err != nil {
 		log.Fatalf("Failed to get kubevirt client - %v", err)
 	}
-	namespaces := strings.Split(vsl.jobConfig.Namespace, ",")
+	namespaces := strings.Split(vsl.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
 		vsList, err := kubeVirtClient.KubernetesSnapshotClient().SnapshotV1().VolumeSnapshots(namespace).List(context.TODO(), options)
 		if err != nil {
@@ -206,22 +206,22 @@ func (vsl *volumeSnapshotLatency) collect(measurementWg *sync.WaitGroup) {
 			Namespace:  volumeSnapshot.Namespace,
 			Name:       volumeSnapshot.Name,
 			MetricName: volumeSnapshotLatencyMeasurement,
-			UUID:       vsl.uuid,
+			UUID:       vsl.Uuid,
 			vsReady:    volumeSnapshot.Status.CreationTime.Time,
-			JobName:    vsl.jobConfig.Name,
+			JobName:    vsl.JobConfig.Name,
 		})
 	}
 }
 
-func (vsl *volumeSnapshotLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
+func (vsl *volumeSnapshotLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]any{
 		volumeSnapshotLatencyMeasurement:          vsl.normLatencies,
 		volumeSnapshotLatencyQuantilesMeasurement: vsl.latencyQuantiles,
 	}
-	IndexLatencyMeasurement(vsl.config, jobName, metricMap, indexerList)
+	IndexLatencyMeasurement(vsl.Config, jobName, metricMap, indexerList)
 }
 
-func (vsl *volumeSnapshotLatency) getMetrics() *sync.Map {
+func (vsl *volumeSnapshotLatency) GetMetrics() *sync.Map {
 	return &vsl.metrics
 }
 
@@ -268,5 +268,5 @@ func (vsl *volumeSnapshotLatency) calcQuantiles() {
 			"Ready": float64(volumeSnapshotMetric.VSReadyLatency),
 		}
 	}
-	vsl.latencyQuantiles = calculateQuantiles(vsl.uuid, vsl.jobConfig.Name, vsl.metadata, vsl.normLatencies, getLatency, volumeSnapshotLatencyQuantilesMeasurement)
+	vsl.latencyQuantiles = CalculateQuantiles(vsl.Uuid, vsl.JobConfig.Name, vsl.Metadata, vsl.normLatencies, getLatency, volumeSnapshotLatencyQuantilesMeasurement)
 }

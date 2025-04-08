@@ -65,7 +65,7 @@ type pvcMetric struct {
 }
 
 type pvcLatency struct {
-	baseMeasurement
+	BaseMeasurement
 	watcher          *metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
@@ -73,21 +73,21 @@ type pvcLatency struct {
 }
 
 type pvcLatencyMeasurementFactory struct {
-	baseMeasurementFactory
+	BaseMeasurementFactory
 }
 
-func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
-	if err := verifyMeasurementConfig(measurement, supportedPvcConditions); err != nil {
+func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+	if err := VerifyMeasurementConfig(measurement, supportedPvcConditions); err != nil {
 		return nil, err
 	}
 	return pvcLatencyMeasurementFactory{
-		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (plmf pvcLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+func (plmf pvcLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &pvcLatency{
-		baseMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
@@ -103,9 +103,9 @@ func (p *pvcLatency) handleCreatePVC(obj interface{}) {
 		StorageClass: getStorageClassName(*pvc),
 		Size:         pvc.Spec.Resources.Requests.Storage().String(),
 		MetricName:   pvcLatencyMeasurement,
-		UUID:         p.uuid,
-		JobName:      p.jobConfig.Name,
-		Metadata:     p.metadata,
+		UUID:         p.Uuid,
+		JobName:      p.JobConfig.Name,
+		Metadata:     p.Metadata,
 		JobIteration: getIntFromLabels(pvcLabels, config.KubeBurnerLabelJobIteration),
 		Replica:      getIntFromLabels(pvcLabels, config.KubeBurnerLabelReplica),
 	})
@@ -146,21 +146,21 @@ func (p *pvcLatency) handleUpdatePVC(obj interface{}) {
 }
 
 // start pvcLatency measurement
-func (p *pvcLatency) start(measurementWg *sync.WaitGroup) error {
-	if p.jobConfig.JobType == config.ReadJob || p.jobConfig.JobType == config.PatchJob || p.jobConfig.JobType == config.DeletionJob {
-		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.jobConfig.JobType)
+func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
+	if p.JobConfig.JobType == config.ReadJob || p.JobConfig.JobType == config.PatchJob || p.JobConfig.JobType == config.DeletionJob {
+		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
 	}
 	p.latencyQuantiles, p.normLatencies = nil, nil
 	defer measurementWg.Done()
 	p.metrics = sync.Map{}
-	log.Infof("Creating PVC latency watcher for %s", p.jobConfig.Name)
+	log.Infof("Creating PVC latency watcher for %s", p.JobConfig.Name)
 	p.watcher = metrics.NewWatcher(
-		p.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
+		p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"pvcWatcher",
 		"persistentvolumeclaims",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", p.runid)
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", p.Runid)
 		},
 		nil,
 	)
@@ -177,7 +177,7 @@ func (p *pvcLatency) start(measurementWg *sync.WaitGroup) error {
 }
 
 // collects PVC measurements triggered in the past
-func (p *pvcLatency) collect(measurementWg *sync.WaitGroup) {
+func (p *pvcLatency) Collect(measurementWg *sync.WaitGroup) {
 	log.Info("Collect method doesn't apply to PVC by design")
 	defer measurementWg.Done()
 }
@@ -191,7 +191,7 @@ func getStorageClassName(pvc corev1.PersistentVolumeClaim) string {
 }
 
 // stop pvc latency measurement
-func (p *pvcLatency) stop() error {
+func (p *pvcLatency) Stop() error {
 	var err error
 	defer func() {
 		if p.watcher != nil {
@@ -204,12 +204,12 @@ func (p *pvcLatency) stop() error {
 		return fmt.Errorf("Something is wrong with system under test. PVC latencies error rate was: %.2f", errorRate)
 	}
 	p.calcQuantiles()
-	if len(p.config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
+	if len(p.Config.LatencyThresholds) > 0 {
+		err = metrics.CheckThreshold(p.Config.LatencyThresholds, p.latencyQuantiles)
 	}
 	for _, q := range p.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", p.jobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %v 99th: %v max: %v avg: %v", p.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
 		log.Infof("PVC latencies error rate was: %.2f", errorRate)
@@ -218,16 +218,16 @@ func (p *pvcLatency) stop() error {
 }
 
 // index sends metrics to the configured indexer
-func (p *pvcLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
+func (p *pvcLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]interface{}{
 		pvcLatencyMeasurement:          p.normLatencies,
 		pvcLatencyQuantilesMeasurement: p.latencyQuantiles,
 	}
-	IndexLatencyMeasurement(p.config, jobName, metricMap, indexerList)
+	IndexLatencyMeasurement(p.Config, jobName, metricMap, indexerList)
 }
 
 // getter function to get metrics
-func (p *pvcLatency) getMetrics() *sync.Map {
+func (p *pvcLatency) GetMetrics() *sync.Map {
 	return &p.metrics
 }
 
@@ -287,5 +287,5 @@ func (p *pvcLatency) calcQuantiles() {
 			string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
 		}
 	}
-	p.latencyQuantiles = calculateQuantiles(p.uuid, p.jobConfig.Name, p.metadata, p.normLatencies, getLatency, pvcLatencyQuantilesMeasurement)
+	p.latencyQuantiles = CalculateQuantiles(p.Uuid, p.JobConfig.Name, p.Metadata, p.normLatencies, getLatency, pvcLatencyQuantilesMeasurement)
 }

@@ -66,7 +66,7 @@ var (
 // - error
 //
 //nolint:gocyclo
-func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper) (int, error) {
+func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) (int, error) {
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
@@ -84,7 +84,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	defer cancel()
 	go func() {
 		var innerRC int
-		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata)
+		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobList = newExecutorList(configSpec, kubeClientProvider)
 		handlePreloadImages(jobList, kubeClientProvider)
 		// Iterate job list

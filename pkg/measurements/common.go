@@ -50,45 +50,45 @@ var (
 	}
 )
 
-type baseMeasurementFactory struct {
-	config   types.Measurement
-	uuid     string
-	runid    string
-	metadata map[string]interface{}
+type BaseMeasurementFactory struct {
+	Config   types.Measurement
+	Uuid     string
+	Runid    string
+	Metadata map[string]interface{}
 }
 
-type baseMeasurement struct {
-	config     types.Measurement
-	uuid       string
-	runid      string
-	jobConfig  *config.Job
-	clientSet  kubernetes.Interface
-	restConfig *rest.Config
-	metadata   map[string]interface{}
+type BaseMeasurement struct {
+	Config     types.Measurement
+	Uuid       string
+	Runid      string
+	JobConfig  *config.Job
+	ClientSet  kubernetes.Interface
+	RestConfig *rest.Config
+	Metadata   map[string]interface{}
 }
 
-func newBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) baseMeasurementFactory {
-	return baseMeasurementFactory{
-		config:   measurement,
-		uuid:     configSpec.GlobalConfig.UUID,
-		runid:    configSpec.GlobalConfig.RUNID,
-		metadata: metadata,
+func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) BaseMeasurementFactory {
+	return BaseMeasurementFactory{
+		Config:   measurement,
+		Uuid:     configSpec.GlobalConfig.UUID,
+		Runid:    configSpec.GlobalConfig.RUNID,
+		Metadata: metadata,
 	}
 }
 
-func (bmf baseMeasurementFactory) newBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) baseMeasurement {
-	return baseMeasurement{
-		config:     bmf.config,
-		uuid:       bmf.uuid,
-		runid:      bmf.runid,
-		jobConfig:  jobConfig,
-		clientSet:  clientSet,
-		restConfig: restConfig,
-		metadata:   bmf.metadata,
+func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) BaseMeasurement {
+	return BaseMeasurement{
+		Config:     bmf.Config,
+		Uuid:       bmf.Uuid,
+		Runid:      bmf.Runid,
+		JobConfig:  jobConfig,
+		ClientSet:  clientSet,
+		RestConfig: restConfig,
+		Metadata:   bmf.Metadata,
 	}
 }
 
-func verifyMeasurementConfig(config types.Measurement, supportedConditions map[string]struct{}) error {
+func VerifyMeasurementConfig(config types.Measurement, supportedConditions map[string]struct{}) error {
 	for _, th := range config.LatencyThresholds {
 		if _, supported := supportedConditions[th.ConditionType]; !supported {
 			return fmt.Errorf("unsupported condition type in measurement: %s", th.ConditionType)
@@ -133,7 +133,7 @@ func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 
 // Common function to calculate quantiles for both node and pod latencies
 // Receives a list of normalized latencies and a function to get the latencies for each condition
-func calculateQuantiles(uuid, jobName string, metadata map[string]interface{}, normLatencies []interface{}, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
+func CalculateQuantiles(uuid, jobName string, metadata map[string]interface{}, normLatencies []interface{}, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
 	quantileMap := map[string][]float64{}
 	for _, normLatency := range normLatencies {
 		for condition, latency := range getLatency(normLatency) {
