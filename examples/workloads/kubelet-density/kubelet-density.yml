@@ -1,15 +1,19 @@
 ---
 global:
   gc: true
+  gcTimeout: 12s
   measurements:
    - name: podLatency
+metricsEndpoints:
+  - indexer:
+      type: local
 jobs:
   - name: kubelet-density
-    jobIterations: 25
-    qps: 2
-    burst: 2
+    jobIterations: 10
+    qps: 10
+    burst: 10
     preLoadImages: false
-    namespacedIterations: false
+    namespacedIterations: true
     namespace: kubelet-density
     waitWhenFinished: true
     podWait: false
