@@ -250,14 +250,16 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
-	if globalConfig.GC && !globalConfig.GCMetrics {
-		log.Info("Garbage collecting jobs")
-		gcWg.Wait()
-	}
-	// When GC times out and job execution has finished successfully, return timeout
-	if gcCtx.Err() == context.DeadlineExceeded && rc == 0 {
-		errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
-		rc = rcTimeout
+	if globalConfig.GC {
+		if !globalConfig.GCMetrics {
+			log.Info("Garbage collecting jobs")
+			gcWg.Wait()
+		}
+		// When GC times out and job execution has finished successfully, return timeout
+		if gcCtx.Err() == context.DeadlineExceeded && rc == 0 {
+			errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
+			rc = rcTimeout
+		}
 	}
 	return rc, utilerrors.NewAggregate(errs)
 }
