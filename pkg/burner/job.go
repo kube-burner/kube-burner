@@ -72,6 +72,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var executedJobs []prometheus.Job
 	var jobList []Executor
 	var msWg, gcWg sync.WaitGroup
+	var gcCtx context.Context
+	var cancelGC context.CancelFunc
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -186,7 +188,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
 			//nolint:govet
-			gcCtx, _ := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+			gcCtx, _ = context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 			for _, job := range jobList {
 				gcWg.Add(1)
 				go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
@@ -230,24 +232,32 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	}()
 	select {
 	case rc = <-res:
+	// When benchmark times out
 	case <-time.After(configSpec.GlobalConfig.Timeout):
 		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
 		log.Error(err.Error())
 		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
-		gcCtx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
-		defer cancel()
-		for _, job := range jobList[:len(executedJobs)-1] {
-			gcWg.Add(1)
-			go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
-		}
 		errs = append(errs, err)
 		rc = rcTimeout
+		if globalConfig.GC {
+			gcCtx, cancelGC = context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+			defer cancelGC()
+			for _, job := range jobList[:len(executedJobs)-1] {
+				gcWg.Add(1)
+				go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
+			}
+		}
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
 	if globalConfig.GC && !globalConfig.GCMetrics {
 		log.Info("Garbage collecting jobs")
 		gcWg.Wait()
+	}
+	// When GC times out and job execution has finished successfully, return timeout
+	if gcCtx.Err() == context.DeadlineExceeded && rc == 0 {
+		errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
+		rc = rcTimeout
 	}
 	return rc, utilerrors.NewAggregate(errs)
 }
@@ -360,7 +370,11 @@ func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector 
 	if wg != nil {
 		defer wg.Done()
 	}
-	util.CleanupNamespaces(ctx, jobExecutor.clientSet, labelSelector)
+	err := util.CleanupNamespaces(ctx, jobExecutor.clientSet, labelSelector)
+	// Just report error and continue
+	if err != nil {
+		log.Error(err.Error())
+	}
 	for _, obj := range jobExecutor.objects {
 		jobExecutor.limiter.Wait(ctx)
 		if !obj.namespaced {
