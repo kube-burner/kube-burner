@@ -68,7 +68,7 @@ type volumeSnapshotMetric struct {
 }
 
 type volumeSnapshotLatency struct {
-	baseLatencyMeasurement
+	baseMeasurement
 
 	watcher          *metrics.Watcher
 	metrics          sync.Map
@@ -77,7 +77,7 @@ type volumeSnapshotLatency struct {
 }
 
 type volumeSnapshotLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 }
 
 func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (measurementFactory, error) {
@@ -85,13 +85,13 @@ func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurem
 		return nil, err
 	}
 	return volumeSnapshotLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
 func (vslmf volumeSnapshotLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &volumeSnapshotLatency{
-		baseLatencyMeasurement: vslmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		baseMeasurement: vslmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 

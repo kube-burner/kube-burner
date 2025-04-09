@@ -42,7 +42,7 @@ const (
 )
 
 type serviceLatency struct {
-	baseLatencyMeasurement
+	baseMeasurement
 
 	svcWatcher       *metrics.Watcher
 	epWatcher        *metrics.Watcher
@@ -67,7 +67,7 @@ type svcMetric struct {
 }
 
 type serviceLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 }
 
 func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
@@ -76,13 +76,13 @@ func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement typ
 	}
 
 	return serviceLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
 func (slmf serviceLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &serviceLatency{
-		baseLatencyMeasurement: slmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		baseMeasurement: slmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 

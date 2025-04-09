@@ -64,7 +64,7 @@ type NodeMetric struct {
 }
 
 type nodeLatency struct {
-	baseLatencyMeasurement
+	baseMeasurement
 
 	watcher          *metrics.Watcher
 	metrics          sync.Map
@@ -73,7 +73,7 @@ type nodeLatency struct {
 }
 
 type nodeLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	baseMeasurementFactory
 }
 
 func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
@@ -81,13 +81,13 @@ func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.
 		return nil, err
 	}
 	return nodeLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		baseMeasurementFactory: newBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
 func (nlmf nodeLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
 	return &nodeLatency{
-		baseLatencyMeasurement: nlmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		baseMeasurement: nlmf.newBaseLatency(jobConfig, clientSet, restConfig),
 	}
 }
 
