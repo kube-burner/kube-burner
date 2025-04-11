@@ -22,6 +22,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
@@ -45,10 +46,10 @@ func NewWorkloadHelper(config Config, embedConfig *embed.FS, kubeClientProvider 
 }
 
 func (wh *WorkloadHelper) Run(workload string) int {
-	return wh.RunWithAdditionalVars(workload, nil)
+	return wh.RunWithAdditionalVars(workload, nil, nil)
 }
 
-func (wh *WorkloadHelper) RunWithAdditionalVars(workload string, additionalVars map[string]interface{}) int {
+func (wh *WorkloadHelper) RunWithAdditionalVars(workload string, additionalVars map[string]interface{}, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) int {
 	configFile := fmt.Sprintf("%s.yml", workload)
 	var embedFS *embed.FS
 	var embedFSDir string
@@ -79,7 +80,7 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(workload string, additionalVars 
 		MetricsMetadata: wh.MetricsMetadata,
 		UserMetaData:    wh.UserMetadata,
 	})
-	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper)
+	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, additionalMeasurementFactoryMap)
 	if err != nil {
 		log.Error(err.Error())
 	}
