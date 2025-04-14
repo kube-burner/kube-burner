@@ -128,8 +128,14 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 			switch c.Type {
 			case cdiv1beta1.DataVolumeBound:
 				if dvm.dvBound.IsZero() {
-					log.Debugf("Updated bound time for dataVolume [%s]", dataVolume.Name)
-					dvm.dvBound = c.LastTransitionTime.Time.UTC()
+					// DataVolume should not reach Bound at the time of creation
+					// Workaround for issue https://issues.redhat.com/browse/CNV-59653
+					if c.LastTransitionTime.Time.UTC() == dvm.Timestamp {
+						log.Debugf("DV [%v]: Disregard bound [%v] with timestamp [%v] equal to creation time", dataVolume.Name, c.Type, dvm.Timestamp)
+					} else {
+						log.Debugf("Updated bound time for dataVolume [%s]", dataVolume.Name)
+						dvm.dvBound = c.LastTransitionTime.Time.UTC()
+					}
 				}
 			case cdiv1beta1.DataVolumeRunning:
 				if dvm.dvRunning.IsZero() {
@@ -138,8 +144,14 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 				}
 			case cdiv1beta1.DataVolumeReady:
 				if dvm.dvReady.IsZero() {
-					log.Debugf("Updated ready time for dataVolume [%s]", dataVolume.Name)
-					dvm.dvReady = c.LastTransitionTime.Time.UTC()
+					// DataVolume should not reach Ready at the time of creation
+					// Workaround for issue https://issues.redhat.com/browse/CNV-59653
+					if c.LastTransitionTime.Time.UTC() == dvm.Timestamp {
+						log.Debugf("DV [%v]: Disregard bound [%v] with timestamp [%v] equal to creation time", dataVolume.Name, c.Type, dvm.Timestamp)
+					} else {
+						log.Debugf("Updated ready time for dataVolume [%s]", dataVolume.Name)
+						dvm.dvReady = c.LastTransitionTime.Time.UTC()
+					}
 				}
 			}
 		}
