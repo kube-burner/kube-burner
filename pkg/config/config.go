@@ -162,7 +162,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if allowMissingKeys {
 		templateOptions = util.MissingKeyZero
 	}
-	renderedCfg, err := util.RenderTemplate(cfg, inputData, templateOptions)
+	renderedCfg, err := util.RenderTemplate(cfg, inputData, templateOptions, []string{})
 	if err != nil {
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}
