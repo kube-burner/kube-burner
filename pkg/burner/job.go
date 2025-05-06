@@ -132,10 +132,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Error(err.Error())
 				}
 				if job.Churn {
-					now := time.Now().UTC()
-					executedJobs[len(executedJobs)-1].ChurnStart = &now
+					churnStart := time.Now().UTC()
+					executedJobs[len(executedJobs)-1].ChurnStart = &churnStart
 					job.RunCreateJobWithChurn(ctx)
-					executedJobs[len(executedJobs)-1].ChurnEnd = &now
+					churnEnd := time.Now().UTC()
+					executedJobs[len(executedJobs)-1].ChurnEnd = &churnEnd
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
