@@ -128,7 +128,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 				restClient:       getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
 				watcherName:      "vsWatcher",
 				watchedResource:  "volumesnapshots",
-				watchFilterRunID: true,
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vsl.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vsl.handleCreateVolumeSnapshot,
 					UpdateFunc: func(oldObj, newObj any) {

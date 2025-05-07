@@ -157,7 +157,7 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 				restClient:       nil,
 				watcherName:      "podWatcher",
 				watchedResource:  "pods",
-				watchFilterRunID: true,
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePod,
 					UpdateFunc: func(oldObj, newObj interface{}) {

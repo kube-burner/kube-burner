@@ -153,7 +153,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 				restClient:       nil,
 				watcherName:      "pvcWatcher",
 				watchedResource:  "persistentvolumeclaims",
-				watchFilterRunID: true,
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePVC,
 					UpdateFunc: func(oldObj, newObj interface{}) {
@@ -190,7 +190,7 @@ func (p *pvcLatency) Stop() error {
 	errorRate := p.normalizeMetrics()
 	if errorRate > 10.00 {
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("Something is wrong with system under test. PVC latencies error rate was: %.2f", errorRate)
+		return fmt.Errorf("something is wrong with system under test. PVC latencies error rate was: %.2f", errorRate)
 	}
 	p.calcQuantiles()
 	if len(p.Config.LatencyThresholds) > 0 {

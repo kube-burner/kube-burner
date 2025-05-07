@@ -43,8 +43,8 @@ const (
 type serviceLatency struct {
 	BaseMeasurement
 
-	epLister   lcorev1.EndpointsLister
-	svcLister  lcorev1.ServiceLister
+	epLister  lcorev1.EndpointsLister
+	svcLister lcorev1.ServiceLister
 }
 
 type svcMetric struct {
@@ -171,20 +171,20 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 		&s.BaseMeasurement,
 		[]MeasurementWatcher{
 			{
-				restClient:       nil,
-				watcherName:      "svcWatcher",
-				watchedResource:  "services",
-				watchFilterRunID: true,
+				restClient:      nil,
+				watcherName:     "svcWatcher",
+				watchedResource: "services",
+				labelSelector:   fmt.Sprintf("kube-burner-runid=%v", s.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: s.handleCreateSvc,
 				},
 			},
 			{
-				restClient: nil,
-				watcherName: "epWatcher",
+				restClient:      nil,
+				watcherName:     "epWatcher",
 				watchedResource: "endpoints",
-				watchFilterRunID: false,
-				handlers: nil,
+				labelSelector:   "",
+				handlers:        nil,
 			},
 		},
 	)

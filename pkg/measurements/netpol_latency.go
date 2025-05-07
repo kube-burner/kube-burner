@@ -510,7 +510,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 				restClient:       nil,
 				watcherName:      "netpolWatcher",
 				watchedResource:  "networkpolicies",
-				watchFilterRunID: true,
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", n.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNetpol,
 				},

@@ -25,6 +25,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -267,10 +268,10 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 		&vmi.BaseMeasurement,
 		[]MeasurementWatcher{
 			{
-				restClient:       restClient,
-				watcherName:      "vmWatcher",
-				watchedResource:  "virtualmachines",
-				watchFilterRunID: true,
+				restClient:      restClient,
+				watcherName:     "vmWatcher",
+				watchedResource: "virtualmachines",
+				labelSelector:   fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVM,
 					UpdateFunc: func(oldObj, newObj interface{}) {
@@ -279,10 +280,10 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				},
 			},
 			{
-				restClient:       restClient,
-				watcherName:      "vmiWatcher",
-				watchedResource:  "virtualmachineinstances",
-				watchFilterRunID: true,
+				restClient:      restClient,
+				watcherName:     "vmiWatcher",
+				watchedResource: "virtualmachineinstances",
+				labelSelector:   fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMI,
 					UpdateFunc: func(oldObj, newObj interface{}) {
@@ -291,10 +292,15 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				},
 			},
 			{
-				restClient: nil,
-				watcherName: "podWatcher",
+				restClient:      nil,
+				watcherName:     "podWatcher",
 				watchedResource: "pods",
-				watchFilterRunID: true,
+				labelSelector: labels.Set(
+					map[string]string{
+						"kubevirt.io":       "virt-launcher",
+						"kube-burner-runid": vmi.Runid,
+					},
+				).String(),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMIPod,
 					UpdateFunc: func(oldObj, newObj interface{}) {
@@ -304,21 +310,6 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
-	// vmi.vmiPodWatcher = metrics.NewWatcher(
-	// 	vmi.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-	// 	"podWatcher",
-	// 	"pods",
-	// 	corev1.NamespaceAll,
-	// 	func(options *metav1.ListOptions) {
-	// 		options.LabelSelector = labels.Set(
-	// 			map[string]string{
-	// 				"kubevirt.io":       "virt-launcher",
-	// 				"kube-burner-runid": vmi.Runid,
-	// 			},
-	// 		).String()
-	// 	},
-	// 	nil,
-	// )
 }
 
 func newRESTClientWithRegisteredKubevirtResource(restConfig *rest.Config) *rest.RESTClient {

@@ -67,7 +67,7 @@ type BaseMeasurement struct {
 	ClientSet        kubernetes.Interface
 	RestConfig       *rest.Config
 	Metadata         map[string]any
-	watchers          []*metrics.Watcher
+	watchers         []*metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []any
 	normLatencies    []any
@@ -77,7 +77,7 @@ type MeasurementWatcher struct {
 	restClient       *rest.RESTClient
 	watcherName      string
 	watchedResource  string
-	watchFilterRunID bool
+	labelSelector    string
 	handlers         *cache.ResourceEventHandlerFuncs
 }
 
@@ -114,9 +114,9 @@ func Start(bm *BaseMeasurement, measurementWatchers []MeasurementWatcher) error 
 			restClient = bm.ClientSet.CoreV1().RESTClient().(*rest.RESTClient)
 		}
 		var optionsModifier func(options *metav1.ListOptions)
-		if measurementWatcher.watchFilterRunID {
+		if measurementWatcher.labelSelector != "" {
 			optionsModifier = func(options *metav1.ListOptions) {
-				options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", bm.Runid)
+				options.LabelSelector = measurementWatcher.labelSelector
 			}
 		}
 		log.Infof("Creating %v latency watcher for %s", measurementWatcher.watchedResource, bm.JobConfig.Name)
