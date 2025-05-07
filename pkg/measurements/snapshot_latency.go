@@ -24,7 +24,6 @@ import (
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -69,11 +68,6 @@ type volumeSnapshotMetric struct {
 
 type volumeSnapshotLatency struct {
 	BaseMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []any
-	normLatencies    []any
 }
 
 type volumeSnapshotLatencyMeasurementFactory struct {
@@ -127,31 +121,19 @@ func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
 
 func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	// Reset latency slices, required in multi-job benchmarks
-	vsl.latencyQuantiles, vsl.normLatencies = nil, nil
-	vsl.metrics = sync.Map{}
-	log.Infof("Creating Data Volume latency watcher for %s", vsl.JobConfig.Name)
-	vsl.watcher = metrics.NewWatcher(
+	return Start(
+		&vsl.BaseMeasurement,
 		getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
 		"vsWatcher",
 		"volumesnapshots",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vsl.Runid)
+		true,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: vsl.handleCreateVolumeSnapshot,
+			UpdateFunc: func(oldObj, newObj any) {
+				vsl.handleUpdateVolumeSnapshot(newObj)
+			},
 		},
-		nil,
 	)
-	vsl.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: vsl.handleCreateVolumeSnapshot,
-		UpdateFunc: func(oldObj, newObj any) {
-			vsl.handleUpdateVolumeSnapshot(newObj)
-		},
-	})
-	if err := vsl.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("VolumeSnapshot Latency measurement error: %s", err)
-	}
-
-	return nil
 }
 
 func (vsl *volumeSnapshotLatency) Stop() error {

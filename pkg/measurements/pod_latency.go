@@ -73,11 +73,6 @@ type podMetric struct {
 
 type podLatency struct {
 	BaseMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type podLatencyMeasurementFactory struct {
@@ -154,31 +149,20 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 
 // start podLatency measurement
 func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
-	// Reset latency slices, required in multi-job benchmarks
-	p.latencyQuantiles, p.normLatencies = nil, nil
 	defer measurementWg.Done()
-	p.metrics = sync.Map{}
-	log.Infof("Creating Pod latency watcher for %s", p.JobConfig.Name)
-	p.watcher = metrics.NewWatcher(
-		p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+	return Start(
+		&p.BaseMeasurement,
+		nil,
 		"podWatcher",
 		"pods",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", p.Runid)
+		true,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: p.handleCreatePod,
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				p.handleUpdatePod(newObj)
+			},
 		},
-		nil,
 	)
-	p.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: p.handleCreatePod,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			p.handleUpdatePod(newObj)
-		},
-	})
-	if err := p.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Pod Latency measurement error: %s", err)
-	}
-	return nil
 }
 
 // collects pod measurements triggered in the past

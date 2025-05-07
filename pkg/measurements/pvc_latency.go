@@ -25,7 +25,6 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -66,10 +65,6 @@ type pvcMetric struct {
 
 type pvcLatency struct {
 	BaseMeasurement
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type pvcLatencyMeasurementFactory struct {
@@ -147,33 +142,23 @@ func (p *pvcLatency) handleUpdatePVC(obj interface{}) {
 
 // start pvcLatency measurement
 func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
+	defer measurementWg.Done()
 	if p.JobConfig.JobType == config.ReadJob || p.JobConfig.JobType == config.PatchJob || p.JobConfig.JobType == config.DeletionJob {
 		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
 	}
-	p.latencyQuantiles, p.normLatencies = nil, nil
-	defer measurementWg.Done()
-	p.metrics = sync.Map{}
-	log.Infof("Creating PVC latency watcher for %s", p.JobConfig.Name)
-	p.watcher = metrics.NewWatcher(
-		p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+	return Start(
+		&p.BaseMeasurement,
+		nil,
 		"pvcWatcher",
 		"persistentvolumeclaims",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", p.Runid)
+		true,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: p.handleCreatePVC,
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				p.handleUpdatePVC(newObj)
+			},
 		},
-		nil,
 	)
-	p.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: p.handleCreatePVC,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			p.handleUpdatePVC(newObj)
-		},
-	})
-	if err := p.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("PVC Latency measurement error: %s", err)
-	}
-	return nil
 }
 
 // collects PVC measurements triggered in the past

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
 )
 
@@ -58,13 +60,17 @@ type BaseMeasurementFactory struct {
 }
 
 type BaseMeasurement struct {
-	Config     types.Measurement
-	Uuid       string
-	Runid      string
-	JobConfig  *config.Job
-	ClientSet  kubernetes.Interface
-	RestConfig *rest.Config
-	Metadata   map[string]interface{}
+	Config           types.Measurement
+	Uuid             string
+	Runid            string
+	JobConfig        *config.Job
+	ClientSet        kubernetes.Interface
+	RestConfig       *rest.Config
+	Metadata         map[string]any
+	watcher          *metrics.Watcher
+	metrics          sync.Map
+	latencyQuantiles []any
+	normLatencies    []any
 }
 
 func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) BaseMeasurementFactory {
@@ -86,6 +92,36 @@ func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSe
 		RestConfig: restConfig,
 		Metadata:   bmf.Metadata,
 	}
+}
+
+func Start(bm *BaseMeasurement, restClient *rest.RESTClient, watcherName, watchedResource string, watchFilterRunID bool, handlers cache.ResourceEventHandlerFuncs) error {
+	// Reset latency slices, required in multi-job benchmarks
+	bm.latencyQuantiles, bm.normLatencies = nil, nil
+	bm.metrics = sync.Map{}
+	log.Infof("Creating %v latency watcher for %s", watchedResource, bm.JobConfig.Name)
+	if restClient == nil {
+		restClient = bm.ClientSet.CoreV1().RESTClient().(*rest.RESTClient)
+	}
+	var optionsModifier func(options *metav1.ListOptions)
+	if watchFilterRunID {
+		optionsModifier = func(options *metav1.ListOptions) {
+			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", bm.Runid)
+		}
+	}
+	bm.watcher = metrics.NewWatcher(
+		restClient,
+		watcherName,
+		watchedResource,
+		corev1.NamespaceAll,
+		optionsModifier,
+		nil,
+	)
+	bm.watcher.Informer.AddEventHandler(handlers)
+	if err := bm.watcher.StartAndCacheSync(); err != nil {
+		log.Errorf("%v Latency measurement error: %s", watchedResource, err)
+	}
+
+	return nil
 }
 
 func VerifyMeasurementConfig(config types.Measurement, supportedConditions map[string]struct{}) error {

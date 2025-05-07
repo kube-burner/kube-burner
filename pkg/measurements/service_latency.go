@@ -48,9 +48,6 @@ type serviceLatency struct {
 	epWatcher        *metrics.Watcher
 	epLister         lcorev1.EndpointsLister
 	svcLister        lcorev1.ServiceLister
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type svcMetric struct {

@@ -74,11 +74,6 @@ type dvMetric struct {
 
 type dvLatency struct {
 	BaseMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type dvLatencyMeasurementFactory struct {
@@ -161,31 +156,19 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 
 func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	// Reset latency slices, required in multi-job benchmarks
-	dv.latencyQuantiles, dv.normLatencies = nil, nil
-	dv.metrics = sync.Map{}
-	log.Infof("Creating Data Volume latency watcher for %s", dv.JobConfig.Name)
-	dv.watcher = metrics.NewWatcher(
+	return Start(
+		&dv.BaseMeasurement,
 		getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
 		"dvWatcher",
 		"datavolumes",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", dv.Runid)
+		true,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: dv.handleCreateDV,
+			UpdateFunc: func(oldObj, newObj any) {
+				dv.handleUpdateDV(newObj)
+			},
 		},
-		nil,
 	)
-	dv.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: dv.handleCreateDV,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			dv.handleUpdateDV(newObj)
-		},
-	})
-	if err := dv.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("DataVolume Latency measurement error: %s", err)
-	}
-
-	return nil
 }
 
 func (dv *dvLatency) Stop() error {

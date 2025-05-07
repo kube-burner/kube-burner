@@ -88,11 +88,6 @@ type netpolLatency struct {
 	BaseMeasurement
 	embedFS    *embed.FS
 	embedFSDir string
-
-	netpolWatcher    *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type netpolMetric struct {
@@ -507,27 +502,17 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 	if len(connections) > 0 {
 		sendConnections()
 	}
-	n.latencyQuantiles, n.normLatencies = nil, nil
 
-	// Create watchers to record network policy creation timestamp
-	log.Infof("Creating netpol latency watcher for %s", n.JobConfig.Name)
-	n.netpolWatcher = metrics.NewWatcher(
-		n.ClientSet.NetworkingV1().RESTClient().(*rest.RESTClient),
+	return Start(
+		&n.BaseMeasurement,
+		nil,
 		"netpolWatcher",
 		"networkpolicies",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-uuid=%v", n.Uuid)
+		true,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: n.handleCreateNetpol,
 		},
-		cache.Indexers{},
 	)
-	n.netpolWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: n.handleCreateNetpol,
-	})
-	if err := n.netpolWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Network Policy Latency measurement error: %s", err)
-	}
-	return nil
 }
 
 func (n *netpolLatency) Stop() error {
@@ -544,7 +529,7 @@ func (n *netpolLatency) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
-		n.netpolWatcher.StopWatcher()
+		n.watcher.StopWatcher()
 	}()
 	kutil.CleanupNamespaces(ctx, n.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
 	n.normalizeMetrics()

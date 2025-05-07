@@ -65,11 +65,6 @@ type NodeMetric struct {
 
 type nodeLatency struct {
 	BaseMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type nodeLatencyMeasurementFactory struct {
@@ -142,25 +137,19 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 	n.Collect(&wg)
 	wg.Wait()
 	log.Infof("Creating Node latency watcher for %s", n.JobConfig.Name)
-	n.watcher = metrics.NewWatcher(
-		n.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+	return Start(
+		&n.BaseMeasurement,
+		nil,
 		"nodeWatcher",
 		"nodes",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
+		false,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: n.handleCreateNode,
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				n.handleUpdateNode(newObj)
+			},
 		},
-		nil,
 	)
-	n.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: n.handleCreateNode,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			n.handleUpdateNode(newObj)
-		},
-	})
-	if err := n.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Node Latency measurement error: %s", err)
-	}
-	return nil
 }
 
 func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
