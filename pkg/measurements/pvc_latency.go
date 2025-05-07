@@ -148,14 +148,18 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	}
 	return Start(
 		&p.BaseMeasurement,
-		nil,
-		"pvcWatcher",
-		"persistentvolumeclaims",
-		true,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: p.handleCreatePVC,
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				p.handleUpdatePVC(newObj)
+		[]MeasurementWatcher{
+			{
+				restClient:       nil,
+				watcherName:      "pvcWatcher",
+				watchedResource:  "persistentvolumeclaims",
+				watchFilterRunID: true,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: p.handleCreatePVC,
+					UpdateFunc: func(oldObj, newObj interface{}) {
+						p.handleUpdatePVC(newObj)
+					},
+				},
 			},
 		},
 	)
@@ -179,8 +183,8 @@ func getStorageClassName(pvc corev1.PersistentVolumeClaim) string {
 func (p *pvcLatency) Stop() error {
 	var err error
 	defer func() {
-		if p.watcher != nil {
-			p.watcher.StopWatcher()
+		if p.watchers != nil && p.watchers[0] != nil {
+			p.watchers[0].StopWatcher()
 		}
 	}()
 	errorRate := p.normalizeMetrics()

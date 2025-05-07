@@ -152,14 +152,18 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	return Start(
 		&p.BaseMeasurement,
-		nil,
-		"podWatcher",
-		"pods",
-		true,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: p.handleCreatePod,
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				p.handleUpdatePod(newObj)
+		[]MeasurementWatcher{
+			{
+				restClient:       nil,
+				watcherName:      "podWatcher",
+				watchedResource:  "pods",
+				watchFilterRunID: true,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: p.handleCreatePod,
+					UpdateFunc: func(oldObj, newObj interface{}) {
+						p.handleUpdatePod(newObj)
+					},
+				},
 			},
 		},
 	)
@@ -216,8 +220,8 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 func (p *podLatency) Stop() error {
 	var err error
 	defer func() {
-		if p.watcher != nil {
-			p.watcher.StopWatcher()
+		if p.watchers != nil && p.watchers[0] != nil {
+			p.watchers[0].StopWatcher()
 		}
 	}()
 	errorRate := p.normalizeMetrics()

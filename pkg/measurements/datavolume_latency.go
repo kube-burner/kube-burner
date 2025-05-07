@@ -158,14 +158,18 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	return Start(
 		&dv.BaseMeasurement,
-		getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
-		"dvWatcher",
-		"datavolumes",
-		true,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: dv.handleCreateDV,
-			UpdateFunc: func(oldObj, newObj any) {
-				dv.handleUpdateDV(newObj)
+		[]MeasurementWatcher{
+			{
+				restClient:       getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
+				watcherName:      "dvWatcher",
+				watchedResource:  "datavolumes",
+				watchFilterRunID: true,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: dv.handleCreateDV,
+					UpdateFunc: func(oldObj, newObj any) {
+						dv.handleUpdateDV(newObj)
+					},
+				},
 			},
 		},
 	)
@@ -174,8 +178,8 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 func (dv *dvLatency) Stop() error {
 	var err error
 	defer func() {
-		if dv.watcher != nil {
-			dv.watcher.StopWatcher()
+		if dv.watchers[0] != nil {
+			dv.watchers[0].StopWatcher()
 		}
 	}()
 	errorRate := dv.normalizeMetrics()

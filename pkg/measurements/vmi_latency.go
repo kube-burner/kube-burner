@@ -25,8 +25,6 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -91,10 +89,6 @@ type vmiMetric struct {
 
 type vmiLatency struct {
 	BaseMeasurement
-
-	vmWatcher        *metrics.Watcher
-	vmiWatcher       *metrics.Watcher
-	vmiPodWatcher    *metrics.Watcher
 }
 
 type vmiLatencyMeasurementFactory struct {
@@ -268,78 +262,63 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 // Start starts vmiLatency measurement
 func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	// Reset latency slices, required in multi-job benchmarks
-	vmi.latencyQuantiles, vmi.normLatencies = nil, nil
-	vmi.metrics = sync.Map{}
-	log.Infof("Creating VM latency watcher for %s", vmi.JobConfig.Name)
 	restClient := newRESTClientWithRegisteredKubevirtResource(vmi.RestConfig)
-	vmi.vmWatcher = metrics.NewWatcher(
-		restClient,
-		"vmWatcher",
-		"virtualmachines",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vmi.Runid)
-		},
-		nil,
-	)
-	vmi.vmWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: vmi.handleCreateVM,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			vmi.handleUpdateVM(newObj)
-		},
-	})
-	if err := vmi.vmWatcher.StartAndCacheSync(); err != nil {
-		return fmt.Errorf("VMI Latency measurement error: %s", err)
-	}
-
-	log.Infof("Creating VMI latency watcher for %s", vmi.JobConfig.Name)
-	vmi.vmiWatcher = metrics.NewWatcher(
-		restClient,
-		"vmiWatcher",
-		"virtualmachineinstances",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vmi.Runid)
-		},
-		nil,
-	)
-	vmi.vmiWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: vmi.handleCreateVMI,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			vmi.handleUpdateVMI(newObj)
-		},
-	})
-	if err := vmi.vmiWatcher.StartAndCacheSync(); err != nil {
-		return fmt.Errorf("VMI Latency measurement error: %s", err)
-	}
-
-	log.Infof("Creating VMI Pod latency watcher for %s", vmi.JobConfig.Name)
-	vmi.vmiPodWatcher = metrics.NewWatcher(
-		vmi.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-		"podWatcher",
-		"pods",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = labels.Set(
-				map[string]string{
-					"kubevirt.io":       "virt-launcher",
-					"kube-burner-runid": vmi.Runid,
+	return Start(
+		&vmi.BaseMeasurement,
+		[]MeasurementWatcher{
+			{
+				restClient:       restClient,
+				watcherName:      "vmWatcher",
+				watchedResource:  "virtualmachines",
+				watchFilterRunID: true,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: vmi.handleCreateVM,
+					UpdateFunc: func(oldObj, newObj interface{}) {
+						vmi.handleUpdateVM(newObj)
+					},
 				},
-			).String()
+			},
+			{
+				restClient:       restClient,
+				watcherName:      "vmiWatcher",
+				watchedResource:  "virtualmachineinstances",
+				watchFilterRunID: true,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: vmi.handleCreateVMI,
+					UpdateFunc: func(oldObj, newObj interface{}) {
+						vmi.handleUpdateVMI(newObj)
+					},
+				},
+			},
+			{
+				restClient: nil,
+				watcherName: "podWatcher",
+				watchedResource: "pods",
+				watchFilterRunID: true,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: vmi.handleCreateVMIPod,
+					UpdateFunc: func(oldObj, newObj interface{}) {
+						vmi.handleUpdateVMIPod(newObj)
+					},
+				},
+			},
 		},
-		nil,
 	)
-	vmi.vmiPodWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: vmi.handleCreateVMIPod,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			vmi.handleUpdateVMIPod(newObj)
-		},
-	})
-	if err := vmi.vmiPodWatcher.StartAndCacheSync(); err != nil {
-		return fmt.Errorf("VMI Pod Latency measurement error: %s", err)
-	}
-	return nil
+	// vmi.vmiPodWatcher = metrics.NewWatcher(
+	// 	vmi.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+	// 	"podWatcher",
+	// 	"pods",
+	// 	corev1.NamespaceAll,
+	// 	func(options *metav1.ListOptions) {
+	// 		options.LabelSelector = labels.Set(
+	// 			map[string]string{
+	// 				"kubevirt.io":       "virt-launcher",
+	// 				"kube-burner-runid": vmi.Runid,
+	// 			},
+	// 		).String()
+	// 	},
+	// 	nil,
+	// )
 }
 
 func newRESTClientWithRegisteredKubevirtResource(restConfig *rest.Config) *rest.RESTClient {
@@ -371,9 +350,9 @@ func (vmi *vmiLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops vmiLatency measurement
 func (vmi *vmiLatency) Stop() error {
-	vmi.vmWatcher.StopWatcher()
-	vmi.vmiWatcher.StopWatcher()
-	vmi.vmiPodWatcher.StopWatcher()
+	vmi.watchers[0].StopWatcher()
+	vmi.watchers[1].StopWatcher()
+	vmi.watchers[2].StopWatcher()
 	if vmi.JobConfig.JobType == config.DeletionJob {
 		return nil
 	}

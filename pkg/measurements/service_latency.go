@@ -28,7 +28,6 @@ import (
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	lcorev1 "k8s.io/client-go/listers/core/v1"
@@ -44,10 +43,8 @@ const (
 type serviceLatency struct {
 	BaseMeasurement
 
-	svcWatcher       *metrics.Watcher
-	epWatcher        *metrics.Watcher
-	epLister         lcorev1.EndpointsLister
-	svcLister        lcorev1.ServiceLister
+	epLister   lcorev1.EndpointsLister
+	svcLister  lcorev1.ServiceLister
 }
 
 type svcMetric struct {
@@ -170,37 +167,32 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("Creating service latency watcher for %s", s.JobConfig.Name)
-	s.svcWatcher = metrics.NewWatcher(
-		s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-		"svcWatcher",
-		"services",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", s.Runid)
+	err = Start(
+		&s.BaseMeasurement,
+		[]MeasurementWatcher{
+			{
+				restClient:       nil,
+				watcherName:      "svcWatcher",
+				watchedResource:  "services",
+				watchFilterRunID: true,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: s.handleCreateSvc,
+				},
+			},
+			{
+				restClient: nil,
+				watcherName: "epWatcher",
+				watchedResource: "endpoints",
+				watchFilterRunID: false,
+				handlers: nil,
+			},
 		},
-		cache.Indexers{},
 	)
-	s.svcWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: s.handleCreateSvc,
-	})
-	s.epWatcher = metrics.NewWatcher(
-		s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-		"epWatcher",
-		"endpoints",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {},
-		cache.Indexers{},
-	)
-	// Use an endpoints lister to reduce and optimize API interactions in waitForEndpoints
-	s.svcLister = lcorev1.NewServiceLister(s.svcWatcher.Informer.GetIndexer())
-	s.epLister = lcorev1.NewEndpointsLister(s.epWatcher.Informer.GetIndexer())
-	if err := s.svcWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Service Latency measurement error: %s", err)
+	if err != nil {
+		return err
 	}
-	if err := s.epWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Service Latency measurement error: %s", err)
-	}
+	s.svcLister = lcorev1.NewServiceLister(s.watchers[0].Informer.GetIndexer())
+	s.epLister = lcorev1.NewEndpointsLister(s.watchers[1].Informer.GetIndexer())
 	return nil
 }
 
@@ -209,8 +201,8 @@ func (s *serviceLatency) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
-		s.svcWatcher.StopWatcher()
-		s.epWatcher.StopWatcher()
+		s.watchers[0].StopWatcher()
+		s.watchers[1].StopWatcher()
 	}()
 	kutil.CleanupNamespaces(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()

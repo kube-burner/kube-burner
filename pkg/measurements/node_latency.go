@@ -139,14 +139,18 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 	log.Infof("Creating Node latency watcher for %s", n.JobConfig.Name)
 	return Start(
 		&n.BaseMeasurement,
-		nil,
-		"nodeWatcher",
-		"nodes",
-		false,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: n.handleCreateNode,
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				n.handleUpdateNode(newObj)
+		[]MeasurementWatcher{
+			{
+				restClient:       nil,
+				watcherName:      "nodeWatcher",
+				watchedResource:  "nodes",
+				watchFilterRunID: false,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: n.handleCreateNode,
+					UpdateFunc: func(oldObj, newObj interface{}) {
+						n.handleUpdateNode(newObj)
+					},
+				},
 			},
 		},
 	)
@@ -194,8 +198,8 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 func (n *nodeLatency) Stop() error {
 	var err error
 	defer func() {
-		if n.watcher != nil {
-			n.watcher.StopWatcher()
+		if n.watchers != nil && n.watchers[0] != nil {
+			n.watchers[0].StopWatcher()
 		}
 	}()
 	n.normalizeLatencies()

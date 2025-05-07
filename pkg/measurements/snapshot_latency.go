@@ -123,14 +123,18 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	return Start(
 		&vsl.BaseMeasurement,
-		getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
-		"vsWatcher",
-		"volumesnapshots",
-		true,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: vsl.handleCreateVolumeSnapshot,
-			UpdateFunc: func(oldObj, newObj any) {
-				vsl.handleUpdateVolumeSnapshot(newObj)
+		[]MeasurementWatcher{
+			{
+				restClient:       getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
+				watcherName:      "vsWatcher",
+				watchedResource:  "volumesnapshots",
+				watchFilterRunID: true,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: vsl.handleCreateVolumeSnapshot,
+					UpdateFunc: func(oldObj, newObj any) {
+						vsl.handleUpdateVolumeSnapshot(newObj)
+					},
+				},
 			},
 		},
 	)
@@ -139,8 +143,8 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 func (vsl *volumeSnapshotLatency) Stop() error {
 	var err error
 	defer func() {
-		if vsl.watcher != nil {
-			vsl.watcher.StopWatcher()
+		if vsl.watchers != nil && vsl.watchers[0] != nil {
+			vsl.watchers[0].StopWatcher()
 		}
 	}()
 	errorRate := vsl.normalizeMetrics()

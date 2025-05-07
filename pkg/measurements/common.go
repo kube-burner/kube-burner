@@ -67,10 +67,18 @@ type BaseMeasurement struct {
 	ClientSet        kubernetes.Interface
 	RestConfig       *rest.Config
 	Metadata         map[string]any
-	watcher          *metrics.Watcher
+	watchers          []*metrics.Watcher
 	metrics          sync.Map
 	latencyQuantiles []any
 	normLatencies    []any
+}
+
+type MeasurementWatcher struct {
+	restClient       *rest.RESTClient
+	watcherName      string
+	watchedResource  string
+	watchFilterRunID bool
+	handlers         *cache.ResourceEventHandlerFuncs
 }
 
 func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) BaseMeasurementFactory {
@@ -94,31 +102,38 @@ func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSe
 	}
 }
 
-func Start(bm *BaseMeasurement, restClient *rest.RESTClient, watcherName, watchedResource string, watchFilterRunID bool, handlers cache.ResourceEventHandlerFuncs) error {
+func Start(bm *BaseMeasurement, measurementWatchers []MeasurementWatcher) error {
 	// Reset latency slices, required in multi-job benchmarks
 	bm.latencyQuantiles, bm.normLatencies = nil, nil
 	bm.metrics = sync.Map{}
-	log.Infof("Creating %v latency watcher for %s", watchedResource, bm.JobConfig.Name)
-	if restClient == nil {
-		restClient = bm.ClientSet.CoreV1().RESTClient().(*rest.RESTClient)
-	}
-	var optionsModifier func(options *metav1.ListOptions)
-	if watchFilterRunID {
-		optionsModifier = func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", bm.Runid)
+
+	bm.watchers = make([]*metrics.Watcher, len(measurementWatchers))
+	for i, measurementWatcher := range measurementWatchers {
+		restClient := measurementWatcher.restClient
+		if restClient == nil {
+			restClient = bm.ClientSet.CoreV1().RESTClient().(*rest.RESTClient)
 		}
-	}
-	bm.watcher = metrics.NewWatcher(
-		restClient,
-		watcherName,
-		watchedResource,
-		corev1.NamespaceAll,
-		optionsModifier,
-		nil,
-	)
-	bm.watcher.Informer.AddEventHandler(handlers)
-	if err := bm.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("%v Latency measurement error: %s", watchedResource, err)
+		var optionsModifier func(options *metav1.ListOptions)
+		if measurementWatcher.watchFilterRunID {
+			optionsModifier = func(options *metav1.ListOptions) {
+				options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", bm.Runid)
+			}
+		}
+		log.Infof("Creating %v latency watcher for %s", measurementWatcher.watchedResource, bm.JobConfig.Name)
+		bm.watchers[i] = metrics.NewWatcher(
+			restClient,
+			measurementWatcher.watcherName,
+			measurementWatcher.watchedResource,
+			corev1.NamespaceAll,
+			optionsModifier,
+			nil,
+		)
+		if measurementWatcher.handlers != nil {
+			bm.watchers[i].Informer.AddEventHandler(measurementWatcher.handlers)
+		}
+		if err := bm.watchers[i].StartAndCacheSync(); err != nil {
+			log.Errorf("%v Latency measurement error: %s", measurementWatcher.watchedResource, err)
+		}
 	}
 
 	return nil
