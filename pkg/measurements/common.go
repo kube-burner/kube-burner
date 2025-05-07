@@ -113,19 +113,17 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 		if restClient == nil {
 			restClient = bm.ClientSet.CoreV1().RESTClient().(*rest.RESTClient)
 		}
-		var optionsModifier func(options *metav1.ListOptions)
-		if measurementWatcher.labelSelector != "" {
-			optionsModifier = func(options *metav1.ListOptions) {
-				options.LabelSelector = measurementWatcher.labelSelector
-			}
-		}
 		log.Infof("Creating %v latency watcher for %s", measurementWatcher.resource, bm.JobConfig.Name)
 		bm.watchers[i] = metrics.NewWatcher(
 			restClient,
 			measurementWatcher.name,
 			measurementWatcher.resource,
 			corev1.NamespaceAll,
-			optionsModifier,
+			func(options *metav1.ListOptions) {
+				if measurementWatcher.labelSelector != "" {
+					options.LabelSelector = measurementWatcher.labelSelector
+				}
+			},
 			nil,
 		)
 		if measurementWatcher.handlers != nil {
