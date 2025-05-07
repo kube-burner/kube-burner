@@ -33,7 +33,6 @@ import (
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 )
 
@@ -175,29 +174,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 }
 
 func (dv *dvLatency) Stop() error {
-	var err error
-	defer func() {
-		if dv.watchers[0] != nil {
-			dv.watchers[0].StopWatcher()
-		}
-	}()
-	errorRate := dv.normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. DataVolume latencies error rate was: %.2f", errorRate)
-	}
-	dv.calcQuantiles()
-	if len(dv.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(dv.Config.LatencyThresholds, dv.latencyQuantiles)
-	}
-	for _, q := range dv.latencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", dv.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
-	}
-	if errorRate > 0 {
-		log.Infof("DV latencies error rate was: %.2f", errorRate)
-	}
-	return err
+	return dv.stopMeasurement(dv.normalizeMetrics, dv.calcQuantiles)
 }
 
 func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {

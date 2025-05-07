@@ -139,6 +139,32 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 	return nil
 }
 
+func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, calcQuantiles func()) error {
+	var err error
+	defer func() {
+		for _, watcher := range bm.watchers {
+			watcher.StopWatcher()
+		}
+	}()
+	errorRate := normalizeMetrics()
+	if errorRate > 10.00 {
+		log.Error("Latency errors beyond 10%. Hence invalidating the results")
+		return fmt.Errorf("something is wrong with system under test. DataVolume latencies error rate was: %.2f", errorRate)
+	}
+	calcQuantiles()
+	if len(bm.Config.LatencyThresholds) > 0 {
+		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.latencyQuantiles)
+	}
+	for _, q := range bm.latencyQuantiles {
+		pq := q.(metrics.LatencyQuantiles)
+		log.Infof("%s: %v 99th: %v max: %v avg: %v", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
+	}
+	if errorRate > 0 {
+		log.Infof("DV latencies error rate was: %.2f", errorRate)
+	}
+	return err
+}
+
 func VerifyMeasurementConfig(config types.Measurement, supportedConditions map[string]struct{}) error {
 	for _, th := range config.LatencyThresholds {
 		if _, supported := supportedConditions[th.ConditionType]; !supported {

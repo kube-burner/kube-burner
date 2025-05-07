@@ -33,7 +33,6 @@ import (
 	"kubevirt.io/client-go/kubecli"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 )
 
@@ -140,29 +139,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 }
 
 func (vsl *volumeSnapshotLatency) Stop() error {
-	var err error
-	defer func() {
-		if vsl.watchers != nil && vsl.watchers[0] != nil {
-			vsl.watchers[0].StopWatcher()
-		}
-	}()
-	errorRate := vsl.normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. VolumeSnapshot latencies error rate was: %.2f", errorRate)
-	}
-	vsl.calcQuantiles()
-	if len(vsl.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(vsl.Config.LatencyThresholds, vsl.latencyQuantiles)
-	}
-	for _, q := range vsl.latencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", vsl.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
-	}
-	if errorRate > 0 {
-		log.Infof("DataVolume latencies error rate was: %.2f", errorRate)
-	}
-	return err
+	return vsl.stopMeasurement(vsl.normalizeMetrics, vsl.calcQuantiles)
 }
 
 func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {

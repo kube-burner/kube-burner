@@ -21,7 +21,6 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -180,29 +179,7 @@ func getStorageClassName(pvc corev1.PersistentVolumeClaim) string {
 
 // stop pvc latency measurement
 func (p *pvcLatency) Stop() error {
-	var err error
-	defer func() {
-		if p.watchers != nil && p.watchers[0] != nil {
-			p.watchers[0].StopWatcher()
-		}
-	}()
-	errorRate := p.normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. PVC latencies error rate was: %.2f", errorRate)
-	}
-	p.calcQuantiles()
-	if len(p.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(p.Config.LatencyThresholds, p.latencyQuantiles)
-	}
-	for _, q := range p.latencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", p.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
-	}
-	if errorRate > 0 {
-		log.Infof("PVC latencies error rate was: %.2f", errorRate)
-	}
-	return err
+	return p.stopMeasurement(p.normalizeMetrics, p.calcQuantiles)
 }
 
 // index sends metrics to the configured indexer

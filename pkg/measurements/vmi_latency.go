@@ -21,7 +21,6 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -340,20 +339,7 @@ func (vmi *vmiLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops vmiLatency measurement
 func (vmi *vmiLatency) Stop() error {
-	vmi.watchers[0].StopWatcher()
-	vmi.watchers[1].StopWatcher()
-	vmi.watchers[2].StopWatcher()
-	if vmi.JobConfig.JobType == config.DeletionJob {
-		return nil
-	}
-	vmi.normalizeMetrics()
-	vmi.calcQuantiles()
-	err := metrics.CheckThreshold(vmi.Config.LatencyThresholds, vmi.latencyQuantiles)
-	for _, q := range vmi.latencyQuantiles {
-		vmiq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", vmi.JobConfig.Name, vmiq.QuantileName, vmiq.P99, vmiq.Max, vmiq.Avg)
-	}
-	return err
+	return vmi.stopMeasurement(vmi.normalizeMetrics, vmi.calcQuantiles)
 }
 
 // index sends metrics to the configured indexer
@@ -369,7 +355,7 @@ func (vmi *vmiLatency) GetMetrics() *sync.Map {
 	return &vmi.metrics
 }
 
-func (vmi *vmiLatency) normalizeMetrics() {
+func (vmi *vmiLatency) normalizeMetrics() float64 {
 	vmi.metrics.Range(func(key, value interface{}) bool {
 		m := value.(vmiMetric)
 		if m.vmiRunning.IsZero() {
@@ -393,6 +379,7 @@ func (vmi *vmiLatency) normalizeMetrics() {
 		vmi.normLatencies = append(vmi.normLatencies, m)
 		return true
 	})
+	return 0
 }
 
 func (vmi *vmiLatency) calcQuantiles() {

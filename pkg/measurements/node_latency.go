@@ -21,7 +21,6 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -195,24 +194,7 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 }
 
 func (n *nodeLatency) Stop() error {
-	var err error
-	defer func() {
-		if n.watchers != nil && n.watchers[0] != nil {
-			n.watchers[0].StopWatcher()
-		}
-	}()
-	n.normalizeLatencies()
-	n.CalculateQuantiles()
-	if len(n.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(n.Config.LatencyThresholds, n.latencyQuantiles)
-	}
-	if n.JobConfig.Name != "workers-scale" {
-		for _, q := range n.latencyQuantiles {
-			nq := q.(metrics.LatencyQuantiles)
-			log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", n.JobConfig.Name, nq.QuantileName, nq.P50, nq.P99, nq.Max, nq.Avg)
-		}
-	}
-	return err
+	return n.stopMeasurement(n.normalizeLatencies, n.calculateQuantiles)
 }
 
 func (n *nodeLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
@@ -227,7 +209,7 @@ func (n *nodeLatency) GetMetrics() *sync.Map {
 	return &n.metrics
 }
 
-func (n *nodeLatency) normalizeLatencies() {
+func (n *nodeLatency) normalizeLatencies() float64 {
 	n.metrics.Range(func(key, value interface{}) bool {
 		m := value.(NodeMetric)
 		// If a node does not reach the Ready state, we skip that node
@@ -252,9 +234,10 @@ func (n *nodeLatency) normalizeLatencies() {
 		n.normLatencies = append(n.normLatencies, m)
 		return true
 	})
+	return 0
 }
 
-func (n *nodeLatency) CalculateQuantiles() {
+func (n *nodeLatency) calculateQuantiles() {
 	getLatency := func(normLatency interface{}) map[string]float64 {
 		nodeMetric := normLatency.(NodeMetric)
 		return map[string]float64{
