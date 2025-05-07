@@ -231,10 +231,6 @@ func (dv *dvLatency) Index(jobName string, indexerList map[string]indexers.Index
 	IndexLatencyMeasurement(dv.Config, jobName, metricMap, indexerList)
 }
 
-func (dv *dvLatency) GetMetrics() *sync.Map {
-	return &dv.metrics
-}
-
 func (dv *dvLatency) normalizeMetrics() float64 {
 	dataVolumeCount := 0
 	erroredDataVolumes := 0

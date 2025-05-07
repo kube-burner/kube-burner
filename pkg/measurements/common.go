@@ -165,6 +165,10 @@ func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, calc
 	return err
 }
 
+func (bm *BaseMeasurement) GetMetrics() *sync.Map {
+	return &bm.metrics
+}
+
 func VerifyMeasurementConfig(config types.Measurement, supportedConditions map[string]struct{}) error {
 	for _, th := range config.LatencyThresholds {
 		if _, supported := supportedConditions[th.ConditionType]; !supported {

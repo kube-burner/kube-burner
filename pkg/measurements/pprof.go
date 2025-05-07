@@ -208,10 +208,6 @@ func (p *pprof) Stop() error {
 func (p *pprof) Index(_ string, _ map[string]indexers.Indexer) {
 }
 
-func (p *pprof) GetMetrics() *sync.Map {
-	return &sync.Map{}
-}
-
 func readCerts(cert, privKey string) (string, string, error) {
 	var certFd, privKeyFd *os.File
 	var certData, privKeyData []byte

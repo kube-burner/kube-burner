@@ -191,11 +191,6 @@ func (p *pvcLatency) Index(jobName string, indexerList map[string]indexers.Index
 	IndexLatencyMeasurement(p.Config, jobName, metricMap, indexerList)
 }
 
-// getter function to get metrics
-func (p *pvcLatency) GetMetrics() *sync.Map {
-	return &p.metrics
-}
-
 // normalizes pvc latency metrics
 func (p *pvcLatency) normalizeMetrics() float64 {
 	totalPVCs := 0

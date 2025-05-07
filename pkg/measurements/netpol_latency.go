@@ -545,10 +545,6 @@ func (n *netpolLatency) Stop() error {
 	return nil
 }
 
-func (n *netpolLatency) GetMetrics() *sync.Map {
-	return &n.metrics
-}
-
 func (n *netpolLatency) normalizeMetrics() {
 	var latencies []float64
 	var minLatencies []float64

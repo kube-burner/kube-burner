@@ -183,10 +183,6 @@ func (vsl *volumeSnapshotLatency) Index(jobName string, indexerList map[string]i
 	IndexLatencyMeasurement(vsl.Config, jobName, metricMap, indexerList)
 }
 
-func (vsl *volumeSnapshotLatency) GetMetrics() *sync.Map {
-	return &vsl.metrics
-}
-
 func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 	volumeSnapshotCount := 0
 	erroredVolumeSnapshots := 0

@@ -205,10 +205,6 @@ func (n *nodeLatency) Index(jobName string, indexerList map[string]indexers.Inde
 	IndexLatencyMeasurement(n.Config, jobName, metricMap, indexerList)
 }
 
-func (n *nodeLatency) GetMetrics() *sync.Map {
-	return &n.metrics
-}
-
 func (n *nodeLatency) normalizeLatencies() float64 {
 	n.metrics.Range(func(key, value interface{}) bool {
 		m := value.(NodeMetric)

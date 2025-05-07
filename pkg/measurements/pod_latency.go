@@ -228,10 +228,6 @@ func (p *podLatency) Index(jobName string, indexerList map[string]indexers.Index
 	IndexLatencyMeasurement(p.Config, jobName, metricMap, indexerList)
 }
 
-func (p *podLatency) GetMetrics() *sync.Map {
-	return &p.metrics
-}
-
 func (p *podLatency) normalizeMetrics() float64 {
 	totalPods := 0
 	erroredPods := 0

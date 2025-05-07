@@ -252,10 +252,6 @@ func (s *serviceLatency) Index(jobName string, indexerList map[string]indexers.I
 	IndexLatencyMeasurement(s.Config, jobName, metricMap, indexerList)
 }
 
-func (s *serviceLatency) GetMetrics() *sync.Map {
-	return &s.metrics
-}
-
 func (s *serviceLatency) waitForEndpoints(svc *corev1.Service) error {
 	err := wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		endpoints, err := s.epLister.Endpoints(svc.Namespace).Get(svc.Name)

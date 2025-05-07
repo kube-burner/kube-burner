@@ -351,10 +351,6 @@ func (vmi *vmiLatency) Index(jobName string, indexerList map[string]indexers.Ind
 	IndexLatencyMeasurement(vmi.Config, jobName, metricMap, indexerList)
 }
 
-func (vmi *vmiLatency) GetMetrics() *sync.Map {
-	return &vmi.metrics
-}
-
 func (vmi *vmiLatency) normalizeMetrics() float64 {
 	vmi.metrics.Range(func(key, value interface{}) bool {
 		m := value.(vmiMetric)
