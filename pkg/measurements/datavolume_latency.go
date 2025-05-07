@@ -155,7 +155,7 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 
 func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	return dv.startMeasurement(
+	dv.startMeasurement(
 		[]MeasurementWatcher{
 			{
 				restClient:    getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
@@ -171,6 +171,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
+	return nil
 }
 
 func (dv *dvLatency) Stop() error {

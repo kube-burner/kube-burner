@@ -120,7 +120,7 @@ func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
 
 func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	return vsl.startMeasurement(
+	vsl.startMeasurement(
 		[]MeasurementWatcher{
 			{
 				restClient:    getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
@@ -136,6 +136,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
+	return nil
 }
 
 func (vsl *volumeSnapshotLatency) Stop() error {

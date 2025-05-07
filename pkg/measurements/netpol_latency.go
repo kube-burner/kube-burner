@@ -503,7 +503,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 		sendConnections()
 	}
 
-	return n.startMeasurement(
+	n.startMeasurement(
 		[]MeasurementWatcher{
 			{
 				restClient:    nil,
@@ -516,6 +516,8 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
+
+	return nil
 }
 
 func (n *netpolLatency) Stop() error {

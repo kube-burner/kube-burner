@@ -167,7 +167,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err != nil {
 		return err
 	}
-	err = s.startMeasurement(
+	s.startMeasurement(
 		[]MeasurementWatcher{
 			{
 				restClient:    nil,
@@ -187,9 +187,6 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
-	if err != nil {
-		return err
-	}
 	s.svcLister = lcorev1.NewServiceLister(s.watchers[0].Informer.GetIndexer())
 	s.epLister = lcorev1.NewEndpointsLister(s.watchers[1].Informer.GetIndexer())
 	return nil

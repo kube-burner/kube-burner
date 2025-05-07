@@ -145,7 +145,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	if p.JobConfig.JobType == config.ReadJob || p.JobConfig.JobType == config.PatchJob || p.JobConfig.JobType == config.DeletionJob {
 		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
 	}
-	return p.startMeasurement(
+	p.startMeasurement(
 		[]MeasurementWatcher{
 			{
 				restClient:    nil,
@@ -161,6 +161,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
+	return nil
 }
 
 // collects PVC measurements triggered in the past

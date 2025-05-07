@@ -263,7 +263,7 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	restClient := newRESTClientWithRegisteredKubevirtResource(vmi.RestConfig)
-	return vmi.startMeasurement(
+	vmi.startMeasurement(
 		[]MeasurementWatcher{
 			{
 				restClient:    restClient,
@@ -308,6 +308,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
+	return nil
 }
 
 func newRESTClientWithRegisteredKubevirtResource(restConfig *rest.Config) *rest.RESTClient {

@@ -149,7 +149,7 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 // start podLatency measurement
 func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	return p.startMeasurement(
+	p.startMeasurement(
 		[]MeasurementWatcher{
 			{
 				restClient:    nil,
@@ -165,6 +165,7 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
+	return nil
 }
 
 // collects pod measurements triggered in the past
