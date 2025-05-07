@@ -137,8 +137,7 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 	n.Collect(&wg)
 	wg.Wait()
 	log.Infof("Creating Node latency watcher for %s", n.JobConfig.Name)
-	return startMeasurement(
-		&n.BaseMeasurement,
+	return n.startMeasurement(
 		[]MeasurementWatcher{
 			{
 				restClient:    nil,
