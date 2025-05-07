@@ -38,13 +38,14 @@ import (
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
-		GC:               false,
-		GCMetrics:        false,
-		GCTimeout:        1 * time.Hour,
-		RequestTimeout:   60 * time.Second,
-		Measurements:     []mtypes.Measurement{},
-		WaitWhenFinished: false,
-		Timeout:          4 * time.Hour,
+		GC:                false,
+		GCMetrics:         false,
+		GCTimeout:         1 * time.Hour,
+		RequestTimeout:    60 * time.Second,
+		Measurements:      []mtypes.Measurement{},
+		WaitWhenFinished:  false,
+		Timeout:           4 * time.Hour,
+		FunctionTemplates: []string{},
 	},
 }
 
@@ -162,7 +163,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if allowMissingKeys {
 		templateOptions = util.MissingKeyZero
 	}
-	renderedCfg, err := util.RenderTemplate(cfg, inputData, templateOptions)
+	renderedCfg, err := util.RenderTemplate(cfg, inputData, templateOptions, []string{})
 	if err != nil {
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}
