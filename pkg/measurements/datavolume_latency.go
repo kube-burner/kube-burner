@@ -160,10 +160,10 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 		&dv.BaseMeasurement,
 		[]MeasurementWatcher{
 			{
-				restClient:       getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
-				watcherName:      "dvWatcher",
-				watchedResource:  "datavolumes",
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", dv.Runid),
+				restClient:      getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
+				watcherName:     "dvWatcher",
+				watchedResource: "datavolumes",
+				labelSelector:   fmt.Sprintf("kube-burner-runid=%v", dv.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: dv.handleCreateDV,
 					UpdateFunc: func(oldObj, newObj any) {

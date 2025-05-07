@@ -74,11 +74,11 @@ type BaseMeasurement struct {
 }
 
 type MeasurementWatcher struct {
-	restClient       *rest.RESTClient
-	watcherName      string
-	watchedResource  string
-	labelSelector    string
-	handlers         *cache.ResourceEventHandlerFuncs
+	restClient      *rest.RESTClient
+	watcherName     string
+	watchedResource string
+	labelSelector   string
+	handlers        *cache.ResourceEventHandlerFuncs
 }
 
 func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) BaseMeasurementFactory {

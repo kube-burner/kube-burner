@@ -150,10 +150,10 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 		&p.BaseMeasurement,
 		[]MeasurementWatcher{
 			{
-				restClient:       nil,
-				watcherName:      "pvcWatcher",
-				watchedResource:  "persistentvolumeclaims",
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
+				restClient:      nil,
+				watcherName:     "pvcWatcher",
+				watchedResource: "persistentvolumeclaims",
+				labelSelector:   fmt.Sprintf("kube-burner-runid=%v", p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePVC,
 					UpdateFunc: func(oldObj, newObj interface{}) {
