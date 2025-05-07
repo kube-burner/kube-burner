@@ -503,7 +503,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 		sendConnections()
 	}
 
-	return Start(
+	return startMeasurement(
 		&n.BaseMeasurement,
 		[]MeasurementWatcher{
 			{

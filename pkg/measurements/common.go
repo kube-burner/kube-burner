@@ -102,7 +102,7 @@ func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSe
 	}
 }
 
-func Start(bm *BaseMeasurement, measurementWatchers []MeasurementWatcher) error {
+func startMeasurement(bm *BaseMeasurement, measurementWatchers []MeasurementWatcher) error {
 	// Reset latency slices, required in multi-job benchmarks
 	bm.latencyQuantiles, bm.normLatencies = nil, nil
 	bm.metrics = sync.Map{}

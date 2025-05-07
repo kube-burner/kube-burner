@@ -167,7 +167,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err != nil {
 		return err
 	}
-	err = Start(
+	err = startMeasurement(
 		&s.BaseMeasurement,
 		[]MeasurementWatcher{
 			{

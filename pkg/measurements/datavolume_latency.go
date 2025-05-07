@@ -156,7 +156,7 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 
 func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	return Start(
+	return startMeasurement(
 		&dv.BaseMeasurement,
 		[]MeasurementWatcher{
 			{
