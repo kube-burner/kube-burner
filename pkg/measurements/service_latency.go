@@ -171,20 +171,20 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 		&s.BaseMeasurement,
 		[]MeasurementWatcher{
 			{
-				restClient:      nil,
-				watcherName:     "svcWatcher",
-				watchedResource: "services",
-				labelSelector:   fmt.Sprintf("kube-burner-runid=%v", s.Runid),
+				restClient:    nil,
+				name:          "svcWatcher",
+				resource:      "services",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", s.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: s.handleCreateSvc,
 				},
 			},
 			{
-				restClient:      nil,
-				watcherName:     "epWatcher",
-				watchedResource: "endpoints",
-				labelSelector:   "",
-				handlers:        nil,
+				restClient:    nil,
+				name:          "epWatcher",
+				resource:      "endpoints",
+				labelSelector: "",
+				handlers:      nil,
 			},
 		},
 	)

@@ -268,10 +268,10 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 		&vmi.BaseMeasurement,
 		[]MeasurementWatcher{
 			{
-				restClient:      restClient,
-				watcherName:     "vmWatcher",
-				watchedResource: "virtualmachines",
-				labelSelector:   fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
+				restClient:    restClient,
+				name:          "vmWatcher",
+				resource:      "virtualmachines",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVM,
 					UpdateFunc: func(oldObj, newObj interface{}) {
@@ -280,10 +280,10 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				},
 			},
 			{
-				restClient:      restClient,
-				watcherName:     "vmiWatcher",
-				watchedResource: "virtualmachineinstances",
-				labelSelector:   fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
+				restClient:    restClient,
+				name:          "vmiWatcher",
+				resource:      "virtualmachineinstances",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMI,
 					UpdateFunc: func(oldObj, newObj interface{}) {
@@ -292,9 +292,9 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				},
 			},
 			{
-				restClient:      nil,
-				watcherName:     "podWatcher",
-				watchedResource: "pods",
+				restClient: nil,
+				name:       "podWatcher",
+				resource:   "pods",
 				labelSelector: labels.Set(
 					map[string]string{
 						"kubevirt.io":       "virt-launcher",

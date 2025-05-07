@@ -74,11 +74,11 @@ type BaseMeasurement struct {
 }
 
 type MeasurementWatcher struct {
-	restClient      *rest.RESTClient
-	watcherName     string
-	watchedResource string
-	labelSelector   string
-	handlers        *cache.ResourceEventHandlerFuncs
+	restClient    *rest.RESTClient
+	name          string
+	resource      string
+	labelSelector string
+	handlers      *cache.ResourceEventHandlerFuncs
 }
 
 func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) BaseMeasurementFactory {
@@ -119,11 +119,11 @@ func Start(bm *BaseMeasurement, measurementWatchers []MeasurementWatcher) error 
 				options.LabelSelector = measurementWatcher.labelSelector
 			}
 		}
-		log.Infof("Creating %v latency watcher for %s", measurementWatcher.watchedResource, bm.JobConfig.Name)
+		log.Infof("Creating %v latency watcher for %s", measurementWatcher.resource, bm.JobConfig.Name)
 		bm.watchers[i] = metrics.NewWatcher(
 			restClient,
-			measurementWatcher.watcherName,
-			measurementWatcher.watchedResource,
+			measurementWatcher.name,
+			measurementWatcher.resource,
 			corev1.NamespaceAll,
 			optionsModifier,
 			nil,
@@ -132,7 +132,7 @@ func Start(bm *BaseMeasurement, measurementWatchers []MeasurementWatcher) error 
 			bm.watchers[i].Informer.AddEventHandler(measurementWatcher.handlers)
 		}
 		if err := bm.watchers[i].StartAndCacheSync(); err != nil {
-			log.Errorf("%v Latency measurement error: %s", measurementWatcher.watchedResource, err)
+			log.Errorf("%v Latency measurement error: %s", measurementWatcher.resource, err)
 		}
 	}
 

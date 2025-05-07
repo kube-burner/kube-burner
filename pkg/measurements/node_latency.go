@@ -141,10 +141,10 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 		&n.BaseMeasurement,
 		[]MeasurementWatcher{
 			{
-				restClient:      nil,
-				watcherName:     "nodeWatcher",
-				watchedResource: "nodes",
-				labelSelector:   "",
+				restClient:    nil,
+				name:          "nodeWatcher",
+				resource:      "nodes",
+				labelSelector: "",
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNode,
 					UpdateFunc: func(oldObj, newObj interface{}) {
