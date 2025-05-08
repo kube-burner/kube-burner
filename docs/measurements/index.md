@@ -148,8 +148,7 @@ It generates a document like the following per each job:
 
 Where `completionLatency` and `starTimeLatency` indicate the job completion time and startup latency respectively since its creation timestamp.
 
-
-Jobod latency quantile sample:
+Job latency quantile sample:
 
 ```json
 [
