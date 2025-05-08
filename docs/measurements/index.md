@@ -123,7 +123,7 @@ Collects latencies from the different job stages, these **latency metrics are in
 
 ### Metrics
 
-The metrics collected are pod latency timeseries (`jobLatencyMeasurement`) and two documents holding a summary of different job latency quantiles (`jobLatencyQuantilesMeasurement`).
+The metrics collected are job latency timeseries (`jobLatencyMeasurement`) and two documents holding a summary of different job latency quantiles (`jobLatencyQuantilesMeasurement`).
 
 It generates a document like the following per each job:
 
