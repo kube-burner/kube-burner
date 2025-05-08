@@ -78,7 +78,7 @@ jobs:
     - objectTemplate: objectTemplates/pod.yml
       replicas: 1
 
-    - objectTemplate: objectTemplates/jobpod.yml
+    - objectTemplate: objectTemplates/job.yml
       replicas: 1
 
     - objectTemplate: objectTemplates/service.yml
