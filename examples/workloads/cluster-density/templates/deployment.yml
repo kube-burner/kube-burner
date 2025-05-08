@@ -37,14 +37,7 @@ spec:
            protocol: TCP
         name: {{.name}}
         env:
-        - name: ENVVAR1_{{.name}}
-          value: {{.envVar}} 
-        - name: ENVVAR2_{{.name}}
-          value: {{.envVar}} 
-        - name: ENVVAR3_{{.name}}
-          value: {{.envVar}} 
-        - name: ENVVAR4_{{.name}}
-          value: {{.envVar}} 
+        {{- template "env_func" (dict "envName" .envName "envVar" .envVar "n" 4 "indent" 8) }}
       volumes:
       - name: secret-1
         secret:

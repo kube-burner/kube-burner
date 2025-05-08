@@ -103,6 +103,8 @@ type GlobalConfig struct {
 	ClusterHealth bool `yaml:"clusterHealth"`
 	// Global Benchmark timeout
 	Timeout time.Duration `yaml:"timeout"`
+	// Function templates to render at runtime
+	FunctionTemplates []string `yaml:"functionTemplates"`
 }
 
 // Object defines an object that kube-burner will create

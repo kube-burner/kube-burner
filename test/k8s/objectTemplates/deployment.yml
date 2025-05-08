@@ -19,3 +19,5 @@ spec:
         - infinity
         image: {{.containerImage}}
         name: ci-app
+        env: 
+        {{- template "env_func" (dict "envName" .envName "envVar" .envVar "n" 4 "indent" 8) }}
