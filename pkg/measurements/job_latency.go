@@ -182,7 +182,7 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops jobLatency measurement
 func (j *jobLatency) Stop() error {
-	return j.stopMeasurement(j.normalizeMetrics, j.calcQuantiles)
+	return j.stopMeasurement(j.normalizeMetrics, j.getLatency)
 }
 
 func (j *jobLatency) GetMetrics() *sync.Map {
@@ -209,13 +209,10 @@ func (j *jobLatency) normalizeMetrics() float64 {
 	return 0
 }
 
-func (j *jobLatency) calcQuantiles() {
-	getLatency := func(normLatency any) map[string]float64 {
-		jobMetric := normLatency.(jobMetric)
-		return map[string]float64{
-			jobStartTimeMeasurement:     float64(jobMetric.StartTimeLatency),
-			string(batchv1.JobComplete): float64(jobMetric.CompletionLatency),
-		}
+func (j *jobLatency) getLatency(normLatency any) map[string]float64 {
+	jobMetric := normLatency.(jobMetric)
+	return map[string]float64{
+		jobStartTimeMeasurement:     float64(jobMetric.StartTimeLatency),
+		string(batchv1.JobComplete): float64(jobMetric.CompletionLatency),
 	}
-	j.latencyQuantiles = CalculateQuantiles(j.Uuid, j.JobConfig.Name, j.Metadata, j.normLatencies, getLatency, jobLatencyQuantilesMeasurement)
 }

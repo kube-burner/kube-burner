@@ -216,7 +216,7 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops podLatency measurement
 func (p *podLatency) Stop() error {
-	return p.stopMeasurement(p.normalizeMetrics, p.calcQuantiles)
+	return p.stopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 
 func (p *podLatency) normalizeMetrics() float64 {
@@ -276,16 +276,13 @@ func (p *podLatency) normalizeMetrics() float64 {
 	return float64(erroredPods) / float64(totalPods) * 100.0
 }
 
-func (p *podLatency) calcQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		podMetric := normLatency.(podMetric)
-		return map[string]float64{
-			string(corev1.PodScheduled):              float64(podMetric.SchedulingLatency),
-			string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
-			string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
-			string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
-			string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
-		}
+func (p *podLatency) getLatency(normLatency any) map[string]float64 {
+	podMetric := normLatency.(podMetric)
+	return map[string]float64{
+		string(corev1.PodScheduled):              float64(podMetric.SchedulingLatency),
+		string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
+		string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
+		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
+		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
 	}
-	p.latencyQuantiles = CalculateQuantiles(p.Uuid, p.JobConfig.Name, p.Metadata, p.normLatencies, getLatency, podLatencyQuantilesMeasurement)
 }

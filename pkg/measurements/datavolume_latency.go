@@ -174,7 +174,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 }
 
 func (dv *dvLatency) Stop() error {
-	return dv.stopMeasurement(dv.normalizeMetrics, dv.calcQuantiles)
+	return dv.stopMeasurement(dv.normalizeMetrics, dv.getLatency)
 }
 
 func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
@@ -273,14 +273,11 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 	return float64(erroredDataVolumes) / float64(dataVolumeCount) * 100.0
 }
 
-func (dv *dvLatency) calcQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		dataVolumeMetric := normLatency.(dvMetric)
-		return map[string]float64{
-			string(cdiv1beta1.DataVolumeBound):   float64(dataVolumeMetric.DVBoundLatency),
-			string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
-			string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
-		}
+func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
+	dataVolumeMetric := normLatency.(dvMetric)
+	return map[string]float64{
+		string(cdiv1beta1.DataVolumeBound):   float64(dataVolumeMetric.DVBoundLatency),
+		string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
+		string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
 	}
-	dv.latencyQuantiles = CalculateQuantiles(dv.Uuid, dv.JobConfig.Name, dv.Metadata, dv.normLatencies, getLatency, dvLatencyQuantilesMeasurement)
 }

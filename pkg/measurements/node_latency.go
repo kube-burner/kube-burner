@@ -193,7 +193,7 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 }
 
 func (n *nodeLatency) Stop() error {
-	return n.stopMeasurement(n.normalizeLatencies, n.calculateQuantiles)
+	return n.stopMeasurement(n.normalizeLatencies, n.getLatency)
 }
 
 func (n *nodeLatency) normalizeLatencies() float64 {
@@ -224,15 +224,12 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 	return 0
 }
 
-func (n *nodeLatency) calculateQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		nodeMetric := normLatency.(NodeMetric)
-		return map[string]float64{
-			string(corev1.NodeMemoryPressure): float64(nodeMetric.NodeMemoryPressureLatency),
-			string(corev1.NodeDiskPressure):   float64(nodeMetric.NodeDiskPressureLatency),
-			string(corev1.NodePIDPressure):    float64(nodeMetric.NodePIDPressureLatency),
-			string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
-		}
+func (n *nodeLatency) getLatency(normLatency any) map[string]float64 {
+	nodeMetric := normLatency.(NodeMetric)
+	return map[string]float64{
+		string(corev1.NodeMemoryPressure): float64(nodeMetric.NodeMemoryPressureLatency),
+		string(corev1.NodeDiskPressure):   float64(nodeMetric.NodeDiskPressureLatency),
+		string(corev1.NodePIDPressure):    float64(nodeMetric.NodePIDPressureLatency),
+		string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
 	}
-	n.latencyQuantiles = CalculateQuantiles(n.Uuid, n.JobConfig.Name, n.Metadata, n.normLatencies, getLatency, nodeLatencyQuantilesMeasurement)
 }

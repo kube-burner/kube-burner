@@ -139,7 +139,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 }
 
 func (vsl *volumeSnapshotLatency) Stop() error {
-	return vsl.stopMeasurement(vsl.normalizeMetrics, vsl.calcQuantiles)
+	return vsl.stopMeasurement(vsl.normalizeMetrics, vsl.getLatency)
 }
 
 func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
@@ -211,12 +211,9 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 	return float64(erroredVolumeSnapshots) / float64(volumeSnapshotCount) * 100.0
 }
 
-func (vsl *volumeSnapshotLatency) calcQuantiles() {
-	getLatency := func(normLatency any) map[string]float64 {
-		volumeSnapshotMetric := normLatency.(volumeSnapshotMetric)
-		return map[string]float64{
-			"Ready": float64(volumeSnapshotMetric.VSReadyLatency),
-		}
+func (vsl *volumeSnapshotLatency) getLatency(normLatency any) map[string]float64 {
+	volumeSnapshotMetric := normLatency.(volumeSnapshotMetric)
+	return map[string]float64{
+		"Ready": float64(volumeSnapshotMetric.VSReadyLatency),
 	}
-	vsl.latencyQuantiles = CalculateQuantiles(vsl.Uuid, vsl.JobConfig.Name, vsl.Metadata, vsl.normLatencies, getLatency, volumeSnapshotLatencyQuantilesMeasurement)
 }

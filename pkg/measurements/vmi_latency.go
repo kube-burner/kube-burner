@@ -339,7 +339,7 @@ func (vmi *vmiLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops vmiLatency measurement
 func (vmi *vmiLatency) Stop() error {
-	return vmi.stopMeasurement(vmi.normalizeMetrics, vmi.calcQuantiles)
+	return vmi.stopMeasurement(vmi.normalizeMetrics, vmi.getLatency)
 }
 
 func (vmi *vmiLatency) normalizeMetrics() float64 {
@@ -369,23 +369,20 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 	return 0
 }
 
-func (vmi *vmiLatency) calcQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		vmiMetric := normLatency.(vmiMetric)
-		return map[string]float64{
-			"VM" + string(kvv1.VirtualMachineReady): float64(vmiMetric.VMReadyLatency),
-			"VMICreated":                            float64(vmiMetric.VMICreatedLatency),
-			"VMI" + string(kvv1.Pending):            float64(vmiMetric.VMIPendingLatency),
-			"VMI" + string(kvv1.Scheduling):         float64(vmiMetric.VMISchedulingLatency),
-			"VMI" + string(kvv1.Scheduled):          float64(vmiMetric.VMIScheduledLatency),
-			"VMI" + string(kvv1.Running):            float64(vmiMetric.VMIRunningLatency),
-			"PodCreated":                            float64(vmiMetric.PodCreatedLatency),
-			"Pod" + string(corev1.PodScheduled):     float64(vmiMetric.PodScheduledLatency),
-			"Pod" + string(corev1.PodInitialized):   float64(vmiMetric.PodInitializedLatency),
-			"Pod" + string(corev1.ContainersReady):  float64(vmiMetric.PodContainersReadyLatency),
-		}
+func (vmi *vmiLatency) getLatency(normLatency any) map[string]float64 {
+	vmiMetric := normLatency.(vmiMetric)
+	return map[string]float64{
+		"VM" + string(kvv1.VirtualMachineReady): float64(vmiMetric.VMReadyLatency),
+		"VMICreated":                            float64(vmiMetric.VMICreatedLatency),
+		"VMI" + string(kvv1.Pending):            float64(vmiMetric.VMIPendingLatency),
+		"VMI" + string(kvv1.Scheduling):         float64(vmiMetric.VMISchedulingLatency),
+		"VMI" + string(kvv1.Scheduled):          float64(vmiMetric.VMIScheduledLatency),
+		"VMI" + string(kvv1.Running):            float64(vmiMetric.VMIRunningLatency),
+		"PodCreated":                            float64(vmiMetric.PodCreatedLatency),
+		"Pod" + string(corev1.PodScheduled):     float64(vmiMetric.PodScheduledLatency),
+		"Pod" + string(corev1.PodInitialized):   float64(vmiMetric.PodInitializedLatency),
+		"Pod" + string(corev1.ContainersReady):  float64(vmiMetric.PodContainersReadyLatency),
 	}
-	vmi.latencyQuantiles = CalculateQuantiles(vmi.Uuid, vmi.JobConfig.Name, vmi.Metadata, vmi.normLatencies, getLatency, vmiLatencyQuantilesMeasurement)
 }
 
 // Returns the parent VM UID if there is one

@@ -139,7 +139,7 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 	}
 }
 
-func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, calcQuantiles func()) error {
+func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, getLatency func(any) map[string]float64) error {
 	var err error
 	defer func() {
 		for _, watcher := range bm.watchers {
@@ -151,7 +151,7 @@ func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, calc
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")
 		return fmt.Errorf("something is wrong with system under test. DataVolume latencies error rate was: %.2f", errorRate)
 	}
-	calcQuantiles()
+	bm.calculateQuantiles(getLatency)
 	if len(bm.Config.LatencyThresholds) > 0 {
 		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.latencyQuantiles)
 	}
@@ -222,19 +222,19 @@ func (bm *BaseMeasurement) indexLatencyMeasurement(jobName string, metricMap map
 
 // Common function to calculate quantiles for both node and pod latencies
 // Receives a list of normalized latencies and a function to get the latencies for each condition
-func CalculateQuantiles(uuid, jobName string, metadata map[string]interface{}, normLatencies []interface{}, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
+func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]float64) []any {
 	quantileMap := map[string][]float64{}
-	for _, normLatency := range normLatencies {
+	for _, normLatency := range bm.normLatencies {
 		for condition, latency := range getLatency(normLatency) {
 			quantileMap[condition] = append(quantileMap[condition], latency)
 		}
 	}
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = uuid
-		latencySummary.Metadata = metadata
-		latencySummary.MetricName = metricName
-		latencySummary.JobName = jobName
+		latencySummary.UUID = bm.Uuid
+		latencySummary.Metadata = bm.Metadata
+		latencySummary.MetricName = bm.QuantilesMeasurementName
+		latencySummary.JobName = bm.JobConfig.Name
 		return latencySummary
 	}
 

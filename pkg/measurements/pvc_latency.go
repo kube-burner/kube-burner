@@ -179,7 +179,7 @@ func getStorageClassName(pvc corev1.PersistentVolumeClaim) string {
 
 // stop pvc latency measurement
 func (p *pvcLatency) Stop() error {
-	return p.stopMeasurement(p.normalizeMetrics, p.calcQuantiles)
+	return p.stopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 
 // normalizes pvc latency metrics
@@ -228,15 +228,11 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 	return float64(erroredPVCs) / float64(totalPVCs) * 100.0
 }
 
-// calculates latency quantiles
-func (p *pvcLatency) calcQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		pvcMetric := normLatency.(pvcMetric)
-		return map[string]float64{
-			string(corev1.ClaimPending): float64(pvcMetric.PendingLatency),
-			string(corev1.ClaimBound):   float64(pvcMetric.BindingLatency),
-			string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
-		}
+func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
+	pvcMetric := normLatency.(pvcMetric)
+	return map[string]float64{
+		string(corev1.ClaimPending): float64(pvcMetric.PendingLatency),
+		string(corev1.ClaimBound):   float64(pvcMetric.BindingLatency),
+		string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
 	}
-	p.latencyQuantiles = CalculateQuantiles(p.Uuid, p.JobConfig.Name, p.Metadata, p.normLatencies, getLatency, pvcLatencyQuantilesMeasurement)
 }
