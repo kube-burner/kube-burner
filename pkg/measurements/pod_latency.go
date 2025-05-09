@@ -142,10 +142,8 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 							pm.containersReady = c.LastTransitionTime.Time.UTC()
 						}
 					case corev1.PodReady:
-						if pm.podReady.IsZero() {
-							log.Debugf("Pod %s is ready", pod.Name)
-							pm.podReady = c.LastTransitionTime.Time.UTC()
-						}
+						log.Debugf("Pod %s is ready", pod.Name)
+						pm.podReady = c.LastTransitionTime.Time.UTC()
 					}
 				}
 			}

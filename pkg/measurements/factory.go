@@ -50,6 +50,7 @@ type Measurement interface {
 
 var measurementFactoryMap = map[string]NewMeasurementFactory{
 	"podLatency":            newPodLatencyMeasurementFactory,
+	"jobLatency":            newJobLatencyMeasurementFactory,
 	"pvcLatency":            newPvcLatencyMeasurementFactory,
 	"nodeLatency":           newNodeLatencyMeasurementFactory,
 	"vmiLatency":            newVmiLatencyMeasurementFactory,

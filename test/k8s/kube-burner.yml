@@ -15,6 +15,7 @@ global:
 {{ end }}
   - name: serviceLatency
     svcTimeout: 5s
+  - name: jobLatency
 metricsEndpoints:
 {{ if .ES_INDEXING }}
   - endpoint: http://localhost:9090
@@ -79,6 +80,9 @@ jobs:
       {{- end }}
 
     - objectTemplate: objectTemplates/pod.yml
+      replicas: 1
+
+    - objectTemplate: objectTemplates/job.yml
       replicas: 1
 
     - objectTemplate: objectTemplates/service.yml
