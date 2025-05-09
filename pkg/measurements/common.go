@@ -16,19 +16,11 @@ package measurements
 
 import (
 	"context"
-	"fmt"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,213 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
 )
-
-var (
-	supportedLatencyMetricsMap = map[string]struct{}{
-		"P99": {},
-		"P95": {},
-		"P50": {},
-		"Avg": {},
-		"Max": {},
-	}
-)
-
-type BaseMeasurementFactory struct {
-	Config   types.Measurement
-	Uuid     string
-	Runid    string
-	Metadata map[string]interface{}
-}
-
-type BaseMeasurement struct {
-	Config                   types.Measurement
-	Uuid                     string
-	Runid                    string
-	JobConfig                *config.Job
-	ClientSet                kubernetes.Interface
-	RestConfig               *rest.Config
-	Metadata                 map[string]any
-	watchers                 []*metrics.Watcher
-	metrics                  sync.Map
-	MeasurementName          string
-	latencyQuantiles         []any
-	QuantilesMeasurementName string
-	normLatencies            []any
-}
-
-type MeasurementWatcher struct {
-	restClient    *rest.RESTClient
-	name          string
-	resource      string
-	labelSelector string
-	handlers      *cache.ResourceEventHandlerFuncs
-}
-
-func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) BaseMeasurementFactory {
-	return BaseMeasurementFactory{
-		Config:   measurement,
-		Uuid:     configSpec.GlobalConfig.UUID,
-		Runid:    configSpec.GlobalConfig.RUNID,
-		Metadata: metadata,
-	}
-}
-
-func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, measurementName, quantilesMeasurementName string) BaseMeasurement {
-	return BaseMeasurement{
-		Config:                   bmf.Config,
-		Uuid:                     bmf.Uuid,
-		Runid:                    bmf.Runid,
-		JobConfig:                jobConfig,
-		ClientSet:                clientSet,
-		RestConfig:               restConfig,
-		Metadata:                 bmf.Metadata,
-		MeasurementName:          measurementName,
-		QuantilesMeasurementName: quantilesMeasurementName,
-	}
-}
-
-func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWatcher) {
-	// Reset latency slices, required in multi-job benchmarks
-	bm.latencyQuantiles, bm.normLatencies = nil, nil
-	bm.metrics = sync.Map{}
-
-	bm.watchers = make([]*metrics.Watcher, len(measurementWatchers))
-	for i, measurementWatcher := range measurementWatchers {
-		restClient := measurementWatcher.restClient
-		if restClient == nil {
-			restClient = bm.ClientSet.CoreV1().RESTClient().(*rest.RESTClient)
-		}
-		log.Infof("Creating %v latency watcher for %s", measurementWatcher.resource, bm.JobConfig.Name)
-		bm.watchers[i] = metrics.NewWatcher(
-			restClient,
-			measurementWatcher.name,
-			measurementWatcher.resource,
-			corev1.NamespaceAll,
-			func(options *metav1.ListOptions) {
-				if measurementWatcher.labelSelector != "" {
-					options.LabelSelector = measurementWatcher.labelSelector
-				}
-			},
-			nil,
-		)
-		if measurementWatcher.handlers != nil {
-			bm.watchers[i].Informer.AddEventHandler(measurementWatcher.handlers)
-		}
-		if err := bm.watchers[i].StartAndCacheSync(); err != nil {
-			log.Errorf("%v Latency measurement error: %s", measurementWatcher.resource, err)
-		}
-	}
-}
-
-func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, getLatency func(any) map[string]float64) error {
-	var err error
-	defer func() {
-		for _, watcher := range bm.watchers {
-			watcher.StopWatcher()
-		}
-	}()
-	errorRate := normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. DataVolume latencies error rate was: %.2f", errorRate)
-	}
-	bm.calculateQuantiles(getLatency)
-	if len(bm.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.latencyQuantiles)
-	}
-	for _, q := range bm.latencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
-	}
-	if errorRate > 0 {
-		log.Infof("DV latencies error rate was: %.2f", errorRate)
-	}
-	return err
-}
-
-func (bm *BaseMeasurement) GetMetrics() *sync.Map {
-	return &bm.metrics
-}
-
-func VerifyMeasurementConfig(config types.Measurement, supportedConditions map[string]struct{}) error {
-	for _, th := range config.LatencyThresholds {
-		if _, supported := supportedConditions[th.ConditionType]; !supported {
-			return fmt.Errorf("unsupported condition type in measurement: %s", th.ConditionType)
-		}
-		if _, supportedLatency := supportedLatencyMetricsMap[th.Metric]; !supportedLatency {
-			return fmt.Errorf("unsupported metric %s in measurement, supported are: %s", th.Metric, strings.Join(maps.Keys(supportedLatencyMetricsMap), ", "))
-		}
-	}
-	return nil
-}
-func (bm *BaseMeasurement) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		bm.MeasurementName:          bm.normLatencies,
-		bm.QuantilesMeasurementName: bm.latencyQuantiles,
-	}
-	bm.indexLatencyMeasurement(jobName, metricMap, indexerList)
-}
-
-// Keep this method to allow reuse when overriding Index
-func (bm *BaseMeasurement) indexLatencyMeasurement(jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
-	indexDocuments := func(indexer indexers.Indexer, metricName string, data []interface{}) {
-		log.Infof("Indexing metric %s", metricName)
-		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
-		}
-		log.Debugf("Indexing [%d] documents: %s", len(data), metricName)
-		resp, err := indexer.Index(data, indexingOpts)
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			log.Info(resp)
-		}
-	}
-	for metricName, data := range metricMap {
-		// Use the configured TimeseriesIndexer or QuantilesIndexer when specified or else use all indexers
-		if bm.Config.TimeseriesIndexer != "" && (metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement || metricName == nodeLatencyMeasurement || metricName == pvcLatencyMeasurement) {
-			indexer := indexerList[bm.Config.TimeseriesIndexer]
-			indexDocuments(indexer, metricName, data)
-		} else if bm.Config.QuantilesIndexer != "" && (metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement || metricName == nodeLatencyQuantilesMeasurement || metricName == pvcLatencyQuantilesMeasurement) {
-			indexer := indexerList[bm.Config.QuantilesIndexer]
-			indexDocuments(indexer, metricName, data)
-		} else {
-			for _, indexer := range indexerList {
-				indexDocuments(indexer, metricName, data)
-			}
-		}
-	}
-
-}
-
-// Common function to calculate quantiles for both node and pod latencies
-// Receives a list of normalized latencies and a function to get the latencies for each condition
-func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]float64) []any {
-	quantileMap := map[string][]float64{}
-	for _, normLatency := range bm.normLatencies {
-		for condition, latency := range getLatency(normLatency) {
-			quantileMap[condition] = append(quantileMap[condition], latency)
-		}
-	}
-	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
-		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = bm.Uuid
-		latencySummary.Metadata = bm.Metadata
-		latencySummary.MetricName = bm.QuantilesMeasurementName
-		latencySummary.JobName = bm.JobConfig.Name
-		return latencySummary
-	}
-
-	var latencyQuantiles []interface{}
-	for condition, latencies := range quantileMap {
-		latencyQuantiles = append(latencyQuantiles, calcSummary(condition, latencies))
-	}
-
-	return latencyQuantiles
-}
 
 func getIntFromLabels(labels map[string]string, key string) int {
 	strVal, ok := labels[key]
@@ -272,9 +59,9 @@ func deployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, im
 					Name:            podName,
 					ImagePullPolicy: corev1.PullAlways,
 					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: ptr.To[bool](false),
+						AllowPrivilegeEscalation: ptr.To(false),
 						Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-						RunAsNonRoot:             ptr.To[bool](true),
+						RunAsNonRoot:             ptr.To(true),
 						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 						RunAsUser:                ptr.To[int64](1000),
 					},

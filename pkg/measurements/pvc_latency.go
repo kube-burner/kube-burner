@@ -70,7 +70,7 @@ type pvcLatencyMeasurementFactory struct {
 }
 
 func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedPvcConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedPvcConditions); err != nil {
 		return nil, err
 	}
 	return pvcLatencyMeasurementFactory{

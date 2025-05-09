@@ -73,7 +73,7 @@ type volumeSnapshotLatencyMeasurementFactory struct {
 }
 
 func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedVolumeSnapshotConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedVolumeSnapshotConditions); err != nil {
 		return nil, err
 	}
 	return volumeSnapshotLatencyMeasurementFactory{

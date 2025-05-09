@@ -533,7 +533,7 @@ func (n *netpolLatency) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
-		n.watchers[0].StopWatcher()
+		n.stopWatchers()
 	}()
 	kutil.CleanupNamespaces(ctx, n.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
 	n.normalizeMetrics()

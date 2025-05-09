@@ -95,7 +95,7 @@ type vmiLatencyMeasurementFactory struct {
 }
 
 func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedVMIConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedVMIConditions); err != nil {
 		return nil, err
 	}
 	return vmiLatencyMeasurementFactory{

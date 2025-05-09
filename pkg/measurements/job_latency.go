@@ -70,7 +70,7 @@ type jobLatencyMeasurementFactory struct {
 }
 
 func newJobLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedJobConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedJobConditions); err != nil {
 		return nil, err
 	}
 	return jobLatencyMeasurementFactory{

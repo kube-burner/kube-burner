@@ -78,7 +78,7 @@ type podLatencyMeasurementFactory struct {
 }
 
 func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedPodConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedPodConditions); err != nil {
 		return nil, err
 	}
 	return podLatencyMeasurementFactory{

@@ -79,7 +79,7 @@ type dvLatencyMeasurementFactory struct {
 }
 
 func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedDvConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedDvConditions); err != nil {
 		return nil, err
 	}
 	return dvLatencyMeasurementFactory{

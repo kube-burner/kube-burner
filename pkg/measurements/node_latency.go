@@ -70,7 +70,7 @@ type nodeLatencyMeasurementFactory struct {
 }
 
 func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedNodeConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedNodeConditions); err != nil {
 		return nil, err
 	}
 	return nodeLatencyMeasurementFactory{
