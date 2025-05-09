@@ -60,17 +60,19 @@ type BaseMeasurementFactory struct {
 }
 
 type BaseMeasurement struct {
-	Config           types.Measurement
-	Uuid             string
-	Runid            string
-	JobConfig        *config.Job
-	ClientSet        kubernetes.Interface
-	RestConfig       *rest.Config
-	Metadata         map[string]any
-	watchers         []*metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []any
-	normLatencies    []any
+	Config                   types.Measurement
+	Uuid                     string
+	Runid                    string
+	JobConfig                *config.Job
+	ClientSet                kubernetes.Interface
+	RestConfig               *rest.Config
+	Metadata                 map[string]any
+	watchers                 []*metrics.Watcher
+	metrics                  sync.Map
+	MeasurementName          string
+	latencyQuantiles         []any
+	QuantilesMeasurementName string
+	normLatencies            []any
 }
 
 type MeasurementWatcher struct {
@@ -90,15 +92,17 @@ func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measure
 	}
 }
 
-func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) BaseMeasurement {
+func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, measurementName, quantilesMeasurementName string) BaseMeasurement {
 	return BaseMeasurement{
-		Config:     bmf.Config,
-		Uuid:       bmf.Uuid,
-		Runid:      bmf.Runid,
-		JobConfig:  jobConfig,
-		ClientSet:  clientSet,
-		RestConfig: restConfig,
-		Metadata:   bmf.Metadata,
+		Config:                   bmf.Config,
+		Uuid:                     bmf.Uuid,
+		Runid:                    bmf.Runid,
+		JobConfig:                jobConfig,
+		ClientSet:                clientSet,
+		RestConfig:               restConfig,
+		Metadata:                 bmf.Metadata,
+		MeasurementName:          measurementName,
+		QuantilesMeasurementName: quantilesMeasurementName,
 	}
 }
 
@@ -176,8 +180,16 @@ func VerifyMeasurementConfig(config types.Measurement, supportedConditions map[s
 	}
 	return nil
 }
+func (bm *BaseMeasurement) Index(jobName string, indexerList map[string]indexers.Indexer) {
+	metricMap := map[string][]interface{}{
+		bm.MeasurementName:          bm.normLatencies,
+		bm.QuantilesMeasurementName: bm.latencyQuantiles,
+	}
+	bm.indexLatencyMeasurement(jobName, metricMap, indexerList)
+}
 
-func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
+// Keep this method to allow reuse when overriding Index
+func (bm *BaseMeasurement) indexLatencyMeasurement(jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
 	indexDocuments := func(indexer indexers.Indexer, metricName string, data []interface{}) {
 		log.Infof("Indexing metric %s", metricName)
 		indexingOpts := indexers.IndexingOpts{
@@ -193,11 +205,11 @@ func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap
 	}
 	for metricName, data := range metricMap {
 		// Use the configured TimeseriesIndexer or QuantilesIndexer when specified or else use all indexers
-		if config.TimeseriesIndexer != "" && (metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement || metricName == nodeLatencyMeasurement || metricName == pvcLatencyMeasurement) {
-			indexer := indexerList[config.TimeseriesIndexer]
+		if bm.Config.TimeseriesIndexer != "" && (metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement || metricName == nodeLatencyMeasurement || metricName == pvcLatencyMeasurement) {
+			indexer := indexerList[bm.Config.TimeseriesIndexer]
 			indexDocuments(indexer, metricName, data)
-		} else if config.QuantilesIndexer != "" && (metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement || metricName == nodeLatencyQuantilesMeasurement || metricName == pvcLatencyQuantilesMeasurement) {
-			indexer := indexerList[config.QuantilesIndexer]
+		} else if bm.Config.QuantilesIndexer != "" && (metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement || metricName == nodeLatencyQuantilesMeasurement || metricName == pvcLatencyQuantilesMeasurement) {
+			indexer := indexerList[bm.Config.QuantilesIndexer]
 			indexDocuments(indexer, metricName, data)
 		} else {
 			for _, indexer := range indexerList {

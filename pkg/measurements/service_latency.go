@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
@@ -76,7 +75,7 @@ func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement typ
 
 func (slmf serviceLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &serviceLatency{
-		BaseMeasurement: slmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: slmf.NewBaseLatency(jobConfig, clientSet, restConfig, svcLatencyMeasurement, svcLatencyQuantilesMeasurement),
 	}
 }
 
@@ -239,14 +238,6 @@ func (s *serviceLatency) normalizeMetrics() {
 	if len(ipAssignedLatencies) > 0 {
 		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("IPAssigned", ipAssignedLatencies))
 	}
-}
-
-func (s *serviceLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		svcLatencyMeasurement:          s.normLatencies,
-		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(s.Config, jobName, metricMap, indexerList)
 }
 
 func (s *serviceLatency) waitForEndpoints(svc *corev1.Service) error {

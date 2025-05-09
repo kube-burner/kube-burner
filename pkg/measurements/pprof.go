@@ -64,7 +64,7 @@ func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types
 
 func (plmf pprofLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &pprof{
-		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig, "", ""),
 	}
 }
 

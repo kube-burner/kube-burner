@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,7 +89,7 @@ func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Me
 
 func (dvlmf dvLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &dvLatency{
-		BaseMeasurement: dvlmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: dvlmf.NewBaseLatency(jobConfig, clientSet, restConfig, dvLatencyMeasurement, dvLatencyQuantilesMeasurement),
 	}
 }
 
@@ -222,14 +221,6 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 			JobName:    dv.JobConfig.Name,
 		})
 	}
-}
-
-func (dv *dvLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		dvLatencyMeasurement:          dv.normLatencies,
-		dvLatencyQuantilesMeasurement: dv.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(dv.Config, jobName, metricMap, indexerList)
 }
 
 func (dv *dvLatency) normalizeMetrics() float64 {

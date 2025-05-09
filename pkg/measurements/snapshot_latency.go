@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,7 +83,7 @@ func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurem
 
 func (vslmf volumeSnapshotLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &volumeSnapshotLatency{
-		BaseMeasurement: vslmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: vslmf.NewBaseLatency(jobConfig, clientSet, restConfig, volumeSnapshotLatencyMeasurement, volumeSnapshotLatencyQuantilesMeasurement),
 	}
 }
 
@@ -174,14 +173,6 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 			JobName:    vsl.JobConfig.Name,
 		})
 	}
-}
-
-func (vsl *volumeSnapshotLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]any{
-		volumeSnapshotLatencyMeasurement:          vsl.normLatencies,
-		volumeSnapshotLatencyQuantilesMeasurement: vsl.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(vsl.Config, jobName, metricMap, indexerList)
 }
 
 func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {

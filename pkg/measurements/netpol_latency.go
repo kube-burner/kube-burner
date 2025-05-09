@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	kconfig "github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
@@ -118,7 +117,7 @@ func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement typ
 
 func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *kconfig.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &netpolLatency{
-		BaseMeasurement: nplmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: nplmf.NewBaseLatency(jobConfig, clientSet, restConfig, netpolLatencyMeasurement, netpolLatencyQuantilesMeasurement),
 		embedFS:         nplmf.embedFS,
 		embedFSDir:      nplmf.embedFSDir,
 	}
@@ -572,14 +571,6 @@ func (n *netpolLatency) normalizeMetrics() {
 		n.latencyQuantiles = append(n.latencyQuantiles, calcSummary("Ready", latencies))
 		n.latencyQuantiles = append(n.latencyQuantiles, calcSummary("minReady", minLatencies))
 	}
-}
-
-func (n *netpolLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		netpolLatencyMeasurement:          n.normLatencies,
-		netpolLatencyQuantilesMeasurement: n.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(n.Config, jobName, metricMap, indexerList)
 }
 
 func (n *netpolLatency) Collect(measurementWg *sync.WaitGroup) {

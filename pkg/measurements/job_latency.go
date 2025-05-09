@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
@@ -81,7 +80,7 @@ func newJobLatencyMeasurementFactory(configSpec config.Spec, measurement types.M
 
 func (jlmf jobLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &jobLatency{
-		BaseMeasurement: jlmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: jlmf.NewBaseLatency(jobConfig, clientSet, restConfig, jobLatencyMeasurement, jobLatencyQuantilesMeasurement),
 	}
 }
 
@@ -184,15 +183,6 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 // Stop stops jobLatency measurement
 func (j *jobLatency) Stop() error {
 	return j.stopMeasurement(j.normalizeMetrics, j.calcQuantiles)
-}
-
-// index sends metrics to the configured indexer
-func (j *jobLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]any{
-		jobLatencyMeasurement:          j.normLatencies,
-		jobLatencyQuantilesMeasurement: j.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(j.Config, jobName, metricMap, indexerList)
 }
 
 func (j *jobLatency) GetMetrics() *sync.Map {

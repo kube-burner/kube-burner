@@ -19,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
@@ -106,7 +105,7 @@ func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.M
 
 func (vmilmf vmiLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &vmiLatency{
-		BaseMeasurement: vmilmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: vmilmf.NewBaseLatency(jobConfig, clientSet, restConfig, vmiLatencyMeasurement, vmiLatencyQuantilesMeasurement),
 	}
 }
 
@@ -341,15 +340,6 @@ func (vmi *vmiLatency) Collect(measurementWg *sync.WaitGroup) {
 // Stop stops vmiLatency measurement
 func (vmi *vmiLatency) Stop() error {
 	return vmi.stopMeasurement(vmi.normalizeMetrics, vmi.calcQuantiles)
-}
-
-// index sends metrics to the configured indexer
-func (vmi *vmiLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		vmiLatencyMeasurement:          vmi.normLatencies,
-		vmiLatencyQuantilesMeasurement: vmi.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(vmi.Config, jobName, metricMap, indexerList)
 }
 
 func (vmi *vmiLatency) normalizeMetrics() float64 {

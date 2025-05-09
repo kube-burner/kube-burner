@@ -19,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
@@ -81,7 +80,7 @@ func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.
 
 func (nlmf nodeLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &nodeLatency{
-		BaseMeasurement: nlmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: nlmf.NewBaseLatency(jobConfig, clientSet, restConfig, nodeLatencyMeasurement, nodeLatencyQuantilesMeasurement),
 	}
 }
 
@@ -195,14 +194,6 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 
 func (n *nodeLatency) Stop() error {
 	return n.stopMeasurement(n.normalizeLatencies, n.calculateQuantiles)
-}
-
-func (n *nodeLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		nodeLatencyMeasurement:          n.normLatencies,
-		nodeLatencyQuantilesMeasurement: n.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(n.Config, jobName, metricMap, indexerList)
 }
 
 func (n *nodeLatency) normalizeLatencies() float64 {
