@@ -157,7 +157,7 @@ func (bm *BaseMeasurement) indexLatencyMeasurement(jobName string, metricMap map
 
 // Common function to calculate quantiles for both node and pod latencies
 // Receives a function to get the latencies for each condition
-func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]float64) []any {
+func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]float64) {
 	quantileMap := map[string][]float64{}
 	for _, normLatency := range bm.normLatencies {
 		for condition, latency := range getLatency(normLatency) {
@@ -173,10 +173,8 @@ func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]fl
 		return latencySummary
 	}
 
-	var latencyQuantiles []any
+	bm.latencyQuantiles = make([]any, 0, len(quantileMap))
 	for condition, latencies := range quantileMap {
-		latencyQuantiles = append(latencyQuantiles, calcSummary(condition, latencies))
+		bm.latencyQuantiles = append(bm.latencyQuantiles, calcSummary(condition, latencies))
 	}
-
-	return latencyQuantiles
 }
