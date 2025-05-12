@@ -178,7 +178,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 				},
 			},
 			{
-				restClient:    nil,
+				restClient:    s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 				name:          "epWatcher",
 				resource:      "endpoints",
 				labelSelector: "",
