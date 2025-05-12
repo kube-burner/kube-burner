@@ -137,7 +137,7 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 	n.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    nil,
+				restClient:    n.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 				name:          "nodeWatcher",
 				resource:      "nodes",
 				labelSelector: "",

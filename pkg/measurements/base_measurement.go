@@ -61,13 +61,9 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 
 	bm.watchers = make([]*metrics.Watcher, len(measurementWatchers))
 	for i, measurementWatcher := range measurementWatchers {
-		restClient := measurementWatcher.restClient
-		if restClient == nil {
-			restClient = bm.ClientSet.CoreV1().RESTClient().(*rest.RESTClient)
-		}
 		log.Infof("Creating %v latency watcher for %s", measurementWatcher.resource, bm.JobConfig.Name)
 		bm.watchers[i] = metrics.NewWatcher(
-			restClient,
+			measurementWatcher.restClient,
 			measurementWatcher.name,
 			measurementWatcher.resource,
 			corev1.NamespaceAll,

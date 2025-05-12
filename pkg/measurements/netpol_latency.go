@@ -505,7 +505,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 	n.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    nil,
+				restClient:    n.ClientSet.NetworkingV1().RESTClient().(*rest.RESTClient),
 				name:          "netpolWatcher",
 				resource:      "networkpolicies",
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", n.Runid),

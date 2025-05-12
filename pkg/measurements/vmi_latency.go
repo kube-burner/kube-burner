@@ -289,7 +289,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				},
 			},
 			{
-				restClient: nil,
+				restClient: vmi.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 				name:       "podWatcher",
 				resource:   "pods",
 				labelSelector: labels.Set(

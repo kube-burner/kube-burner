@@ -125,7 +125,7 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 	j.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    nil,
+				restClient:    j.ClientSet.BatchV1().RESTClient().(*rest.RESTClient),
 				name:          "jobWatcher",
 				resource:      "jobs",
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", j.Runid),

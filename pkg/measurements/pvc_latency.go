@@ -147,7 +147,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	p.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    nil,
+				restClient:    p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 				name:          "pvcWatcher",
 				resource:      "persistentvolumeclaims",
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),

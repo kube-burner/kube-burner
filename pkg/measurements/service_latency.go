@@ -169,7 +169,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	s.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    nil,
+				restClient:    s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 				name:          "svcWatcher",
 				resource:      "services",
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", s.Runid),
