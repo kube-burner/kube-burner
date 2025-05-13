@@ -102,6 +102,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
 		ChurnDeletionStrategy:  "default",
+		MetricsClosing:         "afterJob",
 	}
 
 	if err := unmarshal(&raw); err != nil {
@@ -189,6 +190,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		}
 		if job.JobIterations < 1 && (job.JobType == CreationJob || job.JobType == ReadJob) {
 			log.Fatalf("Job %s has < 1 iterations", job.Name)
+		}
+		if job.MetricsClosing != "afterJob" && job.MetricsClosing != "afterJobPause" && job.MetricsClosing != "afterMeasurements" {
+			log.Fatalf("Invalid value %s for MetricsClosing", job.MetricsClosing)
 		}
 		if job.JobType == DeletionJob {
 			configSpec.Jobs[i].PreLoadImages = false
