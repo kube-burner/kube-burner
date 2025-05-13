@@ -207,8 +207,8 @@ type Job struct {
 	ObjectWait bool `yaml:"objectWait" json:"objectWait,omitempty"`
 	// MetricsAggregate aggregate the metrics of this job with the next one
 	MetricsAggregate bool `yaml:"metricsAggregate" json:"metricsAggregate,omitempty"`
-	// MetricsCollectionEndpoint defines when to stop metrics collection
-	MetricsCollectionEndpoint string `yaml:"metricsCollectionEndpoint" json:"metricsCollectionEndpoint,omitempty"`
+	// MetricsClosing defines when to stop metrics collection
+	MetricsClosing string `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
 }
 
 type WaitOptions struct {

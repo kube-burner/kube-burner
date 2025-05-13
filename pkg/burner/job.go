@@ -158,14 +158,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 			}
 			jobEnd := time.Now().UTC()
-			if job.MetricsCollectionEndpoint == "AfterJob" {
+			if job.MetricsClosing == "afterJob" {
 				executedJobs[len(executedJobs)-1].End = jobEnd
 			}
 			if job.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
 				time.Sleep(job.JobPause)
 			}
-			if job.MetricsCollectionEndpoint == "AfterJobPause" {
+			if job.MetricsClosing == "afterJobPause" {
 				executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 			}
 			if !globalConfig.WaitWhenFinished {
@@ -179,7 +179,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Error(err.Error())
 					innerRC = rcMeasurement
 				}
-				if job.MetricsCollectionEndpoint == "AfterMeasurements" {
+				if job.MetricsClosing == "afterMeasurements" {
 					executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 				}
 				if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
