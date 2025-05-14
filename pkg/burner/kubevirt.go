@@ -94,7 +94,7 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 	config.KubeVirtOpRemoveVolume: nil,
 }
 
-func (ex *Executor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMapper) {
 	var err error
 
 	if len(ex.ExecutionMode) == 0 {
@@ -123,7 +123,7 @@ func (ex *Executor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMap
 	}
 }
 
-func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// If LabelSelector was not set at the wait block, use the same selector used for the operation
@@ -182,7 +182,7 @@ func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 	}
 }
 
-func getVolumeSourceFromVolume(ex *Executor, volumeName, namespace string) (*kubevirtV1.HotplugVolumeSource, error) {
+func getVolumeSourceFromVolume(ex *JobExecutor, volumeName, namespace string) (*kubevirtV1.HotplugVolumeSource, error) {
 	//Check if data volume exists.
 	_, err := ex.kubeVirtClient.CdiClient().CdiV1beta1().DataVolumes(namespace).Get(context.TODO(), volumeName, metav1.GetOptions{})
 	if err == nil {
@@ -209,7 +209,7 @@ func getVolumeSourceFromVolume(ex *Executor, volumeName, namespace string) (*kub
 	return nil, fmt.Errorf("volume %s is not a DataVolume or PersistentVolumeClaim", volumeName)
 }
 
-func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]interface{}) error {
+func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]interface{}) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
@@ -294,7 +294,7 @@ func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]int
 	return nil
 }
 
-func removeVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]interface{}) error {
+func removeVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]interface{}) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
