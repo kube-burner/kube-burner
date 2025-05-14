@@ -112,7 +112,7 @@ func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructure
 }
 
 // Verify verifies the number of created objects
-func (ex *Executor) Verify() bool {
+func (ex *JobExecutor) Verify() bool {
 	var objList *unstructured.UnstructuredList
 	var replicas int
 	success := true
@@ -181,16 +181,19 @@ func newRESTMapper(discoveryClient *discovery.DiscoveryClient) meta.RESTMapper {
 	return restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
 }
 
-func (ex *Executor) RunJob(ctx context.Context) {
+func (ex *JobExecutor) Run(ctx context.Context) {
 	switch ex.ExecutionMode {
 	case config.ExecutionModeParallel:
 		ex.runParallel(ctx)
 	case config.ExecutionModeSequential:
 		ex.runSequential(ctx)
 	}
+	if ex.GC {
+		ex.gc(ctx, nil)
+	}
 }
 
-func (ex *Executor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
+func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
 	var itemList *unstructured.UnstructuredList
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
@@ -213,7 +216,7 @@ func (ex *Executor) getItemListForObject(obj *object) (*unstructured.Unstructure
 	return itemList, nil
 }
 
-func (ex *Executor) runSequential(ctx context.Context) {
+func (ex *JobExecutor) runSequential(ctx context.Context) {
 	for i := range ex.JobIterations {
 		for _, obj := range ex.objects {
 			if ctx.Err() != nil {
@@ -265,7 +268,7 @@ func (ex *Executor) runSequential(ctx context.Context) {
 }
 
 // runParallel executes all objects for all jobs in parallel
-func (ex *Executor) runParallel(ctx context.Context) {
+func (ex *JobExecutor) runParallel(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
 		if ctx.Err() != nil {

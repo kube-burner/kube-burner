@@ -39,9 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
-	var err error
+func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 	var f io.Reader
+	var err error
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
@@ -86,7 +86,7 @@ func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -195,12 +195,12 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 // Simple integer division on the iteration allows us to batch iterations into
 // namespaces. Division means namespaces are populated to their desired number
 // of iterations before the next namespace is created.
-func (ex *Executor) generateNamespace(iteration int) string {
+func (ex *JobExecutor) generateNamespace(iteration int) string {
 	nsIndex := iteration / ex.IterationsPerNamespace
 	return fmt.Sprintf("%s-%d", ex.Namespace, nsIndex)
 }
 
-func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string, obj *object, ns string, iteration int, replicaWg *sync.WaitGroup) {
+func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]string, obj *object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
 
 	for r := 1; r <= obj.Replicas; r++ {
@@ -243,7 +243,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 	wg.Wait()
 }
 
-func (ex *Executor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
+func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
 	util.RetryWithExponentialBackOff(func() (bool, error) {
@@ -292,7 +292,7 @@ func (ex *Executor) createRequest(ctx context.Context, gvr schema.GroupVersionRe
 }
 
 // RunCreateJobWithChurn executes a churn creation job
-func (ex *Executor) RunCreateJobWithChurn(ctx context.Context) {
+func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 	if ctx.Err() != nil {
 		return
 	}

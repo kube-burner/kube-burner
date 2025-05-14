@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (ex *Executor) setupReadJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupReadJob(mapper meta.RESTMapper) {
 	log.Debugf("Preparing read job: %s", ex.Name)
 	ex.itemHandler = readHandler
 	ex.ExecutionMode = config.ExecutionModeSequential
@@ -38,7 +38,7 @@ func (ex *Executor) setupReadJob(mapper meta.RESTMapper) {
 	log.Infof("Job %s: %d iterations", ex.Name, ex.JobIterations)
 }
 
-func readHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func readHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 	ex.limiter.Wait(context.TODO())
 	var err error
