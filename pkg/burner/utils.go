@@ -188,9 +188,6 @@ func (ex *JobExecutor) Run(ctx context.Context) {
 	case config.ExecutionModeSequential:
 		ex.runSequential(ctx)
 	}
-	if ex.GC {
-		ex.gc(ctx, nil)
-	}
 }
 
 func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
