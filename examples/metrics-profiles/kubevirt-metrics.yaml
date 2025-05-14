@@ -191,7 +191,7 @@
 - query: count(kube_secret_info{}) > 0
   metricName: secretCount
 
-- query: count(kube_deployment_labels{}) > 0
+- query: count(kube_deployment_spec_replicas{}) > 0
   metricName: deploymentCount
 
 - query: count(kube_configmap_info{}) > 0
