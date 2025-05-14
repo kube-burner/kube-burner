@@ -120,9 +120,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn deletion strategy: %v", jobExecutor.ChurnDeletionStrategy)
 				}
 				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces)
-				if jobExecutor.GC {
-					jobExecutor.gc(ctx, nil)
-				}
 				if ctx.Err() != nil {
 					return
 				}
@@ -195,6 +192,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}(measurementsInstance, measurementsJobName)
 				}
 				measurementsInstance = nil
+			}
+			if jobExecutor.GC {
+				jobExecutor.gc(ctx, nil)
 			}
 		}
 		if globalConfig.WaitWhenFinished {
