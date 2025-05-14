@@ -107,6 +107,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `jobIterationDelay`          | How long to wait between each job iteration. This is also the wait interval between each delete operation                             | Duration | 0s       |
 | `jobPause`                   | How long to pause after finishing the job                                                                                             | Duration | 0s       |
 | `beforeCleanup`              | Allows to run a bash script before the workload is deleted                                                                            | String   | ""       |
+| `gc`                         | Garbage collect job                                                                                                                   | Boolean  | false    |
 | `qps`                        | Limit object creation queries per second                                                                                              | Integer  | 0        |
 | `burst`                      | Maximum burst for throttle                                                                                                            | Integer  | 0        |
 | `objects`                    | List of objects the job will create. Detailed on the [objects section](#objects)                                                      | List     | []       |
