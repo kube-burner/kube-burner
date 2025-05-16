@@ -64,7 +64,7 @@ func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types
 
 func (plmf pprofLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &pprof{
-		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig, "", ""),
 	}
 }
 
@@ -206,10 +206,6 @@ func (p *pprof) Stop() error {
 
 // Fake index function for pprof
 func (p *pprof) Index(_ string, _ map[string]indexers.Indexer) {
-}
-
-func (p *pprof) GetMetrics() *sync.Map {
-	return &sync.Map{}
 }
 
 func readCerts(cert, privKey string) (string, string, error) {
