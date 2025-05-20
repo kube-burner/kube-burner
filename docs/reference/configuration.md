@@ -49,7 +49,7 @@ In this section is described global job configuration, it holds the following pa
     The precedence order to wait on resources is Global.waitWhenFinished > Job.waitWhenFinished > Job.podWait
 
 !!! warning
-    Bear in mind that `waitWhenFinished` behavior might be affected when job's garbage collection is enabled.
+     Global `waitWhenFinished` and job `gc` are mutually exclusive and cannot be enabled at the same time.
 
 kube-burner connects k8s clusters using the following methods in this order:
 
