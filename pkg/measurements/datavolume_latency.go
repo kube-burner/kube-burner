@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +32,6 @@ import (
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 )
 
@@ -74,11 +72,6 @@ type dvMetric struct {
 
 type dvLatency struct {
 	BaseMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type dvLatencyMeasurementFactory struct {
@@ -86,7 +79,7 @@ type dvLatencyMeasurementFactory struct {
 }
 
 func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedDvConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedDvConditions); err != nil {
 		return nil, err
 	}
 	return dvLatencyMeasurementFactory{
@@ -96,7 +89,7 @@ func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Me
 
 func (dvlmf dvLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &dvLatency{
-		BaseMeasurement: dvlmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: dvlmf.NewBaseLatency(jobConfig, clientSet, restConfig, dvLatencyMeasurement, dvLatencyQuantilesMeasurement),
 	}
 }
 
@@ -161,57 +154,27 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 
 func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	// Reset latency slices, required in multi-job benchmarks
-	dv.latencyQuantiles, dv.normLatencies = nil, nil
-	dv.metrics = sync.Map{}
-	log.Infof("Creating Data Volume latency watcher for %s", dv.JobConfig.Name)
-	dv.watcher = metrics.NewWatcher(
-		getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
-		"dvWatcher",
-		"datavolumes",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", dv.Runid)
+	dv.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
+				name:          "dvWatcher",
+				resource:      "datavolumes",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", dv.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: dv.handleCreateDV,
+					UpdateFunc: func(oldObj, newObj any) {
+						dv.handleUpdateDV(newObj)
+					},
+				},
+			},
 		},
-		nil,
 	)
-	dv.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: dv.handleCreateDV,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			dv.handleUpdateDV(newObj)
-		},
-	})
-	if err := dv.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("DataVolume Latency measurement error: %s", err)
-	}
-
 	return nil
 }
 
 func (dv *dvLatency) Stop() error {
-	var err error
-	defer func() {
-		if dv.watcher != nil {
-			dv.watcher.StopWatcher()
-		}
-	}()
-	errorRate := dv.normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. DataVolume latencies error rate was: %.2f", errorRate)
-	}
-	dv.calcQuantiles()
-	if len(dv.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(dv.Config.LatencyThresholds, dv.latencyQuantiles)
-	}
-	for _, q := range dv.latencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", dv.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
-	}
-	if errorRate > 0 {
-		log.Infof("DV latencies error rate was: %.2f", errorRate)
-	}
-	return err
+	return dv.stopMeasurement(dv.normalizeMetrics, dv.getLatency)
 }
 
 func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
@@ -258,18 +221,6 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 			JobName:    dv.JobConfig.Name,
 		})
 	}
-}
-
-func (dv *dvLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		dvLatencyMeasurement:          dv.normLatencies,
-		dvLatencyQuantilesMeasurement: dv.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(dv.Config, jobName, metricMap, indexerList)
-}
-
-func (dv *dvLatency) GetMetrics() *sync.Map {
-	return &dv.metrics
 }
 
 func (dv *dvLatency) normalizeMetrics() float64 {
@@ -322,14 +273,11 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 	return float64(erroredDataVolumes) / float64(dataVolumeCount) * 100.0
 }
 
-func (dv *dvLatency) calcQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		dataVolumeMetric := normLatency.(dvMetric)
-		return map[string]float64{
-			string(cdiv1beta1.DataVolumeBound):   float64(dataVolumeMetric.DVBoundLatency),
-			string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
-			string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
-		}
+func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
+	dataVolumeMetric := normLatency.(dvMetric)
+	return map[string]float64{
+		string(cdiv1beta1.DataVolumeBound):   float64(dataVolumeMetric.DVBoundLatency),
+		string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
+		string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
 	}
-	dv.latencyQuantiles = CalculateQuantiles(dv.Uuid, dv.JobConfig.Name, dv.Metadata, dv.normLatencies, getLatency, dvLatencyQuantilesMeasurement)
 }
