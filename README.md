@@ -19,7 +19,7 @@ Kube-burner is a binary application written in golang that makes extensive usage
 
 ## Code of Conduct
 
-This project is for everyone. We ask that our users and contributors take a few minutes to review our [Code of Conduct](CODE_OF_CONDUCT.md).
+This project is for everyone. We ask that our users and contributors take a few minutes to review our [Code of Conduct](./code-of-conduct.md).
 
 ## Documentation
 
