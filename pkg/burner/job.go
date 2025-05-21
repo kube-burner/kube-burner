@@ -103,6 +103,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance = measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
 				measurementsInstance.Start()
 			}
+			if job.BeforeExecution != "" {
+				runLifecycleHook("BeforeExecution", job.BeforeExecution, true, configSpec, &errs, &innerRC)
+			}
 			log.Infof("Triggering job: %s", job.Name)
 			if job.JobType == config.CreationJob {
 				if job.Cleanup {
@@ -147,15 +150,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 			}
 			if job.BeforeCleanup != "" {
-				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
-				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup, configSpec.EmbedFS, configSpec.EmbedFSDir)
-				if err != nil {
-					err = fmt.Errorf("BeforeCleanup failed: %v", err)
-					log.Error(err.Error())
-					errs = append(errs, err)
-					innerRC = 1
-				}
-				log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
+				runLifecycleHook("BeforeCleanup", job.BeforeCleanup, false, configSpec, &errs, &innerRC)
 			}
 			jobEnd := time.Now().UTC()
 			if job.MetricsClosing == "afterJob" {
@@ -272,6 +267,27 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 	}
 	return rc, utilerrors.NewAggregate(errs)
+}
+
+// runLifecycleHook runs a user-defined shell script for a specific lifecycle hook
+func runLifecycleHook(name string, script string, background bool, configSpec config.Spec, errs *[]error, rc *int) {
+	if script == "" {
+		return
+	}
+
+	if background {
+		log.Infof("Running %s command %s", name, script)
+	} else {
+		log.Infof("Waiting for %s command %s to finish", name, script)
+	}
+
+	_, _, err := util.RunShellCmd(script, configSpec.EmbedFS, configSpec.EmbedFSDir, background)
+	if err != nil {
+		err = fmt.Errorf("%s failed: %v", name, err)
+		log.Error(err.Error())
+		*errs = append(*errs, err)
+		*rc = 1
+	}
 }
 
 // If requests, preload the images used in the test into the node
