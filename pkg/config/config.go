@@ -103,6 +103,8 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnDelay:             5 * time.Minute,
 		ChurnDeletionStrategy:  "default",
 		MetricsClosing:         "afterJob",
+		EnableWatcher:          false,
+		WatchDuration:          1 * time.Hour,
 	}
 
 	if err := unmarshal(&raw); err != nil {

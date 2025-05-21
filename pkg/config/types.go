@@ -201,6 +201,10 @@ type Job struct {
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
 	// Execute objects in a job either parallel or sequential. Default: parallel
 	ExecutionMode ExecutionMode `yaml:"executionMode" json:"executionMode,omitempty"`
+	// Enables watchers in the read job
+	EnableWatcher bool `yaml:"enableWatcher"  json:"enableWatcher,omitempty"`
+	// Duration to keep watching. Only works when watcher is enabled in read job
+	WatchDuration time.Duration `yaml:"watchDuration" json:"watchDuration,omitempty"`
 	// ObjectDelay how much time to wait between objects processing in patch jobs
 	ObjectDelay time.Duration `yaml:"objectDelay" json:"objectDelay,omitempty"`
 	// ObjectWait wait for each object to complete before processing the next one
