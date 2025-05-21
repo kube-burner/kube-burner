@@ -19,9 +19,10 @@ import (
 	"embed"
 	"os/exec"
 	"strings"
+	"syscall"
 )
 
-func RunShellCmd(shellCmdLine string, configEmbedFS *embed.FS, configEmbedFSDir string) (*bytes.Buffer, *bytes.Buffer, error) {
+func RunShellCmd(shellCmdLine string, configEmbedFS *embed.FS, configEmbedFSDir string, background bool) (*bytes.Buffer, *bytes.Buffer, error) {
 	// Split the shell script from its args
 	parts := strings.Split(shellCmdLine, " ")
 
@@ -47,6 +48,15 @@ func RunShellCmd(shellCmdLine string, configEmbedFS *embed.FS, configEmbedFSDir 
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb
+
+	if background {
+		// Fully detach from parent so the child keeps running if Go process exits
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true,
+		}
+		err = cmd.Start()
+		return &outb, &errb, err
+	}
 
 	// Run the command and return its return and outputs
 	err = cmd.Run()

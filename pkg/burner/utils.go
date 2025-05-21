@@ -204,7 +204,7 @@ func (ex *Executor) getItemListForObject(obj *object) (*unstructured.Unstructure
 			log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
 			return false, nil
 		}
-		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
+		log.Infof("Found %d %s with selector %s", len(itemList.Items), obj.gvr.Resource, labelSelector)
 		return true, nil
 	}, 1*time.Second, 3, 0, ex.MaxWaitTimeout)
 	if err != nil {
@@ -219,31 +219,37 @@ func (ex *Executor) runSequential(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
-			itemList, err := ex.getItemListForObject(obj)
-			if err != nil {
-				continue
-			}
 			var wg sync.WaitGroup
-			objectTimeUTC := time.Now().UTC().Unix()
-			for _, item := range itemList.Items {
+			if ex.EnableWatcher {
 				wg.Add(1)
-				go ex.itemHandler(ex, obj, item, i, objectTimeUTC, &wg)
-			}
-			// Wait for all items in the object
-			wg.Wait()
+				go ex.itemHandler(ex, obj, unstructured.Unstructured{}, 0, 0, &wg)
+				continue
+			} else {
+				itemList, err := ex.getItemListForObject(obj)
+				if err != nil {
+					continue
+				}
+				objectTimeUTC := time.Now().UTC().Unix()
+				for _, item := range itemList.Items {
+					wg.Add(1)
+					go ex.itemHandler(ex, obj, item, i, objectTimeUTC, &wg)
+				}
+				// Wait for all items in the object
+				wg.Wait()
 
-			// If requested, wait for the completion of the specific object
-			if ex.ObjectWait {
-				ex.waitForObject("", obj)
-			}
+				// If requested, wait for the completion of the specific object
+				if ex.ObjectWait {
+					ex.waitForObject("", obj)
+				}
 
-			if ex.objectFinalizer != nil {
-				ex.objectFinalizer(ex, obj)
-			}
-			// Wait between object
-			if ex.ObjectDelay > 0 {
-				log.Infof("Sleeping between objects for %v", ex.ObjectDelay)
-				time.Sleep(ex.ObjectDelay)
+				if ex.objectFinalizer != nil {
+					ex.objectFinalizer(ex, obj)
+				}
+				// Wait between object
+				if ex.ObjectDelay > 0 {
+					log.Infof("Sleeping between objects for %v", ex.ObjectDelay)
+					time.Sleep(ex.ObjectDelay)
+				}
 			}
 		}
 		if ex.WaitWhenFinished {
@@ -271,15 +277,21 @@ func (ex *Executor) runParallel(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		itemList, err := ex.getItemListForObject(obj)
-		if err != nil {
+		if ex.EnableWatcher {
+			wg.Add(1)
+			go ex.itemHandler(ex, obj, unstructured.Unstructured{}, 0, 0, &wg)
 			continue
-		}
-		for j := 0; j < ex.JobIterations; j++ {
-			objectTimeUTC := time.Now().UTC().Unix()
-			for _, item := range itemList.Items {
-				wg.Add(1)
-				go ex.itemHandler(ex, obj, item, j, objectTimeUTC, &wg)
+		} else {
+			itemList, err := ex.getItemListForObject(obj)
+			if err != nil {
+				continue
+			}
+			for j := 0; j < ex.JobIterations; j++ {
+				objectTimeUTC := time.Now().UTC().Unix()
+				for _, item := range itemList.Items {
+					wg.Add(1)
+					go ex.itemHandler(ex, obj, item, j, objectTimeUTC, &wg)
+				}
 			}
 		}
 	}
