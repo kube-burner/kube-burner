@@ -142,6 +142,8 @@ type Job struct {
 	JobIterationDelay time.Duration `yaml:"jobIterationDelay" json:"jobIterationDelay,omitempty"`
 	// JobPause how much time to pause after finishing the job
 	JobPause time.Duration `yaml:"jobPause" json:"jobPause,omitempty"`
+	// BeforeExecution allows to trigger a bash script in the background before the workload.
+	BeforeExecution string `yaml:"beforeExecution" json:"beforeExecution,omitempty"`
 	// BeforeCleanup allows to run a bash script before the workload is deleted.
 	BeforeCleanup string `yaml:"beforeCleanup" json:"beforeCleanup,omitempty"`
 	// Name job name
