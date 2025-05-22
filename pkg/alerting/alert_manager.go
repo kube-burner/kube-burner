@@ -18,9 +18,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
-	"path"
 	"strings"
 	"text/template"
 	"time"
@@ -28,6 +28,7 @@ import (
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -100,7 +101,13 @@ func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.
 }
 
 func (a *AlertManager) readProfile(alertProfileCfg string) error {
-	f, err := util.GetReader(alertProfileCfg, a.prometheus.ConfigSpec.EmbedFS, path.Dir(a.prometheus.ConfigSpec.EmbedFSDir))
+	var err error
+	var f io.Reader
+	if fileutils.EmbedCfg.FS != nil {
+		f, err = fileutils.GetAlertsReader(alertProfileCfg)
+	} else {
+		f, err = fileutils.GetReader(alertProfileCfg)
+	}
 	if err != nil {
 		return fmt.Errorf("error reading alert profile %s: %s", alertProfileCfg, err)
 	}

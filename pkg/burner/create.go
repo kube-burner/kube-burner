@@ -28,6 +28,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +38,8 @@ import (
 )
 
 func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMapper) {
+	var err error
+	var f io.Reader
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
@@ -44,7 +47,11 @@ func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMappe
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		f, err := util.GetReader(o.ObjectTemplate, configSpec.EmbedFS, configSpec.EmbedFSDir)
+		if fileutils.EmbedCfg.FS != nil {
+			f, err = fileutils.GetWorkloadReader(o.ObjectTemplate)
+		} else {
+			f, err = fileutils.GetReader(o.ObjectTemplate)
+		}
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}

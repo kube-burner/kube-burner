@@ -31,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -85,8 +86,6 @@ type ProxyResponse struct {
 
 type netpolLatency struct {
 	BaseMeasurement
-	embedFS    *embed.FS
-	embedFSDir string
 }
 
 type netpolMetric struct {
@@ -103,23 +102,17 @@ type netpolMetric struct {
 
 type netpolLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
-	embedFS    *embed.FS
-	embedFSDir string
 }
 
 func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
 	return netpolLatencyMeasurementFactory{
 		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
-		embedFS:                configSpec.EmbedFS,
-		embedFSDir:             configSpec.EmbedFSDir,
 	}, nil
 }
 
 func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *kconfig.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &netpolLatency{
 		BaseMeasurement: nplmf.NewBaseLatency(jobConfig, clientSet, restConfig, netpolLatencyMeasurement, netpolLatencyQuantilesMeasurement),
-		embedFS:         nplmf.embedFS,
-		embedFSDir:      nplmf.embedFSDir,
 	}
 }
 
@@ -237,7 +230,7 @@ func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig
 func (n *netpolLatency) prepareConnections() {
 	// Reset latency slices, required in multi-job benchmarks
 	for _, obj := range n.JobConfig.Objects {
-		cleanTemplate, err := readTemplate(obj, n.embedFS, n.embedFSDir)
+		cleanTemplate, err := readTemplate(obj, fileutils.EmbedCfg.FS)
 		if err != nil {
 			log.Fatalf("Error in readTemplate %s: %s", obj.ObjectTemplate, err)
 		}
@@ -446,8 +439,14 @@ func (n *netpolLatency) processResults() {
 }
 
 // Read network policy object template
-func readTemplate(o kconfig.Object, embedFS *embed.FS, embedFSDir string) ([]byte, error) {
-	f, err := kutil.GetReader(o.ObjectTemplate, embedFS, embedFSDir)
+func readTemplate(o kconfig.Object, embedFS *embed.FS) ([]byte, error) {
+	var err error
+	var f io.Reader
+	if fileutils.EmbedCfg.FS != nil {
+		f, err = fileutils.GetWorkloadReader(o.ObjectTemplate)
+	} else {
+		f, err = fileutils.GetReader(o.ObjectTemplate)
+	}
 	if err != nil {
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 	}

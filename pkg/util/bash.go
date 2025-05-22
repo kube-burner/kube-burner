@@ -16,17 +16,18 @@ package util
 
 import (
 	"bytes"
-	"embed"
 	"os/exec"
 	"strings"
+
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
-func RunShellCmd(shellCmdLine string, configEmbedFS *embed.FS, configEmbedFSDir string) (*bytes.Buffer, *bytes.Buffer, error) {
+func RunShellCmd(shellCmdLine string) (*bytes.Buffer, *bytes.Buffer, error) {
 	// Split the shell script from its args
 	parts := strings.Split(shellCmdLine, " ")
 
 	// Get a reader (embedded, local or remote) for the contents of the file
-	shellScriptReader, err := GetReader(parts[0], configEmbedFS, configEmbedFSDir)
+	shellScriptReader, err := fileutils.GetReader(parts[0])
 	if err != nil {
 		return nil, nil, err
 	}
