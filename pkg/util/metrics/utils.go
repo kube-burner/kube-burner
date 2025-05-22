@@ -20,6 +20,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -27,7 +28,7 @@ import (
 // Decodes metrics endpoint yaml file
 func DecodeMetricsEndpoint(metricsEndpointPath string) []config.MetricsEndpoint {
 	var metricsEndpoints []config.MetricsEndpoint
-	f, err := util.GetReader(metricsEndpointPath, nil, "")
+	f, err := fileutils.GetReader(metricsEndpointPath)
 	if err != nil {
 		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpointPath, err)
 	}

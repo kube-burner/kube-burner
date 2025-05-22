@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
 type object struct {
@@ -57,7 +57,7 @@ func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper
 
 	if obj.ObjectTemplate != "" {
 		log.Debugf("Rendering template: %s", obj.ObjectTemplate)
-		f, err := util.GetReader(obj.ObjectTemplate, configSpec.EmbedFS, configSpec.EmbedFSDir)
+		f, err := fileutils.GetReader(obj.ObjectTemplate)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
 		}
