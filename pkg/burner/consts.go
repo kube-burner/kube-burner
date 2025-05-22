@@ -16,6 +16,7 @@ const (
 	PersistentVolumeClaim            = "PersistentVolumeClaim"
 	VolumeSnapshot                   = "VolumeSnapshot"
 	DataVolume                       = "DataVolume"
+	DataSource                       = "DataSource"
 )
 
 type statusPath struct {

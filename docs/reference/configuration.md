@@ -59,13 +59,13 @@ Using function templates we can define a block of code as function and reuse it 
 ```
 env:
 - name: ENVVAR1_{{.name}}
-  value: {{.envVar}} 
+  value: {{.envVar}}
 - name: ENVVAR2_{{.name}}
-  value: {{.envVar}} 
+  value: {{.envVar}}
 - name: ENVVAR3_{{.name}}
-  value: {{.envVar}} 
+  value: {{.envVar}}
 - name: ENVVAR4_{{.name}}
-  value: {{.envVar}} 
+  value: {{.envVar}}
 ```
 Now I want to modularize and use it in my code. In order to do that, I will create a template **envs.tpl** as below.
 ```
@@ -83,7 +83,7 @@ global:
 ```
 Final step is to invoke this function with required parameters to make sure it replaces the redundant code in our **deployment.yaml** file.
 ```
-env: 
+env:
 {{- template "env_func" (dict "name" .name "envVar" .envVar "n" 4 "indent" 8) }}
 ```
 We are all set! We should have our function rendered at the runtime and can be reused in future as well.
@@ -160,6 +160,26 @@ Each object element supports the following parameters:
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
+
+### Built-in support for object waiters
+
+The following object types have built-in waiters:
+- StatefulSet
+- Deployment
+- DaemonSet
+- ReplicaSet
+- Job
+- Pod
+- ReplicationController
+- Build
+- BuildConfig
+- VirtualMachine
+- VirtualMachineInstance
+- VirtualMachineInstanceReplicaSet
+- PersistentVolumeClaim
+- VolumeSnapshot
+- DataVolume
+- DataSource
 
 !!! info
     Find more info about the waiters implementation in the `pkg/burner/waiters.go` file

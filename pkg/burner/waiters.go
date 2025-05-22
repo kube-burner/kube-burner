@@ -56,6 +56,11 @@ var (
 			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
 			timeGreaterThan:      false,
 		},
+		DataSource: {
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
 	}
 )
 
