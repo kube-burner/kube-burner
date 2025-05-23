@@ -34,7 +34,7 @@ type object struct {
 	ready      bool
 }
 
-func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper, defaultAPIVersion string) *object {
+func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion string) *object {
 	if obj.APIVersion == "" {
 		obj.APIVersion = defaultAPIVersion
 	}

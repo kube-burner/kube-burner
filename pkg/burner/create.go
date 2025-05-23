@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMapper) {
+func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
 	var err error
 	var f io.Reader
 	log.Debugf("Preparing create job: %s", ex.Name)

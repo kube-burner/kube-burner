@@ -17,7 +17,6 @@ package measurements
 import (
 	"bytes"
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -230,7 +229,7 @@ func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig
 func (n *netpolLatency) prepareConnections() {
 	// Reset latency slices, required in multi-job benchmarks
 	for _, obj := range n.JobConfig.Objects {
-		cleanTemplate, err := readTemplate(obj, fileutils.EmbedCfg.FS)
+		cleanTemplate, err := readTemplate(obj)
 		if err != nil {
 			log.Fatalf("Error in readTemplate %s: %s", obj.ObjectTemplate, err)
 		}
@@ -439,7 +438,7 @@ func (n *netpolLatency) processResults() {
 }
 
 // Read network policy object template
-func readTemplate(o kconfig.Object, embedFS *embed.FS) ([]byte, error) {
+func readTemplate(o kconfig.Object) ([]byte, error) {
 	var err error
 	var f io.Reader
 	if fileutils.EmbedCfg.FS != nil {

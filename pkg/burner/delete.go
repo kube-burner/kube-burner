@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (ex *Executor) setupDeleteJob(configSpec config.Spec, mapper meta.RESTMapper) {
+func (ex *Executor) setupDeleteJob(mapper meta.RESTMapper) {
 	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
@@ -42,7 +42,7 @@ func (ex *Executor) setupDeleteJob(configSpec config.Spec, mapper meta.RESTMappe
 	ex.WaitWhenFinished = false
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, APIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1))
 	}
 }
 
