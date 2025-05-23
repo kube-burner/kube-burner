@@ -31,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -102,13 +103,13 @@ func initCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			configFileReader, err := util.GetReader(configFile, nil, "")
+			configFileReader, err := fileutils.GetReader(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
 			var userDataFileReader io.Reader
 			if userDataFile != "" {
-				userDataFileReader, err = util.GetReader(userDataFile, nil, "")
+				userDataFileReader, err = fileutils.GetReader(userDataFile)
 				if err != nil {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
@@ -228,7 +229,7 @@ func measureCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
-			f, err := util.GetReader(configFile, nil, "")
+			f, err := fileutils.GetReader(configFile)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}

@@ -148,7 +148,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
-				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup, configSpec.EmbedFS, configSpec.EmbedFSDir)
+				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup)
 				if err != nil {
 					err = fmt.Errorf("BeforeCleanup failed: %v", err)
 					log.Error(err.Error())
