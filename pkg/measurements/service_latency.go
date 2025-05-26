@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
@@ -28,7 +27,6 @@ import (
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	lcorev1 "k8s.io/client-go/listers/core/v1"
@@ -44,13 +42,8 @@ const (
 type serviceLatency struct {
 	BaseMeasurement
 
-	svcWatcher       *metrics.Watcher
-	epWatcher        *metrics.Watcher
-	epLister         lcorev1.EndpointsLister
-	svcLister        lcorev1.ServiceLister
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
+	epLister  lcorev1.EndpointsLister
+	svcLister lcorev1.ServiceLister
 }
 
 type svcMetric struct {
@@ -82,7 +75,7 @@ func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement typ
 
 func (slmf serviceLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &serviceLatency{
-		BaseMeasurement: slmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: slmf.NewBaseLatency(jobConfig, clientSet, restConfig, svcLatencyMeasurement, svcLatencyQuantilesMeasurement),
 	}
 }
 
@@ -173,37 +166,28 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("Creating service latency watcher for %s", s.JobConfig.Name)
-	s.svcWatcher = metrics.NewWatcher(
-		s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-		"svcWatcher",
-		"services",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", s.Runid)
+	s.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				name:          "svcWatcher",
+				resource:      "services",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", s.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: s.handleCreateSvc,
+				},
+			},
+			{
+				restClient:    s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				name:          "epWatcher",
+				resource:      "endpoints",
+				labelSelector: "",
+				handlers:      nil,
+			},
 		},
-		cache.Indexers{},
 	)
-	s.svcWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: s.handleCreateSvc,
-	})
-	s.epWatcher = metrics.NewWatcher(
-		s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-		"epWatcher",
-		"endpoints",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {},
-		cache.Indexers{},
-	)
-	// Use an endpoints lister to reduce and optimize API interactions in waitForEndpoints
-	s.svcLister = lcorev1.NewServiceLister(s.svcWatcher.Informer.GetIndexer())
-	s.epLister = lcorev1.NewEndpointsLister(s.epWatcher.Informer.GetIndexer())
-	if err := s.svcWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Service Latency measurement error: %s", err)
-	}
-	if err := s.epWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Service Latency measurement error: %s", err)
-	}
+	s.svcLister = lcorev1.NewServiceLister(s.watchers[0].Informer.GetIndexer())
+	s.epLister = lcorev1.NewEndpointsLister(s.watchers[1].Informer.GetIndexer())
 	return nil
 }
 
@@ -212,8 +196,7 @@ func (s *serviceLatency) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
-		s.svcWatcher.StopWatcher()
-		s.epWatcher.StopWatcher()
+		s.stopWatchers()
 	}()
 	kutil.CleanupNamespaces(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
@@ -254,18 +237,6 @@ func (s *serviceLatency) normalizeMetrics() {
 	if len(ipAssignedLatencies) > 0 {
 		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("IPAssigned", ipAssignedLatencies))
 	}
-}
-
-func (s *serviceLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		svcLatencyMeasurement:          s.normLatencies,
-		svcLatencyQuantilesMeasurement: s.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(s.Config, jobName, metricMap, indexerList)
-}
-
-func (s *serviceLatency) GetMetrics() *sync.Map {
-	return &s.metrics
 }
 
 func (s *serviceLatency) waitForEndpoints(svc *corev1.Service) error {
