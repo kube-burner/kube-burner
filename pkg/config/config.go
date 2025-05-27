@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -121,9 +122,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 func getInputData(userDataFileReader io.Reader, additionalVars map[string]interface{}) (map[string]interface{}, error) {
 	inputData := make(map[string]interface{})
 	// First copy from additionalVars
-	for key, value := range additionalVars {
-		inputData[key] = value
-	}
+	maps.Copy(inputData, additionalVars)
 	// If a userDataFileReader was provided use it to override values
 	if userDataFileReader != nil {
 		userDataFileVars := make(map[string]interface{})
@@ -135,14 +134,10 @@ func getInputData(userDataFileReader io.Reader, additionalVars map[string]interf
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse file: %w", err)
 		}
-		for key, value := range userDataFileVars {
-			inputData[key] = value
-		}
+		maps.Copy(inputData, userDataFileVars)
 	}
 	// Add all entries from environment variables, overriding duplicates
-	for key, value := range util.EnvToMap() {
-		inputData[key] = value
-	}
+	maps.Copy(inputData, util.EnvToMap())
 	return inputData, nil
 }
 
@@ -178,6 +173,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		return configSpec, err
 	}
 	if err := validateDNS1123(); err != nil {
+		return configSpec, err
+	}
+	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
 	for i, job := range configSpec.Jobs {
@@ -297,6 +295,16 @@ func jobIsDuped() error {
 		jobCount[job.Name]++
 		if jobCount[job.Name] > 1 {
 			return fmt.Errorf("Job names must be unique")
+		}
+	}
+	return nil
+}
+
+// validateGC checks if GC and global waitWhenFinished are enabled at the same time
+func validateGC() error {
+	for _, job := range configSpec.Jobs {
+		if job.GC && configSpec.GlobalConfig.WaitWhenFinished {
+			return fmt.Errorf("Jobs GC and global waitWhenFinished cannot be enabled at the same time")
 		}
 	}
 	return nil
