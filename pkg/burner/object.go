@@ -57,7 +57,7 @@ func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion stri
 
 	if obj.ObjectTemplate != "" {
 		log.Debugf("Rendering template: %s", obj.ObjectTemplate)
-		f, err := fileutils.GetReader(obj.ObjectTemplate)
+		f, err := fileutils.GetMetricsReader(obj.ObjectTemplate, nil)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
 		}

@@ -45,36 +45,44 @@ func NewEmbedConfiguration(embedFS *embed.FS, embedWorkloadsDir, embedMetricsDir
 }
 
 func GetWorkloadReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
-	return getEmbedReader(location, embedCfg.fs, embedCfg.workloadsDir)
+	if embedCfg != nil {
+		return getEmbedReader(location, embedCfg.fs, embedCfg.workloadsDir)
+	}
+	return getReader(location)
 }
 
 func GetMetricsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
-	return getEmbedReader(location, embedCfg.fs, embedCfg.metricsDir)
+	if embedCfg != nil {
+		return getEmbedReader(location, embedCfg.fs, embedCfg.metricsDir)
+	}
+	return getReader(location)
 }
 
 func GetAlertsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
-	return getEmbedReader(location, embedCfg.fs, embedCfg.alertsDir)
+	if embedCfg != nil {
+		return getEmbedReader(location, embedCfg.fs, embedCfg.alertsDir)
+	}
+	return getReader(location)
 }
 
 func GetScriptsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
-	return getEmbedReader(location, embedCfg.fs, embedCfg.scriptsDir)
+	if embedCfg != nil {
+		return getEmbedReader(location, embedCfg.fs, embedCfg.scriptsDir)
+	}
+	return getReader(location)
 }
 
 func getEmbedReader(location string, embedFS *embed.FS, embedDir string) (io.Reader, error) {
-	if embedFS != nil {
-		log.Debugf("Looking for file %s in embed fs", location)
-		f, err := embedFS.Open(filepath.Join(embedDir, location))
-		if err != nil {
-			log.Infof("File %s not found in the embedded filesystem. Falling back to original path", location)
-			return GetReader(location)
-		}
-		return f, nil
-
+	log.Debugf("Looking for file %s in embed fs", location)
+	f, err := embedFS.Open(filepath.Join(embedDir, location))
+	if err != nil {
+		log.Infof("File %s not found in the embedded filesystem. Falling back to original path", location)
+		return getReader(location)
 	}
-	return GetReader(location)
+	return f, nil
 }
 
-func GetReader(location string) (io.Reader, error) {
+func getReader(location string) (io.Reader, error) {
 	var f io.Reader
 	u, err := url.Parse(location)
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
