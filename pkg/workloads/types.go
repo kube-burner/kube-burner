@@ -37,5 +37,5 @@ type WorkloadHelper struct {
 	MetadataAgent      ocpmetadata.Metadata
 	SummaryMetadata    map[string]interface{}
 	MetricsMetadata    map[string]interface{}
-	EmbedCfg           *fileutils.EmbedConfiguration
+	embedCfg           *fileutils.EmbedConfiguration
 }

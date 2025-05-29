@@ -9,7 +9,7 @@ There're some helper functions meant to be consumed by wrappers in the `workload
 In order to start a new wrapper you need to instantiate a new `WorkloadHelper` by calling `workloads.NewWorkloadHelper()`.
 
 ```golang
-wh := workloads.NewWorkloadHelper(config.Config, embedFS, "workloads", "metrics", "alerts", &config.KubeClientProvider)
+wh := workloads.NewWorkloadHelper(config.Config, embedFS, "workloads", "metrics", "alerts", "scripts", &config.KubeClientProvider)
 returnCode := wh.Run("workload.yaml")
 ```
 

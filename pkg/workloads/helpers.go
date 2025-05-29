@@ -50,7 +50,7 @@ func NewWorkloadHelper(config Config, embedFS *embed.FS, workloadDir, metricsDir
 		kubeClientProvider: kubeClientProvider,
 		MetricsMetadata:    make(map[string]any),
 		SummaryMetadata:    make(map[string]any),
-		EmbedCfg:           embedCfg,
+		embedCfg:           embedCfg,
 	}
 	return wh
 }
@@ -76,7 +76,7 @@ func (wh *WorkloadHelper) Run(configFile string) int {
 // Returns:
 //   - An integer representing the result of the workload execution.
 func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVars map[string]any, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) int {
-	f, err := fileutils.GetWorkloadReader(configFile, wh.EmbedCfg)
+	f, err := fileutils.GetWorkloadReader(configFile, wh.embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading configuration file: %v", err.Error())
 	}
@@ -96,7 +96,7 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVar
 		MetricsMetadata: wh.MetricsMetadata,
 		UserMetaData:    wh.UserMetadata,
 	})
-	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, additionalMeasurementFactoryMap, wh.EmbedCfg)
+	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, additionalMeasurementFactoryMap, wh.embedCfg)
 	if err != nil {
 		log.Error(err.Error())
 	}
