@@ -19,6 +19,7 @@ import (
 
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/v2/ocp-metadata"
 	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
 type Config struct {
@@ -36,4 +37,5 @@ type WorkloadHelper struct {
 	MetadataAgent      ocpmetadata.Metadata
 	SummaryMetadata    map[string]interface{}
 	MetricsMetadata    map[string]interface{}
+	EmbedCfg           *fileutils.EmbedConfiguration
 }

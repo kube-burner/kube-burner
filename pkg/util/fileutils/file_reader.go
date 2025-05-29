@@ -26,38 +26,44 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type embedConfiguration struct {
-	FS           *embed.FS
-	WorkloadsDir string
-	MetricsDir   string
-	AlertsDir    string
+type EmbedConfiguration struct {
+	fs           *embed.FS
+	workloadsDir string
+	metricsDir   string
+	alertsDir    string
+	scriptsDir   string
 }
 
-var EmbedCfg embedConfiguration
-
-func SetEmbedConfiguration(embedFS *embed.FS, embedWorkloadsDir, embedMetricsDir, embedAlertsDir string) {
-	EmbedCfg.FS = embedFS
-	EmbedCfg.WorkloadsDir = embedWorkloadsDir
-	EmbedCfg.MetricsDir = embedMetricsDir
-	EmbedCfg.AlertsDir = embedAlertsDir
+func NewEmbedConfiguration(embedFS *embed.FS, embedWorkloadsDir, embedMetricsDir, embedAlertsDir, scriptsDir string) *EmbedConfiguration {
+	return &EmbedConfiguration{
+		fs:           embedFS,
+		workloadsDir: embedWorkloadsDir,
+		metricsDir:   embedMetricsDir,
+		alertsDir:    embedAlertsDir,
+		scriptsDir:   scriptsDir,
+	}
 }
 
-func GetWorkloadReader(location string) (io.Reader, error) {
-	return getEmbedReader(location, EmbedCfg.WorkloadsDir)
+func GetWorkloadReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
+	return getEmbedReader(location, embedCfg.fs, embedCfg.workloadsDir)
 }
 
-func GetMetricsReader(location string) (io.Reader, error) {
-	return getEmbedReader(location, EmbedCfg.MetricsDir)
+func GetMetricsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
+	return getEmbedReader(location, embedCfg.fs, embedCfg.metricsDir)
 }
 
-func GetAlertsReader(location string) (io.Reader, error) {
-	return getEmbedReader(location, EmbedCfg.AlertsDir)
+func GetAlertsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
+	return getEmbedReader(location, embedCfg.fs, embedCfg.alertsDir)
 }
 
-func getEmbedReader(location, prefix string) (io.Reader, error) {
-	if EmbedCfg.FS != nil {
+func GetScriptsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
+	return getEmbedReader(location, embedCfg.fs, embedCfg.scriptsDir)
+}
+
+func getEmbedReader(location string, embedFS *embed.FS, embedDir string) (io.Reader, error) {
+	if embedFS != nil {
 		log.Debugf("Looking for file %s in embed fs", location)
-		f, err := EmbedCfg.FS.Open(filepath.Join(prefix, location))
+		f, err := embedFS.Open(filepath.Join(embedDir, location))
 		if err != nil {
 			log.Infof("File %s not found in the embedded filesystem. Falling back to original path", location)
 			return GetReader(location)

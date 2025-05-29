@@ -28,6 +28,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -66,7 +67,7 @@ var (
 // - error
 //
 //nolint:gocyclo
-func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) (int, error) {
+func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory, embedCfg *fileutils.EmbedConfiguration) (int, error) {
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
@@ -87,7 +88,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	go func() {
 		var innerRC int
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
-		jobList = newExecutorList(configSpec, kubeClientProvider)
+		jobList = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		handlePreloadImages(jobList, kubeClientProvider)
 		// Iterate job list
 		var measurementsInstance *measurements.Measurements
@@ -148,7 +149,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
-				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup)
+				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup, job.embedCfg)
 				if err != nil {
 					err = fmt.Errorf("BeforeCleanup failed: %v", err)
 					log.Error(err.Error())
@@ -348,11 +349,11 @@ func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) []Executor {
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration) []Executor {
 	var executorList []Executor
 	for _, job := range configSpec.Jobs {
 		verifyJobDefaults(&job, configSpec.GlobalConfig.Timeout)
-		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job))
+		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job, embedCfg))
 	}
 	return executorList
 }

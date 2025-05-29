@@ -22,6 +22,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ import (
 
 type BaseMeasurement struct {
 	Config                   types.Measurement
+	embedCfg                 *fileutils.EmbedConfiguration
 	Uuid                     string
 	Runid                    string
 	JobConfig                *config.Job

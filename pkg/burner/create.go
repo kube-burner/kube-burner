@@ -49,11 +49,7 @@ func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		if fileutils.EmbedCfg.FS != nil {
-			f, err = fileutils.GetWorkloadReader(o.ObjectTemplate)
-		} else {
-			f, err = fileutils.GetReader(o.ObjectTemplate)
-		}
+		f, err = fileutils.GetWorkloadReader(o.ObjectTemplate, ex.embedCfg)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}

@@ -128,14 +128,10 @@ func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.
 }
 
 // ReadProfile reads, parses and validates metric profile configuration
-func (p *Prometheus) ReadProfile(location string) error {
+func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfiguration) error {
 	var err error
 	var f io.Reader
-	if fileutils.EmbedCfg.FS != nil {
-		f, err = fileutils.GetMetricsReader(location)
-	} else {
-		f, err = fileutils.GetReader(location)
-	}
+	f, err = fileutils.GetMetricsReader(location, embedCfg)
 	if err != nil {
 		return fmt.Errorf("error reading metrics profile %s: %s", location, err)
 	}

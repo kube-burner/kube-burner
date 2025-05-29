@@ -130,7 +130,7 @@ func initCmd() *cobra.Command {
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil)
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil, nil)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(rc)
@@ -473,7 +473,7 @@ func alertCmd() *cobra.Command {
 				Start: time.Unix(start, 0),
 				End:   time.Unix(end, 0),
 			}
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil, nil); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(job)

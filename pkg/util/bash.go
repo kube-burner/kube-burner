@@ -22,12 +22,12 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
-func RunShellCmd(shellCmdLine string) (*bytes.Buffer, *bytes.Buffer, error) {
+func RunShellCmd(shellCmdLine string, embedCfg *fileutils.EmbedConfiguration) (*bytes.Buffer, *bytes.Buffer, error) {
 	// Split the shell script from its args
 	parts := strings.Split(shellCmdLine, " ")
 
 	// Get a reader (embedded, local or remote) for the contents of the file
-	shellScriptReader, err := fileutils.GetReader(parts[0])
+	shellScriptReader, err := fileutils.GetScriptsReader(parts[0], embedCfg)
 	if err != nil {
 		return nil, nil, err
 	}
