@@ -26,6 +26,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"maps"
+
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
@@ -215,9 +217,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 		}
 		// make a copy of the labels map for each goroutine to prevent panic from concurrent read and write
 		copiedLabels := make(map[string]string)
-		for k, v := range labels {
-			copiedLabels[k] = v
-		}
+		maps.Copy(copiedLabels, labels)
 		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
 
 		wg.Add(1)
@@ -229,9 +229,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 			// Re-decode rendered object
 			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
 
-			for k, v := range newObject.GetLabels() {
-				copiedLabels[k] = v
-			}
+			maps.Copy(copiedLabels, newObject.GetLabels())
 			newObject.SetLabels(copiedLabels)
 			setMetadataLabels(newObject, copiedLabels)
 
