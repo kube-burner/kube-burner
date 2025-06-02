@@ -15,11 +15,11 @@
 package workloads
 
 import (
-	"embed"
 	"time"
 
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/v2/ocp-metadata"
 	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
 type Config struct {
@@ -27,16 +27,15 @@ type Config struct {
 	Timeout         time.Duration
 	MetricsEndpoint string
 	UserMetadata    string
-	ConfigDir       string
 	PrometheusURL   string
 	PrometheusToken string
 }
 
 type WorkloadHelper struct {
 	Config
-	embedConfig        *embed.FS
 	kubeClientProvider *config.KubeClientProvider
 	MetadataAgent      ocpmetadata.Metadata
 	SummaryMetadata    map[string]interface{}
 	MetricsMetadata    map[string]interface{}
+	embedCfg           *fileutils.EmbedConfiguration
 }
