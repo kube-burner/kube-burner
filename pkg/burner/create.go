@@ -96,12 +96,8 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	var wg sync.WaitGroup
 	var ns string
 	var err error
-	for label, value := range ex.NamespaceLabels {
-		nsLabels[label] = value
-	}
-	for annotation, value := range ex.NamespaceAnnotations {
-		nsAnnotations[annotation] = value
-	}
+	maps.Copy(nsLabels, ex.NamespaceLabels)
+	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
 		if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {

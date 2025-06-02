@@ -27,8 +27,8 @@ type ScraperConfig struct {
 	ConfigSpec      *config.Spec
 	MetricsEndpoint string
 	UserMetaData    string
-	SummaryMetadata map[string]interface{}
-	MetricsMetadata map[string]interface{}
+	SummaryMetadata map[string]any
+	MetricsMetadata map[string]any
 	MetricsProfile  string
 	AlertProfile    string
 	EmbedCfg        *fileutils.EmbedConfiguration
@@ -39,6 +39,6 @@ type Scraper struct {
 	PrometheusClients []*prometheus.Prometheus
 	AlertMs           []*alerting.AlertManager
 	IndexerList       map[string]indexers.Indexer
-	SummaryMetadata   map[string]interface{}
-	MetricsMetadata   map[string]interface{}
+	SummaryMetadata   map[string]any
+	MetricsMetadata   map[string]any
 }

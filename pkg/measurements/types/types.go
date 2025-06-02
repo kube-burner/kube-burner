@@ -23,7 +23,7 @@ const (
 )
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
-func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) error {
+func (m *Measurement) UnmarshalMeasurement(unmarshal func(any) error) error {
 	type rawMeasurement Measurement
 	measurement := rawMeasurement{
 		PProfDirectory: pprofDirectory,

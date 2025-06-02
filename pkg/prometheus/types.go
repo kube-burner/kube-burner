@@ -38,7 +38,7 @@ type Prometheus struct {
 	Step           time.Duration
 	UUID           string
 	ConfigSpec     config.Spec
-	metadata       map[string]interface{}
+	metadata       map[string]any
 	indexer        *indexers.Indexer
 }
 
@@ -72,5 +72,5 @@ type metric struct {
 	ChurnMetric bool              `json:"churnMetric,omitempty"`
 	MetricName  string            `json:"metricName,omitempty"`
 	JobName     string            `json:"jobName,omitempty"`
-	Metadata    interface{}       `json:"metadata,omitempty"`
+	Metadata    any               `json:"metadata,omitempty"`
 }

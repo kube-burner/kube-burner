@@ -56,14 +56,14 @@ type svcMetric struct {
 	Name              string             `json:"service"`
 	ServiceType       corev1.ServiceType `json:"type"`
 	JobName           string             `json:"jobName,omitempty"`
-	Metadata          interface{}        `json:"metadata,omitempty"`
+	Metadata          any                `json:"metadata,omitempty"`
 }
 
 type serviceLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	if measurement.ServiceTimeout == 0 {
 		return nil, fmt.Errorf("svcTimeout cannot be 0")
 	}
@@ -79,7 +79,7 @@ func (slmf serviceLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Jo
 	}
 }
 
-func (s *serviceLatency) handleCreateSvc(obj interface{}) {
+func (s *serviceLatency) handleCreateSvc(obj any) {
 	// TODO Magic annotation to skip service
 	svc := obj.(*corev1.Service)
 	if annotation, ok := svc.Annotations["kube-burner.io/service-latency"]; ok {
@@ -212,7 +212,7 @@ func (s *serviceLatency) normalizeMetrics() {
 	var latencies []float64
 	var ipAssignedLatencies []float64
 	sLen := 0
-	s.metrics.Range(func(key, value interface{}) bool {
+	s.metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(svcMetric)
 		latencies = append(latencies, float64(metric.ReadyLatency))

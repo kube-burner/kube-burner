@@ -209,7 +209,7 @@ func getVolumeSourceFromVolume(ex *Executor, volumeName, namespace string) (*kub
 	return nil, fmt.Errorf("volume %s is not a DataVolume or PersistentVolumeClaim", volumeName)
 }
 
-func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]interface{}) error {
+func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
@@ -294,7 +294,7 @@ func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]int
 	return nil
 }
 
-func removeVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]interface{}) error {
+func removeVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")

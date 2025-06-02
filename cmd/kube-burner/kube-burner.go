@@ -219,7 +219,7 @@ func measureCmd() *cobra.Command {
 	var userMetadata string
 	var kubeConfig, kubeContext string
 	indexerList := make(map[string]indexers.Indexer)
-	metadata := make(map[string]interface{})
+	metadata := make(map[string]any)
 	cmd := &cobra.Command{
 		Use:   "measure",
 		Short: "Take measurements for a given set of resources without running workload",

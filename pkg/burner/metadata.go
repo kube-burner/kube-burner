@@ -18,24 +18,26 @@ import (
 	"encoding/json"
 	"time"
 
+	"maps"
+
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
 
 type JobSummary struct {
-	Timestamp           time.Time              `json:"timestamp"`
-	EndTimestamp        time.Time              `json:"endTimestamp"`
-	ChurnStartTimestamp *time.Time             `json:"churnStartTimestamp,omitempty"`
-	ChurnEndTimestamp   *time.Time             `json:"churnEndTimestamp,omitempty"`
-	ElapsedTime         float64                `json:"elapsedTime"`
-	UUID                string                 `json:"uuid"`
-	MetricName          string                 `json:"metricName"`
-	JobConfig           config.Job             `json:"jobConfig"`
-	Version             string                 `json:"version,omitempty"`
-	Passed              bool                   `json:"passed"`
-	ExecutionErrors     string                 `json:"executionErrors,omitempty"`
-	Metadata            map[string]interface{} `json:"-"`
+	Timestamp           time.Time      `json:"timestamp"`
+	EndTimestamp        time.Time      `json:"endTimestamp"`
+	ChurnStartTimestamp *time.Time     `json:"churnStartTimestamp,omitempty"`
+	ChurnEndTimestamp   *time.Time     `json:"churnEndTimestamp,omitempty"`
+	ElapsedTime         float64        `json:"elapsedTime"`
+	UUID                string         `json:"uuid"`
+	MetricName          string         `json:"metricName"`
+	JobConfig           config.Job     `json:"jobConfig"`
+	Version             string         `json:"version,omitempty"`
+	Passed              bool           `json:"passed"`
+	ExecutionErrors     string         `json:"executionErrors,omitempty"`
+	Metadata            map[string]any `json:"-"`
 }
 
 const jobSummaryMetric = "jobSummary"
@@ -43,15 +45,13 @@ const jobSummaryMetric = "jobSummary"
 // IndexJobSummary indexes jobSummaries Generates and indexes a document with metadata information of the passed job
 func IndexJobSummary(jobSummaries []JobSummary, indexer indexers.Indexer) {
 	log.Info("Indexing job summaries")
-	var jobSummariesInt []interface{}
+	var jobSummariesInt []any
 	for _, summary := range jobSummaries {
 		summaryMap := make(map[string]any)
 		j, _ := json.Marshal(summary)
 		json.Unmarshal(j, &summaryMap)
 		summaryMap["metricName"] = jobSummaryMetric
-		for k, v := range summary.Metadata {
-			summaryMap[k] = v
-		}
+		maps.Copy(summaryMap, summary.Metadata)
 		jobSummariesInt = append(jobSummariesInt, summaryMap)
 	}
 	indexingOpts := indexers.IndexingOpts{

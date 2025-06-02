@@ -21,9 +21,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func ReadUserMetadata(inputFile string) (map[string]interface{}, error) {
+func ReadUserMetadata(inputFile string) (map[string]any, error) {
 	log.Infof("Reading provided user metadata from %s", inputFile)
-	userMetadata := make(map[string]interface{})
+	userMetadata := make(map[string]any)
 	f, err := os.Open(inputFile)
 	if err != nil {
 		return userMetadata, err

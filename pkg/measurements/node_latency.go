@@ -58,7 +58,7 @@ type NodeMetric struct {
 	JobName                   string            `json:"jobName,omitempty"`
 	Name                      string            `json:"nodeName"`
 	Labels                    map[string]string `json:"labels"`
-	Metadata                  interface{}       `json:"metadata,omitempty"`
+	Metadata                  any               `json:"metadata,omitempty"`
 }
 
 type nodeLatency struct {
@@ -69,7 +69,7 @@ type nodeLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedNodeConditions); err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (nlmf nodeLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, 
 	}
 }
 
-func (n *nodeLatency) handleCreateNode(obj interface{}) {
+func (n *nodeLatency) handleCreateNode(obj any) {
 	node := obj.(*corev1.Node)
 	labels := node.Labels
 	n.metrics.LoadOrStore(string(node.UID), NodeMetric{
@@ -98,7 +98,7 @@ func (n *nodeLatency) handleCreateNode(obj interface{}) {
 	})
 }
 
-func (n *nodeLatency) handleUpdateNode(obj interface{}) {
+func (n *nodeLatency) handleUpdateNode(obj any) {
 	node := obj.(*corev1.Node)
 	if value, exists := n.metrics.Load(string(node.UID)); exists {
 		nm := value.(NodeMetric)
@@ -143,7 +143,7 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 				labelSelector: "",
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNode,
-					UpdateFunc: func(oldObj, newObj interface{}) {
+					UpdateFunc: func(oldObj, newObj any) {
 						n.handleUpdateNode(newObj)
 					},
 				},
@@ -197,7 +197,7 @@ func (n *nodeLatency) Stop() error {
 }
 
 func (n *nodeLatency) normalizeLatencies() float64 {
-	n.metrics.Range(func(key, value interface{}) bool {
+	n.metrics.Range(func(key, value any) bool {
 		m := value.(NodeMetric)
 		// If a node does not reach the Ready state, we skip that node
 		if m.NodeReady.IsZero() {

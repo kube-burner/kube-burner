@@ -60,14 +60,14 @@ type dvMetric struct {
 	dvReady          time.Time
 	DVReadyLatency   int `json:"dvReadyLatency"`
 
-	MetricName   string      `json:"metricName"`
-	UUID         string      `json:"uuid"`
-	Namespace    string      `json:"namespace"`
-	Name         string      `json:"dvName"`
-	JobName      string      `json:"jobName,omitempty"`
-	JobIteration int         `json:"jobIteration"`
-	Replica      int         `json:"replica"`
-	Metadata     interface{} `json:"metadata,omitempty"`
+	MetricName   string `json:"metricName"`
+	UUID         string `json:"uuid"`
+	Namespace    string `json:"namespace"`
+	Name         string `json:"dvName"`
+	JobName      string `json:"jobName,omitempty"`
+	JobIteration int    `json:"jobIteration"`
+	Replica      int    `json:"replica"`
+	Metadata     any    `json:"metadata,omitempty"`
 }
 
 type dvLatency struct {
@@ -78,7 +78,7 @@ type dvLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedDvConditions); err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (dvlmf dvLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 	}
 }
 
-func (dv *dvLatency) handleCreateDV(obj interface{}) {
+func (dv *dvLatency) handleCreateDV(obj any) {
 	dataVolume := obj.(*cdiv1beta1.DataVolume)
 	dvLabels := dataVolume.GetLabels()
 	dv.metrics.LoadOrStore(string(dataVolume.UID), dvMetric{
@@ -109,7 +109,7 @@ func (dv *dvLatency) handleCreateDV(obj interface{}) {
 	})
 }
 
-func (dv *dvLatency) handleUpdateDV(obj interface{}) {
+func (dv *dvLatency) handleUpdateDV(obj any) {
 	dataVolume := obj.(*cdiv1beta1.DataVolume)
 	if value, exists := dv.metrics.Load(string(dataVolume.UID)); exists {
 		dvm := value.(dvMetric)
@@ -227,7 +227,7 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 	dataVolumeCount := 0
 	erroredDataVolumes := 0
 
-	dv.metrics.Range(func(key, value interface{}) bool {
+	dv.metrics.Range(func(key, value any) bool {
 		m := value.(dvMetric)
 		// Skip DataVolume if it did not reach the Ready state (this timestamp isn't set)
 		if m.dvReady.IsZero() {

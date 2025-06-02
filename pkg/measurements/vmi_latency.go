@@ -72,18 +72,18 @@ type vmiMetric struct {
 	vmiRunning                time.Time
 	VMIRunningLatency         int64 `json:"vmiRunningLatency"`
 	vmReady                   time.Time
-	VMReadyLatency            int64       `json:"vmReadyLatency"`
-	MetricName                string      `json:"metricName"`
-	UUID                      string      `json:"uuid"`
-	Namespace                 string      `json:"namespace"`
-	PodName                   string      `json:"podName,omitempty"`
-	VMName                    string      `json:"vmName,omitempty"`
-	VMIName                   string      `json:"vmiName,omitempty"`
-	NodeName                  string      `json:"nodeName"`
-	JobName                   string      `json:"jobName,omitempty"`
-	Metadata                  interface{} `json:"metadata,omitempty"`
-	JobIteration              int         `json:"jobIteration"`
-	Replica                   int         `json:"replica"`
+	VMReadyLatency            int64  `json:"vmReadyLatency"`
+	MetricName                string `json:"metricName"`
+	UUID                      string `json:"uuid"`
+	Namespace                 string `json:"namespace"`
+	PodName                   string `json:"podName,omitempty"`
+	VMName                    string `json:"vmName,omitempty"`
+	VMIName                   string `json:"vmiName,omitempty"`
+	NodeName                  string `json:"nodeName"`
+	JobName                   string `json:"jobName,omitempty"`
+	Metadata                  any    `json:"metadata,omitempty"`
+	JobIteration              int    `json:"jobIteration"`
+	Replica                   int    `json:"replica"`
 }
 
 type vmiLatency struct {
@@ -94,7 +94,7 @@ type vmiLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedVMIConditions); err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (vmilmf vmiLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job,
 	}
 }
 
-func (vmi *vmiLatency) handleCreateVM(obj interface{}) {
+func (vmi *vmiLatency) handleCreateVM(obj any) {
 	vm := obj.(*kvv1.VirtualMachine)
 	vmLabels := vm.GetLabels()
 	vmi.metrics.LoadOrStore(string(vm.UID), vmiMetric{
@@ -122,7 +122,7 @@ func (vmi *vmiLatency) handleCreateVM(obj interface{}) {
 	})
 }
 
-func (vmi *vmiLatency) handleUpdateVM(obj interface{}) {
+func (vmi *vmiLatency) handleUpdateVM(obj any) {
 	vm := obj.(*kvv1.VirtualMachine)
 	if vmM, ok := vmi.metrics.Load(string(vm.UID)); ok {
 		vmMetric := vmM.(vmiMetric)
@@ -139,7 +139,7 @@ func (vmi *vmiLatency) handleUpdateVM(obj interface{}) {
 	}
 }
 
-func (vmi *vmiLatency) handleCreateVMI(obj interface{}) {
+func (vmi *vmiLatency) handleCreateVMI(obj any) {
 	vmiObj := obj.(*kvv1.VirtualMachineInstance)
 	now := vmiObj.CreationTimestamp.UTC()
 	parentVMID := getParentVMMapID(vmiObj)
@@ -165,7 +165,7 @@ func (vmi *vmiLatency) handleCreateVMI(obj interface{}) {
 	}
 }
 
-func (vmi *vmiLatency) handleUpdateVMI(obj interface{}) {
+func (vmi *vmiLatency) handleUpdateVMI(obj any) {
 	vmiObj := obj.(*kvv1.VirtualMachineInstance)
 	// in case the parent is a VM object
 	mapID := getParentVMMapID(vmiObj)
@@ -198,7 +198,7 @@ func (vmi *vmiLatency) handleUpdateVMI(obj interface{}) {
 	}
 }
 
-func (vmi *vmiLatency) handleCreateVMIPod(obj interface{}) {
+func (vmi *vmiLatency) handleCreateVMIPod(obj any) {
 	pod := obj.(*corev1.Pod)
 	vmiName, err := getParentVMIName(pod)
 	if err != nil {
@@ -206,7 +206,7 @@ func (vmi *vmiLatency) handleCreateVMIPod(obj interface{}) {
 		return
 	}
 	// Iterate over all vmi metrics to get the one with the same VMI name
-	vmi.metrics.Range(func(k, v interface{}) bool {
+	vmi.metrics.Range(func(k, v any) bool {
 		vmiMetric := v.(vmiMetric)
 		if vmiMetric.VMIName == vmiName {
 			vmiMetric.PodName = pod.Name
@@ -217,7 +217,7 @@ func (vmi *vmiLatency) handleCreateVMIPod(obj interface{}) {
 	})
 }
 
-func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
+func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
 	pod := obj.(*corev1.Pod)
 	vmiName, err := getParentVMIName(pod)
 	if err != nil {
@@ -225,7 +225,7 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj interface{}) {
 		return
 	}
 	// Iterate over all vmi metrics to get the one with the same VMI name
-	vmi.metrics.Range(func(k, v interface{}) bool {
+	vmi.metrics.Range(func(k, v any) bool {
 		vmiMetric := v.(vmiMetric)
 		if vmiMetric.VMIName == vmiName {
 			if vmiMetric.podReady.IsZero() {
@@ -271,7 +271,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVM,
-					UpdateFunc: func(oldObj, newObj interface{}) {
+					UpdateFunc: func(oldObj, newObj any) {
 						vmi.handleUpdateVM(newObj)
 					},
 				},
@@ -283,7 +283,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMI,
-					UpdateFunc: func(oldObj, newObj interface{}) {
+					UpdateFunc: func(oldObj, newObj any) {
 						vmi.handleUpdateVMI(newObj)
 					},
 				},
@@ -300,7 +300,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				).String(),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMIPod,
-					UpdateFunc: func(oldObj, newObj interface{}) {
+					UpdateFunc: func(oldObj, newObj any) {
 						vmi.handleUpdateVMIPod(newObj)
 					},
 				},
@@ -343,7 +343,7 @@ func (vmi *vmiLatency) Stop() error {
 }
 
 func (vmi *vmiLatency) normalizeMetrics() float64 {
-	vmi.metrics.Range(func(key, value interface{}) bool {
+	vmi.metrics.Range(func(key, value any) bool {
 		m := value.(vmiMetric)
 		if m.vmiRunning.IsZero() {
 			log.Tracef("VMI %v latency ignored as it did not reach Running state", m.VMIName)

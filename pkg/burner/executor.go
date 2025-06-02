@@ -17,6 +17,8 @@ package burner
 import (
 	"sync"
 
+	"maps"
+
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
@@ -90,16 +92,14 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 
 func (ex *Executor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {
 	// Processing template
-	templateData := map[string]interface{}{
+	templateData := map[string]any{
 		jobName:      ex.Name,
 		jobIteration: iteration,
 		jobUUID:      ex.uuid,
 		jobRunId:     ex.runid,
 		replica:      replicaIndex,
 	}
-	for k, v := range obj.InputVars {
-		templateData[k] = v
-	}
+	maps.Copy(templateData, obj.InputVars)
 
 	templateOption := util.MissingKeyError
 	if ex.DefaultMissingKeysWithZero {
