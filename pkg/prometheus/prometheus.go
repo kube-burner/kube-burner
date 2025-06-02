@@ -17,7 +17,6 @@ package prometheus
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"math"
 	"text/template"
 	"time"
@@ -129,9 +128,7 @@ func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.
 
 // ReadProfile reads, parses and validates metric profile configuration
 func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfiguration) error {
-	var err error
-	var f io.Reader
-	f, err = fileutils.GetMetricsReader(location, embedCfg)
+	f, err := fileutils.GetMetricsReader(location, embedCfg)
 	if err != nil {
 		return fmt.Errorf("error reading metrics profile %s: %s", location, err)
 	}

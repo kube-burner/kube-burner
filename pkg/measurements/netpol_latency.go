@@ -439,9 +439,7 @@ func (n *netpolLatency) processResults() {
 
 // Read network policy object template
 func readTemplate(o kconfig.Object, embedCfg *fileutils.EmbedConfiguration) ([]byte, error) {
-	var err error
-	var f io.Reader
-	f, err = fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
+	f, err := fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 	}
