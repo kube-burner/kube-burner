@@ -8,7 +8,7 @@ Note: Many organizations and users actively contribute to the kube-burner commun
 
 | Organization | Contact | Status | Description of Use |
 | - | - | - | - |
-| - | - | ![production](https://img.shields.io/badge/-production-blue?style=flat) | - |
+| [Red Hat](https://www.redhat.com/en) | rpattath@redhat.com | ![production](https://img.shields.io/badge/-production-blue?style=flat) | Kube-burner is a highly reliable performance testing tool used to ensure the quality and stability of Red Hat Openshift at scale. The engineering team runs all the workloads under kube-burner on different cloud platforms on both self-managed and cloud services environments prior to the release of a new version of the product. The different workloads target different components of the products and helps uncover issues commonly seen on heavily loaded and scaled up enviroments, for example: resource consumption, latencies, etc. The team also contributes to the kube-burner project consistently which helps the workloads to keep up with the new features introduced to the product. Inclusion of this test coverage has contributed to gaining the trust of new and existing customers of the product.  |
 | - | - | ![internal](https://img.shields.io/badge/-internal-green?style=flat) | - |
 | - | - | ![development](https://img.shields.io/badge/-development-green?style=flat) | - |
 
