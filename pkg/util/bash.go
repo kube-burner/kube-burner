@@ -16,10 +16,11 @@ package util
 
 import (
 	"bytes"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"os/exec"
 	"strings"
 	"syscall"
+
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
 func RunShellCmd(shellCmdLine string, embedCfg *fileutils.EmbedConfiguration, background bool) (*bytes.Buffer, *bytes.Buffer, error) {
