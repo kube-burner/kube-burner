@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"path"
 	"text/template"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/cloud-bulldozer/go-commons/v2/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -127,13 +127,12 @@ func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.
 }
 
 // ReadProfile reads, parses and validates metric profile configuration
-func (p *Prometheus) ReadProfile(location string) error {
-	f, err := util.GetReader(location, p.ConfigSpec.EmbedFS, path.Dir(p.ConfigSpec.EmbedFSDir))
+func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfiguration) error {
+	f, err := fileutils.GetMetricsReader(location, embedCfg)
 	if err != nil {
 		return fmt.Errorf("error reading metrics profile %s: %s", location, err)
 	}
 	p.profileName = location
-
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
 	metricProfile := metricProfile{

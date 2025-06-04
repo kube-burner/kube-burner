@@ -21,10 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -34,7 +32,6 @@ import (
 	"kubevirt.io/client-go/kubecli"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 )
 
@@ -69,11 +66,6 @@ type volumeSnapshotMetric struct {
 
 type volumeSnapshotLatency struct {
 	BaseMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []any
-	normLatencies    []any
 }
 
 type volumeSnapshotLatencyMeasurementFactory struct {
@@ -81,7 +73,7 @@ type volumeSnapshotLatencyMeasurementFactory struct {
 }
 
 func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedVolumeSnapshotConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedVolumeSnapshotConditions); err != nil {
 		return nil, err
 	}
 	return volumeSnapshotLatencyMeasurementFactory{
@@ -91,7 +83,7 @@ func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurem
 
 func (vslmf volumeSnapshotLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &volumeSnapshotLatency{
-		BaseMeasurement: vslmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: vslmf.NewBaseLatency(jobConfig, clientSet, restConfig, volumeSnapshotLatencyMeasurement, volumeSnapshotLatencyQuantilesMeasurement),
 	}
 }
 
@@ -127,57 +119,27 @@ func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
 
 func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	// Reset latency slices, required in multi-job benchmarks
-	vsl.latencyQuantiles, vsl.normLatencies = nil, nil
-	vsl.metrics = sync.Map{}
-	log.Infof("Creating Data Volume latency watcher for %s", vsl.JobConfig.Name)
-	vsl.watcher = metrics.NewWatcher(
-		getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
-		"vsWatcher",
-		"volumesnapshots",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", vsl.Runid)
+	vsl.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
+				name:          "vsWatcher",
+				resource:      "volumesnapshots",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vsl.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: vsl.handleCreateVolumeSnapshot,
+					UpdateFunc: func(oldObj, newObj any) {
+						vsl.handleUpdateVolumeSnapshot(newObj)
+					},
+				},
+			},
 		},
-		nil,
 	)
-	vsl.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: vsl.handleCreateVolumeSnapshot,
-		UpdateFunc: func(oldObj, newObj any) {
-			vsl.handleUpdateVolumeSnapshot(newObj)
-		},
-	})
-	if err := vsl.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("VolumeSnapshot Latency measurement error: %s", err)
-	}
-
 	return nil
 }
 
 func (vsl *volumeSnapshotLatency) Stop() error {
-	var err error
-	defer func() {
-		if vsl.watcher != nil {
-			vsl.watcher.StopWatcher()
-		}
-	}()
-	errorRate := vsl.normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. VolumeSnapshot latencies error rate was: %.2f", errorRate)
-	}
-	vsl.calcQuantiles()
-	if len(vsl.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(vsl.Config.LatencyThresholds, vsl.latencyQuantiles)
-	}
-	for _, q := range vsl.latencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", vsl.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
-	}
-	if errorRate > 0 {
-		log.Infof("DataVolume latencies error rate was: %.2f", errorRate)
-	}
-	return err
+	return vsl.stopMeasurement(vsl.normalizeMetrics, vsl.getLatency)
 }
 
 func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
@@ -211,18 +173,6 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 			JobName:    vsl.JobConfig.Name,
 		})
 	}
-}
-
-func (vsl *volumeSnapshotLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]any{
-		volumeSnapshotLatencyMeasurement:          vsl.normLatencies,
-		volumeSnapshotLatencyQuantilesMeasurement: vsl.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(vsl.Config, jobName, metricMap, indexerList)
-}
-
-func (vsl *volumeSnapshotLatency) GetMetrics() *sync.Map {
-	return &vsl.metrics
 }
 
 func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
@@ -261,12 +211,9 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 	return float64(erroredVolumeSnapshots) / float64(volumeSnapshotCount) * 100.0
 }
 
-func (vsl *volumeSnapshotLatency) calcQuantiles() {
-	getLatency := func(normLatency any) map[string]float64 {
-		volumeSnapshotMetric := normLatency.(volumeSnapshotMetric)
-		return map[string]float64{
-			"Ready": float64(volumeSnapshotMetric.VSReadyLatency),
-		}
+func (vsl *volumeSnapshotLatency) getLatency(normLatency any) map[string]float64 {
+	volumeSnapshotMetric := normLatency.(volumeSnapshotMetric)
+	return map[string]float64{
+		"Ready": float64(volumeSnapshotMetric.VSReadyLatency),
 	}
-	vsl.latencyQuantiles = CalculateQuantiles(vsl.Uuid, vsl.JobConfig.Name, vsl.Metadata, vsl.normLatencies, getLatency, volumeSnapshotLatencyQuantilesMeasurement)
 }

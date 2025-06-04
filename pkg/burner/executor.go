@@ -19,6 +19,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,9 +49,10 @@ type Executor struct {
 	dynamicClient     *dynamic.DynamicClient
 	kubeVirtClient    kubecli.KubevirtClient
 	functionTemplates []string
+	embedCfg          *fileutils.EmbedConfiguration
 }
 
-func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job) Executor {
+func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) Executor {
 	ex := Executor{
 		Job:               job,
 		limiter:           rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
@@ -58,6 +60,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		runid:             configSpec.GlobalConfig.RUNID,
 		waitLimiter:       rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
+		embedCfg:          embedCfg,
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
@@ -70,15 +73,15 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 
 	switch job.JobType {
 	case config.CreationJob:
-		ex.setupCreateJob(configSpec, mapper)
+		ex.setupCreateJob(mapper)
 	case config.DeletionJob:
-		ex.setupDeleteJob(configSpec, mapper)
+		ex.setupDeleteJob(mapper)
 	case config.PatchJob:
-		ex.setupPatchJob(configSpec, mapper)
+		ex.setupPatchJob(mapper)
 	case config.ReadJob:
-		ex.setupReadJob(configSpec, mapper)
+		ex.setupReadJob(mapper)
 	case config.KubeVirtJob:
-		ex.setupKubeVirtJob(configSpec, mapper)
+		ex.setupKubeVirtJob(mapper)
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}

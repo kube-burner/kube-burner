@@ -87,12 +87,12 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				if indexer == nil {
 					log.Fatalf("Metrics profile is configured for endpoint #%d but no indexer was defined", pos)
 				}
-				if err := p.ReadProfile(metricProfile); err != nil {
+				if err := p.ReadProfile(metricProfile, scraperConfig.EmbedCfg); err != nil {
 					log.Fatal(err.Error())
 				}
 			}
 			for _, alertProfile := range metricsEndpoint.Alerts {
-				if alertM, err = alerting.NewAlertManager(alertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, indexer, scraperConfig.MetricsMetadata); err != nil {
+				if alertM, err = alerting.NewAlertManager(alertProfile, scraperConfig.ConfigSpec.GlobalConfig.UUID, p, indexer, scraperConfig.MetricsMetadata, scraperConfig.EmbedCfg); err != nil {
 					log.Fatalf("Error creating alert manager: %s", err)
 				}
 				alertMs = append(alertMs, alertM)

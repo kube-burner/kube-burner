@@ -19,9 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -65,11 +63,6 @@ type NodeMetric struct {
 
 type nodeLatency struct {
 	BaseMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type nodeLatencyMeasurementFactory struct {
@@ -77,7 +70,7 @@ type nodeLatencyMeasurementFactory struct {
 }
 
 func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedNodeConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedNodeConditions); err != nil {
 		return nil, err
 	}
 	return nodeLatencyMeasurementFactory{
@@ -87,7 +80,7 @@ func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.
 
 func (nlmf nodeLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &nodeLatency{
-		BaseMeasurement: nlmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: nlmf.NewBaseLatency(jobConfig, clientSet, restConfig, nodeLatencyMeasurement, nodeLatencyQuantilesMeasurement),
 	}
 }
 
@@ -141,25 +134,22 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 	wg.Add(1)
 	n.Collect(&wg)
 	wg.Wait()
-	log.Infof("Creating Node latency watcher for %s", n.JobConfig.Name)
-	n.watcher = metrics.NewWatcher(
-		n.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-		"nodeWatcher",
-		"nodes",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
+	n.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    n.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				name:          "nodeWatcher",
+				resource:      "nodes",
+				labelSelector: "",
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: n.handleCreateNode,
+					UpdateFunc: func(oldObj, newObj interface{}) {
+						n.handleUpdateNode(newObj)
+					},
+				},
+			},
 		},
-		nil,
 	)
-	n.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: n.handleCreateNode,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			n.handleUpdateNode(newObj)
-		},
-	})
-	if err := n.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Node Latency measurement error: %s", err)
-	}
 	return nil
 }
 
@@ -203,39 +193,10 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 }
 
 func (n *nodeLatency) Stop() error {
-	var err error
-	defer func() {
-		if n.watcher != nil {
-			n.watcher.StopWatcher()
-		}
-	}()
-	n.normalizeLatencies()
-	n.CalculateQuantiles()
-	if len(n.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(n.Config.LatencyThresholds, n.latencyQuantiles)
-	}
-	if n.JobConfig.Name != "workers-scale" {
-		for _, q := range n.latencyQuantiles {
-			nq := q.(metrics.LatencyQuantiles)
-			log.Infof("%s: %s 50th: %v 99th: %v max: %v avg: %v", n.JobConfig.Name, nq.QuantileName, nq.P50, nq.P99, nq.Max, nq.Avg)
-		}
-	}
-	return err
+	return n.stopMeasurement(n.normalizeLatencies, n.getLatency)
 }
 
-func (n *nodeLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		nodeLatencyMeasurement:          n.normLatencies,
-		nodeLatencyQuantilesMeasurement: n.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(n.Config, jobName, metricMap, indexerList)
-}
-
-func (n *nodeLatency) GetMetrics() *sync.Map {
-	return &n.metrics
-}
-
-func (n *nodeLatency) normalizeLatencies() {
+func (n *nodeLatency) normalizeLatencies() float64 {
 	n.metrics.Range(func(key, value interface{}) bool {
 		m := value.(NodeMetric)
 		// If a node does not reach the Ready state, we skip that node
@@ -260,17 +221,15 @@ func (n *nodeLatency) normalizeLatencies() {
 		n.normLatencies = append(n.normLatencies, m)
 		return true
 	})
+	return 0
 }
 
-func (n *nodeLatency) CalculateQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		nodeMetric := normLatency.(NodeMetric)
-		return map[string]float64{
-			string(corev1.NodeMemoryPressure): float64(nodeMetric.NodeMemoryPressureLatency),
-			string(corev1.NodeDiskPressure):   float64(nodeMetric.NodeDiskPressureLatency),
-			string(corev1.NodePIDPressure):    float64(nodeMetric.NodePIDPressureLatency),
-			string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
-		}
+func (n *nodeLatency) getLatency(normLatency any) map[string]float64 {
+	nodeMetric := normLatency.(NodeMetric)
+	return map[string]float64{
+		string(corev1.NodeMemoryPressure): float64(nodeMetric.NodeMemoryPressureLatency),
+		string(corev1.NodeDiskPressure):   float64(nodeMetric.NodeDiskPressureLatency),
+		string(corev1.NodePIDPressure):    float64(nodeMetric.NodePIDPressureLatency),
+		string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
 	}
-	n.latencyQuantiles = CalculateQuantiles(n.Uuid, n.JobConfig.Name, n.Metadata, n.normLatencies, getLatency, nodeLatencyQuantilesMeasurement)
 }

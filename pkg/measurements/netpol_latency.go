@@ -17,7 +17,6 @@ package measurements
 import (
 	"bytes"
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,12 +25,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	kconfig "github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -86,13 +85,6 @@ type ProxyResponse struct {
 
 type netpolLatency struct {
 	BaseMeasurement
-	embedFS    *embed.FS
-	embedFSDir string
-
-	netpolWatcher    *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
 }
 
 type netpolMetric struct {
@@ -109,23 +101,17 @@ type netpolMetric struct {
 
 type netpolLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
-	embedFS    *embed.FS
-	embedFSDir string
 }
 
 func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
 	return netpolLatencyMeasurementFactory{
 		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
-		embedFS:                configSpec.EmbedFS,
-		embedFSDir:             configSpec.EmbedFSDir,
 	}, nil
 }
 
 func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *kconfig.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &netpolLatency{
-		BaseMeasurement: nplmf.NewBaseLatency(jobConfig, clientSet, restConfig),
-		embedFS:         nplmf.embedFS,
-		embedFSDir:      nplmf.embedFSDir,
+		BaseMeasurement: nplmf.NewBaseLatency(jobConfig, clientSet, restConfig, netpolLatencyMeasurement, netpolLatencyQuantilesMeasurement),
 	}
 }
 
@@ -243,7 +229,7 @@ func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig
 func (n *netpolLatency) prepareConnections() {
 	// Reset latency slices, required in multi-job benchmarks
 	for _, obj := range n.JobConfig.Objects {
-		cleanTemplate, err := readTemplate(obj, n.embedFS, n.embedFSDir)
+		cleanTemplate, err := readTemplate(obj, n.embedCfg)
 		if err != nil {
 			log.Fatalf("Error in readTemplate %s: %s", obj.ObjectTemplate, err)
 		}
@@ -452,8 +438,8 @@ func (n *netpolLatency) processResults() {
 }
 
 // Read network policy object template
-func readTemplate(o kconfig.Object, embedFS *embed.FS, embedFSDir string) ([]byte, error) {
-	f, err := kutil.GetReader(o.ObjectTemplate, embedFS, embedFSDir)
+func readTemplate(o kconfig.Object, embedCfg *fileutils.EmbedConfiguration) ([]byte, error) {
+	f, err := fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 	}
@@ -507,26 +493,21 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 	if len(connections) > 0 {
 		sendConnections()
 	}
-	n.latencyQuantiles, n.normLatencies = nil, nil
 
-	// Create watchers to record network policy creation timestamp
-	log.Infof("Creating netpol latency watcher for %s", n.JobConfig.Name)
-	n.netpolWatcher = metrics.NewWatcher(
-		n.ClientSet.NetworkingV1().RESTClient().(*rest.RESTClient),
-		"netpolWatcher",
-		"networkpolicies",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-uuid=%v", n.Uuid)
+	n.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    n.ClientSet.NetworkingV1().RESTClient().(*rest.RESTClient),
+				name:          "netpolWatcher",
+				resource:      "networkpolicies",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", n.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: n.handleCreateNetpol,
+				},
+			},
 		},
-		cache.Indexers{},
 	)
-	n.netpolWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: n.handleCreateNetpol,
-	})
-	if err := n.netpolWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Network Policy Latency measurement error: %s", err)
-	}
+
 	return nil
 }
 
@@ -544,7 +525,7 @@ func (n *netpolLatency) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
-		n.netpolWatcher.StopWatcher()
+		n.stopWatchers()
 	}()
 	kutil.CleanupNamespaces(ctx, n.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
 	n.normalizeMetrics()
@@ -555,10 +536,6 @@ func (n *netpolLatency) Stop() error {
 
 	}
 	return nil
-}
-
-func (n *netpolLatency) GetMetrics() *sync.Map {
-	return &n.metrics
 }
 
 func (n *netpolLatency) normalizeMetrics() {
@@ -586,14 +563,6 @@ func (n *netpolLatency) normalizeMetrics() {
 		n.latencyQuantiles = append(n.latencyQuantiles, calcSummary("Ready", latencies))
 		n.latencyQuantiles = append(n.latencyQuantiles, calcSummary("minReady", minLatencies))
 	}
-}
-
-func (n *netpolLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		netpolLatencyMeasurement:          n.normLatencies,
-		netpolLatencyQuantilesMeasurement: n.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(n.Config, jobName, metricMap, indexerList)
 }
 
 func (n *netpolLatency) Collect(measurementWg *sync.WaitGroup) {

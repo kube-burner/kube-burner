@@ -28,6 +28,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -66,7 +67,7 @@ var (
 // - error
 //
 //nolint:gocyclo
-func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) (int, error) {
+func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory, embedCfg *fileutils.EmbedConfiguration) (int, error) {
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
@@ -87,7 +88,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	go func() {
 		var innerRC int
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
-		jobList = newExecutorList(configSpec, kubeClientProvider)
+		jobList = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		handlePreloadImages(jobList, kubeClientProvider)
 		// Iterate job list
 		var measurementsInstance *measurements.Measurements
@@ -104,7 +105,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance.Start()
 			}
 			if job.BeforeExecution != "" {
-				runLifecycleHook("BeforeExecution", job.BeforeExecution, true, configSpec, &errs, &innerRC)
+				runLifecycleHook("BeforeExecution", job.BeforeExecution, true, job.embedCfg, &errs, &innerRC)
 			}
 			log.Infof("Triggering job: %s", job.Name)
 			if job.JobType == config.CreationJob {
@@ -150,7 +151,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 			}
 			if job.BeforeCleanup != "" {
-				runLifecycleHook("BeforeCleanup", job.BeforeCleanup, false, configSpec, &errs, &innerRC)
+				runLifecycleHook("BeforeCleanup", job.BeforeCleanup, false, job.embedCfg, &errs, &innerRC)
 			}
 			jobEnd := time.Now().UTC()
 			if job.MetricsClosing == "afterJob" {
@@ -270,7 +271,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 }
 
 // runLifecycleHook runs a user-defined shell script for a specific lifecycle hook
-func runLifecycleHook(name string, script string, background bool, configSpec config.Spec, errs *[]error, rc *int) {
+func runLifecycleHook(name string, script string, background bool, embedCfg *fileutils.EmbedConfiguration, errs *[]error, rc *int) {
 	if script == "" {
 		return
 	}
@@ -281,7 +282,7 @@ func runLifecycleHook(name string, script string, background bool, configSpec co
 		log.Infof("Waiting for %s command %s to finish", name, script)
 	}
 
-	_, _, err := util.RunShellCmd(script, configSpec.EmbedFS, configSpec.EmbedFSDir, background)
+	_, _, err := util.RunShellCmd(script, embedCfg, background)
 	if err != nil {
 		err = fmt.Errorf("%s failed: %v", name, err)
 		log.Error(err.Error())
@@ -364,11 +365,11 @@ func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) []Executor {
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration) []Executor {
 	var executorList []Executor
 	for _, job := range configSpec.Jobs {
 		verifyJobDefaults(&job, configSpec.GlobalConfig.Timeout)
-		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job))
+		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job, embedCfg))
 	}
 	return executorList
 }

@@ -18,9 +18,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
-	"path"
 	"strings"
 	"text/template"
 	"time"
@@ -28,6 +28,7 @@ import (
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -62,7 +63,7 @@ type alert struct {
 	Description string        `json:"description"`
 	MetricName  string        `json:"metricName"`
 	ChurnMetric bool          `json:"churnMetric,omitempty"`
-	Metadata    interface{}   `json:"metadata,omitempty"`
+	Metadata    any           `json:"metadata,omitempty"`
 }
 
 // AlertManager configuration
@@ -71,7 +72,8 @@ type AlertManager struct {
 	prometheus   *prometheus.Prometheus
 	indexer      *indexers.Indexer
 	uuid         string
-	metadata     interface{}
+	metadata     any
+	embedCfg     *fileutils.EmbedConfiguration
 }
 
 var baseTemplate = []string{
@@ -85,7 +87,7 @@ type descriptionTemplate struct {
 }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, indexer *indexers.Indexer, metadata interface{}) (*AlertManager, error) {
+func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.Prometheus, indexer *indexers.Indexer, metadata any, embedCfg *fileutils.EmbedConfiguration) (*AlertManager, error) {
 	log.Infof("🔔 Initializing alert manager for prometheus: %v", prometheusClient.Endpoint)
 	a := AlertManager{
 		prometheus: prometheusClient,
@@ -100,7 +102,9 @@ func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.
 }
 
 func (a *AlertManager) readProfile(alertProfileCfg string) error {
-	f, err := util.GetReader(alertProfileCfg, a.prometheus.ConfigSpec.EmbedFS, path.Dir(a.prometheus.ConfigSpec.EmbedFSDir))
+	var err error
+	var f io.Reader
+	f, err = fileutils.GetAlertsReader(alertProfileCfg, a.embedCfg)
 	if err != nil {
 		return fmt.Errorf("error reading alert profile %s: %s", alertProfileCfg, err)
 	}
@@ -115,7 +119,7 @@ func (a *AlertManager) readProfile(alertProfileCfg string) error {
 // Evaluate evaluates expressions
 func (a *AlertManager) Evaluate(job prometheus.Job) error {
 	errs := []error{}
-	var alertList []interface{}
+	var alertList []any
 	var renderedQuery bytes.Buffer
 	if job.JobConfig.Name != "" {
 		log.Infof("Evaluating alerts for job %s in: %v", job.JobConfig.Name, a.prometheus.Endpoint)
@@ -158,11 +162,11 @@ func (a *AlertManager) validateTemplates() error {
 	return nil
 }
 
-func parseMatrix(value model.Value, uuid, description string, metadata interface{}, severity severityLevel, churnStart, churnEnd *time.Time) ([]interface{}, error) {
+func parseMatrix(value model.Value, uuid, description string, metadata any, severity severityLevel, churnStart, churnEnd *time.Time) ([]any, error) {
 	var renderedDesc bytes.Buffer
 	var templateData descriptionTemplate
 	// The same query can fire multiple alerts, so we have to return an array of them
-	var alertSet []interface{}
+	var alertSet []any
 	errs := []error{}
 	t, _ := template.New("").Parse(strings.Join(append(baseTemplate, description), ""))
 	data, ok := value.(model.Matrix)
@@ -213,7 +217,7 @@ func parseMatrix(value model.Value, uuid, description string, metadata interface
 	return alertSet, utilerrors.NewAggregate(errs)
 }
 
-func (a *AlertManager) index(alertSet []interface{}) {
+func (a *AlertManager) index(alertSet []any) {
 	log.Info("Indexing alerts")
 	log.Debugf("Indexing [%d] documents", len(alertSet))
 	resp, err := (*a.indexer).Index(alertSet, indexers.IndexingOpts{MetricName: alertMetricName})

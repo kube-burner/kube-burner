@@ -26,14 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (ex *Executor) setupReadJob(configSpec config.Spec, mapper meta.RESTMapper) {
+func (ex *Executor) setupReadJob(mapper meta.RESTMapper) {
 	log.Debugf("Preparing read job: %s", ex.Name)
 	ex.itemHandler = readHandler
 	ex.ExecutionMode = config.ExecutionModeSequential
 
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, APIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1))
 	}
 	log.Infof("Job %s: %d iterations", ex.Name, ex.JobIterations)
 }
