@@ -48,17 +48,17 @@ type pvcMetric struct {
 	bound          int64
 	BindingLatency int `json:"bindingLatency"`
 	lost           int64
-	LostLatency    int         `json:"lostLatency"`
-	UUID           string      `json:"uuid"`
-	Name           string      `json:"pvcName"`
-	JobName        string      `json:"jobName,omitempty"`
-	Namespace      string      `json:"namespace"`
-	MetricName     string      `json:"metricName"`
-	Size           string      `json:"size"`
-	StorageClass   string      `json:"storageClass"`
-	JobIteration   int         `json:"jobIteration"`
-	Replica        int         `json:"replica"`
-	Metadata       interface{} `json:"metadata,omitempty"`
+	LostLatency    int    `json:"lostLatency"`
+	UUID           string `json:"uuid"`
+	Name           string `json:"pvcName"`
+	JobName        string `json:"jobName,omitempty"`
+	Namespace      string `json:"namespace"`
+	MetricName     string `json:"metricName"`
+	Size           string `json:"size"`
+	StorageClass   string `json:"storageClass"`
+	JobIteration   int    `json:"jobIteration"`
+	Replica        int    `json:"replica"`
+	Metadata       any    `json:"metadata,omitempty"`
 }
 
 type pvcLatency struct {
@@ -69,7 +69,7 @@ type pvcLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedPvcConditions); err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (plmf pvcLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 }
 
 // creates pvc metric
-func (p *pvcLatency) handleCreatePVC(obj interface{}) {
+func (p *pvcLatency) handleCreatePVC(obj any) {
 	pvc := obj.(*corev1.PersistentVolumeClaim)
 	log.Tracef("handleCreatePVC: %s", pvc.Name)
 	pvcLabels := pvc.GetLabels()
@@ -105,7 +105,7 @@ func (p *pvcLatency) handleCreatePVC(obj interface{}) {
 }
 
 // handles pvc update
-func (p *pvcLatency) handleUpdatePVC(obj interface{}) {
+func (p *pvcLatency) handleUpdatePVC(obj any) {
 	pvc := obj.(*corev1.PersistentVolumeClaim)
 	log.Tracef("handleUpdatePVC: %s", pvc.Name)
 	if value, exists := p.metrics.Load(string(pvc.UID)); exists {
@@ -153,7 +153,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePVC,
-					UpdateFunc: func(oldObj, newObj interface{}) {
+					UpdateFunc: func(oldObj, newObj any) {
 						p.handleUpdatePVC(newObj)
 					},
 				},
@@ -187,7 +187,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 	totalPVCs := 0
 	erroredPVCs := 0
 
-	p.metrics.Range(func(key, value interface{}) bool {
+	p.metrics.Range(func(key, value any) bool {
 		m := value.(pvcMetric)
 		// If a pvc does not reach the stable state, we skip that one
 		if m.bound == 0 && m.lost == 0 {

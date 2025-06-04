@@ -57,16 +57,16 @@ type podMetric struct {
 	podReady                      time.Time
 	PodReadyLatency               int `json:"podReadyLatency"`
 	readyToStartContainers        time.Time
-	ReadyToStartContainersLatency int         `json:"readyToStartContainersLatency"`
-	MetricName                    string      `json:"metricName"`
-	UUID                          string      `json:"uuid"`
-	JobName                       string      `json:"jobName,omitempty"`
-	JobIteration                  int         `json:"jobIteration"`
-	Replica                       int         `json:"replica"`
-	Namespace                     string      `json:"namespace"`
-	Name                          string      `json:"podName"`
-	NodeName                      string      `json:"nodeName"`
-	Metadata                      interface{} `json:"metadata,omitempty"`
+	ReadyToStartContainersLatency int    `json:"readyToStartContainersLatency"`
+	MetricName                    string `json:"metricName"`
+	UUID                          string `json:"uuid"`
+	JobName                       string `json:"jobName,omitempty"`
+	JobIteration                  int    `json:"jobIteration"`
+	Replica                       int    `json:"replica"`
+	Namespace                     string `json:"namespace"`
+	Name                          string `json:"podName"`
+	NodeName                      string `json:"nodeName"`
+	Metadata                      any    `json:"metadata,omitempty"`
 }
 
 type podLatency struct {
@@ -77,7 +77,7 @@ type podLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedPodConditions); err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (plmf podLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 	}
 }
 
-func (p *podLatency) handleCreatePod(obj interface{}) {
+func (p *podLatency) handleCreatePod(obj any) {
 	pod := obj.(*corev1.Pod)
 	podLabels := pod.GetLabels()
 	p.metrics.LoadOrStore(string(pod.UID), podMetric{
@@ -108,7 +108,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 	})
 }
 
-func (p *podLatency) handleUpdatePod(obj interface{}) {
+func (p *podLatency) handleUpdatePod(obj any) {
 	pod := obj.(*corev1.Pod)
 	if value, exists := p.metrics.Load(string(pod.UID)); exists {
 		pm := value.(podMetric)
@@ -157,7 +157,7 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePod,
-					UpdateFunc: func(oldObj, newObj interface{}) {
+					UpdateFunc: func(oldObj, newObj any) {
 						p.handleUpdatePod(newObj)
 					},
 				},
@@ -223,7 +223,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 	totalPods := 0
 	erroredPods := 0
 
-	p.metrics.Range(func(key, value interface{}) bool {
+	p.metrics.Range(func(key, value any) bool {
 		m := value.(podMetric)
 		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {

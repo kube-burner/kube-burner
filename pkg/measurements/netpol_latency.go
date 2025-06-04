@@ -25,6 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"maps"
+	"slices"
+
 	kconfig "github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
@@ -95,7 +98,7 @@ type netpolMetric struct {
 	UUID            string        `json:"uuid"`
 	Namespace       string        `json:"namespace"`
 	Name            string        `json:"netpol"`
-	Metadata        interface{}   `json:"metadata,omitempty"`
+	Metadata        any           `json:"metadata,omitempty"`
 	JobName         string        `json:"jobName,omitempty"`
 }
 
@@ -103,7 +106,7 @@ type netpolLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]interface{}) (MeasurementFactory, error) {
+func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	return netpolLatencyMeasurementFactory{
 		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
@@ -185,7 +188,7 @@ func addPodsByLabel(clientSet kubernetes.Interface, ns string, ps *metav1.LabelS
 
 // Record the network policy creation timestamp when it is created.
 // We later do a diff with successful connection timestamp and define that as a network policy programming latency.
-func (n *netpolLatency) handleCreateNetpol(obj interface{}) {
+func (n *netpolLatency) handleCreateNetpol(obj any) {
 	netpol := obj.(*networkingv1.NetworkPolicy)
 	npCreationTime[netpol.Name] = netpol.CreationTimestamp.Time.UTC()
 }
@@ -193,15 +196,13 @@ func (n *netpolLatency) handleCreateNetpol(obj interface{}) {
 // Render the network policy from the object template using iteration details as input
 func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
 
-	templateData := map[string]interface{}{
+	templateData := map[string]any{
 		"JobName":   n.JobConfig.Name,
 		"Iteration": strconv.Itoa(iteration),
 		"UUID":      n.Uuid,
 		"Replica":   strconv.Itoa(replica),
 	}
-	for k, v := range obj.InputVars {
-		templateData[k] = v
-	}
+	maps.Copy(templateData, obj.InputVars)
 	renderedObj, err := kutil.RenderTemplate(objectSpec, templateData, kutil.MissingKeyError, []string{})
 	if err != nil {
 		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
@@ -236,7 +237,7 @@ func (n *netpolLatency) prepareConnections() {
 		if getObjectType(obj, cleanTemplate) != "NetworkPolicy" {
 			continue
 		}
-		for i := 0; i < n.JobConfig.JobIterations; i++ {
+		for i := range n.JobConfig.JobIterations {
 			for r := 1; r <= obj.Replicas; r++ {
 				networkPolicy := n.getNetworkPolicy(i, r, obj, cleanTemplate)
 				nsIndex := i / n.JobConfig.IterationsPerNamespace
@@ -260,8 +261,8 @@ func (n *netpolLatency) prepareConnections() {
 							}
 						}
 						namespaces := getNamespacesByLabel(from.NamespaceSelector)
-						for _, namepsace := range namespaces {
-							remoteAddrs := addPodsByLabel(n.ClientSet, namepsace, from.PodSelector)
+						for _, namespace := range namespaces {
+							remoteAddrs := addPodsByLabel(n.ClientSet, namespace, from.PodSelector)
 							for _, ra := range remoteAddrs {
 								// exclude sending connection request to same ip address
 								otherIPs := []string{}
@@ -274,16 +275,10 @@ func (n *netpolLatency) prepareConnections() {
 											// Avoid a peer pod pinging multiple times to same local pod because of pod reuse by network policies
 											otherIPs = append(otherIPs, ip)
 										} else {
-											var netpolExists bool
 											// check if network policy doesn't exist in the addrReuse
-											for _, v := range addrReuse[ar] {
-												if v == networkPolicy.Name {
-													netpolExists = true
-													break
-												}
-											}
-											if !netpolExists {
+											if !slices.Contains(addrReuse[ar], networkPolicy.Name) {
 												addrReuse[ar] = append(addrReuse[ar], networkPolicy.Name)
+
 											}
 										}
 									}
@@ -542,7 +537,7 @@ func (n *netpolLatency) normalizeMetrics() {
 	var latencies []float64
 	var minLatencies []float64
 	sLen := 0
-	n.metrics.Range(func(key, value interface{}) bool {
+	n.metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(netpolMetric)
 		latencies = append(latencies, float64(metric.ReadyLatency))

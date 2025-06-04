@@ -62,7 +62,7 @@ var (
 func setLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
 	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
 	if !found {
-		labelMap = make(map[string]interface{}, len(labels))
+		labelMap = make(map[string]any, len(labels))
 	}
 	for k, v := range labels {
 		labelMap[k] = v
@@ -78,7 +78,7 @@ func setLabelsInArray(obj *unstructured.Unstructured, labels map[string]string, 
 
 	for _, a := range array {
 		innerObj := unstructured.Unstructured{}
-		innerObj.SetUnstructuredContent(a.(map[string]interface{}))
+		innerObj.SetUnstructuredContent(a.(map[string]any))
 
 		setLabels(&innerObj, labels, templatePath)
 	}
@@ -214,7 +214,7 @@ func (ex *Executor) getItemListForObject(obj *object) (*unstructured.Unstructure
 }
 
 func (ex *Executor) runSequential(ctx context.Context) {
-	for i := 0; i < ex.JobIterations; i++ {
+	for i := range ex.JobIterations {
 		for _, obj := range ex.objects {
 			if ctx.Err() != nil {
 				return
@@ -275,7 +275,7 @@ func (ex *Executor) runParallel(ctx context.Context) {
 		if err != nil {
 			continue
 		}
-		for j := 0; j < ex.JobIterations; j++ {
+		for j := range ex.JobIterations {
 			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)

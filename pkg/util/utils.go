@@ -35,7 +35,7 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-func GetBoolValue(m map[string]interface{}, key string) *bool {
+func GetBoolValue(m map[string]any, key string) *bool {
 	var ret *bool
 	var convertedValue bool
 
@@ -62,7 +62,7 @@ func GetBoolValue(m map[string]interface{}, key string) *bool {
 	return ret
 }
 
-func GetIntegerValue(m map[string]interface{}, key string) *int {
+func GetIntegerValue(m map[string]any, key string) *int {
 	var ret *int
 	var intValue int
 
@@ -86,7 +86,7 @@ func GetIntegerValue(m map[string]interface{}, key string) *int {
 	return ret
 }
 
-func GetStringValue(m map[string]interface{}, key string) *string {
+func GetStringValue(m map[string]any, key string) *string {
 	var ret *string
 	var strValue string
 

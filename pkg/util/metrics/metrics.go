@@ -26,7 +26,7 @@ import (
 
 // Processes common config and executes according to the caller
 func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
-	userMetadata := make(map[string]interface{})
+	userMetadata := make(map[string]any)
 	if len(scraperConfig.ConfigSpec.MetricsEndpoints) == 0 && scraperConfig.MetricsEndpoint == "" {
 		return Scraper{}
 	}

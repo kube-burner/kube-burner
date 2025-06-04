@@ -81,7 +81,7 @@ func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 	}
 	tr := tar.NewReader(gzipReader)
 	for {
-		var metrics []interface{}
+		var metrics []any
 		hdr, err := tr.Next()
 		// io.EOF returned at the end of file
 		if err == io.EOF {
