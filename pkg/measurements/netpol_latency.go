@@ -261,8 +261,8 @@ func (n *netpolLatency) prepareConnections() {
 							}
 						}
 						namespaces := getNamespacesByLabel(from.NamespaceSelector)
-						for _, namepsace := range namespaces {
-							remoteAddrs := addPodsByLabel(n.ClientSet, namepsace, from.PodSelector)
+						for _, namespace := range namespaces {
+							remoteAddrs := addPodsByLabel(n.ClientSet, namespace, from.PodSelector)
 							for _, ra := range remoteAddrs {
 								// exclude sending connection request to same ip address
 								otherIPs := []string{}
@@ -275,13 +275,10 @@ func (n *netpolLatency) prepareConnections() {
 											// Avoid a peer pod pinging multiple times to same local pod because of pod reuse by network policies
 											otherIPs = append(otherIPs, ip)
 										} else {
-											var netpolExists bool
 											// check if network policy doesn't exist in the addrReuse
-											if slices.Contains(addrReuse[ar], networkPolicy.Name) {
-												netpolExists = true
-											}
-											if !netpolExists {
+											if !slices.Contains(addrReuse[ar], networkPolicy.Name) {
 												addrReuse[ar] = append(addrReuse[ar], networkPolicy.Name)
+
 											}
 										}
 									}
