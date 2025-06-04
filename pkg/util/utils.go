@@ -121,46 +121,58 @@ func ResourceToRESTClient(clientset kubernetes.Interface, kind string) (*rest.RE
 	kind = strings.ToLower(kind)
 	switch kind {
 	// CoreV1 resources
-	case "pod", "pods",
-		"service", "services",
-		"endpoints",
-		"configmap", "configmaps",
-		"secret", "secrets",
-		"persistentvolume", "persistentvolumes",
-		"persistentvolumeclaim", "persistentvolumeclaims",
-		"node", "nodes",
-		"namespace", "namespaces",
-		"event", "events",
-		"serviceaccount", "serviceaccounts",
-		"limitrange", "limitranges",
-		"resourcequota", "resourcequotas":
+	case "pod",
+		"service",
+		"endpoint",
+		"configmap",
+		"secret",
+		"persistentvolume",
+		"persistentvolumeclaim",
+		"node",
+		"namespace",
+		"event",
+		"serviceaccount",
+		"limitrange",
+		"resourcequota":
 		return clientset.CoreV1().RESTClient().(*rest.RESTClient), nil
 
 	// AppsV1 resources
-	case "deployment", "deployments",
-		"statefulset", "statefulsets",
-		"daemonset", "daemonsets",
-		"replicaset", "replicasets":
+	case "deployment",
+		"statefulset",
+		"daemonset",
+		"replicaset":
 		return clientset.AppsV1().RESTClient().(*rest.RESTClient), nil
 
 	// BatchV1 resources
-	case "job", "jobs",
-		"cronjob", "cronjobs":
+	case "job",
+		"cronjob":
 		return clientset.BatchV1().RESTClient().(*rest.RESTClient), nil
 
 	// NetworkingV1 resources
-	case "ingress", "ingresses",
-		"networkpolicy", "networkpolicies":
+	case "ingress",
+		"networkpolicy":
 		return clientset.NetworkingV1().RESTClient().(*rest.RESTClient), nil
 
 	// RBACV1 resources
-	case "role", "roles",
-		"clusterrole", "clusterroles",
-		"rolebinding", "rolebindings",
-		"clusterrolebinding", "clusterrolebindings":
+	case "role",
+		"clusterrole",
+		"rolebinding",
+		"clusterrolebinding":
 		return clientset.RbacV1().RESTClient().(*rest.RESTClient), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported resource kind: %s", kind)
 	}
+}
+
+// NaivePlural gives naive plurals
+func NaivePlural(kind string) string {
+	kindLower := strings.ToLower(kind)
+	if strings.HasSuffix(kindLower, "ss") {
+		return kindLower + "es"
+	}
+	if strings.HasSuffix(kindLower, "cy") {
+		return strings.TrimSuffix(kindLower, "cy") + "cies"
+	}
+	return kindLower + "s"
 }

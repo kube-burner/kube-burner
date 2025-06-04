@@ -45,6 +45,7 @@ func (wm *WatcherManager) Start(kind string, labelSelector map[string]string, in
 		_ = wm.limiter.Wait(context.TODO())
 
 		kindLower := strings.ToLower(kind)
+		plural := util.NaivePlural(kind)
 		indexNum := strconv.Itoa(index)
 		replicaNum := strconv.Itoa(replica)
 		watcherName := kindLower + "_watcher_" + indexNum + "_replica_" + replicaNum
@@ -55,7 +56,7 @@ func (wm *WatcherManager) Start(kind string, labelSelector map[string]string, in
 		watcher := NewWatcher(
 			restClient,
 			watcherName,
-			kindLower+"s",
+			plural,
 			corev1.NamespaceAll,
 			func(options *metav1.ListOptions) {
 				options.LabelSelector = labels.SelectorFromSet(labelSelector).String()
