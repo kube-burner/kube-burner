@@ -35,4 +35,6 @@ type WatcherManager struct {
 	watchers  map[string]*Watcher
 	mu        sync.Mutex
 	wg        sync.WaitGroup
+	errMu     sync.Mutex
+	errs      []error
 }

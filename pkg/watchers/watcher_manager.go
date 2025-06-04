@@ -16,6 +16,7 @@ package watchers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -45,17 +46,19 @@ func (wm *WatcherManager) Start(kind string, labelSelector map[string]string, in
 		_ = wm.limiter.Wait(context.TODO())
 
 		kindLower := strings.ToLower(kind)
+		plural := util.NaivePlural(kind)
 		indexNum := strconv.Itoa(index)
 		replicaNum := strconv.Itoa(replica)
 		watcherName := kindLower + "_watcher_" + indexNum + "_replica_" + replicaNum
 		restClient, err := util.ResourceToRESTClient(wm.clientSet, kindLower)
 		if err != nil {
-			log.Errorf("Error: %v", err)
+			wm.recordError(fmt.Errorf("Error getting REST client for %s: %w", kindLower, err))
+			return
 		}
 		watcher := NewWatcher(
 			restClient,
 			watcherName,
-			kindLower+"s",
+			plural,
 			corev1.NamespaceAll,
 			func(options *metav1.ListOptions) {
 				options.LabelSelector = labels.SelectorFromSet(labelSelector).String()
@@ -64,7 +67,7 @@ func (wm *WatcherManager) Start(kind string, labelSelector map[string]string, in
 		)
 
 		if err := watcher.StartAndCacheSync(); err != nil {
-			log.Errorf("Watcher error: %s", err)
+			wm.recordError(fmt.Errorf("Error starting %s: %w", watcherName, err))
 			return
 		}
 		log.Infof("Started %s", watcherName)
@@ -76,35 +79,30 @@ func (wm *WatcherManager) Start(kind string, labelSelector map[string]string, in
 }
 
 // Wait method to wait for all the watchers
-func (wm *WatcherManager) Wait() {
+func (wm *WatcherManager) Wait() []error {
 	wm.wg.Wait()
-}
-
-// StopWatcher method to stop a specific watcher
-func (wm *WatcherManager) StopWatcher(name string) {
-	wm.mu.Lock()
-	defer wm.mu.Unlock()
-	watcher, exists := wm.watchers[name]
-	if !exists {
-		log.Warnf("Watcher %q not found, cannot stop", name)
-		return
-	}
-	if err := watcher.StopWatcher(); err != nil {
-		log.Errorf("Failed to stop watcher %q: %v", name, err)
-		return
-	}
-	log.Infof("Watcher %q stopped successfully", name)
-	delete(wm.watchers, name)
+	wm.errMu.Lock()
+	defer wm.errMu.Unlock()
+	return wm.errs
 }
 
 // StopAll method to stop all the watchers
-func (wm *WatcherManager) StopAll() {
+func (wm *WatcherManager) StopAll() []error {
+	var stopErrors []error
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 	for name, watcher := range wm.watchers {
 		log.Infof("Stopping %s", name)
 		if err := watcher.StopWatcher(); err != nil {
-			log.Errorf("failed to stop watcher %s: %v", name, err)
+			stopErrors = append(stopErrors, fmt.Errorf("failed to stop watcher %s: %v", name, err))
 		}
 	}
+	return stopErrors
+}
+
+// recordError records the error
+func (wm *WatcherManager) recordError(err error) {
+	wm.errMu.Lock()
+	defer wm.errMu.Unlock()
+	wm.errs = append(wm.errs, err)
 }

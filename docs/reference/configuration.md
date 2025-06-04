@@ -148,13 +148,16 @@ Examples of valid configuration files can be found in the [examples folder](http
 
 ### Watchers
 
-We have watchers support during the benchmark workload. It is at a job level and will be usefull in scenarios where want to monitor overhead created by watchers on a cluster.
+We have watchers support during the benchmark workload. It is at a job level and will be usefull in scenarios where we want to monitor overhead created by watchers on a cluster.
 
-| Option       | Description                                             | Type    | Default |
-|--------------|---------------------------------------------------------|---------|---------|
-| `kind` | Object kind to consider for watch | String | "" |
-| `labelSelector` | Objects with these labels will be considered for watch | Object | {} |
-| `replicas` | Number of watcher replicas to create | int  | 0 |
+!!! note 
+    This feature doesn't effect the overall QPS/Burst as it uses its own client instance.
+
+| Option            | Description                                             | Type    | Default |
+|-------------------|---------------------------------------------------------|---------|---------|
+| `kind`            | Object kind to consider for watch                       | String  |    ""   |
+| `labelSelector`   | Objects with these labels will be considered for watch  | Object  |    {}   |
+| `replicas`        | Number of watcher replicas to create                    | Integer |     0   |
 
 ### Objects
 
