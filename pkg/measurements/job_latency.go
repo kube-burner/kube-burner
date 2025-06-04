@@ -21,11 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -66,10 +63,6 @@ type jobMetric struct {
 
 type jobLatency struct {
 	BaseMeasurement
-	watcher          *watchers.Watcher
-	metrics          sync.Map
-	latencyQuantiles []any
-	normLatencies    []any
 }
 
 type jobLatencyMeasurementFactory struct {
@@ -77,7 +70,7 @@ type jobLatencyMeasurementFactory struct {
 }
 
 func newJobLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
-	if err := VerifyMeasurementConfig(measurement, supportedJobConditions); err != nil {
+	if err := verifyMeasurementConfig(measurement, supportedJobConditions); err != nil {
 		return nil, err
 	}
 	return jobLatencyMeasurementFactory{
@@ -87,7 +80,7 @@ func newJobLatencyMeasurementFactory(configSpec config.Spec, measurement types.M
 
 func (jlmf jobLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &jobLatency{
-		BaseMeasurement: jlmf.NewBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: jlmf.NewBaseLatency(jobConfig, clientSet, restConfig, jobLatencyMeasurement, jobLatencyQuantilesMeasurement),
 	}
 }
 
@@ -128,30 +121,23 @@ func (j *jobLatency) handleUpdateJob(obj any) {
 
 // start jobLatency measurement
 func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
-	// Reset latency slices, required in multi-job benchmarks
-	j.latencyQuantiles, j.normLatencies = nil, nil
 	defer measurementWg.Done()
-	j.metrics = sync.Map{}
-	log.Infof("Creating Job latency watcher for %s", j.JobConfig.Name)
-	j.watcher = watchers.NewWatcher(
-		j.ClientSet.BatchV1().RESTClient().(*rest.RESTClient),
-		"jobWatcher",
-		"jobs",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", j.Runid)
+	j.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    j.ClientSet.BatchV1().RESTClient().(*rest.RESTClient),
+				name:          "jobWatcher",
+				resource:      "jobs",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", j.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: j.handleCreateJob,
+					UpdateFunc: func(oldObj, newObj any) {
+						j.handleUpdateJob(newObj)
+					},
+				},
+			},
 		},
-		nil,
 	)
-	j.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: j.handleCreateJob,
-		UpdateFunc: func(oldObj, newObj any) {
-			j.handleUpdateJob(newObj)
-		},
-	})
-	if err := j.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Job Latency measurement error: %s", err)
-	}
 	return nil
 }
 
@@ -196,38 +182,14 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops jobLatency measurement
 func (j *jobLatency) Stop() error {
-	var err error
-	defer func() {
-		if j.watcher != nil {
-			j.watcher.StopWatcher()
-		}
-	}()
-	j.normalizeMetrics()
-	j.calcQuantiles()
-	if len(j.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(j.Config.LatencyThresholds, j.latencyQuantiles)
-	}
-	for _, q := range j.latencyQuantiles {
-		jq := q.(metrics.LatencyQuantiles)
-		log.Infof("jobLatency @ %v: %v 99th: %v max: %v avg: %v", j.JobConfig.Name, jq.QuantileName, jq.P99, jq.Max, jq.Avg)
-	}
-	return err
-}
-
-// index sends metrics to the configured indexer
-func (j *jobLatency) Index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]any{
-		jobLatencyMeasurement:          j.normLatencies,
-		jobLatencyQuantilesMeasurement: j.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(j.Config, jobName, metricMap, indexerList)
+	return j.stopMeasurement(j.normalizeMetrics, j.getLatency)
 }
 
 func (j *jobLatency) GetMetrics() *sync.Map {
 	return &j.metrics
 }
 
-func (j *jobLatency) normalizeMetrics() {
+func (j *jobLatency) normalizeMetrics() float64 {
 	j.metrics.Range(func(key, value any) bool {
 		m := value.(jobMetric)
 		// If a job does not reach the Complete state (this timestamp isn't set), we skip that job
@@ -244,15 +206,13 @@ func (j *jobLatency) normalizeMetrics() {
 		j.normLatencies = append(j.normLatencies, m)
 		return true
 	})
+	return 0
 }
 
-func (j *jobLatency) calcQuantiles() {
-	getLatency := func(normLatency any) map[string]float64 {
-		jobMetric := normLatency.(jobMetric)
-		return map[string]float64{
-			jobStartTimeMeasurement:     float64(jobMetric.StartTimeLatency),
-			string(batchv1.JobComplete): float64(jobMetric.CompletionLatency),
-		}
+func (j *jobLatency) getLatency(normLatency any) map[string]float64 {
+	jobMetric := normLatency.(jobMetric)
+	return map[string]float64{
+		jobStartTimeMeasurement:     float64(jobMetric.StartTimeLatency),
+		string(batchv1.JobComplete): float64(jobMetric.CompletionLatency),
 	}
-	j.latencyQuantiles = CalculateQuantiles(j.Uuid, j.JobConfig.Name, j.Metadata, j.normLatencies, getLatency, jobLatencyQuantilesMeasurement)
 }

@@ -94,7 +94,7 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 	config.KubeVirtOpRemoveVolume: nil,
 }
 
-func (ex *Executor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMapper) {
+func (ex *Executor) setupKubeVirtJob(mapper meta.RESTMapper) {
 	var err error
 
 	if len(ex.ExecutionMode) == 0 {
@@ -119,7 +119,7 @@ func (ex *Executor) setupKubeVirtJob(configSpec config.Spec, mapper meta.RESTMap
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, kubeVirtAPIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, mapper, kubeVirtAPIVersionV1))
 	}
 }
 
@@ -209,7 +209,7 @@ func getVolumeSourceFromVolume(ex *Executor, volumeName, namespace string) (*kub
 	return nil, fmt.Errorf("volume %s is not a DataVolume or PersistentVolumeClaim", volumeName)
 }
 
-func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]interface{}) error {
+func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
@@ -294,7 +294,7 @@ func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]int
 	return nil
 }
 
-func removeVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]interface{}) error {
+func removeVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")

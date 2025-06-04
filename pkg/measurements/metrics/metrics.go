@@ -27,23 +27,23 @@ import (
 
 // LatencyQuantiles holds the latency measurement quantiles
 type LatencyQuantiles struct {
-	QuantileName string      `json:"quantileName"`
-	UUID         string      `json:"uuid"`
-	P99          int         `json:"P99"`
-	P95          int         `json:"P95"`
-	P50          int         `json:"P50"`
-	Min          int         `json:"min"`
-	Max          int         `json:"max"`
-	Avg          int         `json:"avg"`
-	Timestamp    time.Time   `json:"timestamp"`
-	MetricName   string      `json:"metricName"`
-	JobName      string      `json:"jobName,omitempty"`
-	Metadata     interface{} `json:"metadata,omitempty"`
+	QuantileName string    `json:"quantileName"`
+	UUID         string    `json:"uuid"`
+	P99          int       `json:"P99"`
+	P95          int       `json:"P95"`
+	P50          int       `json:"P50"`
+	Min          int       `json:"min"`
+	Max          int       `json:"max"`
+	Avg          int       `json:"avg"`
+	Timestamp    time.Time `json:"timestamp"`
+	MetricName   string    `json:"metricName"`
+	JobName      string    `json:"jobName,omitempty"`
+	Metadata     any       `json:"metadata,omitempty"`
 }
 
 // CheckThreshold checks latency thresholds
 // returns a concatenated list of error strings with a new line between each string
-func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []interface{}) error {
+func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []any) error {
 	errs := []error{}
 	log.Info("Evaluating latency thresholds")
 	for _, phase := range thresholds {

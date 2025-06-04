@@ -26,8 +26,11 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"maps"
+
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMapper) {
+func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
+	var err error
+	var f io.Reader
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
@@ -44,7 +49,7 @@ func (ex *Executor) setupCreateJob(configSpec config.Spec, mapper meta.RESTMappe
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		f, err := util.GetReader(o.ObjectTemplate, configSpec.EmbedFS, configSpec.EmbedFSDir)
+		f, err = fileutils.GetWorkloadReader(o.ObjectTemplate, ex.embedCfg)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
@@ -91,12 +96,8 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	var wg sync.WaitGroup
 	var ns string
 	var err error
-	for label, value := range ex.NamespaceLabels {
-		nsLabels[label] = value
-	}
-	for annotation, value := range ex.NamespaceAnnotations {
-		nsAnnotations[annotation] = value
-	}
+	maps.Copy(nsLabels, ex.NamespaceLabels)
+	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
 		ns = ex.Namespace
 		if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
@@ -208,9 +209,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 		}
 		// make a copy of the labels map for each goroutine to prevent panic from concurrent read and write
 		copiedLabels := make(map[string]string)
-		for k, v := range labels {
-			copiedLabels[k] = v
-		}
+		maps.Copy(copiedLabels, labels)
 		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
 
 		wg.Add(1)
@@ -222,9 +221,7 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 			// Re-decode rendered object
 			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
 
-			for k, v := range newObject.GetLabels() {
-				copiedLabels[k] = v
-			}
+			maps.Copy(copiedLabels, newObject.GetLabels())
 			newObject.SetLabels(copiedLabels)
 			setMetadataLabels(newObject, copiedLabels)
 

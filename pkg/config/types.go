@@ -15,7 +15,6 @@
 package config
 
 import (
-	"embed"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
@@ -60,10 +59,6 @@ type Spec struct {
 	GlobalConfig GlobalConfig `yaml:"global"`
 	// Jobs list of kube-burner jobs
 	Jobs []Job `yaml:"jobs"`
-	// EmbedFS embed filesystem instance
-	EmbedFS *embed.FS
-	// EmbedFSDir Directory in which the configuration files are in the embed filesystem
-	EmbedFSDir string
 }
 
 // metricEndpoint describes prometheus endpoint to scrape
@@ -115,7 +110,7 @@ type Object struct {
 	Replicas int `yaml:"replicas" json:"replicas,omitempty"`
 	// InputVars contains a map of arbitrary input variables
 	// that can be introduced by users
-	InputVars map[string]interface{} `yaml:"inputVars" json:"inputVars,omitempty"`
+	InputVars map[string]any `yaml:"inputVars" json:"inputVars,omitempty"`
 	// Kind object kind to delete
 	Kind string `yaml:"kind" json:"kind,omitempty"`
 	// The type of patch mode
@@ -127,7 +122,7 @@ type Object struct {
 	// Wait for resource to be ready, it doesn't apply to all resources
 	Wait bool `yaml:"wait" json:"wait"`
 	// WaitOptions define custom behaviors when waiting for objects creation
-	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions,omitempty"`
+	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions"`
 	// Run Once to create the object only once incase of multiple iterative jobs
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
 	// KubeVirt Operation

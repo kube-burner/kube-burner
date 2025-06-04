@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"maps"
+
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
@@ -50,7 +52,7 @@ var configSpec = Spec{
 }
 
 // UnmarshalYAML unmarshals YAML data into the Indexer struct.
-func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawIndexer MetricsEndpoint
 	indexer := rawIndexer{
 		IndexerConfig: indexers.IndexerConfig{
@@ -69,7 +71,7 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(interface{}) error) error
 }
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
-func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
 		Wait: true,
@@ -95,7 +97,7 @@ func (w *Watcher) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // UnmarshalYAML implements Unmarshaller to customize job defaults
-func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawJob Job
 	raw := rawJob{
 		Cleanup:                true,
@@ -131,15 +133,13 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func getInputData(userDataFileReader io.Reader, additionalVars map[string]interface{}) (map[string]interface{}, error) {
-	inputData := make(map[string]interface{})
+func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (map[string]any, error) {
+	inputData := make(map[string]any)
 	// First copy from additionalVars
-	for key, value := range additionalVars {
-		inputData[key] = value
-	}
+	maps.Copy(inputData, additionalVars)
 	// If a userDataFileReader was provided use it to override values
 	if userDataFileReader != nil {
-		userDataFileVars := make(map[string]interface{})
+		userDataFileVars := make(map[string]any)
 		userData, err := io.ReadAll(userDataFileReader)
 		if err != nil {
 			return nil, fmt.Errorf("error reading user data file: %w", err)
@@ -148,14 +148,10 @@ func getInputData(userDataFileReader io.Reader, additionalVars map[string]interf
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse file: %w", err)
 		}
-		for key, value := range userDataFileVars {
-			inputData[key] = value
-		}
+		maps.Copy(inputData, userDataFileVars)
 	}
 	// Add all entries from environment variables, overriding duplicates
-	for key, value := range util.EnvToMap() {
-		inputData[key] = value
-	}
+	maps.Copy(inputData, util.EnvToMap())
 	return inputData, nil
 }
 
@@ -164,7 +160,7 @@ func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec
 }
 
 // Parse parses a configuration file
-func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]interface{}) (Spec, error) {
+func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]any) (Spec, error) {
 	cfg, err := io.ReadAll(configFileReader)
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)

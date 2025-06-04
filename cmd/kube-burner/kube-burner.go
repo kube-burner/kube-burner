@@ -31,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -102,13 +103,13 @@ func initCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			configFileReader, err := util.GetReader(configFile, nil, "")
+			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
 			var userDataFileReader io.Reader
 			if userDataFile != "" {
-				userDataFileReader, err = util.GetReader(userDataFile, nil, "")
+				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
 				if err != nil {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
@@ -129,7 +130,7 @@ func initCmd() *cobra.Command {
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil)
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil, nil)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(rc)
@@ -218,7 +219,7 @@ func measureCmd() *cobra.Command {
 	var userMetadata string
 	var kubeConfig, kubeContext string
 	indexerList := make(map[string]indexers.Indexer)
-	metadata := make(map[string]interface{})
+	metadata := make(map[string]any)
 	cmd := &cobra.Command{
 		Use:   "measure",
 		Short: "Take measurements for a given set of resources without running workload",
@@ -228,7 +229,7 @@ func measureCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
-			f, err := util.GetReader(configFile, nil, "")
+			f, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
@@ -472,7 +473,7 @@ func alertCmd() *cobra.Command {
 				Start: time.Unix(start, 0),
 				End:   time.Unix(end, 0),
 			}
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil, nil); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(job)

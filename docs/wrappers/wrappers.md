@@ -6,13 +6,20 @@ It's possible to extend and take advantage of the kube-burner's features by deve
 
 There're some helper functions meant to be consumed by wrappers in the `workloads` package. These functions provide some shortcuts to incorporate workloads in golang embedded filesystems.
 
+In order to start a new wrapper you need to instantiate a new `WorkloadHelper` by calling `workloads.NewWorkloadHelper()`.
+
+```golang
+wh := workloads.NewWorkloadHelper(config.Config, embedFS, "workloads", "metrics", "alerts", "scripts", &config.KubeClientProvider)
+returnCode := wh.Run("workload.yaml")
+```
+
 ## Customizing template rendering
 
 It's possible to provide custom template rendering functions from a wrapper, this can be done by calling the function `AddRenderingFunction()` of the util package. For example:
 
 ```golang
 util.AddRenderingFunction("isEven", func(n int) bool {
-    return n%2 == 0
+    return n % 2 == 0
 })
 ```
 

@@ -48,7 +48,7 @@ func init() {
 	funcMap["GetIPAddress"] = func(Addresses string, iteration int, addressesPerIteration int) string { // TODO Move this function to kube-burner-ocp
 		var retAddrs []string
 		addrSlice := strings.Split(Addresses, " ")
-		for i := 0; i < addressesPerIteration; i++ {
+		for i := range addressesPerIteration {
 			// For example, if iteration=6 and addressesPerIteration=2, return 12th address from list.
 			// All addresses till 12th address were used in previous job iterations
 			retAddrs = append(retAddrs, addrSlice[(iteration*addressesPerIteration)+i])
@@ -91,7 +91,7 @@ func AddRenderingFunction(name string, function any) {
 }
 
 // RenderTemplate renders a go-template
-func RenderTemplate(original []byte, inputData interface{}, options templateOption, functionTemplates []string) ([]byte, error) {
+func RenderTemplate(original []byte, inputData any, options templateOption, functionTemplates []string) ([]byte, error) {
 	var rendered bytes.Buffer
 	t, err := template.New("").Option(string(options)).Funcs(funcMap).Parse(string(original))
 	if err != nil {
@@ -112,8 +112,8 @@ func RenderTemplate(original []byte, inputData interface{}, options templateOpti
 }
 
 // EnvToMap returns the host environment variables as a map
-func EnvToMap() map[string]interface{} {
-	envMap := make(map[string]interface{})
+func EnvToMap() map[string]any {
+	envMap := make(map[string]any)
 	for _, v := range os.Environ() {
 		envVar := strings.SplitN(v, "=", 2)
 		envMap[envVar[0]] = envVar[1]

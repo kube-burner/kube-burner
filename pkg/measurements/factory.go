@@ -27,7 +27,7 @@ import (
 )
 
 type MeasurementsFactory struct {
-	Metadata  map[string]interface{}
+	Metadata  map[string]any
 	Factories map[string]MeasurementFactory
 }
 
@@ -38,7 +38,7 @@ type Measurements struct {
 type MeasurementFactory interface {
 	NewMeasurement(*config.Job, kubernetes.Interface, *rest.Config) Measurement
 }
-type NewMeasurementFactory func(config.Spec, types.Measurement, map[string]interface{}) (MeasurementFactory, error)
+type NewMeasurementFactory func(config.Spec, types.Measurement, map[string]any) (MeasurementFactory, error)
 
 type Measurement interface {
 	Start(*sync.WaitGroup) error
@@ -74,7 +74,7 @@ func isIndexerOk(configSpec config.Spec, measurement types.Measurement) bool {
 }
 
 // NewMeasurementsFactory initializes the measurement facture
-func NewMeasurementsFactory(configSpec config.Spec, metadata map[string]interface{}, additionalMeasurementFactoryMap map[string]NewMeasurementFactory) *MeasurementsFactory {
+func NewMeasurementsFactory(configSpec config.Spec, metadata map[string]any, additionalMeasurementFactoryMap map[string]NewMeasurementFactory) *MeasurementsFactory {
 	// Add from additionalMeasurementFactoryMap without overwriting
 	for k, v := range additionalMeasurementFactoryMap {
 		if _, exists := measurementFactoryMap[k]; !exists {
