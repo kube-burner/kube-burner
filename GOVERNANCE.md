@@ -98,8 +98,13 @@ and can be rapidly returned to Maintainer status if their availability changes.
 ## Meetings
 
 Time zones permitting, Maintainers are expected to participate in the public
-developer meeting, which occurs
-[TODO: Details of regular developer or maintainer meeting here].  
+developer meeting
+
+When: Every two Mondays
+Time: 9:00 AM (America/New York) 3:00 PM (Europe/Madrid)
+Where: [Zoom meeting](https://zoom-lfx.platform.linuxfoundation.org/meeting/93448055215?password=a34445ac-64af-4e01-9446-3864dff5a243)
+CNCF's [Calendar](https://zoom-lfx.platform.linuxfoundation.org/meetings/cncf?view=week)
+Meeting Notes: [Link](https://docs.google.com/document/d/1r_hfPO1fvtmP7spcYO1XJL87t1b1l9SAQfP9AiwaX48/edit?tab=t.0)
 
 Maintainers will also have closed meetings in order to discuss security reports
 or Code of Conduct violations.  Such meetings should be scheduled by any
