@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -107,7 +108,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					watcherManager.Start(watcher.Kind, watcher.LabelSelector, idx+1, replica+1)
 				}
 			}
-			watcherManager.Wait()
+			watcherStartErrors := watcherManager.Wait()
+			slices.Concat(errs, watcherStartErrors)
 			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = job.Name
@@ -202,7 +204,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				measurementsInstance = nil
 			}
-			watcherManager.StopAll()
+			watcherStopErrs := watcherManager.StopAll()
+			slices.Concat(errs, watcherStopErrs)
 		}
 		if globalConfig.WaitWhenFinished {
 			runWaitList(globalWaitMap, executorMap)

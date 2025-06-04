@@ -218,7 +218,7 @@ type WaitOptions struct {
 }
 
 type Watcher struct {
-	// Kind object kind to consider for wait
+	// Kind object kind to consider for watch
 	Kind string `yaml:"kind" json:"kind,omitempty"`
 	// LabelSelector objects with these labels will be considered
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`

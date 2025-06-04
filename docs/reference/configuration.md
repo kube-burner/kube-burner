@@ -150,11 +150,11 @@ Examples of valid configuration files can be found in the [examples folder](http
 
 We have watchers support during the benchmark workload. It is at a job level and will be usefull in scenarios where want to monitor overhead created by watchers on a cluster.
 
-| Option       | Description                                             | Type    | Default |
-|--------------|---------------------------------------------------------|---------|---------|
-| `kind` | Object kind to consider for watch | String | "" |
-| `labelSelector` | Objects with these labels will be considered for watch | Object | {} |
-| `replicas` | Number of watcher replicas to create | int  | 0 |
+| Option            | Description                                             | Type    | Default |
+|-------------------|---------------------------------------------------------|---------|---------|
+| `kind`            | Object kind to consider for watch                       | String  |    ""   |
+| `labelSelector`   | Objects with these labels will be considered for watch  | Object  |    {}   |
+| `replicas`        | Number of watcher replicas to create                    | Integer |     0   |
 
 ### Objects
 
