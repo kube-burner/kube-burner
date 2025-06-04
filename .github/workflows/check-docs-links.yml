@@ -28,7 +28,7 @@ jobs:
         run: mkdocs build
 
       - name: Link Checker
-        uses: lycheeverse/lychee-action@v2.4.0
+        uses: lycheeverse/lychee-action@v2.4.1
         with:
           args: --verbose --no-progress --exclude-mail --exclude-loopback './docs/**/*.md'
           fail: true
