@@ -95,8 +95,13 @@ func (plmf podLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 func (p *podLatency) handleCreatePod(obj interface{}) {
 	pod := obj.(*corev1.Pod)
 	podLabels := pod.GetLabels()
+	creationTs := pod.CreationTimestamp.Time.UTC()
+	// If current timestamp is before the creation timestamp, use it
+	if time.Now().UTC().Before(pod.CreationTimestamp.Time.UTC()) {
+		creationTs = time.Now().UTC()
+	}
 	p.metrics.LoadOrStore(string(pod.UID), podMetric{
-		Timestamp:    pod.CreationTimestamp.Time.UTC(),
+		Timestamp:    creationTs,
 		Namespace:    pod.Namespace,
 		Name:         pod.Name,
 		MetricName:   podLatencyMeasurement,
@@ -110,6 +115,7 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 
 func (p *podLatency) handleUpdatePod(obj interface{}) {
 	pod := obj.(*corev1.Pod)
+	now := time.Now().UTC()
 	if value, exists := p.metrics.Load(string(pod.UID)); exists {
 		pm := value.(podMetric)
 		if pm.podReady.IsZero() {
@@ -119,24 +125,44 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 					switch c.Type {
 					case corev1.PodScheduled:
 						if pm.scheduled.IsZero() {
-							pm.scheduled = c.LastTransitionTime.Time.UTC()
+							if now.Before(c.LastTransitionTime.Time.UTC()) {
+								pm.scheduled = now
+							} else {
+								pm.scheduled = c.LastTransitionTime.Time.UTC()
+							}
 							pm.NodeName = pod.Spec.NodeName
 						}
 					case corev1.PodReadyToStartContainers:
 						if pm.readyToStartContainers.IsZero() {
-							pm.readyToStartContainers = c.LastTransitionTime.Time.UTC()
+							if now.Before(c.LastTransitionTime.Time.UTC()) {
+								pm.readyToStartContainers = now
+							} else {
+								pm.readyToStartContainers = c.LastTransitionTime.Time.UTC()
+							}
 						}
 					case corev1.PodInitialized:
 						if pm.initialized.IsZero() {
-							pm.initialized = c.LastTransitionTime.Time.UTC()
+							if now.Before(c.LastTransitionTime.Time.UTC()) {
+								pm.initialized = now
+							} else {
+								pm.initialized = c.LastTransitionTime.Time.UTC()
+							}
 						}
 					case corev1.ContainersReady:
 						if pm.containersReady.IsZero() {
-							pm.containersReady = c.LastTransitionTime.Time.UTC()
+							if now.Before(c.LastTransitionTime.Time.UTC()) {
+								pm.containersReady = now
+							} else {
+								pm.containersReady = c.LastTransitionTime.Time.UTC()
+							}
 						}
 					case corev1.PodReady:
 						log.Debugf("Pod %s is ready", pod.Name)
-						pm.podReady = c.LastTransitionTime.Time.UTC()
+						if now.Before(c.LastTransitionTime.Time.UTC()) {
+							pm.podReady = now
+						} else {
+							pm.podReady = c.LastTransitionTime.Time.UTC()
+						}
 					}
 				}
 			}
