@@ -29,7 +29,9 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/rest"
 )
@@ -86,6 +88,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	defer cancel()
 	go func() {
 		var innerRC int
+		clientSet, _ := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobList = newExecutorList(configSpec, kubeClientProvider)
 		handlePreloadImages(jobList, kubeClientProvider)
@@ -97,6 +100,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
 			})
+			watcherManager := watchers.NewWatcherManager(clientSet, rate.NewLimiter(rate.Limit(job.QPS), job.Burst))
+			for idx, watcher := range job.Watchers {
+				for replica := range watcher.Replicas {
+					watcherManager.Start(watcher.Kind, watcher.LabelSelector, idx+1, replica+1)
+				}
+			}
+			watcherManager.Wait()
 			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = job.Name
@@ -191,6 +201,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				measurementsInstance = nil
 			}
+			watcherManager.StopAll()
 		}
 		if globalConfig.WaitWhenFinished {
 			runWaitList(globalWaitMap, executorMap)

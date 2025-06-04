@@ -23,6 +23,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +67,7 @@ type NodeMetric struct {
 type nodeLatency struct {
 	BaseMeasurement
 
-	watcher          *metrics.Watcher
+	watcher          *watchers.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
@@ -142,7 +143,7 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 	n.Collect(&wg)
 	wg.Wait()
 	log.Infof("Creating Node latency watcher for %s", n.JobConfig.Name)
-	n.watcher = metrics.NewWatcher(
+	n.watcher = watchers.NewWatcher(
 		n.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"nodeWatcher",
 		"nodes",

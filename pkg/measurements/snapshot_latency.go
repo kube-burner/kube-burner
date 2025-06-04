@@ -36,6 +36,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 )
 
 const (
@@ -70,7 +71,7 @@ type volumeSnapshotMetric struct {
 type volumeSnapshotLatency struct {
 	BaseMeasurement
 
-	watcher          *metrics.Watcher
+	watcher          *watchers.Watcher
 	metrics          sync.Map
 	latencyQuantiles []any
 	normLatencies    []any
@@ -131,7 +132,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 	vsl.latencyQuantiles, vsl.normLatencies = nil, nil
 	vsl.metrics = sync.Map{}
 	log.Infof("Creating Data Volume latency watcher for %s", vsl.JobConfig.Name)
-	vsl.watcher = metrics.NewWatcher(
+	vsl.watcher = watchers.NewWatcher(
 		getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
 		"vsWatcher",
 		"volumesnapshots",

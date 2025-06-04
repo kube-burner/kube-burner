@@ -25,6 +25,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,7 +66,7 @@ type jobMetric struct {
 
 type jobLatency struct {
 	BaseMeasurement
-	watcher          *metrics.Watcher
+	watcher          *watchers.Watcher
 	metrics          sync.Map
 	latencyQuantiles []any
 	normLatencies    []any
@@ -132,7 +133,7 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	j.metrics = sync.Map{}
 	log.Infof("Creating Job latency watcher for %s", j.JobConfig.Name)
-	j.watcher = metrics.NewWatcher(
+	j.watcher = watchers.NewWatcher(
 		j.ClientSet.BatchV1().RESTClient().(*rest.RESTClient),
 		"jobWatcher",
 		"jobs",

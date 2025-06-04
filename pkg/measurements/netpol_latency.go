@@ -32,6 +32,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -89,7 +90,7 @@ type netpolLatency struct {
 	embedFS    *embed.FS
 	embedFSDir string
 
-	netpolWatcher    *metrics.Watcher
+	netpolWatcher    *watchers.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
@@ -511,7 +512,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 
 	// Create watchers to record network policy creation timestamp
 	log.Infof("Creating netpol latency watcher for %s", n.JobConfig.Name)
-	n.netpolWatcher = metrics.NewWatcher(
+	n.netpolWatcher = watchers.NewWatcher(
 		n.ClientSet.NetworkingV1().RESTClient().(*rest.RESTClient),
 		"netpolWatcher",
 		"networkpolicies",

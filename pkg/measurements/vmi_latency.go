@@ -23,6 +23,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,9 +93,9 @@ type vmiMetric struct {
 type vmiLatency struct {
 	BaseMeasurement
 
-	vmWatcher        *metrics.Watcher
-	vmiWatcher       *metrics.Watcher
-	vmiPodWatcher    *metrics.Watcher
+	vmWatcher        *watchers.Watcher
+	vmiWatcher       *watchers.Watcher
+	vmiPodWatcher    *watchers.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
@@ -276,7 +277,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 	vmi.metrics = sync.Map{}
 	log.Infof("Creating VM latency watcher for %s", vmi.JobConfig.Name)
 	restClient := newRESTClientWithRegisteredKubevirtResource(vmi.RestConfig)
-	vmi.vmWatcher = metrics.NewWatcher(
+	vmi.vmWatcher = watchers.NewWatcher(
 		restClient,
 		"vmWatcher",
 		"virtualmachines",
@@ -297,7 +298,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 	}
 
 	log.Infof("Creating VMI latency watcher for %s", vmi.JobConfig.Name)
-	vmi.vmiWatcher = metrics.NewWatcher(
+	vmi.vmiWatcher = watchers.NewWatcher(
 		restClient,
 		"vmiWatcher",
 		"virtualmachineinstances",
@@ -318,7 +319,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 	}
 
 	log.Infof("Creating VMI Pod latency watcher for %s", vmi.JobConfig.Name)
-	vmi.vmiPodWatcher = metrics.NewWatcher(
+	vmi.vmiPodWatcher = watchers.NewWatcher(
 		vmi.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"podWatcher",
 		"pods",

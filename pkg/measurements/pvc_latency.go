@@ -23,6 +23,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +67,7 @@ type pvcMetric struct {
 
 type pvcLatency struct {
 	BaseMeasurement
-	watcher          *metrics.Watcher
+	watcher          *watchers.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
@@ -154,7 +155,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	p.metrics = sync.Map{}
 	log.Infof("Creating PVC latency watcher for %s", p.JobConfig.Name)
-	p.watcher = metrics.NewWatcher(
+	p.watcher = watchers.NewWatcher(
 		p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"pvcWatcher",
 		"persistentvolumeclaims",

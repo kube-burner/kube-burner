@@ -35,6 +35,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 )
 
 const (
@@ -75,7 +76,7 @@ type dvMetric struct {
 type dvLatency struct {
 	BaseMeasurement
 
-	watcher          *metrics.Watcher
+	watcher          *watchers.Watcher
 	metrics          sync.Map
 	latencyQuantiles []interface{}
 	normLatencies    []interface{}
@@ -165,7 +166,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 	dv.latencyQuantiles, dv.normLatencies = nil, nil
 	dv.metrics = sync.Map{}
 	log.Infof("Creating Data Volume latency watcher for %s", dv.JobConfig.Name)
-	dv.watcher = metrics.NewWatcher(
+	dv.watcher = watchers.NewWatcher(
 		getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
 		"dvWatcher",
 		"datavolumes",

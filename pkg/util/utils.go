@@ -17,10 +17,13 @@ package util
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // RetryWithExponentialBackOff a utility for retrying the given function with exponential backoff.
@@ -111,4 +114,53 @@ func GetStringValue(m map[string]interface{}, key string) *string {
 		}
 	}
 	return ret
+}
+
+// ResourceToRESTClient maps resource kind to appropriate REST client
+func ResourceToRESTClient(clientset kubernetes.Interface, kind string) (*rest.RESTClient, error) {
+	kind = strings.ToLower(kind)
+	switch kind {
+	// CoreV1 resources
+	case "pod", "pods",
+		"service", "services",
+		"endpoints",
+		"configmap", "configmaps",
+		"secret", "secrets",
+		"persistentvolume", "persistentvolumes",
+		"persistentvolumeclaim", "persistentvolumeclaims",
+		"node", "nodes",
+		"namespace", "namespaces",
+		"event", "events",
+		"serviceaccount", "serviceaccounts",
+		"limitrange", "limitranges",
+		"resourcequota", "resourcequotas":
+		return clientset.CoreV1().RESTClient().(*rest.RESTClient), nil
+
+	// AppsV1 resources
+	case "deployment", "deployments",
+		"statefulset", "statefulsets",
+		"daemonset", "daemonsets",
+		"replicaset", "replicasets":
+		return clientset.AppsV1().RESTClient().(*rest.RESTClient), nil
+
+	// BatchV1 resources
+	case "job", "jobs",
+		"cronjob", "cronjobs":
+		return clientset.BatchV1().RESTClient().(*rest.RESTClient), nil
+
+	// NetworkingV1 resources
+	case "ingress", "ingresses",
+		"networkpolicy", "networkpolicies":
+		return clientset.NetworkingV1().RESTClient().(*rest.RESTClient), nil
+
+	// RBACV1 resources
+	case "role", "roles",
+		"clusterrole", "clusterroles",
+		"rolebinding", "rolebindings",
+		"clusterrolebinding", "clusterrolebindings":
+		return clientset.RbacV1().RESTClient().(*rest.RESTClient), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported resource kind: %s", kind)
+	}
 }

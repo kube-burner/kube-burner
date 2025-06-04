@@ -26,6 +26,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,8 +45,8 @@ const (
 type serviceLatency struct {
 	BaseMeasurement
 
-	svcWatcher       *metrics.Watcher
-	epWatcher        *metrics.Watcher
+	svcWatcher       *watchers.Watcher
+	epWatcher        *watchers.Watcher
 	epLister         lcorev1.EndpointsLister
 	svcLister        lcorev1.ServiceLister
 	metrics          sync.Map
@@ -174,7 +175,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 		return err
 	}
 	log.Infof("Creating service latency watcher for %s", s.JobConfig.Name)
-	s.svcWatcher = metrics.NewWatcher(
+	s.svcWatcher = watchers.NewWatcher(
 		s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"svcWatcher",
 		"services",
@@ -187,7 +188,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	s.svcWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: s.handleCreateSvc,
 	})
-	s.epWatcher = metrics.NewWatcher(
+	s.epWatcher = watchers.NewWatcher(
 		s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
 		"epWatcher",
 		"endpoints",

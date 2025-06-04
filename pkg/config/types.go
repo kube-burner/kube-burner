@@ -148,6 +148,8 @@ type Job struct {
 	Name string `yaml:"name" json:"name,omitempty"`
 	// Objects list of objects
 	Objects []Object `yaml:"objects" json:"-"`
+	// Watchers list of watchers
+	Watchers []Watcher `yaml:"watchers" json:"-"`
 	// JobType type of job
 	JobType JobType `yaml:"jobType" json:"jobType,omitempty"`
 	// Max number of queries per second
@@ -218,6 +220,15 @@ type WaitOptions struct {
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// CustomStatusPaths defines the list of jq path specific status fields to check (e.g., [{"key":".[]conditions.type","value":"Available"}]).
 	CustomStatusPaths []StatusPath `yaml:"customStatusPaths" json:"customStatusPaths,omitempty"`
+}
+
+type Watcher struct {
+	// Kind object kind to consider for wait
+	Kind string `yaml:"kind" json:"kind,omitempty"`
+	// LabelSelector objects with these labels will be considered
+	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
+	// Replicas number of replicas to create of the given object
+	Replicas int `yaml:"replicas" json:"replicas,omitempty"`
 }
 
 // StatusPath defines the structure for each key-value pair in CustomStatusPath.
