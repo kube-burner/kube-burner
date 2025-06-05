@@ -339,7 +339,7 @@ func (vmi *vmiLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops vmiLatency measurement
 func (vmi *vmiLatency) Stop() error {
-	return vmi.stopMeasurement(vmi.normalizeMetrics, vmi.getLatency)
+	return vmi.StopMeasurement(vmi.normalizeMetrics, vmi.getLatency)
 }
 
 func (vmi *vmiLatency) normalizeMetrics() float64 {

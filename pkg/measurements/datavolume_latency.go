@@ -174,7 +174,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 }
 
 func (dv *dvLatency) Stop() error {
-	return dv.stopMeasurement(dv.normalizeMetrics, dv.getLatency)
+	return dv.StopMeasurement(dv.normalizeMetrics, dv.getLatency)
 }
 
 func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {

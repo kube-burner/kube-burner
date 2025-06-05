@@ -216,7 +216,7 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops podLatency measurement
 func (p *podLatency) Stop() error {
-	return p.stopMeasurement(p.normalizeMetrics, p.getLatency)
+	return p.StopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 
 func (p *podLatency) normalizeMetrics() float64 {

@@ -139,7 +139,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 }
 
 func (vsl *volumeSnapshotLatency) Stop() error {
-	return vsl.stopMeasurement(vsl.normalizeMetrics, vsl.getLatency)
+	return vsl.StopMeasurement(vsl.normalizeMetrics, vsl.getLatency)
 }
 
 func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {

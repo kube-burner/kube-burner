@@ -179,7 +179,7 @@ func getStorageClassName(pvc corev1.PersistentVolumeClaim) string {
 
 // stop pvc latency measurement
 func (p *pvcLatency) Stop() error {
-	return p.stopMeasurement(p.normalizeMetrics, p.getLatency)
+	return p.StopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 
 // normalizes pvc latency metrics
