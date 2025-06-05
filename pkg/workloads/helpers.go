@@ -95,6 +95,7 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVar
 		SummaryMetadata: wh.SummaryMetadata,
 		MetricsMetadata: wh.MetricsMetadata,
 		UserMetaData:    wh.UserMetadata,
+		EmbedCfg:        wh.embedCfg,
 	})
 	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, additionalMeasurementFactoryMap, wh.embedCfg)
 	if err != nil {
