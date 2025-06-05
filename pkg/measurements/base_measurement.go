@@ -99,7 +99,7 @@ func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, getL
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")
 		return fmt.Errorf("something is wrong with system under test. %v latencies error rate was: %.2f", bm.MeasurementName, errorRate)
 	}
-	bm.calculateQuantiles(getLatency)
+	bm.CalculateQuantiles(getLatency)
 	if len(bm.Config.LatencyThresholds) > 0 {
 		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.latencyQuantiles)
 	}
@@ -108,7 +108,7 @@ func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, getL
 		log.Infof("%s: %v 99th: %v max: %v avg: %v", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
-		log.Infof("DV latencies error rate was: %.2f", errorRate)
+		log.Infof("%v error rate was: %.2f", bm.MeasurementName, errorRate)
 	}
 	return err
 }
@@ -122,11 +122,11 @@ func (bm *BaseMeasurement) Index(jobName string, indexerList map[string]indexers
 		bm.MeasurementName:          bm.normLatencies,
 		bm.QuantilesMeasurementName: bm.latencyQuantiles,
 	}
-	bm.indexLatencyMeasurement(jobName, metricMap, indexerList)
+	bm.IndexLatencyMeasurement(jobName, metricMap, indexerList)
 }
 
 // Keep this method to allow reuse when overriding Index
-func (bm *BaseMeasurement) indexLatencyMeasurement(jobName string, metricMap map[string][]any, indexerList map[string]indexers.Indexer) {
+func (bm *BaseMeasurement) IndexLatencyMeasurement(jobName string, metricMap map[string][]any, indexerList map[string]indexers.Indexer) {
 	indexDocuments := func(indexer indexers.Indexer, metricName string, data []any) {
 		log.Infof("Indexing metric %s", metricName)
 		indexingOpts := indexers.IndexingOpts{
@@ -159,7 +159,7 @@ func (bm *BaseMeasurement) indexLatencyMeasurement(jobName string, metricMap map
 
 // Common function to calculate quantiles for both node and pod latencies
 // Receives a function to get the latencies for each condition
-func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]float64) {
+func (bm *BaseMeasurement) CalculateQuantiles(getLatency func(any) map[string]float64) {
 	quantileMap := map[string][]float64{}
 	for _, normLatency := range bm.normLatencies {
 		for condition, latency := range getLatency(normLatency) {
