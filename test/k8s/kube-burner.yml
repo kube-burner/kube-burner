@@ -45,6 +45,12 @@ jobs:
     jobIterations: {{ add .JOB_ITERATIONS 1 }}
     qps: {{ .QPS }}
     burst: {{ .BURST }}
+    watchers:
+    - kind: Deployment
+      labelSelector: {foo: bar}
+    - kind: Pod
+      labelSelector: {foo: bar}
+      replicas: 2
     namespacedIterations: true
     preLoadImages: true
     preLoadPeriod: 2s
