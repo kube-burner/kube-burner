@@ -91,7 +91,7 @@ func (bm *BaseMeasurement) stopWatchers() {
 	}
 }
 
-func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, getLatency func(any) map[string]float64) error {
+func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getLatency func(any) map[string]float64) error {
 	var err error
 	defer bm.stopWatchers()
 	errorRate := normalizeMetrics()
@@ -108,7 +108,7 @@ func (bm *BaseMeasurement) stopMeasurement(normalizeMetrics func() float64, getL
 		log.Infof("%s: %v 99th: %v max: %v avg: %v", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
-		log.Infof("DV latencies error rate was: %.2f", errorRate)
+		log.Infof("%v error rate was: %.2f", bm.MeasurementName, errorRate)
 	}
 	return err
 }

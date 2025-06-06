@@ -94,6 +94,7 @@ func NewAlertManager(alertProfileCfg, uuid string, prometheusClient *prometheus.
 		uuid:       uuid,
 		indexer:    indexer,
 		metadata:   metadata,
+		embedCfg:   embedCfg,
 	}
 	if err := a.readProfile(alertProfileCfg); err != nil {
 		return &a, err

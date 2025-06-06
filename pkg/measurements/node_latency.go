@@ -193,7 +193,7 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 }
 
 func (n *nodeLatency) Stop() error {
-	return n.stopMeasurement(n.normalizeLatencies, n.getLatency)
+	return n.StopMeasurement(n.normalizeLatencies, n.getLatency)
 }
 
 func (n *nodeLatency) normalizeLatencies() float64 {

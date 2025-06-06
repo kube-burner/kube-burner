@@ -182,7 +182,7 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops jobLatency measurement
 func (j *jobLatency) Stop() error {
-	return j.stopMeasurement(j.normalizeMetrics, j.getLatency)
+	return j.StopMeasurement(j.normalizeMetrics, j.getLatency)
 }
 
 func (j *jobLatency) GetMetrics() *sync.Map {
