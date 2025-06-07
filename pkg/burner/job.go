@@ -79,6 +79,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	globalWaitMap := make(map[string][]string)
 	executorMap := make(map[string]Executor)
 	returnMap := make(map[string]returnPair)
+	timeoutGCStarted := false
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
 	defer cancel()
@@ -226,18 +227,22 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
 		log.Error(err.Error())
 		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
-		gcCtx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
-		defer cancel()
-		for _, job := range jobList[:len(executedJobs)-1] {
-			gcWg.Add(1)
-			go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
+		if globalConfig.GC {
+			gcCtx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+			defer cancel()
+			for _, job := range jobList[:len(executedJobs)-1] {
+				gcWg.Add(1)
+				go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
+			}
+			timeoutGCStarted = true
 		}
 		errs = append(errs, err)
 		rc = rcTimeout
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
-	if globalConfig.GC && !globalConfig.GCMetrics {
+	// Also wait if timeout GC was started, regardless of GCMetrics setting
+	if globalConfig.GC && (!globalConfig.GCMetrics || timeoutGCStarted) {
 		log.Info("Garbage collecting jobs")
 		gcWg.Wait()
 	}
