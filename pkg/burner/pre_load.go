@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"time"
 
+	"maps"
+
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -94,7 +96,7 @@ func getJobImages(job Executor) ([]string, error) {
 	var imageList []string
 	var unstructuredObject unstructured.Unstructured
 	for _, object := range job.objects {
-		renderedObj, err := util.RenderTemplate(object.objectSpec, object.InputVars, util.MissingKeyZero)
+		renderedObj, err := util.RenderTemplate(object.objectSpec, object.InputVars, util.MissingKeyZero, job.functionTemplates)
 		if err != nil {
 			return imageList, err
 		}
@@ -140,12 +142,8 @@ func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabe
 		"kube-burner-preload": "true",
 	}
 	nsAnnotations := make(map[string]string)
-	for label, value := range namespaceLabels {
-		nsLabels[label] = value
-	}
-	for annotation, value := range namespaceAnnotations {
-		nsAnnotations[annotation] = value
-	}
+	maps.Copy(nsLabels, namespaceLabels)
+	maps.Copy(nsAnnotations, namespaceAnnotations)
 	if err := util.CreateNamespace(clientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
 		log.Fatal(err)
 	}

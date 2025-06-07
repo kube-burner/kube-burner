@@ -17,7 +17,6 @@ package measurements
 import (
 	"bytes"
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,12 +25,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
+	"maps"
+	"slices"
+
 	kconfig "github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -85,14 +87,7 @@ type ProxyResponse struct {
 }
 
 type netpolLatency struct {
-	baseLatencyMeasurement
-	embedFS    *embed.FS
-	embedFSDir string
-
-	netpolWatcher    *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
+	BaseMeasurement
 }
 
 type netpolMetric struct {
@@ -103,29 +98,23 @@ type netpolMetric struct {
 	UUID            string        `json:"uuid"`
 	Namespace       string        `json:"namespace"`
 	Name            string        `json:"netpol"`
-	Metadata        interface{}   `json:"metadata,omitempty"`
+	Metadata        any           `json:"metadata,omitempty"`
 	JobName         string        `json:"jobName,omitempty"`
 }
 
 type netpolLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
-	embedFS    *embed.FS
-	embedFSDir string
+	BaseMeasurementFactory
 }
 
-func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	return netpolLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
-		embedFS:                       configSpec.EmbedFS,
-		embedFSDir:                    configSpec.EmbedFSDir,
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (nplmf netpolLatencyMeasurementFactory) newMeasurement(jobConfig *kconfig.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *kconfig.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &netpolLatency{
-		baseLatencyMeasurement: nplmf.newBaseLatency(jobConfig, clientSet, restConfig),
-		embedFS:                nplmf.embedFS,
-		embedFSDir:             nplmf.embedFSDir,
+		BaseMeasurement: nplmf.NewBaseLatency(jobConfig, clientSet, restConfig, netpolLatencyMeasurement, netpolLatencyQuantilesMeasurement),
 	}
 }
 
@@ -199,7 +188,7 @@ func addPodsByLabel(clientSet kubernetes.Interface, ns string, ps *metav1.LabelS
 
 // Record the network policy creation timestamp when it is created.
 // We later do a diff with successful connection timestamp and define that as a network policy programming latency.
-func (n *netpolLatency) handleCreateNetpol(obj interface{}) {
+func (n *netpolLatency) handleCreateNetpol(obj any) {
 	netpol := obj.(*networkingv1.NetworkPolicy)
 	npCreationTime[netpol.Name] = netpol.CreationTimestamp.Time.UTC()
 }
@@ -207,16 +196,14 @@ func (n *netpolLatency) handleCreateNetpol(obj interface{}) {
 // Render the network policy from the object template using iteration details as input
 func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
 
-	templateData := map[string]interface{}{
-		"JobName":   n.jobConfig.Name,
+	templateData := map[string]any{
+		"JobName":   n.JobConfig.Name,
 		"Iteration": strconv.Itoa(iteration),
-		"UUID":      n.uuid,
+		"UUID":      n.Uuid,
 		"Replica":   strconv.Itoa(replica),
 	}
-	for k, v := range obj.InputVars {
-		templateData[k] = v
-	}
-	renderedObj, err := kutil.RenderTemplate(objectSpec, templateData, kutil.MissingKeyError)
+	maps.Copy(templateData, obj.InputVars)
+	renderedObj, err := kutil.RenderTemplate(objectSpec, templateData, kutil.MissingKeyError, []string{})
 	if err != nil {
 		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 	}
@@ -242,20 +229,20 @@ func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig
 // Note: this measurement package only parses template to get IP addresses of pods but never creates network policies. kube-burner's "burner" package creates network policies
 func (n *netpolLatency) prepareConnections() {
 	// Reset latency slices, required in multi-job benchmarks
-	for _, obj := range n.jobConfig.Objects {
-		cleanTemplate, err := readTemplate(obj, n.embedFS, n.embedFSDir)
+	for _, obj := range n.JobConfig.Objects {
+		cleanTemplate, err := readTemplate(obj, n.embedCfg)
 		if err != nil {
 			log.Fatalf("Error in readTemplate %s: %s", obj.ObjectTemplate, err)
 		}
 		if getObjectType(obj, cleanTemplate) != "NetworkPolicy" {
 			continue
 		}
-		for i := 0; i < n.jobConfig.JobIterations; i++ {
+		for i := range n.JobConfig.JobIterations {
 			for r := 1; r <= obj.Replicas; r++ {
 				networkPolicy := n.getNetworkPolicy(i, r, obj, cleanTemplate)
-				nsIndex := i / n.jobConfig.IterationsPerNamespace
-				namespace := fmt.Sprintf("%s-%d", n.jobConfig.Namespace, nsIndex)
-				localPods := addPodsByLabel(n.clientSet, namespace, &networkPolicy.Spec.PodSelector)
+				nsIndex := i / n.JobConfig.IterationsPerNamespace
+				namespace := fmt.Sprintf("%s-%d", n.JobConfig.Namespace, nsIndex)
+				localPods := addPodsByLabel(n.ClientSet, namespace, &networkPolicy.Spec.PodSelector)
 				for _, ingress := range networkPolicy.Spec.Ingress {
 					var ingressPorts []int32
 					for _, from := range ingress.From {
@@ -274,8 +261,8 @@ func (n *netpolLatency) prepareConnections() {
 							}
 						}
 						namespaces := getNamespacesByLabel(from.NamespaceSelector)
-						for _, namepsace := range namespaces {
-							remoteAddrs := addPodsByLabel(n.clientSet, namepsace, from.PodSelector)
+						for _, namespace := range namespaces {
+							remoteAddrs := addPodsByLabel(n.ClientSet, namespace, from.PodSelector)
 							for _, ra := range remoteAddrs {
 								// exclude sending connection request to same ip address
 								otherIPs := []string{}
@@ -288,16 +275,10 @@ func (n *netpolLatency) prepareConnections() {
 											// Avoid a peer pod pinging multiple times to same local pod because of pod reuse by network policies
 											otherIPs = append(otherIPs, ip)
 										} else {
-											var netpolExists bool
 											// check if network policy doesn't exist in the addrReuse
-											for _, v := range addrReuse[ar] {
-												if v == networkPolicy.Name {
-													netpolExists = true
-													break
-												}
-											}
-											if !netpolExists {
+											if !slices.Contains(addrReuse[ar], networkPolicy.Name) {
 												addrReuse[ar] = append(addrReuse[ar], networkPolicy.Name)
+
 											}
 										}
 									}
@@ -444,16 +425,16 @@ func (n *netpolLatency) processResults() {
 			MetricName:      netpolLatencyMeasurement,
 			MinReadyLatency: time.Duration(latencySummary.Min),
 			ReadyLatency:    time.Duration(latencySummary.Max),
-			UUID:            n.uuid,
-			Metadata:        n.metadata,
-			JobName:         n.jobConfig.Name,
+			UUID:            n.Uuid,
+			Metadata:        n.Metadata,
+			JobName:         n.JobConfig.Name,
 		})
 	}
 }
 
 // Read network policy object template
-func readTemplate(o kconfig.Object, embedFS *embed.FS, embedFSDir string) ([]byte, error) {
-	f, err := kutil.GetReader(o.ObjectTemplate, embedFS, embedFSDir)
+func readTemplate(o kconfig.Object, embedCfg *fileutils.EmbedConfiguration) ([]byte, error) {
+	f, err := fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 	}
@@ -476,25 +457,25 @@ func getObjectType(o kconfig.Object, t []byte) string {
 }
 
 // Start network policy measurement
-func (n *netpolLatency) start(measurementWg *sync.WaitGroup) error {
+func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 	var err error
 	defer measurementWg.Done()
 	// Skip latency measurement for 1st job which creates only pods
-	if value, ok := n.jobConfig.NamespaceLabels["kube-burner.io/skip-networkpolicy-latency"]; ok {
+	if value, ok := n.JobConfig.NamespaceLabels["kube-burner.io/skip-networkpolicy-latency"]; ok {
 		if value == "true" {
-			log.Debugf("Discarding network policy latency measurement for the job %v", n.jobConfig.Name)
+			log.Debugf("Discarding network policy latency measurement for the job %v", n.JobConfig.Name)
 			return nil
 		}
 	}
-	_, err = n.clientSet.CoreV1().Pods(networkPolicyProxy).Get(context.TODO(), networkPolicyProxy, metav1.GetOptions{})
+	_, err = n.ClientSet.CoreV1().Pods(networkPolicyProxy).Get(context.TODO(), networkPolicyProxy, metav1.GetOptions{})
 	if err != nil {
-		err = deployPodInNamespace(n.clientSet, networkPolicyProxy, networkPolicyProxy, "quay.io/cloud-bulldozer/netpolproxy:latest", nil)
+		err = deployPodInNamespace(n.ClientSet, networkPolicyProxy, networkPolicyProxy, "quay.io/cloud-bulldozer/netpolproxy:latest", nil)
 		if err != nil {
 			return err
 		}
 	}
 	if proxyPortForwarder == nil {
-		proxyPortForwarder, err = util.NewPodPortForwarder(n.clientSet, *n.restConfig, networkPolicyProxyPort, networkPolicyProxy, networkPolicyProxy)
+		proxyPortForwarder, err = util.NewPodPortForwarder(n.ClientSet, *n.RestConfig, networkPolicyProxyPort, networkPolicyProxy, networkPolicyProxy)
 		if err != nil {
 			return err
 		}
@@ -507,32 +488,27 @@ func (n *netpolLatency) start(measurementWg *sync.WaitGroup) error {
 	if len(connections) > 0 {
 		sendConnections()
 	}
-	n.latencyQuantiles, n.normLatencies = nil, nil
 
-	// Create watchers to record network policy creation timestamp
-	log.Infof("Creating netpol latency watcher for %s", n.jobConfig.Name)
-	n.netpolWatcher = metrics.NewWatcher(
-		n.clientSet.NetworkingV1().RESTClient().(*rest.RESTClient),
-		"netpolWatcher",
-		"networkpolicies",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-uuid=%v", n.uuid)
+	n.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    n.ClientSet.NetworkingV1().RESTClient().(*rest.RESTClient),
+				name:          "netpolWatcher",
+				resource:      "networkpolicies",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", n.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: n.handleCreateNetpol,
+				},
+			},
 		},
-		cache.Indexers{},
 	)
-	n.netpolWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: n.handleCreateNetpol,
-	})
-	if err := n.netpolWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Network Policy Latency measurement error: %s", err)
-	}
+
 	return nil
 }
 
-func (n *netpolLatency) stop() error {
+func (n *netpolLatency) Stop() error {
 	// Skip latency measurement for 1st job which creates only pods
-	if value, ok := n.jobConfig.NamespaceLabels["kube-burner.io/skip-networkpolicy-latency"]; ok {
+	if value, ok := n.JobConfig.NamespaceLabels["kube-burner.io/skip-networkpolicy-latency"]; ok {
 		if value == "true" {
 			return nil
 		}
@@ -544,28 +520,24 @@ func (n *netpolLatency) stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
-		n.netpolWatcher.StopWatcher()
+		n.stopWatchers()
 	}()
-	kutil.CleanupNamespaces(ctx, n.clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
+	kutil.CleanupNamespaces(ctx, n.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
 	n.normalizeMetrics()
 	for _, q := range n.latencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
-		log.Infof("%s: %s 50th: %d 99th: %d max: %d avg: %d", n.jobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %s 50th: %d 99th: %d max: %d avg: %d", n.JobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
 
 	}
 	return nil
-}
-
-func (n *netpolLatency) getMetrics() *sync.Map {
-	return &n.metrics
 }
 
 func (n *netpolLatency) normalizeMetrics() {
 	var latencies []float64
 	var minLatencies []float64
 	sLen := 0
-	n.metrics.Range(func(key, value interface{}) bool {
+	n.metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(netpolMetric)
 		latencies = append(latencies, float64(metric.ReadyLatency))
@@ -575,11 +547,11 @@ func (n *netpolLatency) normalizeMetrics() {
 	})
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
 		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = n.uuid
+		latencySummary.UUID = n.Uuid
 		latencySummary.Timestamp = time.Now().UTC()
-		latencySummary.Metadata = n.metadata
+		latencySummary.Metadata = n.Metadata
 		latencySummary.MetricName = netpolLatencyQuantilesMeasurement
-		latencySummary.JobName = n.jobConfig.Name
+		latencySummary.JobName = n.JobConfig.Name
 		return latencySummary
 	}
 	if sLen > 0 {
@@ -588,14 +560,6 @@ func (n *netpolLatency) normalizeMetrics() {
 	}
 }
 
-func (n *netpolLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		netpolLatencyMeasurement:          n.normLatencies,
-		netpolLatencyQuantilesMeasurement: n.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(n.config, jobName, metricMap, indexerList)
-}
-
-func (n *netpolLatency) collect(measurementWg *sync.WaitGroup) {
+func (n *netpolLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 }

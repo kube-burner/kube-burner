@@ -35,6 +35,30 @@ setup-kind() {
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml
   kubectl wait --for=condition=Available --timeout=600s cdi cdi
+  # Install Snapshot CRDs and Controller
+  SNAPSHOTTER_VERSION=$(curl -s https://api.github.com/repos/kubernetes-csi/external-snapshotter/releases/latest | jq -r .tag_name)
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
+  # Add Host Path CSI Driver and StorageClass
+  CSI_DRIVER_HOST_PATH_DIR=$(mktemp -d)
+  git clone https://github.com/kubernetes-csi/csi-driver-host-path.git ${CSI_DRIVER_HOST_PATH_DIR}
+  ${CSI_DRIVER_HOST_PATH_DIR}/deploy/kubernetes-latest/deploy.sh
+  kubectl apply -f ${CSI_DRIVER_HOST_PATH_DIR}/examples/csi-storageclass.yaml
+  # Install Helm
+  HELM_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/helm/helm/releases/latest)")
+  curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz
+  tar xzvf ${KIND_FOLDER}/helm.tgz -C ${KIND_FOLDER}
+  HELM_EXEC=${KIND_FOLDER}/linux-${ARCH}/helm
+  chmod +x ${HELM_EXEC}
+  # Install K10
+  ${HELM_EXEC} repo add kasten https://charts.kasten.io/
+  kubectl create ns kasten-io
+  ${HELM_EXEC} install k10 kasten/k10 --namespace=kasten-io
+  export STORAGE_CLASS_WITH_SNAPSHOT_NAME="csi-hostpath-sc"
+  export VOLUME_SNAPSHOT_CLASS_NAME="csi-hostpath-snapclass"
 }
 
 create_test_kubeconfig() {
@@ -61,11 +85,58 @@ setup-prometheus() {
   sleep 10
 }
 
+setup-shared-network() {
+  echo "Setting up shared network for monitoring"
+  $OCI_BIN network create monitoring
+}
+
 setup-opensearch() {
   echo "Setting up open-search"
   # Use version 1 to avoid the password requirement
-  $OCI_BIN run --rm -d --name opensearch --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
+  $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
   sleep 10
+}
+
+setup-grafana() {
+  export GRAFANA_URL="http://localhost:3000"
+  export GRAFANA_ROLE="admin"
+  echo "Setting up Grafana"
+  $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
+    --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
+    docker.io/grafana/grafana:latest
+  sleep 10
+  echo "Grafana is running at $GRAFANA_URL"
+}
+
+configure-grafana-datasource() {
+  echo "Configuring Elasticsearch as Grafana Data Source"
+  curl -X POST "$GRAFANA_URL/api/datasources" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Basic $(echo -n "$GRAFANA_ROLE:$GRAFANA_ROLE" | base64)" \
+    --data "{
+      \"name\": \"kube-burner elasticsearch\",
+      \"type\": \"elasticsearch\",
+      \"url\": \"http://opensearch:9200\",
+      \"access\": \"proxy\",
+      \"database\": \"${ES_INDEX}\",
+      \"jsonData\": {
+        \"timeField\": \"timestamp\"
+      }
+    }"
+}
+
+deploy-grafana-dashboards() {
+  echo "Deploying Grafana dashboards from JSON files"
+  for json_file in ../grafana/*.json; do
+    dashboard_json=$(cat "$json_file")
+    curl -s -X POST "$GRAFANA_URL/api/dashboards/db" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Basic $(echo -n "$GRAFANA_ROLE:$GRAFANA_ROLE" | base64)" \
+      --data "{
+        \"dashboard\": $dashboard_json,
+        \"overwrite\": true
+      }"
+  done
 }
 
 check_ns() {
@@ -231,6 +302,24 @@ check_quantile_recorded() {
   MEASUREMENT=$(cat ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json | jq --arg name "${quantileName}" '[.[] | select(.quantileName == $name)][0].avg')
   if [[ ${MEASUREMENT} -eq 0 ]]; then
     echo "Quantile for ${type}/${quantileName} was not recorded for ${job}"
+    return 1
+  fi
+}
+
+check_metrics_not_created_for_job() {
+  local job=$1
+  local type=$2
+
+  METRICS_FILE=${METRICS_FOLDER}/${type}Measurement-${job}.json
+  QUANTILE_FILE=${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json
+
+  if [ -f "${METRICS_FILE}" ]; then
+    echo "Metrics file for ${job} was created"
+    return 1
+  fi
+
+  if [ -f "${QUANTILE_FILE}" ]; then
+    echo "Quantile file for ${job} was created"
     return 1
   fi
 }

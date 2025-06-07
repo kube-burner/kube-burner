@@ -62,7 +62,7 @@ var (
 func setLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
 	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
 	if !found {
-		labelMap = make(map[string]interface{}, len(labels))
+		labelMap = make(map[string]any, len(labels))
 	}
 	for k, v := range labels {
 		labelMap[k] = v
@@ -78,7 +78,7 @@ func setLabelsInArray(obj *unstructured.Unstructured, labels map[string]string, 
 
 	for _, a := range array {
 		innerObj := unstructured.Unstructured{}
-		innerObj.SetUnstructuredContent(a.(map[string]interface{}))
+		innerObj.SetUnstructuredContent(a.(map[string]any))
 
 		setLabels(&innerObj, labels, templatePath)
 	}
@@ -144,7 +144,12 @@ func (ex *Executor) Verify() bool {
 			success = false
 			continue
 		}
-		objectsExpected := ex.JobIterations * obj.Replicas
+		var objectsExpected int
+		if obj.RunOnce {
+			objectsExpected = obj.Replicas
+		} else {
+			objectsExpected = obj.Replicas * ex.JobIterations
+		}
 		if replicas != objectsExpected {
 			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 			success = false
@@ -185,7 +190,7 @@ func (ex *Executor) RunJob(ctx context.Context) {
 	}
 }
 
-func (ex *Executor) getItemListForObject(obj object) (*unstructured.UnstructuredList, error) {
+func (ex *Executor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
 	var itemList *unstructured.UnstructuredList
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
@@ -209,7 +214,7 @@ func (ex *Executor) getItemListForObject(obj object) (*unstructured.Unstructured
 }
 
 func (ex *Executor) runSequential(ctx context.Context) {
-	for i := 0; i < ex.JobIterations; i++ {
+	for i := range ex.JobIterations {
 		for _, obj := range ex.objects {
 			if ctx.Err() != nil {
 				return
@@ -222,14 +227,14 @@ func (ex *Executor) runSequential(ctx context.Context) {
 			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, &obj, item, i, objectTimeUTC, &wg)
+				go ex.itemHandler(ex, obj, item, i, objectTimeUTC, &wg)
 			}
 			// Wait for all items in the object
 			wg.Wait()
 
 			// If requested, wait for the completion of the specific object
 			if ex.ObjectWait {
-				ex.waitForObject("", &obj)
+				ex.waitForObject("", obj)
 			}
 
 			if ex.objectFinalizer != nil {
@@ -270,11 +275,11 @@ func (ex *Executor) runParallel(ctx context.Context) {
 		if err != nil {
 			continue
 		}
-		for j := 0; j < ex.JobIterations; j++ {
+		for j := range ex.JobIterations {
 			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, &obj, item, j, objectTimeUTC, &wg)
+				go ex.itemHandler(ex, obj, item, j, objectTimeUTC, &wg)
 			}
 		}
 	}

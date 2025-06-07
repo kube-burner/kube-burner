@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"path"
 	"text/template"
 	"time"
 
@@ -26,13 +25,14 @@ import (
 	"github.com/cloud-bulldozer/go-commons/v2/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
 // NewPrometheusClient creates a prometheus struct instance with the given parameters
-func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]interface{}, indexer *indexers.Indexer) (*Prometheus, error) {
+func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step time.Duration, metadata map[string]any, indexer *indexers.Indexer) (*Prometheus, error) {
 	var err error
 	p := Prometheus{
 		Step:       step,
@@ -53,7 +53,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 		log.Info("Indexer not configured, skipping metric scraping")
 		return nil
 	}
-	docsToIndex := make(map[string][]interface{})
+	docsToIndex := make(map[string][]any)
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
 	for _, eachJob := range jobList {
@@ -99,7 +99,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 }
 
 // Parse vector parses results for an instant query
-func (p *Prometheus) parseVector(metricName, query string, job Job, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseVector(metricName, query string, job Job, value model.Value, metrics *[]any) error {
 	data, ok := value.(model.Vector)
 	if !ok {
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
@@ -112,7 +112,7 @@ func (p *Prometheus) parseVector(metricName, query string, job Job, value model.
 }
 
 // Parse matrix parses results for an non-instant query
-func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.Value, metrics *[]interface{}) error {
+func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.Value, metrics *[]any) error {
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return fmt.Errorf("unsupported result format: %s", value.Type().String())
@@ -127,13 +127,12 @@ func (p *Prometheus) parseMatrix(metricName, query string, job Job, value model.
 }
 
 // ReadProfile reads, parses and validates metric profile configuration
-func (p *Prometheus) ReadProfile(location string) error {
-	f, err := util.GetReader(location, p.ConfigSpec.EmbedFS, path.Dir(p.ConfigSpec.EmbedFSDir))
+func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfiguration) error {
+	f, err := fileutils.GetMetricsReader(location, embedCfg)
 	if err != nil {
 		return fmt.Errorf("error reading metrics profile %s: %s", location, err)
 	}
 	p.profileName = location
-
 	yamlDec := yaml.NewDecoder(f)
 	yamlDec.KnownFields(true)
 	metricProfile := metricProfile{
@@ -184,14 +183,14 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 }
 
 // runInstantQuery function to run an instant query
-func (p *Prometheus) runInstantQuery(query, metricName string, timestamp time.Time, job Job) []interface{} {
+func (p *Prometheus) runInstantQuery(query, metricName string, timestamp time.Time, job Job) []any {
 	var v model.Value
 	var err error
-	var datapoints []interface{}
+	var datapoints []any
 	log.Debugf("Instant query: %s", query)
 	if v, err = p.Client.Query(query, timestamp); err != nil {
 		log.Warnf("Error found with query %s: %s", query, err)
-		return []interface{}{}
+		return []any{}
 	}
 	if err = p.parseVector(metricName, query, job, v, &datapoints); err != nil {
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
@@ -200,15 +199,15 @@ func (p *Prometheus) runInstantQuery(query, metricName string, timestamp time.Ti
 }
 
 // runRangeQuery function to run a range query
-func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd time.Time, job Job) []interface{} {
+func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd time.Time, job Job) []any {
 	var v model.Value
 	var err error
-	var datapoints []interface{}
+	var datapoints []any
 	log.Debugf("Range query: %s", query)
 	v, err = p.Client.QueryRange(query, jobStart, jobEnd, p.Step)
 	if err != nil {
 		log.Warnf("Error found with query %s: %s", query, err)
-		return []interface{}{}
+		return []any{}
 	}
 	if err = p.parseMatrix(metricName, query, job, v, &datapoints); err != nil {
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
@@ -217,7 +216,7 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 }
 
 // Indexes datapoints to a specified indexer.
-func (p *Prometheus) indexDatapoints(docsToIndex map[string][]interface{}) {
+func (p *Prometheus) indexDatapoints(docsToIndex map[string][]any) {
 	for metricName, docs := range docsToIndex {
 		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
 		resp, err := (*p.indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})

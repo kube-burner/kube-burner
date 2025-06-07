@@ -112,6 +112,83 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 
 In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
 
+## Job latency
+
+Collects latencies from the different job stages, these **latency metrics are in ms**. It can be enabled with:
+
+```yaml
+  measurements:
+  - name: jobLatency
+```
+
+### Metrics
+
+The metrics collected are job latency timeseries (`jobLatencyMeasurement`) and two documents holding a summary of different job latency quantiles (`jobLatencyQuantilesMeasurement`).
+
+It generates a document like the following per each job:
+
+```json
+  {
+    "timestamp": "2025-05-07T10:31:03Z",
+    "startTimeLatency": 0,
+    "completionLatency": 14000,
+    "metricName": "jobLatencyMeasurement",
+    "uuid": "62d3c7a1-4faa-44fb-99ff-cf2b79cdfd22",
+    "jobName": "small",
+    "jobIteration": 0,
+    "replica": 18,
+    "namespace": "kueue-scale-s",
+    "k8sJobName": "kueue-scale-small-18",
+    "metadata": {
+      "ocpMajorVersion": "4.18",
+      "ocpVersion": "4.18.5"
+    }
+  }
+```
+
+Where `completionLatency` and `starTimeLatency` indicate the job completion time and startup latency respectively since its creation timestamp.
+
+Job latency quantile sample:
+
+```json
+[
+  {
+    "quantileName": "StartTime",
+    "uuid": "62d3c7a1-4faa-44fb-99ff-cf2b79cdfd22",
+    "P99": 0,
+    "P95": 0,
+    "P50": 0,
+    "min": 0,
+    "max": 0,
+    "avg": 0,
+    "timestamp": "2025-05-07T10:31:22.181506023Z",
+    "metricName": "jobLatencyQuantilesMeasurement",
+    "jobName": "small",
+    "metadata": {
+      "ocpMajorVersion": "4.18",
+      "ocpVersion": "4.18.5"
+    }
+  },
+  {
+    "quantileName": "Complete",
+    "uuid": "62d3c7a1-4faa-44fb-99ff-cf2b79cdfd22",
+    "P99": 15000,
+    "P95": 15000,
+    "P50": 14000,
+    "min": 13000,
+    "max": 15000,
+    "avg": 13950,
+    "timestamp": "2025-05-07T10:31:22.181509954Z",
+    "metricName": "jobLatencyQuantilesMeasurement",
+    "jobName": "small",
+    "metadata": {
+      "ocpMajorVersion": "4.18",
+      "ocpVersion": "4.18.5"
+    }
+  }
+]
+```
+
 ## VMI latency
 
 Collects latencies from the different vm/vmi startup phases, these **latency metrics are in ms**. It can be enabled with:
@@ -128,8 +205,7 @@ The metrics collected are vm/vmi latency timeseries (`vmiLatencyMeasurement`) an
 One document, such as the following, is indexed per each vm/vmi created by the workload that enters in `Running` condition during the workload:
 
 ```json
-[
-  {
+{
     "timestamp": "2024-11-26T12:57:50Z",
     "podCreatedLatency": 116532,
     "podScheduledLatency": 116574,
@@ -150,30 +226,7 @@ One document, such as the following, is indexed per each vm/vmi created by the w
     "vmiName": "virt-density-27",
     "nodeName": "y37-h25-000-r740xd",
     "jobName": "virt-density",
-  },
-  {
-    "timestamp": "2024-11-26T12:57:53Z",
-    "podCreatedLatency": 125182,
-    "podScheduledLatency": 125182,
-    "podInitializedLatency": 133741,
-    "podContainersReadyLatency": 143130,
-    "podReadyLatency": 143130,
-    "vmiCreatedLatency": 10000,
-    "vmiPendingLatency": 119298,
-    "vmiSchedulingLatency": 119347,
-    "vmiScheduledLatency": 143254,
-    "vmiRunningLatency": 153506,
-    "vmReadyLatency": 153528,
-    "metricName": "vmiLatencyMeasurement",
-    "uuid": "f7c79fd5-58e7-4719-a710-7633ffb20491",
-    "namespace": "virt-density",
-    "podName": "virt-launcher-virt-density-93-82fdm",
-    "vmName": "virt-density-93",
-    "vmiName": "virt-density-93",
-    "nodeName": "y37-h25-000-r740xd",
-    "jobName": "virt-density",
-  }
-]
+}
 ```
 
 !!! info
@@ -319,7 +372,7 @@ Where `quantileName` matches with the node conditions and can be:
 And the metrics, error rates, and their thresholds work the same way as in the pod latency measurement.
 
 ## PVC latency
-Note: This measurement is not supported for patch, read and delete jobs. Because it requires all the events from creation to reaching a stable end state to happen during a job. 
+Note: This measurement is not supported for patch, read and delete jobs. Because it requires all the events from creation to reaching a stable end state to happen during a job.
 
 Collects latencies from different pvc phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
@@ -498,12 +551,14 @@ And the quantiles document has the structure:
 When there're `LoadBalancer` services, an extra document with `quantileName` as `LoadBalancer` is also generated as shown above.
 
 ## DataVolume Latency
+
 Collects latencies from different DataVolume phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
   measurements:
   - name: dataVolumeLatency
 ```
+
 ### Metrics
 
 The metrics collected are data volume latency timeseries (`dataVolumeLatencyMeasurement`) and 2-3 documents holding a summary with different data volume latency quantiles of each lifecycle phase (`dataVolumeLatencyQuantilesMeasurement`).
@@ -582,6 +637,63 @@ Where `quantileName` matches with the pvc phases and can be:
 
 !!! info
     More information about the DataVolume condition types can be found at the [kubevirt documentation](https://github.com/kubevirt/containerized-data-importer/blob/main/doc/datavolumes.md#conditions).
+
+And the metrics, error rates, and their thresholds work the same way as in the other latency measurements.
+
+## VolumeSnapshot Latency
+
+Collects latencies from different VolumeSnapshot phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
+
+```yaml
+  measurements:
+  - name: volumeSnapshotLatency
+```
+
+### Metrics
+
+The metrics collected are data volume latency timeseries (`volumeSnapshotLatencyMeasurement`) and 2-3 documents holding a summary with different Volume Snapshot latency quantiles of each lifecycle phase (`volumeSnapshotLatencyQuantilesMeasurement`).
+
+One document, such as the following, is indexed per each Volume Snapshot created by the workload that enters in `Ready` condition during the workload:
+
+```json
+{
+  "timestamp": "2025-01-13T14:55:44Z",
+  "vsReadyLatency": 8000,
+  "metricName": "volumeSnapshotLatencyMeasurement",
+  "uuid": "ba6afa06-d780-4306-b97e-bfcce60fb5a7",
+  "namespace": "catalog",
+  "vsName": "master-image",
+  "jobName": "create-base-image-snapshot",
+  "jobIteration": 0,
+  "replica": 1,
+}
+```
+
+---
+
+VolumeSnapshot latency quantile sample:
+
+```json
+[
+  {
+    "quantileName": "Ready",
+    "uuid": "59b14eb2-339a-4761-8593-195eb80943a9",
+    "P99": 39000,
+    "P95": 39000,
+    "P50": 19000,
+    "min": 4000,
+    "max": 42000,
+    "avg": 22000,
+    "timestamp": "2025-01-14T14:40:15.304604Z",
+    "metricName": "volumeSnapshotLatencyQuantilesMeasurement",
+    "jobName": "create-snapshots",
+  }
+]
+```
+
+Where `quantileName` matches with the pvc phases and can be:
+
+- `Ready`: Indicates that the Volume Snapshot is ready for usage
 
 And the metrics, error rates, and their thresholds work the same way as in the other latency measurements.
 
@@ -670,6 +782,7 @@ This measure is enabled with:
 ```
 
 ### Metrics
+
 And the quantiles document has the structure:
 ```json
 [
@@ -789,3 +902,22 @@ global:
 ```
 
 With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics.
+
+
+## Additional Custom Measurements
+
+kube-burner already implements core measurements. Additionally the `measurements` package exports interfaces, helper functions, and struct types to allow external consumers to implement custom measurements, interact with the measurement framework, and reuse common components.
+
+Additional measurement code has to:
+
+1. Implement the Measurement interface
+2. Create a new measurement factory with the previous and pass it as argument to RunWithAdditionalVars.
+
+```yaml
+var additionalMeasurementFactoryMap = map[string]measurements.NewMeasurementFactory{
+        "exampleLatency": NewExampleLatencyMeasurementFactory,
+}
+
+wh = workloads.NewWorkloadHelper(workloadConfig, &config, kubeClientProvider)
+rc = wh.RunWithAdditionalVars(workload, nil, additionalMeasurementFactoryMap)
+```

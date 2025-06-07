@@ -19,6 +19,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/alerting"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
 // ScraperConfig holds data related to scraper and target indexer
@@ -26,8 +27,11 @@ type ScraperConfig struct {
 	ConfigSpec      *config.Spec
 	MetricsEndpoint string
 	UserMetaData    string
-	SummaryMetadata map[string]interface{}
-	MetricsMetadata map[string]interface{}
+	SummaryMetadata map[string]any
+	MetricsMetadata map[string]any
+	MetricsProfile  string
+	AlertProfile    string
+	EmbedCfg        *fileutils.EmbedConfiguration
 }
 
 // ScraperResponse holds parsed data related to scraper and target indexer
@@ -35,6 +39,6 @@ type Scraper struct {
 	PrometheusClients []*prometheus.Prometheus
 	AlertMs           []*alerting.AlertManager
 	IndexerList       map[string]indexers.Indexer
-	SummaryMetadata   map[string]interface{}
-	MetricsMetadata   map[string]interface{}
+	SummaryMetadata   map[string]any
+	MetricsMetadata   map[string]any
 }

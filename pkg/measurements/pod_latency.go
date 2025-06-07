@@ -21,9 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -59,47 +57,42 @@ type podMetric struct {
 	podReady                      time.Time
 	PodReadyLatency               int `json:"podReadyLatency"`
 	readyToStartContainers        time.Time
-	ReadyToStartContainersLatency int         `json:"readyToStartContainersLatency"`
-	MetricName                    string      `json:"metricName"`
-	UUID                          string      `json:"uuid"`
-	JobName                       string      `json:"jobName,omitempty"`
-	JobIteration                  int         `json:"jobIteration"`
-	Replica                       int         `json:"replica"`
-	Namespace                     string      `json:"namespace"`
-	Name                          string      `json:"podName"`
-	NodeName                      string      `json:"nodeName"`
-	Metadata                      interface{} `json:"metadata,omitempty"`
+	ReadyToStartContainersLatency int    `json:"readyToStartContainersLatency"`
+	MetricName                    string `json:"metricName"`
+	UUID                          string `json:"uuid"`
+	JobName                       string `json:"jobName,omitempty"`
+	JobIteration                  int    `json:"jobIteration"`
+	Replica                       int    `json:"replica"`
+	Namespace                     string `json:"namespace"`
+	Name                          string `json:"podName"`
+	NodeName                      string `json:"nodeName"`
+	Metadata                      any    `json:"metadata,omitempty"`
 }
 
 type podLatency struct {
-	baseLatencyMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
+	BaseMeasurement
 }
 
 type podLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	BaseMeasurementFactory
 }
 
-func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedPodConditions); err != nil {
 		return nil, err
 	}
 	return podLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (plmf podLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+func (plmf podLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &podLatency{
-		baseLatencyMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig, podLatencyMeasurement, podLatencyQuantilesMeasurement),
 	}
 }
 
-func (p *podLatency) handleCreatePod(obj interface{}) {
+func (p *podLatency) handleCreatePod(obj any) {
 	pod := obj.(*corev1.Pod)
 	podLabels := pod.GetLabels()
 	p.metrics.LoadOrStore(string(pod.UID), podMetric{
@@ -107,15 +100,15 @@ func (p *podLatency) handleCreatePod(obj interface{}) {
 		Namespace:    pod.Namespace,
 		Name:         pod.Name,
 		MetricName:   podLatencyMeasurement,
-		UUID:         p.uuid,
-		JobName:      p.jobConfig.Name,
-		Metadata:     p.metadata,
+		UUID:         p.Uuid,
+		JobName:      p.JobConfig.Name,
+		Metadata:     p.Metadata,
 		JobIteration: getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
 		Replica:      getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
 	})
 }
 
-func (p *podLatency) handleUpdatePod(obj interface{}) {
+func (p *podLatency) handleUpdatePod(obj any) {
 	pod := obj.(*corev1.Pod)
 	if value, exists := p.metrics.Load(string(pod.UID)); exists {
 		pm := value.(podMetric)
@@ -142,10 +135,8 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 							pm.containersReady = c.LastTransitionTime.Time.UTC()
 						}
 					case corev1.PodReady:
-						if pm.podReady.IsZero() {
-							log.Debugf("Pod %s is ready", pod.Name)
-							pm.podReady = c.LastTransitionTime.Time.UTC()
-						}
+						log.Debugf("Pod %s is ready", pod.Name)
+						pm.podReady = c.LastTransitionTime.Time.UTC()
 					}
 				}
 			}
@@ -155,45 +146,38 @@ func (p *podLatency) handleUpdatePod(obj interface{}) {
 }
 
 // start podLatency measurement
-func (p *podLatency) start(measurementWg *sync.WaitGroup) error {
-	// Reset latency slices, required in multi-job benchmarks
-	p.latencyQuantiles, p.normLatencies = nil, nil
+func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	p.metrics = sync.Map{}
-	log.Infof("Creating Pod latency watcher for %s", p.jobConfig.Name)
-	p.watcher = metrics.NewWatcher(
-		p.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
-		"podWatcher",
-		"pods",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", p.runid)
+	p.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				name:          "podWatcher",
+				resource:      "pods",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: p.handleCreatePod,
+					UpdateFunc: func(oldObj, newObj any) {
+						p.handleUpdatePod(newObj)
+					},
+				},
+			},
 		},
-		nil,
 	)
-	p.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: p.handleCreatePod,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			p.handleUpdatePod(newObj)
-		},
-	})
-	if err := p.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("Pod Latency measurement error: %s", err)
-	}
 	return nil
 }
 
 // collects pod measurements triggered in the past
-func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
+func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var pods []corev1.Pod
-	labelSelector := labels.SelectorFromSet(p.jobConfig.NamespaceLabels)
+	labelSelector := labels.SelectorFromSet(p.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
-	namespaces := strings.Split(p.jobConfig.Namespace, ",")
+	namespaces := strings.Split(p.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
-		podList, err := p.clientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
+		podList, err := p.ClientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
 		if err != nil {
 			log.Errorf("error listing pods in namespace %s: %v", namespace, err)
 		}
@@ -220,61 +204,26 @@ func (p *podLatency) collect(measurementWg *sync.WaitGroup) {
 			Name:            pod.Name,
 			MetricName:      podLatencyMeasurement,
 			NodeName:        pod.Spec.NodeName,
-			UUID:            p.uuid,
+			UUID:            p.Uuid,
 			scheduled:       scheduled,
 			initialized:     initialized,
 			containersReady: containersReady,
 			podReady:        podReady,
-			JobName:         p.jobConfig.Name,
+			JobName:         p.JobConfig.Name,
 		})
 	}
 }
 
 // Stop stops podLatency measurement
-func (p *podLatency) stop() error {
-	var err error
-	defer func() {
-		if p.watcher != nil {
-			p.watcher.StopWatcher()
-		}
-	}()
-	errorRate := p.normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. Pod latencies error rate was: %.2f", errorRate)
-	}
-	p.calcQuantiles()
-	if len(p.config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
-	}
-	for _, q := range p.latencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", p.jobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
-	}
-	if errorRate > 0 {
-		log.Infof("Pod latencies error rate was: %.2f", errorRate)
-	}
-	return err
-}
-
-// index sends metrics to the configured indexer
-func (p *podLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		podLatencyMeasurement:          p.normLatencies,
-		podLatencyQuantilesMeasurement: p.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(p.config, jobName, metricMap, indexerList)
-}
-
-func (p *podLatency) getMetrics() *sync.Map {
-	return &p.metrics
+func (p *podLatency) Stop() error {
+	return p.StopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 
 func (p *podLatency) normalizeMetrics() float64 {
 	totalPods := 0
 	erroredPods := 0
 
-	p.metrics.Range(func(key, value interface{}) bool {
+	p.metrics.Range(func(key, value any) bool {
 		m := value.(podMetric)
 		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {
@@ -327,16 +276,13 @@ func (p *podLatency) normalizeMetrics() float64 {
 	return float64(erroredPods) / float64(totalPods) * 100.0
 }
 
-func (p *podLatency) calcQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		podMetric := normLatency.(podMetric)
-		return map[string]float64{
-			string(corev1.PodScheduled):              float64(podMetric.SchedulingLatency),
-			string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
-			string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
-			string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
-			string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
-		}
+func (p *podLatency) getLatency(normLatency any) map[string]float64 {
+	podMetric := normLatency.(podMetric)
+	return map[string]float64{
+		string(corev1.PodScheduled):              float64(podMetric.SchedulingLatency),
+		string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
+		string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
+		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
+		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
 	}
-	p.latencyQuantiles = calculateQuantiles(p.uuid, p.jobConfig.Name, p.metadata, p.normLatencies, getLatency, podLatencyQuantilesMeasurement)
 }

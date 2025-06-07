@@ -1,0 +1,79 @@
+{{- $createVMsJobName := "create-vms" -}}
+
+global:
+  measurements:
+  - name: vmiLatency
+
+metricsEndpoints:
+- indexer:
+    type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+
+jobs:
+  # create a VM but do not wait for it to finish
+  - name: {{ $createVMsJobName }}
+    jobType: create
+    jobIterations: 1
+    qps: 20
+    burst: 20
+    namespace: metrics-aggregate
+    verifyObjects: false
+    waitWhenFinished: false
+    # cleanup cleans previous execution (not deleted or failed)
+    cleanup: true
+    metricsAggregate: true
+    objects:
+
+    - objectTemplate: objectTemplates/vm-ephemeral.yml
+      replicas: 1
+      inputVars:
+        name: kubevirt-ops
+        image: quay.io/kubevirt/fedora-with-test-tooling-container-disk:v0.48.1
+        OS: fedora27
+        cpuCores: 1
+        memory: 64Mi
+        createVMI: false
+
+  - name: start-vm
+    jobType: kubevirt
+    qps: 20
+    burst: 20
+    jobIterations: 1
+    waitWhenFinished: false
+    metricsAggregate: true
+    objects:
+    - kubeVirtOp: start
+      labelSelector:
+        kube-burner-job: {{ $createVMsJobName }}
+
+
+  - name: wait-running
+    jobType: read
+    qps: 20
+    burst: 20
+    jobIterations: 1
+    maxWaitTimeout: 1h
+    waitWhenFinished: true
+    objects:
+    - apiVersion: kubevirt.io/v1
+      kind: VirtualMachine
+      labelSelector:
+        kube-burner-job: {{ $createVMsJobName }}
+
+
+  # cleanup the experiment
+  - name: delete-vms
+    jobType: delete
+    waitForDeletion: true
+    qps: 5
+    burst: 10
+    objects:
+
+    - kind: VirtualMachine
+      labelSelector:
+        kube-burner-job: {{ $createVMsJobName }}
+      apiVersion: kubevirt.io/v1
+
+    - kind: Namespace
+      labelSelector:
+        kube-burner-job: {{ $createVMsJobName }}

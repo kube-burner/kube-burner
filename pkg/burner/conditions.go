@@ -22,7 +22,7 @@ import (
 
 const (
 	jqQueryConditionStringFieldPattern        = "(.conditions.[] | select(.type == \"%s\")).%s"
-	jqQueryConditionLastTransitionTimePattern = "(.conditions.[] | select(.type == \"%s\")).lastTransitionTime | strptime(\"%%Y-%%m-%%dT%%H:%%M:%%SZ\") | mktime >= %d | tostring"
+	jqQueryConditionLastTransitionTimePattern = "(.conditions.[] | select(.type == \"%s\")).lastTransitionTime | strptime(\"%%Y-%%m-%%dT%%H:%%M:%%SZ\") | mktime %s %d | tostring"
 )
 
 type ConditionField string
@@ -35,8 +35,9 @@ const (
 type ConditionType string
 
 const (
-	conditionTypeReady  ConditionType = "Ready"
-	conditionTypePaused ConditionType = "Paused"
+	conditionTypeReady    ConditionType = "Ready"
+	conditionTypePaused   ConditionType = "Paused"
+	conditionTypeComplete ConditionType = "Complete"
 )
 
 type ConditionCheckParam struct {
@@ -58,20 +59,37 @@ func (ccp *ConditionCheckParam) toStatusPath(conditionType ConditionType) config
 type ConditionCheckConfig struct {
 	conditionType        ConditionType
 	conditionCheckParams []ConditionCheckParam
+	timeGreaterThan      bool
 }
 
 func (ccc *ConditionCheckConfig) toStatusPaths(timeUTC int64) []config.StatusPath {
-	statusPath := []config.StatusPath{
-		{
-			Key:   fmt.Sprintf(jqQueryConditionLastTransitionTimePattern, ccc.conditionType, timeUTC),
-			Value: "true",
-		},
+	var statusPath []config.StatusPath
+
+	if timeUTC > 0 {
+		timeComparator := ">="
+		if ccc.timeGreaterThan {
+			timeComparator = ">"
+		}
+		statusPath = append(
+			statusPath,
+			config.StatusPath{
+				Key:   fmt.Sprintf(jqQueryConditionLastTransitionTimePattern, ccc.conditionType, timeComparator, timeUTC),
+				Value: "true",
+			},
+		)
 	}
+
 	for _, cpp := range ccc.conditionCheckParams {
 		statusPath = append(
 			statusPath,
 			cpp.toStatusPath(ccc.conditionType),
 		)
 	}
+
 	return statusPath
 }
+
+// Helper reusable variables
+var (
+	conditionCheckParamStatusTrue = newConditionCheckParam(conditionFieldStatus, "True")
+)

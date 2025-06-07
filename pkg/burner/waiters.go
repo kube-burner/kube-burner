@@ -34,9 +34,39 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 )
 
+var (
+	waitersConditionPaths = map[string]ConditionCheckConfig{
+		Job: {
+			conditionType:        conditionTypeComplete,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+		VirtualMachine: {
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+		VirtualMachineInstance: {
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+		DataVolume: {
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+		DataSource: {
+			conditionType:        conditionTypeReady,
+			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
+			timeGreaterThan:      false,
+		},
+	}
+)
+
 func (ex *Executor) waitForObjects(ns string) {
 	for _, obj := range ex.objects {
-		ex.waitForObject(ns, &obj)
+		ex.waitForObject(ns, obj)
 
 	}
 	if ns != "" {
@@ -58,24 +88,27 @@ func (ex *Executor) waitForObject(ns string, obj *object) {
 	if len(obj.WaitOptions.CustomStatusPaths) > 0 {
 		err = ex.verifyCondition(ns, *obj)
 	} else {
-		kind := obj.kind
+		kind := obj.Kind
 		if obj.WaitOptions.Kind != "" {
 			kind = obj.WaitOptions.Kind
 			ns = corev1.NamespaceAll
 		}
-		switch kind {
-		case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
-			err = ex.waitForReplicas(ns, *obj, waitStatusMap[kind])
-		case Pod:
-			err = ex.waitForPod(ns, *obj)
-		case Build, BuildConfig:
-			err = ex.waitForBuild(ns, *obj)
-		case VirtualMachine, VirtualMachineInstance:
-			err = ex.waitForVMorVMI(ns, *obj)
-		case Job:
-			err = ex.waitForJob(ns, *obj)
-		case PersistentVolumeClaim:
-			err = ex.waitForPVC(ns, *obj)
+		if waiterConditionPath, ok := waitersConditionPaths[kind]; ok {
+			obj.WaitOptions.CustomStatusPaths = waiterConditionPath.toStatusPaths(0)
+			err = ex.verifyCondition(ns, *obj)
+		} else {
+			switch kind {
+			case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
+				err = ex.waitForReplicas(ns, *obj, waitStatusMap[kind])
+			case Pod:
+				err = ex.waitForPod(ns, *obj)
+			case Build, BuildConfig:
+				err = ex.waitForBuild(ns, *obj)
+			case PersistentVolumeClaim:
+				err = ex.waitForPVC(ns, *obj)
+			case VolumeSnapshot:
+				err = ex.waitForVolumeSnapshot(ns, *obj)
+			}
 		}
 	}
 	if err != nil {
@@ -97,7 +130,7 @@ func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) 
 			LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 		})
 		if err != nil {
-			log.Errorf("Error listing %s in %s: %v", obj.kind, ns, err)
+			log.Errorf("Error listing %s in %s: %v", obj.Kind, ns, err)
 			return false, nil
 		}
 		for _, resource := range resources.Items {
@@ -110,7 +143,7 @@ func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) 
 				return false, err
 			}
 			if replicas != readyReplicas {
-				log.Debugf("Waiting for replicas from %s in ns %s to be ready", obj.kind, ns)
+				log.Debugf("Waiting for replicas from %s in ns %s to be ready", obj.Kind, ns)
 				return false, nil
 			}
 		}
@@ -208,18 +241,6 @@ func (ex *Executor) waitForBuild(ns string, obj object) error {
 	return err
 }
 
-func (ex *Executor) waitForJob(ns string, obj object) error {
-	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
-		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
-			{
-				Key:   "(.conditions.[] | select(.type == \"Complete\")).status",
-				Value: "True",
-			},
-		}
-	}
-	return ex.verifyCondition(ns, obj)
-}
-
 func (ex *Executor) verifyCondition(ns string, obj object) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
@@ -235,9 +256,9 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 		}
 		if err != nil {
 			if ns != "" {
-				log.Errorf("Error listing %s in %s: %v", obj.kind, ns, err)
+				log.Errorf("Error listing %s in %s: %v", obj.Kind, ns, err)
 			} else {
-				log.Errorf("Error listing %s: %v", obj.kind, err)
+				log.Errorf("Error listing %s: %v", obj.Kind, err)
 			}
 			return false, nil
 		}
@@ -292,12 +313,12 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 	return err
 }
 
-func (ex *Executor) waitForVMorVMI(ns string, obj object) error {
+func (ex *Executor) waitForVolumeSnapshot(ns string, obj object) error {
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
 		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
 			{
-				Key:   "(.conditions.[] | select(.type == \"Ready\")).status",
-				Value: "True",
+				Key:   ".readyToUse | tostring | ascii_downcase",
+				Value: "true",
 			},
 		}
 	}

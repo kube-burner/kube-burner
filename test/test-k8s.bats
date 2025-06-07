@@ -15,20 +15,30 @@ setup_file() {
   export CHURN_CYCLES=100
   export TEST_KUBECONFIG; TEST_KUBECONFIG=$(mktemp -d)/kubeconfig
   export TEST_KUBECONTEXT=test-context
+  export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
+  export ES_INDEX="kube-burner"
+  export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
     setup-kind
   fi
   create_test_kubeconfig
   setup-prometheus
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
+    $OCI_BIN rm -f opensearch
+    $OCI_BIN network rm -f monitoring
+    setup-shared-network
     setup-opensearch
+    if [ "$DEPLOY_GRAFANA" = "true" ]; then
+      $OCI_BIN rm -f grafana
+      setup-grafana
+      configure-grafana-datasource
+      deploy-grafana-dashboards
+    fi
   fi
 }
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
-  export ES_INDEX="kube-burner"
   export METRICS_FOLDER="metrics-${UUID}"
   export ES_INDEXING=""
   export LOCAL_INDEXING=""
@@ -46,7 +56,10 @@ teardown_file() {
   fi
   $OCI_BIN rm -f prometheus
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
-    $OCI_BIN rm -f opensearch
+    if [ "$DEPLOY_GRAFANA" = "false" ]; then
+      $OCI_BIN rm -f opensearch
+      $OCI_BIN network rm -f monitoring
+    fi
   fi
 }
 
@@ -91,7 +104,7 @@ teardown_file() {
 @test "kube-burner init: os-indexing=true; local-indexing=true; alerting=true"  {
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
-  check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement alert
+  check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json  ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
@@ -212,15 +225,45 @@ teardown_file() {
 }
 
 @test "kube-burner init: datavolume latency" {
-  export STORAGE_CLASS_NAME
-  STORAGE_CLASS_NAME=$(get_default_storage_class)
+  if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
+    echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
+  if [[ -z "$STORAGE_CLASS_NAME" ]]; then
+    echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+
   run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid="${UUID}" --log-level=debug
 
+  # Verify metrics for PVC and DV were collected
   local jobs=("create-vm" "create-base-image-dv")
   for job in "${jobs[@]}"; do
     check_metric_recorded ${job} dvLatency dvReadyLatency
     check_metric_recorded ${job} pvcLatency bindingLatency
     check_quantile_recorded ${job} dvLatency Ready
     check_quantile_recorded ${job} pvcLatency Bound
+  done
+
+  # Verify that metrics for VolumeSnapshot was collected
+  check_metric_recorded create-snapshot volumeSnapshotLatency vsReadyLatency
+  check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
+}
+
+@test "kube-burner init: metrics aggregation" {
+  export STORAGE_CLASS_NAME
+  STORAGE_CLASS_NAME=$(get_default_storage_class)
+  run_cmd ${KUBE_BURNER} init -c kube-burner-metrics-aggregate.yml --uuid="${UUID}" --log-level=debug
+
+  local aggr_job="create-vms"
+  local metric="vmiLatency"
+  check_metric_recorded ${aggr_job} ${metric} vmReadyLatency
+  check_quantile_recorded ${aggr_job} ${metric} VMReady
+
+  local skipped_jobs=("start-vm" "wait-running")
+  for job in "${skipped_jobs[@]}"; do
+    check_metrics_not_created_for_job ${job} ${metric}
+    check_metrics_not_created_for_job ${job} ${metric}
   done
 }

@@ -16,11 +16,14 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"time"
+
+	"maps"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
@@ -28,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -36,18 +40,19 @@ import (
 
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
-		GC:               false,
-		GCMetrics:        false,
-		GCTimeout:        1 * time.Hour,
-		RequestTimeout:   60 * time.Second,
-		Measurements:     []mtypes.Measurement{},
-		WaitWhenFinished: false,
-		Timeout:          4 * time.Hour,
+		GC:                false,
+		GCMetrics:         false,
+		GCTimeout:         1 * time.Hour,
+		RequestTimeout:    60 * time.Second,
+		Measurements:      []mtypes.Measurement{},
+		WaitWhenFinished:  false,
+		Timeout:           4 * time.Hour,
+		FunctionTemplates: []string{},
 	},
 }
 
 // UnmarshalYAML unmarshals YAML data into the Indexer struct.
-func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawIndexer MetricsEndpoint
 	indexer := rawIndexer{
 		IndexerConfig: indexers.IndexerConfig{
@@ -66,7 +71,7 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(interface{}) error) error
 }
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
-func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
 		Wait: true,
@@ -79,7 +84,7 @@ func (o *Object) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // UnmarshalYAML implements Unmarshaller to customize job defaults
-func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawJob Job
 	raw := rawJob{
 		Cleanup:                true,
@@ -99,6 +104,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
 		ChurnDeletionStrategy:  "default",
+		MetricsClosing:         "afterJob",
 	}
 
 	if err := unmarshal(&raw); err != nil {
@@ -114,15 +120,13 @@ func (j *Job) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func getInputData(userDataFileReader io.Reader, additionalVars map[string]interface{}) (map[string]interface{}, error) {
-	inputData := make(map[string]interface{})
+func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (map[string]any, error) {
+	inputData := make(map[string]any)
 	// First copy from additionalVars
-	for key, value := range additionalVars {
-		inputData[key] = value
-	}
+	maps.Copy(inputData, additionalVars)
 	// If a userDataFileReader was provided use it to override values
 	if userDataFileReader != nil {
-		userDataFileVars := make(map[string]interface{})
+		userDataFileVars := make(map[string]any)
 		userData, err := io.ReadAll(userDataFileReader)
 		if err != nil {
 			return nil, fmt.Errorf("error reading user data file: %w", err)
@@ -131,14 +135,10 @@ func getInputData(userDataFileReader io.Reader, additionalVars map[string]interf
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse file: %w", err)
 		}
-		for key, value := range userDataFileVars {
-			inputData[key] = value
-		}
+		maps.Copy(inputData, userDataFileVars)
 	}
 	// Add all entries from environment variables, overriding duplicates
-	for key, value := range util.EnvToMap() {
-		inputData[key] = value
-	}
+	maps.Copy(inputData, util.EnvToMap())
 	return inputData, nil
 }
 
@@ -147,7 +147,7 @@ func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec
 }
 
 // Parse parses a configuration file
-func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]interface{}) (Spec, error) {
+func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]any) (Spec, error) {
 	cfg, err := io.ReadAll(configFileReader)
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
@@ -160,7 +160,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if allowMissingKeys {
 		templateOptions = util.MissingKeyZero
 	}
-	renderedCfg, err := util.RenderTemplate(cfg, inputData, templateOptions)
+	renderedCfg, err := util.RenderTemplate(cfg, inputData, templateOptions, []string{})
 	if err != nil {
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}
@@ -186,6 +186,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		}
 		if job.JobIterations < 1 && (job.JobType == CreationJob || job.JobType == ReadJob) {
 			log.Fatalf("Job %s has < 1 iterations", job.Name)
+		}
+		if job.MetricsClosing != "afterJob" && job.MetricsClosing != "afterJobPause" && job.MetricsClosing != "afterMeasurements" {
+			log.Fatalf("Invalid value %s for MetricsClosing", job.MetricsClosing)
 		}
 		if job.JobType == DeletionJob {
 			configSpec.Jobs[i].PreLoadImages = false
@@ -234,6 +237,40 @@ func (p *KubeClientProvider) ClientSet(QPS float32, burst int) (kubernetes.Inter
 	restConfig.QPS, restConfig.Burst = QPS, burst
 	restConfig.Timeout = configSpec.GlobalConfig.RequestTimeout
 	return kubernetes.NewForConfigOrDie(&restConfig), &restConfig
+}
+
+// FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
+func FetchConfigMap(configMap, namespace string) (string, string, error) {
+	log.Infof("Fetching configmap %s", configMap)
+	var kubeconfig, metricProfile, alertProfile string
+	if os.Getenv("KUBECONFIG") != "" {
+		kubeconfig = os.Getenv("KUBECONFIG")
+	} else if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".kube", "config")); kubeconfig == "" && !os.IsNotExist(err) {
+		kubeconfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	}
+	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		return metricProfile, alertProfile, err
+	}
+	clientSet := kubernetes.NewForConfigOrDie(restConfig)
+	configMapData, err := clientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMap, v1.GetOptions{})
+	if err != nil {
+		return metricProfile, alertProfile, err
+	}
+
+	for name, data := range configMapData.Data {
+		// We write the configMap data into the CWD
+		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
+			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
+		}
+		if name == "metrics.yml" {
+			metricProfile = "metrics.yml"
+		}
+		if name == "alerts.yml" {
+			alertProfile = "alerts.yml"
+		}
+	}
+	return metricProfile, alertProfile, nil
 }
 
 func validateDNS1123() error {

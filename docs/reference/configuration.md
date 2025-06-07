@@ -42,6 +42,8 @@ In this section is described global job configuration, it holds the following pa
 | `gcTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 | `waitWhenFinished` | Wait for all pods/jobs (including probes) to be running/completed when all jobs are completed           | Boolean  | false   |
 | `clusterHealth` | Checks if all the nodes are in "Ready" state                                             | Boolean        | false      |
+| `timeout` | Global benchmark timeout                                             | Duration        | 4hr      |
+| `functionTemplates` | Function template files to render at runtime                                             | List        | []      |
 
 !!! note
     The precedence order to wait on resources is Global.waitWhenFinished > Job.waitWhenFinished > Job.podWait
@@ -51,6 +53,40 @@ kube-burner connects k8s clusters using the following methods in this order:
 - `KUBECONFIG` environment variable
 - `$HOME/.kube/config`
 - In-cluster config (Used when kube-burner runs inside a pod)
+
+### Function templating example
+Using function templates we can define a block of code as function and reuse it in any parts of our configuration. For the purpose of this example, lets assume we have a configuration like below in our **deployment.yaml**
+```
+env:
+- name: ENVVAR1_{{.name}}
+  value: {{.envVar}}
+- name: ENVVAR2_{{.name}}
+  value: {{.envVar}}
+- name: ENVVAR3_{{.name}}
+  value: {{.envVar}}
+- name: ENVVAR4_{{.name}}
+  value: {{.envVar}}
+```
+Now I want to modularize and use it in my code. In order to do that, I will create a template **envs.tpl** as below.
+```
+{{- define "env_func" -}}
+{{- range $i := until $.n }}
+{{- printf "- name: ENVVAR%d_%s\n  value: %s" (add $i 1) $.name $.envVar | nindent $.indent }}
+{{- end }}
+{{- end }}
+```
+Once done we will make sure that our function template is invoked as a part of the global configuration as below so that it can be used across.
+```
+global:
+  functionTemplates:
+    - envs.tpl
+```
+Final step is to invoke this function with required parameters to make sure it replaces the redundant code in our **deployment.yaml** file.
+```
+env:
+{{- template "env_func" (dict "name" .name "envVar" .envVar "n" 4 "indent" 8) }}
+```
+We are all set! We should have our function rendered at the runtime and can be reused in future as well.
 
 ## Jobs
 
@@ -92,9 +128,17 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
 | `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | 0s       |
+| `metricsAggregate`           | Aggregate the metrics collected for this job with those of the next one                                                               | Boolean  | false    |
+| `metricsClosing`  | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                             | String   | afterJob |
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
+
+!!! note
+    When `jobType` is set to [Delete](#delete) the following settings are forced:
+    `jobIterations` is set to `1`,
+    `waitWhenFinished` is set to `false`,
+    `executionMode` is set to `sequential`
 
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
@@ -116,6 +160,26 @@ Each object element supports the following parameters:
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
+
+### Built-in support for object waiters
+
+The following object types have built-in waiters:
+- StatefulSet
+- Deployment
+- DaemonSet
+- ReplicaSet
+- Job
+- Pod
+- ReplicationController
+- Build
+- BuildConfig
+- VirtualMachine
+- VirtualMachineInstance
+- VirtualMachineInstanceReplicaSet
+- PersistentVolumeClaim
+- VolumeSnapshot
+- DataVolume
+- DataSource
 
 !!! info
     Find more info about the waiters implementation in the `pkg/burner/waiters.go` file
@@ -518,3 +582,11 @@ jobs:
   - objectTemplate: deployment.yml
     replicas: 10
 ```
+
+## MetricsClosing
+
+This config defines when the metrics collection should stop. The option supports three values:
+
+- `afterJob` - collect metrics after the job completes
+- `afterJobPause` - collect metrics after the jobPause duration ends
+- `afterMeasurements` - collect metrics after all measurements are finished

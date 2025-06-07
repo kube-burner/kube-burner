@@ -9,7 +9,7 @@ spec:
     spec:
       source:
         registry:
-          url: {{ .rootDiskImage }}
+          url: "docker://quay.io/containerdisks/fedora:40"
       storage:
         volumeMode: Filesystem
         accessModes:
@@ -17,7 +17,7 @@ spec:
         storageClassName: {{ .storageClassName }}
         resources:
           requests:
-            storage: {{ default "5Gi" .rootVolumeSize }}
+            storage: "6Gi"
   running: true
   template:
     spec:
@@ -25,7 +25,7 @@ spec:
       domain:
         resources:
           requests:
-            memory: {{ default "512Mi" .vmMemory }}
+            memory: "512Mi"
         devices:
           disks:
           - disk:
@@ -43,5 +43,5 @@ spec:
         pod: {}
       volumes:
       - dataVolume:
-          name: "{{ .rootDiskVolumeName }}"
+          name: {{ .rootDiskVolumeName }}
         name: rootdisk

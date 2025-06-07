@@ -22,20 +22,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
 type object struct {
 	config.Object
 	gvr        schema.GroupVersionResource
 	objectSpec []byte
-	kind       string
 	namespace  string
 	namespaced bool
 	ready      bool
 }
 
-func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper, defaultAPIVersion string) object {
+func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion string) *object {
 	if obj.APIVersion == "" {
 		obj.APIVersion = defaultAPIVersion
 	}
@@ -58,7 +57,7 @@ func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper
 
 	if obj.ObjectTemplate != "" {
 		log.Debugf("Rendering template: %s", obj.ObjectTemplate)
-		f, err := util.GetReader(obj.ObjectTemplate, configSpec.EmbedFS, configSpec.EmbedFSDir)
+		f, err := fileutils.GetMetricsReader(obj.ObjectTemplate, nil)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
 		}
@@ -69,5 +68,5 @@ func newObject(obj config.Object, configSpec config.Spec, mapper meta.RESTMapper
 		o.objectSpec = t
 	}
 
-	return o
+	return &o
 }

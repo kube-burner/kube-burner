@@ -16,6 +16,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -57,11 +58,10 @@ func CreateNamespace(clientSet kubernetes.Interface, name string, nsLabels map[s
 }
 
 // CleanupNamespaces deletes namespaces with the given selector
-func CleanupNamespaces(ctx context.Context, clientSet kubernetes.Interface, labelSelector string) {
+func CleanupNamespaces(ctx context.Context, clientSet kubernetes.Interface, labelSelector string) error {
 	ns, err := clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
-		log.Errorf("Error listing namespaces: %v", err.Error())
-		return
+		return fmt.Errorf("Error listing namespaces: %v", err.Error())
 	}
 	if len(ns.Items) > 0 {
 		log.Infof("Deleting %d namespaces with label: %s", len(ns.Items), labelSelector)
@@ -69,15 +69,16 @@ func CleanupNamespaces(ctx context.Context, clientSet kubernetes.Interface, labe
 			err := clientSet.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{})
 			if err != nil {
 				if !errors.IsNotFound(err) {
-					log.Errorf("Error deleting namespace %s: %v", ns.Name, err)
+					return fmt.Errorf("Error deleting namespace %s: %v", ns.Name, err)
 				}
 			}
 		}
-		waitForDeleteNamespaces(ctx, clientSet, labelSelector)
+		return waitForDeleteNamespaces(ctx, clientSet, labelSelector)
 	}
+	return nil
 }
 
-func waitForDeleteNamespaces(ctx context.Context, clientSet kubernetes.Interface, labelSelector string) {
+func waitForDeleteNamespaces(ctx context.Context, clientSet kubernetes.Interface, labelSelector string) error {
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		ns, err := clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
@@ -91,10 +92,11 @@ func waitForDeleteNamespaces(ctx context.Context, clientSet kubernetes.Interface
 	})
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			log.Fatalf("Timeout cleaning up namespaces: %v", err)
+			return fmt.Errorf("Timeout cleaning up namespaces: %v", err)
 		}
-		log.Errorf("Error cleaning up namespaces: %v", err)
+		return fmt.Errorf("Error cleaning up namespaces: %v", err)
 	}
+	return nil
 }
 
 // Cleanup non-namespaced resources with the given selector

@@ -17,8 +17,11 @@ package burner
 import (
 	"sync"
 
+	"maps"
+
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,31 +34,35 @@ import (
 
 // Executor contains the information required to execute a job
 type ItemHandler func(ex *Executor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup)
-type ObjectFinalizer func(ex *Executor, obj object)
+type ObjectFinalizer func(ex *Executor, obj *object)
 
 type Executor struct {
 	config.Job
-	objects         []object
-	uuid            string
-	runid           string
-	limiter         *rate.Limiter
-	waitLimiter     *rate.Limiter
-	nsRequired      bool
-	itemHandler     ItemHandler
-	objectFinalizer ObjectFinalizer
-	clientSet       kubernetes.Interface
-	restConfig      *rest.Config
-	dynamicClient   *dynamic.DynamicClient
-	kubeVirtClient  kubecli.KubevirtClient
+	objects           []*object
+	uuid              string
+	runid             string
+	limiter           *rate.Limiter
+	waitLimiter       *rate.Limiter
+	nsRequired        bool
+	itemHandler       ItemHandler
+	objectFinalizer   ObjectFinalizer
+	clientSet         kubernetes.Interface
+	restConfig        *rest.Config
+	dynamicClient     *dynamic.DynamicClient
+	kubeVirtClient    kubecli.KubevirtClient
+	functionTemplates []string
+	embedCfg          *fileutils.EmbedConfiguration
 }
 
-func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job) Executor {
+func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) Executor {
 	ex := Executor{
-		Job:         job,
-		limiter:     rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
-		uuid:        configSpec.GlobalConfig.UUID,
-		runid:       configSpec.GlobalConfig.RUNID,
-		waitLimiter: rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		Job:               job,
+		limiter:           rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		uuid:              configSpec.GlobalConfig.UUID,
+		runid:             configSpec.GlobalConfig.RUNID,
+		waitLimiter:       rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
+		embedCfg:          embedCfg,
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
@@ -68,40 +75,38 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 
 	switch job.JobType {
 	case config.CreationJob:
-		ex.setupCreateJob(configSpec, mapper)
+		ex.setupCreateJob(mapper)
 	case config.DeletionJob:
-		ex.setupDeleteJob(configSpec, mapper)
+		ex.setupDeleteJob(mapper)
 	case config.PatchJob:
-		ex.setupPatchJob(configSpec, mapper)
+		ex.setupPatchJob(mapper)
 	case config.ReadJob:
-		ex.setupReadJob(configSpec, mapper)
+		ex.setupReadJob(mapper)
 	case config.KubeVirtJob:
-		ex.setupKubeVirtJob(configSpec, mapper)
+		ex.setupKubeVirtJob(mapper)
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}
 	return ex
 }
 
-func (ex *Executor) renderTemplateForObject(obj object, iteration, replicaIndex int, asJson bool) []byte {
+func (ex *Executor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {
 	// Processing template
-	templateData := map[string]interface{}{
+	templateData := map[string]any{
 		jobName:      ex.Name,
 		jobIteration: iteration,
 		jobUUID:      ex.uuid,
 		jobRunId:     ex.runid,
 		replica:      replicaIndex,
 	}
-	for k, v := range obj.InputVars {
-		templateData[k] = v
-	}
+	maps.Copy(templateData, obj.InputVars)
 
 	templateOption := util.MissingKeyError
 	if ex.DefaultMissingKeysWithZero {
 		templateOption = util.MissingKeyZero
 	}
 
-	renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption)
+	renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption, ex.functionTemplates)
 	if err != nil {
 		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
 	}

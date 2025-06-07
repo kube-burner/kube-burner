@@ -41,16 +41,16 @@ import (
 )
 
 type pprof struct {
-	baseLatencyMeasurement
+	BaseMeasurement
 
 	stopChannel chan bool
 }
 
 type pprofLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	BaseMeasurementFactory
 }
 
-func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	for _, target := range measurement.PProfTargets {
 		if target.BearerToken != "" && (target.CertFile != "" || target.Cert != "") {
 			return nil, fmt.Errorf("bearerToken and cert auth methods cannot be specified together in the same target")
@@ -58,20 +58,20 @@ func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types
 	}
 
 	return pprofLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (plmf pprofLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+func (plmf pprofLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &pprof{
-		baseLatencyMeasurement: plmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig, "", ""),
 	}
 }
 
-func (p *pprof) start(measurementWg *sync.WaitGroup) error {
+func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	var wg sync.WaitGroup
-	err := os.MkdirAll(p.config.PProfDirectory, 0744)
+	err := os.MkdirAll(p.Config.PProfDirectory, 0744)
 	if err != nil {
 		log.Fatalf("Error creating pprof directory: %s", err)
 	}
@@ -80,7 +80,7 @@ func (p *pprof) start(measurementWg *sync.WaitGroup) error {
 	wg.Wait()
 	go func() {
 		defer close(p.stopChannel)
-		ticker := time.NewTicker(p.config.PProfInterval)
+		ticker := time.NewTicker(p.Config.PProfInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -99,7 +99,7 @@ func (p *pprof) start(measurementWg *sync.WaitGroup) error {
 
 func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
 	labelSelector := labels.Set(target.LabelSelector).String()
-	podList, err := p.clientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+	podList, err := p.ClientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		log.Errorf("Error found listing pods labeled with %s: %s", labelSelector, err)
 	}
@@ -109,14 +109,14 @@ func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
 func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 	var err error
 	var command []string
-	for pos, target := range p.config.PProfTargets {
+	for pos, target := range p.Config.PProfTargets {
 		log.Infof("Collecting %s pprof", target.Name)
 		podList := p.getPods(target)
 		for _, pod := range podList {
 			var cert, privKey io.Reader
 			if target.CertFile != "" && target.KeyFile != "" && first {
 				// target is a copy of one of the slice elements, so we need to modify the target object directly from the slice
-				p.config.PProfTargets[pos].Cert, p.config.PProfTargets[pos].Key, err = readCerts(target.CertFile, target.KeyFile)
+				p.Config.PProfTargets[pos].Cert, p.Config.PProfTargets[pos].Key, err = readCerts(target.CertFile, target.KeyFile)
 				if err != nil {
 					log.Error(err)
 					continue
@@ -140,7 +140,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 			go func(target types.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
 				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Name, time.Now().Unix())
-				f, err := os.Create(path.Join(p.config.PProfDirectory, pprofFile))
+				f, err := os.Create(path.Join(p.Config.PProfDirectory, pprofFile))
 				var stderr bytes.Buffer
 				if err != nil {
 					log.Errorf("Error creating pprof file %s: %s", pprofFile, err)
@@ -160,7 +160,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				} else {
 					command = []string{"curl", "-sSLk", target.URL}
 				}
-				req := p.clientSet.CoreV1().
+				req := p.ClientSet.CoreV1().
 					RESTClient().
 					Post().
 					Resource("pods").
@@ -176,7 +176,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					Stdout:    true,
 				}, scheme.ParameterCodec)
 				log.Debugf("Executing %s in pod %s", command, pod.Name)
-				exec, err := remotecommand.NewSPDYExecutor(p.restConfig, "POST", req.URL())
+				exec, err := remotecommand.NewSPDYExecutor(p.RestConfig, "POST", req.URL())
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
 				}
@@ -189,27 +189,23 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					log.Errorf("Failed to get pprof from %s: %s", pod.Name, stderr.String())
 					os.Remove(f.Name())
 				}
-			}(p.config.PProfTargets[pos], pod)
+			}(p.Config.PProfTargets[pos], pod)
 		}
 	}
 	wg.Wait()
 }
 
-func (p *pprof) collect(measurementWg *sync.WaitGroup) {
+func (p *pprof) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 }
 
-func (p *pprof) stop() error {
+func (p *pprof) Stop() error {
 	p.stopChannel <- true
 	return nil
 }
 
 // Fake index function for pprof
-func (p *pprof) index(_ string, _ map[string]indexers.Indexer) {
-}
-
-func (p *pprof) getMetrics() *sync.Map {
-	return &sync.Map{}
+func (p *pprof) Index(_ string, _ map[string]indexers.Indexer) {
 }
 
 func readCerts(cert, privKey string) (string, string, error) {
@@ -242,7 +238,7 @@ func (p *pprof) copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 		"/tmp/pprof.key": privKey,
 	}
 	for dest, f := range fMap {
-		req := p.clientSet.CoreV1().
+		req := p.ClientSet.CoreV1().
 			RESTClient().
 			Post().
 			Resource("pods").
@@ -256,7 +252,7 @@ func (p *pprof) copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 			Stderr:    true,
 			Stdout:    false,
 		}, scheme.ParameterCodec)
-		exec, err := remotecommand.NewSPDYExecutor(p.restConfig, "POST", req.URL())
+		exec, err := remotecommand.NewSPDYExecutor(p.RestConfig, "POST", req.URL())
 		if err != nil {
 			return fmt.Errorf("failed to establish SPDYExecutor on %s: %s", pod.Name, err)
 		}

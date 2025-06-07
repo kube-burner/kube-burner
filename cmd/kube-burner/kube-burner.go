@@ -31,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -72,10 +73,11 @@ To configure your bash shell to load completions for each session execute:
 }
 
 func initCmd() *cobra.Command {
+	var err error
 	var clientSet kubernetes.Interface
 	var kubeConfig, kubeContext string
-	var metricsEndpoint, configFile string
-	var uuid, userMetadata string
+	var metricsEndpoint, configFile, configMap, metricsProfile, alertProfile string
+	var uuid, userMetadata, namespace string
 	var skipTLSVerify bool
 	var timeout time.Duration
 	var userDataFile string
@@ -90,16 +92,24 @@ func initCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			if configMap != "" {
+				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+				// We assume configFile is config.yml
+				configFile = "config.yml"
+			}
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			configFileReader, err := util.GetReader(configFile, nil, "")
+			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
 			var userDataFileReader io.Reader
 			if userDataFile != "" {
-				userDataFileReader, err = util.GetReader(userDataFile, nil, "")
+				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
 				if err != nil {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
@@ -112,13 +122,15 @@ func initCmd() *cobra.Command {
 				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,
 				UserMetaData:    userMetadata,
+				AlertProfile:    alertProfile,
+				MetricsProfile:  metricsProfile,
 			})
 			if configSpec.GlobalConfig.ClusterHealth {
 				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper)
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil, nil)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(rc)
@@ -130,13 +142,15 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
+	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().SortFlags = false
-	cmd.MarkFlagRequired("config")
+	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd
 }
 
@@ -205,7 +219,7 @@ func measureCmd() *cobra.Command {
 	var userMetadata string
 	var kubeConfig, kubeContext string
 	indexerList := make(map[string]indexers.Indexer)
-	metadata := make(map[string]interface{})
+	metadata := make(map[string]any)
 	cmd := &cobra.Command{
 		Use:   "measure",
 		Short: "Take measurements for a given set of resources without running workload",
@@ -215,7 +229,7 @@ func measureCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
-			f, err := util.GetReader(configFile, nil, "")
+			f, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
@@ -251,7 +265,7 @@ func measureCmd() *cobra.Command {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
 			log.Infof("%v", namespaceLabels)
-			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata).NewMeasurements(
+			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
 				&config.Job{
 					Name:                 jobName,
 					Namespace:            rawNamespaces,
@@ -459,7 +473,7 @@ func alertCmd() *cobra.Command {
 				Start: time.Unix(start, 0),
 				End:   time.Unix(end, 0),
 			}
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil); err != nil {
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil, nil); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
 			err = alertM.Evaluate(job)

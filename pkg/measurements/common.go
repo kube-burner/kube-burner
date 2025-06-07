@@ -16,143 +16,22 @@ package measurements
 
 import (
 	"context"
-	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 )
-
-var (
-	supportedLatencyMetricsMap = map[string]struct{}{
-		"P99": {},
-		"P95": {},
-		"P50": {},
-		"Avg": {},
-		"Max": {},
-	}
-)
-
-type baseLatencyMeasurementFactory struct {
-	config   types.Measurement
-	uuid     string
-	runid    string
-	metadata map[string]interface{}
-}
-
-type baseLatencyMeasurement struct {
-	config     types.Measurement
-	uuid       string
-	runid      string
-	jobConfig  *config.Job
-	clientSet  kubernetes.Interface
-	restConfig *rest.Config
-	metadata   map[string]interface{}
-}
-
-func newBaseLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) baseLatencyMeasurementFactory {
-	return baseLatencyMeasurementFactory{
-		config:   measurement,
-		uuid:     configSpec.GlobalConfig.UUID,
-		runid:    configSpec.GlobalConfig.RUNID,
-		metadata: metadata,
-	}
-}
-
-func (blmf baseLatencyMeasurementFactory) newBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) baseLatencyMeasurement {
-	return baseLatencyMeasurement{
-		config:     blmf.config,
-		uuid:       blmf.uuid,
-		runid:      blmf.runid,
-		jobConfig:  jobConfig,
-		clientSet:  clientSet,
-		restConfig: restConfig,
-		metadata:   blmf.metadata,
-	}
-}
-
-func verifyMeasurementConfig(config types.Measurement, supportedConditions map[string]struct{}) error {
-	for _, th := range config.LatencyThresholds {
-		if _, supported := supportedConditions[th.ConditionType]; !supported {
-			return fmt.Errorf("unsupported condition type in measurement: %s", th.ConditionType)
-		}
-		if _, supportedLatency := supportedLatencyMetricsMap[th.Metric]; !supportedLatency {
-			return fmt.Errorf("unsupported metric %s in measurement, supported are: %s", th.Metric, strings.Join(maps.Keys(supportedLatencyMetricsMap), ", "))
-		}
-	}
-	return nil
-}
-
-func IndexLatencyMeasurement(config types.Measurement, jobName string, metricMap map[string][]interface{}, indexerList map[string]indexers.Indexer) {
-	indexDocuments := func(indexer indexers.Indexer, metricName string, data []interface{}) {
-		log.Infof("Indexing metric %s", metricName)
-		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, jobName),
-		}
-		log.Debugf("Indexing [%d] documents: %s", len(data), metricName)
-		resp, err := indexer.Index(data, indexingOpts)
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			log.Info(resp)
-		}
-	}
-	for metricName, data := range metricMap {
-		// Use the configured TimeseriesIndexer or QuantilesIndexer when specified or else use all indexers
-		if config.TimeseriesIndexer != "" && (metricName == podLatencyMeasurement || metricName == svcLatencyMeasurement || metricName == nodeLatencyMeasurement || metricName == pvcLatencyMeasurement) {
-			indexer := indexerList[config.TimeseriesIndexer]
-			indexDocuments(indexer, metricName, data)
-		} else if config.QuantilesIndexer != "" && (metricName == podLatencyQuantilesMeasurement || metricName == svcLatencyQuantilesMeasurement || metricName == nodeLatencyQuantilesMeasurement || metricName == pvcLatencyQuantilesMeasurement) {
-			indexer := indexerList[config.QuantilesIndexer]
-			indexDocuments(indexer, metricName, data)
-		} else {
-			for _, indexer := range indexerList {
-				indexDocuments(indexer, metricName, data)
-			}
-		}
-	}
-
-}
-
-// Common function to calculate quantiles for both node and pod latencies
-// Receives a list of normalized latencies and a function to get the latencies for each condition
-func calculateQuantiles(uuid, jobName string, metadata map[string]interface{}, normLatencies []interface{}, getLatency func(interface{}) map[string]float64, metricName string) []interface{} {
-	quantileMap := map[string][]float64{}
-	for _, normLatency := range normLatencies {
-		for condition, latency := range getLatency(normLatency) {
-			quantileMap[condition] = append(quantileMap[condition], latency)
-		}
-	}
-	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
-		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = uuid
-		latencySummary.Metadata = metadata
-		latencySummary.MetricName = metricName
-		latencySummary.JobName = jobName
-		return latencySummary
-	}
-
-	var latencyQuantiles []interface{}
-	for condition, latencies := range quantileMap {
-		latencyQuantiles = append(latencyQuantiles, calcSummary(condition, latencies))
-	}
-
-	return latencyQuantiles
-}
 
 func getIntFromLabels(labels map[string]string, key string) int {
 	strVal, ok := labels[key]
@@ -180,9 +59,9 @@ func deployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, im
 					Name:            podName,
 					ImagePullPolicy: corev1.PullAlways,
 					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: ptr.To[bool](false),
+						AllowPrivilegeEscalation: ptr.To(false),
 						Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
-						RunAsNonRoot:             ptr.To[bool](true),
+						RunAsNonRoot:             ptr.To(true),
 						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 						RunAsUser:                ptr.To[int64](1000),
 					},
@@ -213,4 +92,26 @@ func deployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, im
 		return true, nil
 	})
 	return err
+}
+
+func getGroupVersionClient(restConfig *rest.Config, gv schema.GroupVersion, types ...runtime.Object) *rest.RESTClient {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	// Add CDI objects to the scheme
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	scheme.AddKnownTypes(gv, types...)
+
+	shallowCopy := *restConfig
+	shallowCopy.ContentConfig.GroupVersion = &gv
+
+	shallowCopy.APIPath = "/apis"
+	shallowCopy.NegotiatedSerializer = codecs.WithoutConversion()
+	shallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+
+	cdiClient, err := rest.RESTClientFor(&shallowCopy)
+	if err != nil {
+		log.Fatalf("failed to create CDI Client - %v", err)
+	}
+	return cdiClient
 }

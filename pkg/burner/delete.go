@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (ex *Executor) setupDeleteJob(configSpec config.Spec, mapper meta.RESTMapper) {
+func (ex *Executor) setupDeleteJob(mapper meta.RESTMapper) {
 	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
@@ -38,9 +38,11 @@ func (ex *Executor) setupDeleteJob(configSpec config.Spec, mapper meta.RESTMappe
 	ex.JobIterations = 1
 	// Use the sequential mode
 	ex.ExecutionMode = config.ExecutionModeSequential
+	// WaitWhenFinished expects the resources to exists. For this reason wait is handled by WaitForDeletion
+	ex.WaitWhenFinished = false
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, configSpec, mapper, APIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1))
 	}
 }
 
@@ -60,7 +62,7 @@ func deleteHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 	}
 }
 
-func verifyDelete(ex *Executor, obj object) {
+func verifyDelete(ex *Executor, obj *object) {
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,

@@ -28,6 +28,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -66,12 +67,14 @@ var (
 // - error
 //
 //nolint:gocyclo
-func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper) (int, error) {
+func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory, embedCfg *fileutils.EmbedConfiguration) (int, error) {
 	var err error
 	var rc int
 	var executedJobs []prometheus.Job
 	var jobList []Executor
 	var msWg, gcWg sync.WaitGroup
+	var gcCtx context.Context
+	var cancelGC context.CancelFunc
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -85,19 +88,24 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	defer cancel()
 	go func() {
 		var innerRC int
-		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata)
-		jobList = newExecutorList(configSpec, kubeClientProvider)
+		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
+		jobList = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		handlePreloadImages(jobList, kubeClientProvider)
 		// Iterate job list
+		var measurementsInstance *measurements.Measurements
+		var measurementsJobName string
 		for jobPosition, job := range jobList {
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
 			})
 			var waitListNamespaces []string
-			measurementsInstance := measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
+			if measurementsInstance == nil {
+				measurementsJobName = job.Name
+				measurementsInstance = measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
+				measurementsInstance.Start()
+			}
 			log.Infof("Triggering job: %s", job.Name)
-			measurementsInstance.Start()
 			if job.JobType == config.CreationJob {
 				if job.Cleanup {
 					// No timeout for initial job cleanup
@@ -126,10 +134,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Error(err.Error())
 				}
 				if job.Churn {
-					now := time.Now().UTC()
-					executedJobs[len(executedJobs)-1].ChurnStart = &now
+					churnStart := time.Now().UTC()
+					executedJobs[len(executedJobs)-1].ChurnStart = &churnStart
 					job.RunCreateJobWithChurn(ctx)
-					executedJobs[len(executedJobs)-1].ChurnEnd = &now
+					churnEnd := time.Now().UTC()
+					executedJobs[len(executedJobs)-1].ChurnEnd = &churnEnd
 				}
 				globalWaitMap[strconv.Itoa(jobPosition)+job.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobPosition)+job.Name] = job
@@ -141,7 +150,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if job.BeforeCleanup != "" {
 				log.Infof("Waiting for beforeCleanup command %s to finish", job.BeforeCleanup)
-				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup, configSpec.EmbedFS, configSpec.EmbedFSDir)
+				stdOut, stdErr, err := util.RunShellCmd(job.BeforeCleanup, job.embedCfg)
 				if err != nil {
 					err = fmt.Errorf("BeforeCleanup failed: %v", err)
 					log.Error(err.Error())
@@ -150,27 +159,39 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 			}
+			jobEnd := time.Now().UTC()
+			if job.MetricsClosing == "afterJob" {
+				executedJobs[len(executedJobs)-1].End = jobEnd
+			}
 			if job.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
 				time.Sleep(job.JobPause)
 			}
-			executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+			if job.MetricsClosing == "afterJobPause" {
+				executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+			}
 			if !globalConfig.WaitWhenFinished {
-				elapsedTime := executedJobs[len(executedJobs)-1].End.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
+				elapsedTime := jobEnd.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
 				log.Infof("Job %s took %v", job.Name, elapsedTime)
 			}
-			// We stop and index measurements per job
-			if err = measurementsInstance.Stop(); err != nil {
-				errs = append(errs, err)
-				log.Error(err.Error())
-				innerRC = rcMeasurement
-			}
-			if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
-				msWg.Add(1)
-				go func(jobName string) {
-					defer msWg.Done()
-					measurementsInstance.Index(jobName, metricsScraper.IndexerList)
-				}(job.Name)
+			if !job.MetricsAggregate {
+				// We stop and index measurements per job
+				if err = measurementsInstance.Stop(); err != nil {
+					errs = append(errs, err)
+					log.Error(err.Error())
+					innerRC = rcMeasurement
+				}
+				if job.MetricsClosing == "afterMeasurements" {
+					executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+				}
+				if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
+					msWg.Add(1)
+					go func(msi *measurements.Measurements, jobName string) {
+						defer msWg.Done()
+						msi.Index(jobName, metricsScraper.IndexerList)
+					}(measurementsInstance, measurementsJobName)
+				}
+				measurementsInstance = nil
 			}
 		}
 		if globalConfig.WaitWhenFinished {
@@ -179,7 +200,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
 			//nolint:govet
-			gcCtx, _ := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+			gcCtx, _ = context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 			for _, job := range jobList {
 				gcWg.Add(1)
 				go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
@@ -223,28 +244,36 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	}()
 	select {
 	case rc = <-res:
+	// When benchmark times out
 	case <-time.After(configSpec.GlobalConfig.Timeout):
 		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
 		log.Error(err.Error())
 		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		errs = append(errs, err)
+		rc = rcTimeout
 		if globalConfig.GC {
-			gcCtx, cancel := context.WithTimeout(context.Background(), globalConfig.GCTimeout)
-			defer cancel()
+			gcCtx, cancelGC = context.WithTimeout(context.Background(), globalConfig.GCTimeout)
+			defer cancelGC()
 			for _, job := range jobList[:len(executedJobs)-1] {
 				gcWg.Add(1)
 				go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
 			}
 			timeoutGCStarted = true
 		}
-		errs = append(errs, err)
-		rc = rcTimeout
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
-	// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
-	// Also wait if timeout GC was started, regardless of GCMetrics setting
-	if globalConfig.GC && (!globalConfig.GCMetrics || timeoutGCStarted) {
-		log.Info("Garbage collecting jobs")
-		gcWg.Wait()
+	if globalConfig.GC {
+		// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
+		// Also wait if timeout GC was started, regardless of GCMetrics setting
+		if !globalConfig.GCMetrics || timeoutGCStarted {
+			log.Info("Garbage collecting jobs")
+			gcWg.Wait()
+		}
+		// When GC times out and job execution has finished successfully, return timeout
+		if gcCtx.Err() == context.DeadlineExceeded && rc == 0 {
+			errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
+			rc = rcTimeout
+		}
 	}
 	return rc, utilerrors.NewAggregate(errs)
 }
@@ -323,11 +352,11 @@ func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) []Executor {
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration) []Executor {
 	var executorList []Executor
 	for _, job := range configSpec.Jobs {
 		verifyJobDefaults(&job, configSpec.GlobalConfig.Timeout)
-		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job))
+		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job, embedCfg))
 	}
 	return executorList
 }
@@ -357,7 +386,11 @@ func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector 
 	if wg != nil {
 		defer wg.Done()
 	}
-	util.CleanupNamespaces(ctx, jobExecutor.clientSet, labelSelector)
+	err := util.CleanupNamespaces(ctx, jobExecutor.clientSet, labelSelector)
+	// Just report error and continue
+	if err != nil {
+		log.Error(err.Error())
+	}
 	for _, obj := range jobExecutor.objects {
 		jobExecutor.limiter.Wait(ctx)
 		if !obj.namespaced {

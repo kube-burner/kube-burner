@@ -29,7 +29,7 @@ jobs:
       - name: Delete docs for older tags
         run: |
           echo "Keeping documentation for latest tags"
-          all_tags=$(git tag --sort=-v:refname)
+          all_tags=$(git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags)
           tags_to_keep=$(echo "$all_tags" | head -n 3)
           for tag in $all_tags; do
             if [[ $tags_to_keep != *"$tag"* ]]; then

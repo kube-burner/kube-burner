@@ -17,46 +17,66 @@ package workloads
 import (
 	"embed"
 	"fmt"
-	"os"
 	"path"
 
 	"github.com/kube-burner/kube-burner/pkg/burner"
 	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/pkg/measurements"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 )
 
 var ConfigSpec config.Spec
 
-// NewWorkloadHelper initializes workloadHelper
-func NewWorkloadHelper(config Config, embedConfig *embed.FS, kubeClientProvider *config.KubeClientProvider) WorkloadHelper {
-	if config.ConfigDir == "" {
-		log.Fatal("Config dir cannot be empty")
-	}
+// NewWorkloadHelper initializes a WorkloadHelper with the provided configuration and embedded filesystem settings.
+// It sets up the embedded configuration and returns a WorkloadHelper instance with initialized metadata maps.
+//
+// Parameters:
+//   - config: The configuration settings for the workload.
+//   - embedFS: The embedded filesystem containing workload and metrics directories.
+//   - workloadDir: The directory path for workloads in the embedded filesystem.
+//   - metricsDir: The directory path for metrics in the embedded filesystem.
+//   - alertsDir: The directory path for alerts in the embedded filesystem.
+//   - kubeClientProvider: The Kubernetes client provider for interacting with the cluster.
+//
+// Returns:
+//   - A WorkloadHelper instance configured with the provided settings.
+func NewWorkloadHelper(config Config, embedFS *embed.FS, workloadDir, metricsDir, alertsDir, scriptsDir string, kubeClientProvider *config.KubeClientProvider) WorkloadHelper {
+	embedCfg := fileutils.NewEmbedConfiguration(embedFS, workloadDir, metricsDir, alertsDir, scriptsDir)
 	wh := WorkloadHelper{
 		Config:             config,
-		embedConfig:        embedConfig,
 		kubeClientProvider: kubeClientProvider,
-		MetricsMetadata:    make(map[string]interface{}),
-		SummaryMetadata:    make(map[string]interface{}),
+		MetricsMetadata:    make(map[string]any),
+		SummaryMetadata:    make(map[string]any),
+		embedCfg:           embedCfg,
 	}
 	return wh
 }
 
-func (wh *WorkloadHelper) Run(workload string) int {
-	return wh.RunWithAdditionalVars(workload, nil)
+// Run executes the workload based on the provided configuration file.
+//
+// Parameters:
+//   - configFile: The path to the configuration file to be used for the workload.
+//
+// Returns:
+//   - An integer representing the result of the workload execution.
+func (wh *WorkloadHelper) Run(configFile string) int {
+	return wh.RunWithAdditionalVars(configFile, nil, nil)
 }
 
-func (wh *WorkloadHelper) RunWithAdditionalVars(workload string, additionalVars map[string]interface{}) int {
-	configFile := fmt.Sprintf("%s.yml", workload)
-	var embedFS *embed.FS
-	var embedFSDir string
-	if _, err := os.Stat(configFile); err != nil {
-		embedFS = wh.embedConfig
-		embedFSDir = path.Join(wh.ConfigDir, workload)
-	}
-	f, err := util.GetReader(configFile, embedFS, embedFSDir)
+// RunWithAdditionalVars executes the workload based on the provided configuration file.
+//
+// Parameters:
+//   - configFile: The path to the configuration file to be used for the workload.
+//   - additionalVars: A map of additional variables to be used for variable substitution in the configuration file.
+//   - additionalMeasurementFactoryMap: A map of additional measurement factories to be used for measurements.
+//
+// Returns:
+//   - An integer representing the result of the workload execution.
+func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVars map[string]any, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) int {
+	f, err := fileutils.GetWorkloadReader(configFile, wh.embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading configuration file: %v", err.Error())
 	}
@@ -64,9 +84,6 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(workload string, additionalVars 
 	if err != nil {
 		log.Fatal(err)
 	}
-	// Set embedFS parameters according to where the configuration file was found
-	ConfigSpec.EmbedFS = embedFS
-	ConfigSpec.EmbedFSDir = embedFSDir
 	// Overwrite credentials
 	for pos := range ConfigSpec.MetricsEndpoints {
 		ConfigSpec.MetricsEndpoints[pos].Endpoint = wh.PrometheusURL
@@ -78,8 +95,9 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(workload string, additionalVars 
 		SummaryMetadata: wh.SummaryMetadata,
 		MetricsMetadata: wh.MetricsMetadata,
 		UserMetaData:    wh.UserMetadata,
+		EmbedCfg:        wh.embedCfg,
 	})
-	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper)
+	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, additionalMeasurementFactoryMap, wh.embedCfg)
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -88,24 +106,24 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(workload string, additionalVars 
 }
 
 // ExtractWorkload extracts the given workload and metrics profile to the current directory
-func ExtractWorkload(embedConfig embed.FS, configDir string, workload string, rootCfg ...string) error {
-	dirContent, err := embedConfig.ReadDir(path.Join(configDir, workload))
+func ExtractWorkload(embedConfig embed.FS, embedFSDir string, workload string, rootCfg ...string) error {
+	dirContent, err := embedConfig.ReadDir(path.Join(embedFSDir, workload))
 	if err != nil {
 		return err
 	}
-	workloadContent, _ := embedConfig.ReadFile(configDir)
+	workloadContent, _ := embedConfig.ReadFile(embedFSDir)
 	if err = util.CreateFile(fmt.Sprintf("%v.yml", workload), workloadContent); err != nil {
 		return err
 	}
 	for _, f := range dirContent {
-		fileContent, _ := embedConfig.ReadFile(path.Join(configDir, workload, f.Name()))
+		fileContent, _ := embedConfig.ReadFile(path.Join(embedFSDir, workload, f.Name()))
 		err := util.CreateFile(f.Name(), fileContent)
 		if err != nil {
 			return err
 		}
 	}
 	for _, f := range rootCfg {
-		fileContent, _ := embedConfig.ReadFile(path.Join(configDir, f))
+		fileContent, _ := embedConfig.ReadFile(path.Join(embedFSDir, f))
 		if err = util.CreateFile(f, fileContent); err != nil {
 			return err
 		}

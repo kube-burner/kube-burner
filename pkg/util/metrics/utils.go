@@ -20,6 +20,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -27,7 +28,7 @@ import (
 // Decodes metrics endpoint yaml file
 func DecodeMetricsEndpoint(metricsEndpointPath string) []config.MetricsEndpoint {
 	var metricsEndpoints []config.MetricsEndpoint
-	f, err := util.GetReader(metricsEndpointPath, nil, "")
+	f, err := fileutils.GetMetricsReader(metricsEndpointPath, nil)
 	if err != nil {
 		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpointPath, err)
 	}
@@ -35,7 +36,7 @@ func DecodeMetricsEndpoint(metricsEndpointPath string) []config.MetricsEndpoint 
 	if err != nil {
 		log.Fatalf("Error reading configuration file %s: %s", metricsEndpointPath, err)
 	}
-	renderedME, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
+	renderedME, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError, []string{})
 	if err != nil {
 		log.Fatalf("Template error in %s: %s", metricsEndpointPath, err)
 	}

@@ -14,6 +14,9 @@ const (
 	VirtualMachineInstance           = "VirtualMachineInstance"
 	VirtualMachineInstanceReplicaSet = "VirtualMachineInstanceReplicaSet"
 	PersistentVolumeClaim            = "PersistentVolumeClaim"
+	VolumeSnapshot                   = "VolumeSnapshot"
+	DataVolume                       = "DataVolume"
+	DataSource                       = "DataSource"
 )
 
 type statusPath struct {

@@ -21,13 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -35,7 +32,6 @@ import (
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 )
 
@@ -64,67 +60,40 @@ type dvMetric struct {
 	dvReady          time.Time
 	DVReadyLatency   int `json:"dvReadyLatency"`
 
-	MetricName   string      `json:"metricName"`
-	UUID         string      `json:"uuid"`
-	Namespace    string      `json:"namespace"`
-	Name         string      `json:"dvName"`
-	JobName      string      `json:"jobName,omitempty"`
-	JobIteration int         `json:"jobIteration"`
-	Replica      int         `json:"replica"`
-	Metadata     interface{} `json:"metadata,omitempty"`
+	MetricName   string `json:"metricName"`
+	UUID         string `json:"uuid"`
+	Namespace    string `json:"namespace"`
+	Name         string `json:"dvName"`
+	JobName      string `json:"jobName,omitempty"`
+	JobIteration int    `json:"jobIteration"`
+	Replica      int    `json:"replica"`
+	Metadata     any    `json:"metadata,omitempty"`
 }
 
 type dvLatency struct {
-	baseLatencyMeasurement
-
-	watcher          *metrics.Watcher
-	metrics          sync.Map
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
+	BaseMeasurement
 }
 
 type dvLatencyMeasurementFactory struct {
-	baseLatencyMeasurementFactory
+	BaseMeasurementFactory
 }
 
-func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]interface{}) (measurementFactory, error) {
+func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedDvConditions); err != nil {
 		return nil, err
 	}
 	return dvLatencyMeasurementFactory{
-		baseLatencyMeasurementFactory: newBaseLatencyMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (dvlmf dvLatencyMeasurementFactory) newMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) measurement {
+func (dvlmf dvLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &dvLatency{
-		baseLatencyMeasurement: dvlmf.newBaseLatency(jobConfig, clientSet, restConfig),
+		BaseMeasurement: dvlmf.NewBaseLatency(jobConfig, clientSet, restConfig, dvLatencyMeasurement, dvLatencyQuantilesMeasurement),
 	}
 }
 
-func getCDIClient(restConfig *rest.Config) *rest.RESTClient {
-	scheme := runtime.NewScheme()
-	codecs := serializer.NewCodecFactory(scheme)
-
-	// Add CDI objects to the scheme
-	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	scheme.AddKnownTypes(cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{})
-
-	shallowCopy := *restConfig
-	shallowCopy.ContentConfig.GroupVersion = &cdiv1beta1.SchemeGroupVersion
-
-	shallowCopy.APIPath = "/apis"
-	shallowCopy.NegotiatedSerializer = codecs.WithoutConversion()
-	shallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
-
-	cdiClient, err := rest.RESTClientFor(&shallowCopy)
-	if err != nil {
-		log.Fatalf("failed to create CDI Client - %v", err)
-	}
-	return cdiClient
-}
-
-func (dv *dvLatency) handleCreateDV(obj interface{}) {
+func (dv *dvLatency) handleCreateDV(obj any) {
 	dataVolume := obj.(*cdiv1beta1.DataVolume)
 	dvLabels := dataVolume.GetLabels()
 	dv.metrics.LoadOrStore(string(dataVolume.UID), dvMetric{
@@ -132,15 +101,15 @@ func (dv *dvLatency) handleCreateDV(obj interface{}) {
 		Namespace:    dataVolume.Namespace,
 		Name:         dataVolume.Name,
 		MetricName:   dvLatencyMeasurement,
-		UUID:         dv.uuid,
-		JobName:      dv.jobConfig.Name,
-		Metadata:     dv.metadata,
+		UUID:         dv.Uuid,
+		JobName:      dv.JobConfig.Name,
+		Metadata:     dv.Metadata,
 		JobIteration: getIntFromLabels(dvLabels, config.KubeBurnerLabelJobIteration),
 		Replica:      getIntFromLabels(dvLabels, config.KubeBurnerLabelReplica),
 	})
 }
 
-func (dv *dvLatency) handleUpdateDV(obj interface{}) {
+func (dv *dvLatency) handleUpdateDV(obj any) {
 	dataVolume := obj.(*cdiv1beta1.DataVolume)
 	if value, exists := dv.metrics.Load(string(dataVolume.UID)); exists {
 		dvm := value.(dvMetric)
@@ -152,8 +121,14 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 			switch c.Type {
 			case cdiv1beta1.DataVolumeBound:
 				if dvm.dvBound.IsZero() {
-					log.Debugf("Updated bound time for dataVolume [%s]", dataVolume.Name)
-					dvm.dvBound = c.LastTransitionTime.Time.UTC()
+					// DataVolume should not reach Bound at the time of creation
+					// Workaround for issue https://issues.redhat.com/browse/CNV-59653
+					if c.LastTransitionTime.Time.UTC() == dvm.Timestamp {
+						log.Debugf("DV [%v]: Disregard bound [%v] with timestamp [%v] equal to creation time", dataVolume.Name, c.Type, dvm.Timestamp)
+					} else {
+						log.Debugf("Updated bound time for dataVolume [%s]", dataVolume.Name)
+						dvm.dvBound = c.LastTransitionTime.Time.UTC()
+					}
 				}
 			case cdiv1beta1.DataVolumeRunning:
 				if dvm.dvRunning.IsZero() {
@@ -162,8 +137,14 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 				}
 			case cdiv1beta1.DataVolumeReady:
 				if dvm.dvReady.IsZero() {
-					log.Infof("Updated ready time for dataVolume [%s]", dataVolume.Name)
-					dvm.dvReady = c.LastTransitionTime.Time.UTC()
+					// DataVolume should not reach Ready at the time of creation
+					// Workaround for issue https://issues.redhat.com/browse/CNV-59653
+					if c.LastTransitionTime.Time.UTC() == dvm.Timestamp {
+						log.Debugf("DV [%v]: Disregard bound [%v] with timestamp [%v] equal to creation time", dataVolume.Name, c.Type, dvm.Timestamp)
+					} else {
+						log.Debugf("Updated ready time for dataVolume [%s]", dataVolume.Name)
+						dvm.dvReady = c.LastTransitionTime.Time.UTC()
+					}
 				}
 			}
 		}
@@ -171,73 +152,43 @@ func (dv *dvLatency) handleUpdateDV(obj interface{}) {
 	}
 }
 
-func (dv *dvLatency) start(measurementWg *sync.WaitGroup) error {
+func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	// Reset latency slices, required in multi-job benchmarks
-	dv.latencyQuantiles, dv.normLatencies = nil, nil
-	dv.metrics = sync.Map{}
-	log.Infof("Creating Data Volume latency watcher for %s", dv.jobConfig.Name)
-	dv.watcher = metrics.NewWatcher(
-		getCDIClient(dv.restConfig),
-		"dvWatcher",
-		"datavolumes",
-		corev1.NamespaceAll,
-		func(options *metav1.ListOptions) {
-			options.LabelSelector = fmt.Sprintf("kube-burner-runid=%v", dv.runid)
+	dv.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				restClient:    getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
+				name:          "dvWatcher",
+				resource:      "datavolumes",
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", dv.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: dv.handleCreateDV,
+					UpdateFunc: func(oldObj, newObj any) {
+						dv.handleUpdateDV(newObj)
+					},
+				},
+			},
 		},
-		nil,
 	)
-	dv.watcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: dv.handleCreateDV,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			dv.handleUpdateDV(newObj)
-		},
-	})
-	if err := dv.watcher.StartAndCacheSync(); err != nil {
-		log.Errorf("DataVolume Latency measurement error: %s", err)
-	}
-
 	return nil
 }
 
-func (dv *dvLatency) stop() error {
-	var err error
-	defer func() {
-		if dv.watcher != nil {
-			dv.watcher.StopWatcher()
-		}
-	}()
-	errorRate := dv.normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. DataVolume latencies error rate was: %.2f", errorRate)
-	}
-	dv.calcQuantiles()
-	if len(dv.config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(dv.config.LatencyThresholds, dv.latencyQuantiles)
-	}
-	for _, q := range dv.latencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", dv.jobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
-	}
-	if errorRate > 0 {
-		log.Infof("DV latencies error rate was: %.2f", errorRate)
-	}
-	return err
+func (dv *dvLatency) Stop() error {
+	return dv.StopMeasurement(dv.normalizeMetrics, dv.getLatency)
 }
 
-func (dv *dvLatency) collect(measurementWg *sync.WaitGroup) {
+func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var dataVolumes []cdiv1beta1.DataVolume
-	labelSelector := labels.SelectorFromSet(dv.jobConfig.NamespaceLabels)
+	labelSelector := labels.SelectorFromSet(dv.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
-	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(dv.restConfig)
+	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(dv.RestConfig)
 	if err != nil {
 		log.Fatalf("Failed to get kubevirt client - %v", err)
 	}
-	namespaces := strings.Split(dv.jobConfig.Namespace, ",")
+	namespaces := strings.Split(dv.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
 		dvList, err := kubeVirtClient.CdiClient().CdiV1beta1().DataVolumes(namespace).List(context.TODO(), options)
 		if err != nil {
@@ -263,32 +214,20 @@ func (dv *dvLatency) collect(measurementWg *sync.WaitGroup) {
 			Namespace:  dataVolume.Namespace,
 			Name:       dataVolume.Name,
 			MetricName: dvLatencyMeasurement,
-			UUID:       dv.uuid,
+			UUID:       dv.Uuid,
 			dvBound:    bound,
 			dvRunning:  running,
 			dvReady:    ready,
-			JobName:    dv.jobConfig.Name,
+			JobName:    dv.JobConfig.Name,
 		})
 	}
-}
-
-func (dv *dvLatency) index(jobName string, indexerList map[string]indexers.Indexer) {
-	metricMap := map[string][]interface{}{
-		dvLatencyMeasurement:          dv.normLatencies,
-		dvLatencyQuantilesMeasurement: dv.latencyQuantiles,
-	}
-	IndexLatencyMeasurement(dv.config, jobName, metricMap, indexerList)
-}
-
-func (dv *dvLatency) getMetrics() *sync.Map {
-	return &dv.metrics
 }
 
 func (dv *dvLatency) normalizeMetrics() float64 {
 	dataVolumeCount := 0
 	erroredDataVolumes := 0
 
-	dv.metrics.Range(func(key, value interface{}) bool {
+	dv.metrics.Range(func(key, value any) bool {
 		m := value.(dvMetric)
 		// Skip DataVolume if it did not reach the Ready state (this timestamp isn't set)
 		if m.dvReady.IsZero() {
@@ -334,14 +273,11 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 	return float64(erroredDataVolumes) / float64(dataVolumeCount) * 100.0
 }
 
-func (dv *dvLatency) calcQuantiles() {
-	getLatency := func(normLatency interface{}) map[string]float64 {
-		dataVolumeMetric := normLatency.(dvMetric)
-		return map[string]float64{
-			string(cdiv1beta1.DataVolumeBound):   float64(dataVolumeMetric.DVBoundLatency),
-			string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
-			string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
-		}
+func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
+	dataVolumeMetric := normLatency.(dvMetric)
+	return map[string]float64{
+		string(cdiv1beta1.DataVolumeBound):   float64(dataVolumeMetric.DVBoundLatency),
+		string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
+		string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
 	}
-	dv.latencyQuantiles = calculateQuantiles(dv.uuid, dv.jobConfig.Name, dv.metadata, dv.normLatencies, getLatency, dvLatencyQuantilesMeasurement)
 }
