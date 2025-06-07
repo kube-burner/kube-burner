@@ -267,3 +267,12 @@ teardown_file() {
     check_metrics_not_created_for_job ${job} ${metric}
   done
 }
+
+@test "kube-burner init: waitTimeoutAction=collect-metrics-then-exit" {
+  export LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner-timeout-test.yml --uuid="${UUID}" --log-level=debug
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-timeout-test-job.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-timeout-test-job.json
+  check_metric_recorded timeout-test-job podLatency PodReadyLatency
+  check_quantile_recorded timeout-test-job podLatency Ready
+  check_destroyed_ns kube-burner-job=timeout-test-job,kube-burner-uuid="${UUID}"
+}

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quick-pod-{{.Iteration}}-{{.Replica}}
+  namespace: {{.Namespace}}
+spec:
+  containers:
+  - name: sleep
+    image: busybox:latest
+    command: ["sh", "-c", "echo Starting; sleep 1; echo Done"]

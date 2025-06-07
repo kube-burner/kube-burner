@@ -94,6 +94,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		var measurementsInstance *measurements.Measurements
 		var measurementsJobName string
 		for jobPosition, job := range jobList {
+			if job.WaitTimeoutAction == "" {
+				job.WaitTimeoutAction = config.WaitTimeoutActionFailFast
+			}
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
@@ -118,7 +121,27 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", job.ChurnDelay)
 					log.Infof("Churn deletion strategy: %v", job.ChurnDeletionStrategy)
 				}
-				job.RunCreateJob(ctx, 0, job.JobIterations, &waitListNamespaces)
+				err := job.RunCreateJob(ctx, 0, job.JobIterations, &waitListNamespaces)
+				if err != nil {
+					// logic for different waitTimeoutActions
+					innerRC, shouldExit := handleJobError(
+						job,
+						err,
+						measurementsInstance,
+						measurementsJobName,
+						executedJobs,
+						metricsScraper,
+						configSpec,
+						uuid,
+						returnMap,
+						&msWg,
+						&errs)
+					if shouldExit {
+						res <- innerRC
+						return
+					}
+					break
+				}
 				if ctx.Err() != nil {
 					return
 				}
@@ -267,9 +290,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			gcWg.Wait()
 		}
 		// When GC times out and job execution has finished successfully, return timeout
-		if gcCtx.Err() == context.DeadlineExceeded && rc == 0 {
-			errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
-			rc = rcTimeout
+		// when job execution(and has collectmetricsthenexit enabled) has failed, we hit a nil pointer error here, so we add a nested nil checker
+		if gcCtx != nil {
+			if gcCtx.Err() == context.DeadlineExceeded && rc == 0 {
+				errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
+				rc = rcTimeout
+			}
 		}
 	}
 	return rc, utilerrors.NewAggregate(errs)
@@ -396,4 +422,46 @@ func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector 
 			CleanupNamespaceResourcesUsingGVR(ctx, jobExecutor, obj, obj.namespace, labelSelector)
 		}
 	}
+}
+
+// function to handle different wait timeout actions
+func handleJobError(
+	job Executor,
+	err error,
+	measurementsInstance *measurements.Measurements,
+	measurementsJobName string,
+	executedJobs []prometheus.Job,
+	metricsScraper metrics.Scraper,
+	configSpec config.Spec,
+	uuid string,
+	returnMap map[string]returnPair,
+	msWg *sync.WaitGroup,
+	errs *[]error) (int, bool) {
+	log.Errorf("Job %s failed: %v", job.Name, err)
+	*errs = append(*errs, err)
+	innerRC := 1
+	if job.WaitTimeoutAction == config.WaitTimeoutActionCollectMetricsThenExit {
+		log.Infof("Collecting metrics before exiting due to waitTimeoutAction setting")
+		jobEnd := time.Now().UTC()
+		executedJobs[len(executedJobs)-1].End = jobEnd
+		if !job.MetricsAggregate && measurementsInstance != nil {
+			if stopErr := measurementsInstance.Stop(); stopErr != nil {
+				*errs = append(*errs, stopErr)
+				log.Error(stopErr.Error())
+				innerRC = rcMeasurement
+			}
+			if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
+				msWg.Add(1)
+				go func(msi *measurements.Measurements, jobName string) {
+					defer msWg.Done()
+					msi.Index(jobName, metricsScraper.IndexerList)
+				}(measurementsInstance, measurementsJobName)
+			}
+			msWg.Wait()
+			indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false,
+				fmt.Sprintf("Job %s failed: %v", job.Name, err), false)
+			return innerRC, true
+		}
+	}
+	return innerRC, false
 }

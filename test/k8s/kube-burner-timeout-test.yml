@@ -1,0 +1,22 @@
+global:
+  timeout: 3m
+  gc: true
+  uuid: ${UUID}
+  measurements:
+    - name: podLatency
+
+jobs:
+  - name: timeout-test-job
+    jobType: create
+    maxWaitTimeout: 10s 
+    waitTimeoutAction: collect-metrics-then-exit
+    podWait: true
+    objects:
+      - objectTemplate: timeout-pod.yaml
+        replicas: 3
+      - objectTemplate: quick-pod.yaml
+        replicas: 2 
+    jobIterations: 1
+    namespacedIterations: true
+    namespace: timeout-test
+    verifyObjects: true

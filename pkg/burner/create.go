@@ -86,7 +86,7 @@ func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) error {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -110,9 +110,10 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	percent := 1
 	var namespacesCreated = make(map[string]bool)
 	var namespacesWaited = make(map[string]bool)
+	var waitErr error
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
-			return
+			return nil
 		}
 		if i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
@@ -153,7 +154,16 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns)
+				if err := ex.waitForObjects(ns); err != nil {
+					if ex.WaitTimeoutAction == config.WaitTimeoutActionCollectMetricsThenExit {
+						log.Errorf("Error waiting for objects: %v", err)
+						// Continue execution but remember the error
+						waitErr = err
+					} else {
+						// Default behavior - fast fail
+						return err
+					}
+				}
 				namespacesWaited[ns] = true
 			}
 		}
@@ -168,6 +178,9 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ex.restConfig.QPS))
+		// Buffer size here is to be set to number of iterations
+		// Even if all goroutines send errors it wont block channel
+		errCh := make(chan error, iterationEnd-iterationStart)
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.nsRequired && ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
@@ -179,7 +192,11 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				ex.waitForObjects(ns)
+				if err := ex.waitForObjects(ns); err != nil {
+					log.Errorf("Error waiting for objects in namespace %s: %v", ns, err)
+					// Need to send errors from go routine too.
+					errCh <- err
+				}
 				<-sem
 				wg.Done()
 			}(ns)
@@ -189,7 +206,16 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 			}
 		}
 		wg.Wait()
+		select {
+		// assign an error to waitErr if it is nil
+		case err := <-errCh:
+			if waitErr == nil {
+				waitErr = err
+			}
+		default:
+		}
 	}
+	return waitErr
 }
 
 // Simple integer division on the iteration allows us to batch iterations into
