@@ -86,7 +86,7 @@ func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) error {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -112,7 +112,7 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	var namespacesWaited = make(map[string]bool)
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
-			return
+			return nil
 		}
 		if i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
@@ -153,7 +153,16 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns)
+				if err := ex.waitForObjects(ns); err != nil {
+					if ex.WaitTimeoutAction == WaitTimeoutActionCollectMetricsThenExit {
+						log.Errorf("Error waiting for objects: %v", err)
+						// Continue execution but remember the error
+						return err
+					} else {
+						// Default behavior - fast fail
+						return err
+					}
+				}
 				namespacesWaited[ns] = true
 			}
 		}
@@ -179,7 +188,10 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				ex.waitForObjects(ns)
+				if err := ex.waitForObjects(ns); err != nil {
+					log.Errorf("Error waiting for objects in namespace %s: %v", ns, err)
+					// We just log here as we can't return error
+				}
 				<-sem
 				wg.Done()
 			}(ns)
@@ -190,6 +202,7 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 		}
 		wg.Wait()
 	}
+	return nil
 }
 
 // Simple integer division on the iteration allows us to batch iterations into

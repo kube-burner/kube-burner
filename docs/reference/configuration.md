@@ -590,3 +590,21 @@ This config defines when the metrics collection should stop. The option supports
 - `afterJob` - collect metrics after the job completes
 - `afterJobPause` - collect metrics after the jobPause duration ends
 - `afterMeasurements` - collect metrics after all measurements are finished
+
+## Job Configuration
+
+### Wait Timeout Action
+
+The `waitTimeoutAction` parameter controls how kube-burner behaves when objects timeout during wait operations. It either exits directly or lets user have the option to stil collect metrics just as a job fails.
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `fail-fast` | Exit immediately when a timeout occurs | Yes |
+| `collect-metrics-then-exit` | Collect metrics before exiting when a timeout occurs | No |
+
+Example:
+```yaml
+jobs:
+  - name: example-job
+    waitTimeoutAction: collect-metrics-then-exit
+    maxWaitTimeout: 10m

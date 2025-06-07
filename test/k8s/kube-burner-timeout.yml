@@ -1,0 +1,20 @@
+global:
+  timeout: 2m
+  gc: true
+  uuid: ${UUID}
+  measurements:
+    - name: podLatency
+
+jobs:
+  - name: timeout-collect-metrics
+    jobType: create
+    maxWaitTimeout: ${MAX_WAIT_TIMEOUT}
+    waitTimeoutAction: ${WAIT_TIMEOUT_ACTION}
+    podWait: true
+    objects:
+      - objectTemplate: objectTemplates/timeout-pod.yaml
+        replicas: 5
+    jobIterations: 1
+    namespacedIterations: true
+    namespace: test-timeout-collect
+    verifyObjects: true

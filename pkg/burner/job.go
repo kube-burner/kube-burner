@@ -94,6 +94,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		var measurementsInstance *measurements.Measurements
 		var measurementsJobName string
 		for jobPosition, job := range jobList {
+			if job.WaitTimeoutAction == "" {
+				job.WaitTimeoutAction = "fast_fail"
+			}
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
@@ -118,7 +121,43 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", job.ChurnDelay)
 					log.Infof("Churn deletion strategy: %v", job.ChurnDeletionStrategy)
 				}
-				job.RunCreateJob(ctx, 0, job.JobIterations, &waitListNamespaces)
+				err := job.RunCreateJob(ctx, 0, job.JobIterations, &waitListNamespaces)
+				if err != nil {
+					if job.WaitTimeoutAction == WaitTimeoutActionCollectMetricsThenExit {
+						log.Errorf("Job %s failed but continuing to collect metrics: %v", job.Name, err)
+						errs = append(errs, err)
+						innerRC = 1
+						jobEnd := time.Now().UTC()
+						executedJobs[len(executedJobs)-1].End = jobEnd
+						// Explicitly stopping and indexing measurements for this job
+						if !job.MetricsAggregate && measurementsInstance != nil {
+							if err = measurementsInstance.Stop(); err != nil {
+								errs = append(errs, err)
+								log.Error(err.Error())
+								innerRC = rcMeasurement
+							}
+							// Storing failed job's measurements
+							if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
+								msWg.Add(1)
+								go func(msi *measurements.Measurements, jobName string) {
+									defer msWg.Done()
+									msi.Index(jobName, metricsScraper.IndexerList)
+								}(measurementsInstance, measurementsJobName)
+							}
+							msWg.Wait()
+							indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false,
+								fmt.Sprintf("Job %s failed: %v", job.Name, err), false)
+							res <- innerRC
+							return
+						}
+					} else {
+						// Default fail-fast behavior
+						log.Errorf("Job %s failed: %v", job.Name, err)
+						errs = append(errs, err)
+						innerRC = 1
+						break
+					}
+				}
 				if ctx.Err() != nil {
 					return
 				}

@@ -17,6 +17,7 @@ const (
 	VolumeSnapshot                   = "VolumeSnapshot"
 	DataVolume                       = "DataVolume"
 	DataSource                       = "DataSource"
+	WaitTimeoutActionCollectMetricsThenExit = "collect-metrics-then-exit"
 )
 
 type statusPath struct {
