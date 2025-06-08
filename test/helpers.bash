@@ -323,3 +323,8 @@ check_metrics_not_created_for_job() {
     return 1
   fi
 }
+
+fail() {
+  echo "FAILED: $*" >&2
+  return 1
+}

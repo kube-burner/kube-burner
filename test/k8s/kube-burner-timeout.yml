@@ -8,8 +8,8 @@ global:
 jobs:
   - name: timeout-collect-metrics
     jobType: create
-    maxWaitTimeout: ${MAX_WAIT_TIMEOUT}
-    waitTimeoutAction: ${WAIT_TIMEOUT_ACTION}
+    maxWaitTimeout: 5s
+    waitTimeoutAction: collect-metrics-then-exit
     podWait: true
     objects:
       - objectTemplate: objectTemplates/timeout-pod.yaml

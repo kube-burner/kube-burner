@@ -269,18 +269,12 @@ teardown_file() {
 }
 
 @test "kube-burner timeout handling: collect-metrics-then-exit" {
-  export WAIT_TIMEOUT_ACTION="collect-metrics-then-exit"
-  export MAX_WAIT_TIMEOUT="5s"
   
-  # Run the test - should exit with error code but still collect metrics
   run ${KUBE_BURNER} init -c kube-burner-timeout.yml --uuid="${UUID}" --log-level=debug
   
-  # Check for error in output (timing out)
   [[ "$output" == *"timeout occurred while waiting for objects"* ]] || fail "No timeout error detected"
   
-  # Check that metrics were collected
   check_file_exists "${METRICS_FOLDER}/podLatencyMeasurement-timeout-collect-metrics.json"
   
-  # Check for message about collecting metrics
   [[ "$output" == *"Error waiting for objects"* ]] || fail "No error message about waiting for objects found"
 }
