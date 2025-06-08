@@ -29,21 +29,35 @@ help:
 	@echo "Commands for $(BIN_PATH):"
 	@echo
 	@echo 'Usage:'
-	@echo '    make lint                     Install and execute pre-commit'
-	@echo '    make clean                    Clean the compiled binaries'
-	@echo '    [ARCH=arch] make build        Compile the project for arch, default amd64'
-	@echo '    [ARCH=arch] make install      Installs kube-burner binary in the system, default amd64'
-	@echo '    [ARCH=arch] make images       Build images for arch, default amd64'
-	@echo '    [ARCH=arch] make push         Push images for arch, default amd64'
-	@echo '    make manifest                 Create and push manifest for the different architectures supported'
-	@echo '    make help                     Show this message'
+	@echo '    make lint                     	Install and execute pre-commit'
+	@echo '    make clean                    	Clean the compiled binaries'
+	@echo '    [ARCH=arch] make build        	Compile the project for arch, default amd64'
+	@echo '    [ARCH=arch] make build-release 	Compile hardened release binary, default amd64'
+	@echo '    [ARCH=arch] make install      	Installs kube-burner binary in the system, default amd64'
+	@echo '    [ARCH=arch] make images       	Build images for arch, default amd64'
+	@echo '    [ARCH=arch] make push         	Push images for arch, default amd64'
+	@echo '    make manifest                 	Create and push manifest for the different architectures supported'
+	@echo '    make help                     	Show this message'
 
 build: $(BIN_PATH)
 
 $(BIN_PATH): $(SOURCES)
 	@echo -e "\033[2mBuilding $(BIN_PATH)\033[0m"
 	@echo "GOPATH=$(GOPATH)"
-	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner
+	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v \
+		-ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) \
+		-X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) \
+		-X $(KUBE_BURNER_VERSION).Version=$(VERSION)" \
+		-o $(BIN_PATH) ./cmd/kube-burner
+
+build-release: $(SOURCES)
+	@echo -e "\033[2mBuilding hardened release binary $(BIN_PATH)\033[0m"
+	@echo "GOPATH=$(GOPATH)"
+	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -trimpath \
+		-ldflags "-s -w -X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) \
+		-X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) \
+		-X $(KUBE_BURNER_VERSION).Version=$(VERSION)" \
+		-o $(BIN_PATH) ./cmd/kube-burner
 
 lint:
 	@echo "Executing pre-commit for all files"
