@@ -21,6 +21,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -78,9 +79,9 @@ func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.M
 	}, nil
 }
 
-func (plmf pvcLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
+func (plmf pvcLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
 	return &pvcLatency{
-		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig, pvcLatencyMeasurement, pvcLatencyQuantilesMeasurement),
+		BaseMeasurement: plmf.NewBaseLatency(jobConfig, clientSet, restConfig, pvcLatencyMeasurement, pvcLatencyQuantilesMeasurement, embedCfg),
 	}
 }
 

@@ -20,6 +20,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"golang.org/x/exp/maps"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -51,7 +52,14 @@ func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measure
 	}
 }
 
-func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, measurementName, quantilesMeasurementName string) BaseMeasurement {
+func (bmf BaseMeasurementFactory) NewBaseLatency(
+	jobConfig *config.Job,
+	clientSet kubernetes.Interface,
+	restConfig *rest.Config,
+	measurementName,
+	quantilesMeasurementName string,
+	embedCfg *fileutils.EmbedConfiguration,
+) BaseMeasurement {
 	return BaseMeasurement{
 		Config:                   bmf.Config,
 		Uuid:                     bmf.Uuid,
@@ -62,6 +70,7 @@ func (bmf BaseMeasurementFactory) NewBaseLatency(jobConfig *config.Job, clientSe
 		Metadata:                 bmf.Metadata,
 		MeasurementName:          measurementName,
 		QuantilesMeasurementName: quantilesMeasurementName,
+		EmbedCfg:                 embedCfg,
 	}
 }
 

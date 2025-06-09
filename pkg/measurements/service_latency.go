@@ -25,6 +25,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -73,9 +74,9 @@ func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement typ
 	}, nil
 }
 
-func (slmf serviceLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
+func (slmf serviceLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
 	return &serviceLatency{
-		BaseMeasurement: slmf.NewBaseLatency(jobConfig, clientSet, restConfig, svcLatencyMeasurement, svcLatencyQuantilesMeasurement),
+		BaseMeasurement: slmf.NewBaseLatency(jobConfig, clientSet, restConfig, svcLatencyMeasurement, svcLatencyQuantilesMeasurement, embedCfg),
 	}
 }
 

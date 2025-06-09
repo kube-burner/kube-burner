@@ -20,6 +20,7 @@ import (
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
@@ -36,7 +37,7 @@ type Measurements struct {
 }
 
 type MeasurementFactory interface {
-	NewMeasurement(*config.Job, kubernetes.Interface, *rest.Config) Measurement
+	NewMeasurement(*config.Job, kubernetes.Interface, *rest.Config, *fileutils.EmbedConfiguration) Measurement
 }
 type NewMeasurementFactory func(config.Spec, types.Measurement, map[string]any) (MeasurementFactory, error)
 
@@ -109,13 +110,13 @@ func NewMeasurementsFactory(configSpec config.Spec, metadata map[string]any, add
 	return &measurementsFactory
 }
 
-func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider) *Measurements {
+func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration) *Measurements {
 	ms := Measurements{
 		MeasurementsMap: make(map[string]Measurement, len(msf.Factories)),
 	}
 	clientSet, restConfig := kubeClientProvider.ClientSet(jobConfig.QPS, jobConfig.Burst)
 	for name, factory := range msf.Factories {
-		ms.MeasurementsMap[name] = factory.NewMeasurement(jobConfig, clientSet, restConfig)
+		ms.MeasurementsMap[name] = factory.NewMeasurement(jobConfig, clientSet, restConfig, embedCfg)
 	}
 
 	return &ms
