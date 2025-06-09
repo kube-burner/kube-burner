@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	jqQueryConditionStringFieldPattern        = "(.conditions.[] | select(.type == \"%s\")).%s"
-	jqQueryConditionLastTransitionTimePattern = "(.conditions.[] | select(.type == \"%s\")).lastTransitionTime | strptime(\"%%Y-%%m-%%dT%%H:%%M:%%SZ\") | mktime %s %d | tostring"
+	jqQueryConditionStringFieldPattern        = "((.conditions // []) | .[] | select(.type == \"%s\")).%s"
+	jqQueryConditionLastTransitionTimePattern = "((.conditions // []) | .[] | select(.type == \"%s\")).lastTransitionTime | strptime(\"%%Y-%%m-%%dT%%H:%%M:%%SZ\") | mktime %s %d | tostring"
 )
 
 type ConditionField string
