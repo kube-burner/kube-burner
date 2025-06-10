@@ -63,11 +63,13 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner init: churn=true; absolute-path=true" {
+@test "kube-burner init: churn=true; absolute-path=true; job-gc=true" {
   export CHURN=true
   export CHURN_CYCLES=2
+  export GC=false
+  export JOBGC=true
   cp kube-burner.yml /tmp/kube-burner.yml
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
