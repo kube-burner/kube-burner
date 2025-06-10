@@ -33,7 +33,7 @@ import (
 
 type BaseMeasurement struct {
 	Config                   types.Measurement
-	embedCfg                 *fileutils.EmbedConfiguration
+	EmbedCfg                 *fileutils.EmbedConfiguration
 	Uuid                     string
 	Runid                    string
 	JobConfig                *config.Job

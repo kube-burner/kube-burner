@@ -23,6 +23,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -78,9 +79,9 @@ func newJobLatencyMeasurementFactory(configSpec config.Spec, measurement types.M
 	}, nil
 }
 
-func (jlmf jobLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
+func (jlmf jobLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
 	return &jobLatency{
-		BaseMeasurement: jlmf.NewBaseLatency(jobConfig, clientSet, restConfig, jobLatencyMeasurement, jobLatencyQuantilesMeasurement),
+		BaseMeasurement: jlmf.NewBaseLatency(jobConfig, clientSet, restConfig, jobLatencyMeasurement, jobLatencyQuantilesMeasurement, embedCfg),
 	}
 }
 

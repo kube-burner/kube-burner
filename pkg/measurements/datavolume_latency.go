@@ -33,6 +33,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
 const (
@@ -87,9 +88,9 @@ func newDvLatencyMeasurementFactory(configSpec config.Spec, measurement types.Me
 	}, nil
 }
 
-func (dvlmf dvLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
+func (dvlmf dvLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
 	return &dvLatency{
-		BaseMeasurement: dvlmf.NewBaseLatency(jobConfig, clientSet, restConfig, dvLatencyMeasurement, dvLatencyQuantilesMeasurement),
+		BaseMeasurement: dvlmf.NewBaseLatency(jobConfig, clientSet, restConfig, dvLatencyMeasurement, dvLatencyQuantilesMeasurement, embedCfg),
 	}
 }
 

@@ -273,6 +273,7 @@ func measureCmd() *cobra.Command {
 					NamespaceAnnotations: namespaceAnnotations,
 				},
 				config.NewKubeClientProvider(kubeConfig, kubeContext),
+				nil,
 			)
 			measurementsInstance.Collect()
 			if err = measurementsInstance.Stop(); err != nil {
