@@ -102,7 +102,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = job.Name
-				measurementsInstance = measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
+				measurementsInstance = measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider, embedCfg)
 				measurementsInstance.Start()
 			}
 			log.Infof("Triggering job: %s", job.Name)
