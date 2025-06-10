@@ -315,9 +315,12 @@ func jobIsDuped() error {
 
 // validateGC checks if GC and global waitWhenFinished are enabled at the same time
 func validateGC() error {
+	if !configSpec.GlobalConfig.WaitWhenFinished {
+		return nil
+	}
 	for _, job := range configSpec.Jobs {
 		if job.GC && configSpec.GlobalConfig.WaitWhenFinished {
-			return fmt.Errorf("Jobs GC and global waitWhenFinished cannot be enabled at the same time")
+			return fmt.Errorf("jobs GC and global waitWhenFinished cannot be enabled at the same time")
 		}
 	}
 	return nil
