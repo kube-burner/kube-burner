@@ -39,6 +39,7 @@ const (
 )
 
 type KubeVirtOpType string
+type MetricsClosing string
 
 const (
 	KubeVirtOpStart        KubeVirtOpType = "start"
@@ -49,7 +50,16 @@ const (
 	KubeVirtOpMigrate      KubeVirtOpType = "migrate"
 	KubeVirtOpAddVolume    KubeVirtOpType = "add-volume"
 	KubeVirtOpRemoveVolume KubeVirtOpType = "remove-volume"
+	AfterJobPause          MetricsClosing = "afterJobPause"
+	AfterMeasurements      MetricsClosing = "afterMeasurements"
+	AfterJob               MetricsClosing = "afterJob"
 )
+
+var metricsClosing = map[MetricsClosing]struct{}{
+	AfterJobPause:     {},
+	AfterMeasurements: {},
+	AfterJob:          {},
+}
 
 // Spec configuration root
 type Spec struct {
@@ -203,7 +213,7 @@ type Job struct {
 	// MetricsAggregate aggregate the metrics of this job with the next one
 	MetricsAggregate bool `yaml:"metricsAggregate" json:"metricsAggregate,omitempty"`
 	// MetricsClosing defines when to stop metrics collection
-	MetricsClosing string `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
+	MetricsClosing MetricsClosing `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
 }
 
 type WaitOptions struct {
