@@ -151,6 +151,8 @@ type Job struct {
 	Burst int `yaml:"burst" json:"burst,omitempty"`
 	// Namespace namespace base name to use
 	Namespace string `yaml:"namespace" json:"namespace,omitempty"`
+	// Create required namespaces before starting the workload
+	PreCreateNamespaces bool `yaml:"preCreateNamespaces" json:"preCreateNamespaces"`
 	// MaxWaitTimeout maximum wait period
 	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout" json:"maxWaitTimeout,omitempty"`
 	// WaitForDeletion wait for objects to be definitively deleted

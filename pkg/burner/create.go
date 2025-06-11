@@ -31,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,6 +88,8 @@ func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
 
 // RunCreateJob executes a creation job
 func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+	var namespacesWaited = make(map[string]bool)
+	var namespacesCreated = make(map[string]bool)
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -108,8 +111,13 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
-	var namespacesCreated = make(map[string]bool)
-	var namespacesWaited = make(map[string]bool)
+	if ex.nsRequired && ex.NamespacedIterations && ex.PreCreateNamespaces {
+		for i := iterationStart; i < iterationEnd; i++ {
+			if err = util.CreateNamespace(ex.clientSet, ex.generateNamespace(i), nsLabels, nsAnnotations); err != nil {
+				log.Error(err.Error())
+			}
+		}
+	}
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
 			return
@@ -121,14 +129,19 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
-			if !namespacesCreated[ns] {
-				if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
-					log.Error(err.Error())
-					continue
+			// If preCreateNamespaces is not enabled, we actually create the namespace
+			if !ex.PreCreateNamespaces {
+				if !namespacesCreated[ns] {
+					if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
+						log.Error(err.Error())
+						if !errors.IsAlreadyExists(err) {
+							continue
+						}
+					}
 				}
-				namespacesCreated[ns] = true
-				*waitListNamespaces = append(*waitListNamespaces, ns)
 			}
+			namespacesCreated[ns] = true
+			*waitListNamespaces = append(*waitListNamespaces, ns)
 		}
 		for objectIndex, obj := range ex.objects {
 			labels := map[string]string{

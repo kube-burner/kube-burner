@@ -98,6 +98,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `jobType`                    | Type of job to execute. More details at [job types](#job-types)                                                                       | String   | create   |
 | `jobIterations`              | How many times to execute the job                                                                                                     | Integer  | 0        |
 | `namespace`                  | Namespace base name to use                                                                                                            | String   | ""       |
+| `preCreateNamespace`         | Create required namespaces before starting with the job's object creation                                                             | Boolean  | false    1|
 | `namespacedIterations`       | Whether to create a namespace per job iteration                                                                                       | Boolean  | true     |
 | `iterationsPerNamespace`     | The maximum number of `jobIterations` to create in a single namespace. Important for node-density workloads that create Services.     | Integer  | 1        |
 | `cleanup`                    | Cleanup clean up old namespaces                                                                                                       | Boolean  | true     |
