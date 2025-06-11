@@ -15,13 +15,16 @@
 package measurements
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -52,6 +55,7 @@ type imagePullMetric struct {
 
 type imagePullLatency struct {
 	BaseMeasurement
+	Ctx context.Context
 }
 
 type imagePullLatencyMeasurementFactory struct {
@@ -67,6 +71,7 @@ func newImagePullLatencyMeasurementFactory(configSpec config.Spec, measurement t
 func (iplmf imagePullLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &imagePullLatency{
 		BaseMeasurement: iplmf.NewBaseLatency(jobConfig, clientSet, restConfig, imagePullLatencyMeasurement, imagePullLatencyQuantilesMeasurement),
+		Ctx:             context.Background(),
 	}
 }
 
@@ -96,7 +101,7 @@ func (ipl *imagePullLatency) handleUpdatePod(obj any) {
 				ipm.ContainerName = containerStatus.Name
 				ipm.Image = containerStatus.Image
 				ipm.PullStartTime = time.Now().UTC()
-			} else if containerStatus.State.Running != nil && !ipm.PullEndTime.IsZero() {
+			} else if containerStatus.State.Running != nil && ipm.PullEndTime.IsZero() {
 				ipm.PullEndTime = time.Now().UTC()
 				ipm.PullLatency = int(ipm.PullEndTime.Sub(ipm.PullStartTime).Milliseconds())
 			}
@@ -128,7 +133,18 @@ func (ipl *imagePullLatency) Start(measurementWg *sync.WaitGroup) error {
 
 func (ipl *imagePullLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
-	// Collect logic for past measurements if needed
+	// Collect metrics for pods that were created before the measurement started
+	pods, err := ipl.ClientSet.CoreV1().Pods("").List(ipl.Ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("kube-burner-runid=%v", ipl.Runid),
+	})
+	if err != nil {
+		logrus.Errorf("Error collecting image pull metrics: %v", err)
+		return
+	}
+	for _, pod := range pods.Items {
+		ipl.handleCreatePod(&pod)
+		ipl.handleUpdatePod(&pod)
+	}
 }
 
 func (ipl *imagePullLatency) Stop() error {
@@ -136,8 +152,20 @@ func (ipl *imagePullLatency) Stop() error {
 }
 
 func (ipl *imagePullLatency) normalizeMetrics() float64 {
-	// Normalize metrics logic
-	return 0.0
+	var totalLatency float64
+	var count int
+	ipl.metrics.Range(func(_, value any) bool {
+		ipm := value.(imagePullMetric)
+		if ipm.PullLatency > 0 {
+			totalLatency += float64(ipm.PullLatency)
+			count++
+		}
+		return true
+	})
+	if count == 0 {
+		return 0
+	}
+	return totalLatency / float64(count)
 }
 
 func (ipl *imagePullLatency) getLatency(normLatency any) map[string]float64 {
