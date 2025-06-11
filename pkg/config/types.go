@@ -39,7 +39,6 @@ const (
 )
 
 type KubeVirtOpType string
-type MetricsClosing string
 
 const (
 	KubeVirtOpStart        KubeVirtOpType = "start"
@@ -50,16 +49,7 @@ const (
 	KubeVirtOpMigrate      KubeVirtOpType = "migrate"
 	KubeVirtOpAddVolume    KubeVirtOpType = "add-volume"
 	KubeVirtOpRemoveVolume KubeVirtOpType = "remove-volume"
-	AfterJobPause          MetricsClosing = "afterJobPause"
-	AfterMeasurements      MetricsClosing = "afterMeasurements"
-	AfterJob               MetricsClosing = "afterJob"
 )
-
-var metricsClosing = map[MetricsClosing]struct{}{
-	AfterJobPause:     {},
-	AfterMeasurements: {},
-	AfterJob:          {},
-}
 
 // Spec configuration root
 type Spec struct {
@@ -247,3 +237,18 @@ const (
 	KubeBurnerLabelJobIteration = "kube-burner.io/job-iteration"
 	KubeBurnerLabelReplica      = "kube-burner.io/replica"
 )
+
+// MetricsCLosing strategy
+type MetricsClosing string
+
+const (
+	AfterJobPause     MetricsClosing = "afterJobPause"
+	AfterMeasurements MetricsClosing = "afterMeasurements"
+	AfterJob          MetricsClosing = "afterJob"
+)
+
+var metricsClosing = map[MetricsClosing]struct{}{
+	AfterJobPause:     {},
+	AfterMeasurements: {},
+	AfterJob:          {},
+}
