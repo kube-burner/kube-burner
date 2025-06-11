@@ -59,6 +59,7 @@ var measurementFactoryMap = map[string]NewMeasurementFactory{
 	"netpolLatency":         newNetpolLatencyMeasurementFactory,
 	"dataVolumeLatency":     newDvLatencyMeasurementFactory,
 	"volumeSnapshotLatency": newvolumeSnapshotLatencyMeasurementFactory,
+	"imagePullLatency":      newImagePullLatencyMeasurementFactory,
 }
 
 func isIndexerOk(configSpec config.Spec, measurement types.Measurement) bool {

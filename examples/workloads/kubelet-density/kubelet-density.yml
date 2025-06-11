@@ -3,6 +3,7 @@ global:
   gc: true
   measurements:
    - name: podLatency
+   - name: imagePullLatency
 jobs:
   - name: kubelet-density
     jobIterations: 25
