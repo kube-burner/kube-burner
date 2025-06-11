@@ -1,0 +1,19 @@
+---
+global:
+  gc: true
+  measurements:
+    - name: imagePullLatency
+
+jobs:
+  - name: image-pull-test
+    jobIterations: 10
+    qps: 5
+    burst: 5
+    namespacedIterations: false
+    namespace: image-pull-test
+    waitWhenFinished: true
+    podWait: false
+    preLoadImages: false
+    objects:
+      - objectTemplate: pod-template.yml
+        replicas: 1 
