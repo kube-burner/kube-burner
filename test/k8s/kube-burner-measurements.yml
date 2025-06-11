@@ -1,0 +1,47 @@
+---
+global:
+  functionTemplates:
+    - objectTemplates/envs.tpl
+  measurements:
+    - name: podLatency
+
+metricsEndpoints:
+- indexer:
+    type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+
+jobs:
+  - name: precedence-measurements
+    measurements:
+      - name: podLatency
+    jobIterations: 1
+    namespace: precedence-measurements
+    namespacedIterations: true
+    podWait: false
+    cleanup: true
+    objects:
+      - objectTemplate: objectTemplates/deployment.yml
+        replicas: 1
+        inputVars:
+          containerImage: quay.io/cloud-bulldozer/sampleapp:latest
+          envName: deployment-pod
+          envVar: 55d897a9c68ea8a48e59f5ec9cf40aa7ffbdfd33e40bf71ee0ffdba1611518586015791965693165b030b20af4d0979a83d098fcf289e9e9fcbb170df5b144314f3d8d5c0755e0415ed5f8ec53a20f0ac8344e719e0993b3ddecd1d6e7b5f9a4b4cf78c9b9a6f328d754d955d897a9c68ea8a48e59f5ec9cf40aa7ffbdfd33e40bf71ee0ffdba1611518586015791965693165b030b20af4d0979a83d098fcf289e9e9fcbb170df5b144314f3d8d5c0755e0415ed5f8ec53a20f0ac8344e719e0993b3ddecd1d6e7b5f9a4b4cf78c9b9a6f328d754d92857528fe63427c66d5427cc3b61a10a86d5970c4315ced8f0584e1aabc9a696b2414df6268413cb0cdf8828d4fdd2504121e66309b19544325466a8cb2c599307f4ff76eeb64254b81c3fe4969759ff8fd811851d2ff4784c4959eb9af44eda26feb7ede29029c675c317fcc68fc900b52ba28b6e7af3e1d5523e0070776e406371ff6ca1b2437f9e0629b691234edbbeffbabfc305
+
+  - name: merge-measurements
+    measurements:
+      - name: serviceLatency
+        svcTimeout: 5s
+    jobIterations: 1
+    namespace: merge-measurements
+    namespacedIterations: true
+    podWait: false
+    cleanup: true
+    objects:
+      - objectTemplate: objectTemplates/deployment.yml
+        replicas: 1
+        inputVars:
+          containerImage: quay.io/cloud-bulldozer/sampleapp:latest
+          envName: deployment-pod
+          envVar: 55d897a9c68ea8a48e59f5ec9cf40aa7ffbdfd33e40bf71ee0ffdba1611518586015791965693165b030b20af4d0979a83d098fcf289e9e9fcbb170df5b144314f3d8d5c0755e0415ed5f8ec53a20f0ac8344e719e0993b3ddecd1d6e7b5f9a4b4cf78c9b9a6f328d754d955d897a9c68ea8a48e59f5ec9cf40aa7ffbdfd33e40bf71ee0ffdba1611518586015791965693165b030b20af4d0979a83d098fcf289e9e9fcbb170df5b144314f3d8d5c0755e0415ed5f8ec53a20f0ac8344e719e0993b3ddecd1d6e7b5f9a4b4cf78c9b9a6f328d754d92857528fe63427c66d5427cc3b61a10a86d5970c4315ced8f0584e1aabc9a696b2414df6268413cb0cdf8828d4fdd2504121e66309b19544325466a8cb2c599307f4ff76eeb64254b81c3fe4969759ff8fd811851d2ff4784c4959eb9af44eda26feb7ede29029c675c317fcc68fc900b52ba28b6e7af3e1d5523e0070776e406371ff6ca1b2437f9e0629b691234edbbeffbabfc305
+      - objectTemplate: objectTemplates/service.yml
+        replicas: 1
