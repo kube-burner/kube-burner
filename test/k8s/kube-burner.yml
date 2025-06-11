@@ -46,6 +46,7 @@ jobs:
     qps: {{ .QPS }}
     burst: {{ .BURST }}
     namespacedIterations: true
+    preCreateNamespaces: {{ .PRE_CREATE_NS }}
     preLoadImages: true
     preLoadPeriod: 2s
     cleanup: true

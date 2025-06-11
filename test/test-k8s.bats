@@ -17,6 +17,7 @@ setup_file() {
   export TEST_KUBECONTEXT=test-context
   export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
   export ES_INDEX="kube-burner"
+  export PRE_CREATE_NS=false
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
     setup-kind
@@ -63,9 +64,10 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner init: churn=true; absolute-path=true" {
+@test "kube-burner init: churn=true; absolute-path=true; pre-create-ns=true" {
   export CHURN=true
   export CHURN_CYCLES=2
+  export PRE_CREATE_NS=true
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
