@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/itchyny/gojq"
@@ -64,21 +65,23 @@ var (
 	}
 )
 
-func (ex *Executor) waitForObjects(ns string) {
+func (ex *Executor) waitForObjects(ns string) error {
 	for _, obj := range ex.objects {
-		ex.waitForObject(ns, obj)
-
+		if err := ex.waitForObject(ns, obj); err != nil {
+			return err
+		}
+		if ns != "" {
+			log.Infof("Actions in namespace %v completed", ns)
+		} else {
+			log.Info("Actions completed")
+		}
 	}
-	if ns != "" {
-		log.Infof("Actions in namespace %v completed", ns)
-	} else {
-		log.Info("Actions completed")
-	}
+	return nil
 }
 
-func (ex *Executor) waitForObject(ns string, obj *object) {
+func (ex *Executor) waitForObject(ns string, obj *object) error {
 	if !obj.Wait || obj.ready {
-		return
+		return nil
 	}
 	// When the object has defined its own namespace, we use it
 	if obj.namespace != "" {
@@ -113,14 +116,15 @@ func (ex *Executor) waitForObject(ns string, obj *object) {
 	}
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			log.Fatalf("Timeout occurred while waiting for objects in namespace %s: %v", ns, err)
+			return fmt.Errorf("timeout occurred while waiting for objects in namespace %s: %v", ns, err)
 		} else {
-			log.Fatalf("Error waiting for objects in namespace %s: %v", ns, err)
+			return fmt.Errorf("error waiting for objects in namespace %s: %v", ns, err)
 		}
 	}
 	if obj.namespace != "" || obj.RunOnce {
 		obj.ready = true
 	}
+	return nil
 }
 
 func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) error {

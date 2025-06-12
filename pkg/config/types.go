@@ -204,6 +204,9 @@ type Job struct {
 	MetricsAggregate bool `yaml:"metricsAggregate" json:"metricsAggregate,omitempty"`
 	// MetricsClosing defines when to stop metrics collection
 	MetricsClosing string `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
+	// WaitTimeoutAction defines the behavior when wait timeouts occur
+	// Options: "fail-fast" (default), "collect-metrics-then-exit"
+	WaitTimeoutAction string `yaml:"waitTimeoutAction,omitempty" json:"waitTimeoutAction,omitempty"`
 }
 
 type WaitOptions struct {

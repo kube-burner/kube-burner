@@ -267,3 +267,11 @@ teardown_file() {
     check_metrics_not_created_for_job ${job} ${metric}
   done
 }
+
+@test "kube-burner timeout handling: collect-metrics-then-exit" {
+  run ${KUBE_BURNER} init -c kube-burner-timeout.yml --uuid="${UUID}" --log-level=debug
+  
+  check_file_exists "${METRICS_FOLDER}/podLatencyMeasurement-timeout-collect-metrics.json"
+  
+  [[ "$status" -ne 0 ]] || fail "Expected kube-burner to exit with non-zero status"
+}
