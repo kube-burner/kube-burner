@@ -129,7 +129,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
 | `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | 0s       |
 | `metricsAggregate`           | Aggregate the metrics collected for this job with those of the next one                                                               | Boolean  | false    |
-| `metricsClosing`  | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                             | String   | afterJob |
+| `metricsClosing`             | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                  | String   | afterJobPause |
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
@@ -588,5 +588,5 @@ jobs:
 This config defines when the metrics collection should stop. The option supports three values:
 
 - `afterJob` - collect metrics after the job completes
-- `afterJobPause` - collect metrics after the jobPause duration ends
+- `afterJobPause` - collect metrics after the jobPause duration ends (Default)
 - `afterMeasurements` - collect metrics after all measurements are finished

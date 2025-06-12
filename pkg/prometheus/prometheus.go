@@ -65,11 +65,12 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 			continue
 		}
 		for _, metricProfile := range p.MetricProfiles {
-			log.Infof("🔍 Endpoint: %v; profile: %v start: %v end: %v; job: %v", p.Endpoint,
+			log.Infof("🔍 Endpoint: %v; profile: %v start: %v end: %v; job: %v, metricsClosing: %v", p.Endpoint,
 				metricProfile.name,
 				jobStart.Format(time.RFC3339),
 				jobEnd.Format(time.RFC3339),
-				eachJob.JobConfig.Name)
+				eachJob.JobConfig.Name,
+				eachJob.JobConfig.MetricsClosing)
 			for _, metric := range metricProfile.metrics {
 				requiresInstant := false
 				t, _ := template.New("").Parse(metric.Query)

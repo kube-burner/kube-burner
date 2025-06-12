@@ -203,7 +203,7 @@ type Job struct {
 	// MetricsAggregate aggregate the metrics of this job with the next one
 	MetricsAggregate bool `yaml:"metricsAggregate" json:"metricsAggregate,omitempty"`
 	// MetricsClosing defines when to stop metrics collection
-	MetricsClosing string `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
+	MetricsClosing MetricsClosing `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
 }
 
 type WaitOptions struct {
@@ -237,3 +237,18 @@ const (
 	KubeBurnerLabelJobIteration = "kube-burner.io/job-iteration"
 	KubeBurnerLabelReplica      = "kube-burner.io/replica"
 )
+
+// MetricsCLosing strategy
+type MetricsClosing string
+
+const (
+	AfterJobPause     MetricsClosing = "afterJobPause"
+	AfterMeasurements MetricsClosing = "afterMeasurements"
+	AfterJob          MetricsClosing = "afterJob"
+)
+
+var metricsClosing = map[MetricsClosing]struct{}{
+	AfterJobPause:     {},
+	AfterMeasurements: {},
+	AfterJob:          {},
+}
