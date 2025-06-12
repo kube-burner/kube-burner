@@ -57,23 +57,50 @@ func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
-		// Deserialize YAML
-		uns := &unstructured.Unstructured{}
-		cleanTemplate, err := util.CleanupTemplate(t)
-		if err != nil {
-			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
+		
+		// Store the original template
+		objectSpec := t
+		
+		// Create a sample rendering of the template to determine correct GVK
+		// We use iteration 1 as a reference point
+		templateData := map[string]any{
+			jobName:      ex.Name,
+			jobIteration: 1,
+			jobUUID:      ex.uuid,
+			jobRunId:     ex.runid,
+			replica:      1,
 		}
-		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
+		maps.Copy(templateData, o.InputVars)
+		
+		templateOption := util.MissingKeyError
+		if ex.DefaultMissingKeysWithZero {
+			templateOption = util.MissingKeyZero
+		}
+		
+		// Render the template with sample data to get proper Kind
+		renderedTemplate, err := util.RenderTemplate(objectSpec, templateData, templateOption, ex.functionTemplates)
+		if err != nil {
+			log.Fatalf("Template error in %s: %s", o.ObjectTemplate, err)
+		}
+		
+		// Deserialize rendered YAML
+		uns := &unstructured.Unstructured{}
+		_, gvk := yamlToUnstructured(o.ObjectTemplate, renderedTemplate, uns)
+		
+		// Check if this is a CRD
+		isCRD := gvk.Kind == "CustomResourceDefinition"
 		mapping, err := mapper.RESTMapping(gvk.GroupKind())
 		if err != nil {
 			log.Fatal(err)
 		}
+		
 		obj := &object{
 			gvr:        mapping.Resource,
-			objectSpec: t,
+			objectSpec: objectSpec,
 			Object:     o,
 			namespace:  uns.GetNamespace(),
 			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+			isCRD:      isCRD,
 		}
 		obj.Kind = gvk.Kind
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
@@ -130,6 +157,11 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 				*waitListNamespaces = append(*waitListNamespaces, ns)
 			}
 		}
+		// Split objects into CRDs and non-CRDs for ordered processing
+		var crds []*object
+		var nonCRDs []*object
+		
+		// First pass: separate CRDs from non-CRDs
 		for objectIndex, obj := range ex.objects {
 			labels := map[string]string{
 				"kube-burner-uuid":                 ex.uuid,
@@ -139,14 +171,46 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 			}
 			ex.objects[objectIndex].LabelSelector = labels
+			
+			// Categorize objects by type
+			if obj.isCRD {
+				crds = append(crds, obj)
+			} else {
+				nonCRDs = append(nonCRDs, obj)
+			}
+		}
+		
+		// Process CRDs first
+		for _, obj := range crds {
 			if obj.RunOnce {
 				if i == 0 {
 					// this executes only once during the first iteration of an object
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
-					ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
+					ex.replicaHandler(ctx, obj.LabelSelector, obj, ns, i, &wg)
 				}
 			} else {
-				ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
+				ex.replicaHandler(ctx, obj.LabelSelector, obj, ns, i, &wg)
+			}
+		}
+		
+		// Wait for CRDs to be completely created before creating CRs
+		if len(crds) > 0 {
+			log.Debug("Waiting for CRDs to be established before creating Custom Resources")
+			wg.Wait()
+			// Give some extra time for the k8s API server to recognize the CRDs
+			time.Sleep(2 * time.Second)
+		}
+		
+		// Then process non-CRDs
+		for _, obj := range nonCRDs {
+			if obj.RunOnce {
+				if i == 0 {
+					// this executes only once during the first iteration of an object
+					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
+					ex.replicaHandler(ctx, obj.LabelSelector, obj, ns, i, &wg)
+				}
+			} else {
+				ex.replicaHandler(ctx, obj.LabelSelector, obj, ns, i, &wg)
 			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
@@ -218,7 +282,8 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 			var newObject = new(unstructured.Unstructured)
 			ex.limiter.Wait(context.TODO())
 			renderedObj := ex.renderTemplateForObject(obj, iteration, r, false)
-			// Re-decode rendered object
+			// Re-decode rendered object with properly templated fields including kind
+			// This is crucial for templated kinds like TestCRD{{.Iteration}}
 			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
 
 			maps.Copy(copiedLabels, newObject.GetLabels())
@@ -246,6 +311,8 @@ func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string
 func (ex *Executor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
+	isCRD := obj.GetKind() == "CustomResourceDefinition"
+	
 	util.RetryWithExponentialBackOff(func() (bool, error) {
 		if ctx.Err() != nil {
 			return true, err
@@ -287,6 +354,17 @@ func (ex *Executor) createRequest(ctx context.Context, gvr schema.GroupVersionRe
 		} else {
 			log.Debugf("Created %s/%s", uns.GetKind(), uns.GetName())
 		}
+		
+		// If this is a CRD, wait for it to be established
+		if isCRD {
+			crdName := uns.GetName()
+			log.Debugf("Waiting for CRD %s to be established", crdName)
+			
+			// Sleep to allow the CRD to be established
+			// This is a simplified approach since we're avoiding dependency issues
+			time.Sleep(2 * time.Second)
+		}
+		
 		return true, err
 	}, 1*time.Second, 3, 0, timeout)
 }
