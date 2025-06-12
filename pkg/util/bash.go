@@ -18,11 +18,12 @@ import (
 	"bytes"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
-func RunShellCmd(shellCmdLine string, embedCfg *fileutils.EmbedConfiguration) (*bytes.Buffer, *bytes.Buffer, error) {
+func RunShellCmd(shellCmdLine string, embedCfg *fileutils.EmbedConfiguration, background bool) (*bytes.Buffer, *bytes.Buffer, error) {
 	// Split the shell script from its args
 	parts := strings.Split(shellCmdLine, " ")
 
@@ -48,6 +49,15 @@ func RunShellCmd(shellCmdLine string, embedCfg *fileutils.EmbedConfiguration) (*
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb
+
+	if background {
+		// Fully detach from parent so the child keeps running if Go process exits
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true,
+		}
+		err = cmd.Start()
+		return &outb, &errb, err
+	}
 
 	// Run the command and return its return and outputs
 	err = cmd.Run()
