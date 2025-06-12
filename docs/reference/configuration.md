@@ -588,5 +588,5 @@ jobs:
 This config defines when the metrics collection should stop. The option supports three values:
 
 - `afterJob` - collect metrics after the job completes
-- `afterJobPause` - collect metrics after the jobPause duration ends
-- `afterMeasurements` - collect metrics after all measurements are finished (default)
+- `afterJobPause` - collect metrics after the jobPause duration ends (default)
+- `afterMeasurements` - collect metrics after all measurements are finished
