@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics
+package watchers
 
 import (
 	"fmt"
@@ -24,12 +24,6 @@ import (
 )
 
 const informerTimeout = time.Minute
-
-type Watcher struct {
-	name        string
-	stopChannel chan struct{}
-	Informer    cache.SharedIndexInformer
-}
 
 // NewWatcher return a new ListWatcher of the specified resource and namespace
 func NewWatcher(restClient *rest.RESTClient, name string, resource string, namespace string, optionsModifier func(options *metav1.ListOptions), indexers cache.Indexers) *Watcher {
