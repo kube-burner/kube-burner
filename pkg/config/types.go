@@ -129,8 +129,23 @@ type Object struct {
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
 }
 
+//Namespace Handling and Wait Strategy for a Job
+type WaitForCondition struct {
+	Resource string        `yaml:"resource"` // e.g., "networkpolicy", "configmap"
+	Timeout  time.Duration `yaml:"timeout"`  // e.g., 10s
+}
+
+
+
 // Job defines a kube-burner job
 type Job struct {
+	// PreCreateNamespaces creates namespaces before running the job
+	PreCreateNamespaces       bool              `yaml:"preCreateNamespaces"`
+	// NamespaceWaitDuration how long to wait for the namespace to be created
+	NamespaceWaitDuration     time.Duration     `yaml:"namespaceWaitDuration"`
+	// NamespaceWaitForCondition defines a wait condition for the namespace
+	NamespaceWaitForCondition *WaitForCondition `yaml:"namespaceWaitForCondition"`
+
 	// IterationCount how many times to execute the job
 	JobIterations int `yaml:"jobIterations" json:"jobIterations,omitempty"`
 	// IterationDelay how much time to wait between each job iteration

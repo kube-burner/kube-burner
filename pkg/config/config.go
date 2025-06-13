@@ -88,6 +88,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawJob Job
 	raw := rawJob{
 		Cleanup:                true,
+
 		NamespacedIterations:   true,
 		IterationsPerNamespace: 1,
 		PodWait:                false,
@@ -105,6 +106,10 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		ChurnDelay:             5 * time.Minute,
 		ChurnDeletionStrategy:  "default",
 		MetricsClosing:         AfterJobPause,
+
+		PreCreateNamespaces:       false,        
+	    NamespaceWaitDuration:     0,                  
+	    NamespaceWaitForCondition: nil, 
 	}
 
 	if err := unmarshal(&raw); err != nil {
