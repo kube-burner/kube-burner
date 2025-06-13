@@ -15,8 +15,10 @@ builds:
       - ppc64le
       - s390x
     dir: ./cmd/kube-burner/
+    flags:
+      - -trimpath
     ldflags:
-      - -X github.com/cloud-bulldozer/go-commons/v2/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/go-commons/v2/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/go-commons/v2/version.Version={{.Version}}
+      - -s -w -X github.com/cloud-bulldozer/go-commons/v2/version.GitCommit={{.Commit}} -X github.com/cloud-bulldozer/go-commons/v2/version.BuildDate={{.Date}} -X github.com/cloud-bulldozer/go-commons/v2/version.Version={{.Version}}
 archives:
   - format: tar.gz
     name_template: >-
