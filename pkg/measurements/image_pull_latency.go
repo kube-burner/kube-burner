@@ -35,27 +35,30 @@ const (
 	imagePullLatencyQuantilesMeasurement = "imagePullLatencyQuantilesMeasurement"
 )
 
-type imagePullMetric struct {
-	Timestamp     time.Time `json:"timestamp"`
-	PodName       string    `json:"podName"`
+type containerPullMetric struct {
 	ContainerName string    `json:"containerName"`
 	Image         string    `json:"image"`
 	PullStartTime time.Time `json:"pullStartTime"`
 	PullEndTime   time.Time `json:"pullEndTime"`
 	PullLatency   int       `json:"pullLatency"`
-	MetricName    string    `json:"metricName"`
-	UUID          string    `json:"uuid"`
-	JobName       string    `json:"jobName,omitempty"`
-	JobIteration  int       `json:"jobIteration"`
-	Replica       int       `json:"replica"`
-	Namespace     string    `json:"namespace"`
-	NodeName      string    `json:"nodeName"`
-	Metadata      any       `json:"metadata,omitempty"`
+}
+
+type imagePullMetric struct {
+	Timestamp        time.Time                      `json:"timestamp"`
+	PodName          string                         `json:"podName"`
+	Namespace        string                         `json:"namespace"`
+	MetricName       string                         `json:"metricName"`
+	UUID             string                         `json:"uuid"`
+	JobName          string                         `json:"jobName,omitempty"`
+	JobIteration     int                            `json:"jobIteration"`
+	Replica          int                            `json:"replica"`
+	NodeName         string                         `json:"nodeName"`
+	Metadata         any                            `json:"metadata,omitempty"`
+	ContainerMetrics map[string]containerPullMetric `json:"containerMetrics"`
 }
 
 type imagePullLatency struct {
 	BaseMeasurement
-	Ctx context.Context
 }
 
 type imagePullLatencyMeasurementFactory struct {
@@ -71,7 +74,6 @@ func newImagePullLatencyMeasurementFactory(configSpec config.Spec, measurement t
 func (iplmf imagePullLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
 	return &imagePullLatency{
 		BaseMeasurement: iplmf.NewBaseLatency(jobConfig, clientSet, restConfig, imagePullLatencyMeasurement, imagePullLatencyQuantilesMeasurement),
-		Ctx:             context.Background(),
 	}
 }
 
@@ -79,16 +81,17 @@ func (ipl *imagePullLatency) handleCreatePod(obj any) {
 	pod := obj.(*corev1.Pod)
 	podLabels := pod.GetLabels()
 	ipl.metrics.LoadOrStore(string(pod.UID), imagePullMetric{
-		Timestamp:    pod.CreationTimestamp.Time.UTC(),
-		PodName:      pod.Name,
-		Namespace:    pod.Namespace,
-		MetricName:   imagePullLatencyMeasurement,
-		UUID:         ipl.Uuid,
-		JobName:      ipl.JobConfig.Name,
-		Metadata:     ipl.Metadata,
-		JobIteration: getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
-		Replica:      getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
-		NodeName:     pod.Spec.NodeName,
+		Timestamp:        pod.CreationTimestamp.Time.UTC(),
+		PodName:          pod.Name,
+		Namespace:        pod.Namespace,
+		MetricName:       imagePullLatencyMeasurement,
+		UUID:             ipl.Uuid,
+		JobName:          ipl.JobConfig.Name,
+		Metadata:         ipl.Metadata,
+		JobIteration:     getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
+		Replica:          getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
+		NodeName:         pod.Spec.NodeName,
+		ContainerMetrics: make(map[string]containerPullMetric),
 	})
 }
 
@@ -97,14 +100,44 @@ func (ipl *imagePullLatency) handleUpdatePod(obj any) {
 	if value, exists := ipl.metrics.Load(string(pod.UID)); exists {
 		ipm := value.(imagePullMetric)
 		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == "Pulling" {
-				ipm.ContainerName = containerStatus.Name
-				ipm.Image = containerStatus.Image
-				ipm.PullStartTime = time.Now().UTC()
-			} else if containerStatus.State.Running != nil && ipm.PullEndTime.IsZero() {
-				ipm.PullEndTime = time.Now().UTC()
-				ipm.PullLatency = int(ipm.PullEndTime.Sub(ipm.PullStartTime).Milliseconds())
+			containerName := containerStatus.Name
+			containerMetric, exists := ipm.ContainerMetrics[containerName]
+			if !exists {
+				containerMetric = containerPullMetric{
+					ContainerName: containerName,
+					Image:         containerStatus.Image,
+				}
 			}
+
+			// Handle container state transitions
+			switch {
+			case containerStatus.State.Waiting != nil:
+				switch containerStatus.State.Waiting.Reason {
+				case "Pulling":
+					// Only set start time if not already set or if container is restarting
+					if containerMetric.PullStartTime.IsZero() || containerStatus.RestartCount > 0 {
+						containerMetric.PullStartTime = time.Now().UTC()
+						// Reset end time and latency for restarts
+						containerMetric.PullEndTime = time.Time{}
+						containerMetric.PullLatency = 0
+					}
+				case "ImagePullBackOff", "ErrImagePull":
+					// Handle failed pulls
+					if containerMetric.PullStartTime.IsZero() {
+						containerMetric.PullStartTime = time.Now().UTC()
+					}
+					containerMetric.PullEndTime = time.Now().UTC()
+					containerMetric.PullLatency = -1 // Indicate failure
+				}
+			case containerStatus.State.Running != nil:
+				// Only update if we have a start time and haven't recorded the end time
+				if !containerMetric.PullStartTime.IsZero() && containerMetric.PullEndTime.IsZero() {
+					containerMetric.PullEndTime = time.Now().UTC()
+					containerMetric.PullLatency = int(containerMetric.PullEndTime.Sub(containerMetric.PullStartTime).Milliseconds())
+				}
+			}
+
+			ipm.ContainerMetrics[containerName] = containerMetric
 		}
 		ipl.metrics.Store(string(pod.UID), ipm)
 	}
@@ -116,7 +149,7 @@ func (ipl *imagePullLatency) Start(measurementWg *sync.WaitGroup) error {
 		[]MeasurementWatcher{
 			{
 				restClient:    ipl.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-				name:          "podWatcher",
+				name:          "imagePullPodWatcher",
 				resource:      "pods",
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", ipl.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
@@ -134,7 +167,7 @@ func (ipl *imagePullLatency) Start(measurementWg *sync.WaitGroup) error {
 func (ipl *imagePullLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	// Collect metrics for pods that were created before the measurement started
-	pods, err := ipl.ClientSet.CoreV1().Pods("").List(ipl.Ctx, metav1.ListOptions{
+	pods, err := ipl.ClientSet.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("kube-burner-runid=%v", ipl.Runid),
 	})
 	if err != nil {
@@ -152,25 +185,33 @@ func (ipl *imagePullLatency) Stop() error {
 }
 
 func (ipl *imagePullLatency) normalizeMetrics() float64 {
-	var totalLatency float64
-	var count int
+	var totalPulls int
+	var failedPulls int
 	ipl.metrics.Range(func(_, value any) bool {
 		ipm := value.(imagePullMetric)
-		if ipm.PullLatency > 0 {
-			totalLatency += float64(ipm.PullLatency)
-			count++
+		for _, containerMetric := range ipm.ContainerMetrics {
+			totalPulls++
+			if containerMetric.PullLatency < 0 {
+				failedPulls++
+			}
 		}
 		return true
 	})
-	if count == 0 {
+	if totalPulls == 0 {
 		return 0
 	}
-	return totalLatency / float64(count)
+	// Calculate error percentage
+	return float64(failedPulls) / float64(totalPulls) * 100
 }
 
 func (ipl *imagePullLatency) getLatency(normLatency any) map[string]float64 {
 	ipm := normLatency.(imagePullMetric)
-	return map[string]float64{
-		"pullLatency": float64(ipm.PullLatency),
+	latencies := make(map[string]float64)
+	for containerName, containerMetric := range ipm.ContainerMetrics {
+		// Only include successful pulls in latency metrics
+		if containerMetric.PullLatency >= 0 {
+			latencies[fmt.Sprintf("%s_pullLatency", containerName)] = float64(containerMetric.PullLatency)
+		}
 	}
+	return latencies
 }
