@@ -1,0 +1,8 @@
+---
+apiVersion: testcrd.example.com/v1
+kind: TestCRD1
+metadata:
+  name: test1
+spec:
+  workload: vNIHE
+  iterations: 1

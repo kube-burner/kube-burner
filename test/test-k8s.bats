@@ -267,3 +267,9 @@ teardown_file() {
     check_metrics_not_created_for_job ${job} ${metric}
   done
 }
+
+@test "kube-burner init: templated kind field" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-templated-kind.yml --uuid="${UUID}" --log-level=debug
+  # If the test completes without error, it means the templated kind field worked correctly
+  kubectl delete crd testcrds1.testcrd.example.com testcrds2.testcrd.example.com
+}
