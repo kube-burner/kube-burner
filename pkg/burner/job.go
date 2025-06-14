@@ -336,19 +336,19 @@ func verifyJobTimeout(job *config.Job, defaultTimeout time.Duration) {
 }
 
 func verifyQPSBurst(job *config.Job) {
-    if job.QPS <= 0 {
-        log.Warnf("Invalid QPS (%v); using default: %v", job.QPS, rest.DefaultQPS)
-        job.QPS = rest.DefaultQPS
-    } else {
-        log.Infof("QPS: %v", job.QPS)
-    }
+	if job.QPS <= 0 {
+		log.Warnf("Invalid QPS (%v); using default: %v", job.QPS, rest.DefaultQPS)
+		job.QPS = rest.DefaultQPS
+	} else {
+		log.Infof("QPS: %v", job.QPS)
+	}
 
-    if job.Burst <= 0 {
-        log.Warnf("Invalid Burst (%v); using default: %v", job.Burst, rest.DefaultBurst)
-        job.Burst = rest.DefaultBurst
-    } else {
-        log.Infof("Burst: %v", job.Burst)
-    }
+	if job.Burst <= 0 {
+		log.Warnf("Invalid Burst (%v); using default: %v", job.Burst, rest.DefaultBurst)
+		job.Burst = rest.DefaultBurst
+	} else {
+		log.Infof("Burst: %v", job.Burst)
+	}
 }
 
 func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
