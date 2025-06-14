@@ -36,11 +36,11 @@ const (
 )
 
 type containerPullMetric struct {
-	ContainerName string    `json:"containerName"`
-	Image         string    `json:"image"`
-	PullStartTime time.Time `json:"pullStartTime"`
-	PullEndTime   time.Time `json:"pullEndTime"`
-	PullLatency   int       `json:"pullLatency"`
+	ContainerName string `json:"containerName"`
+	Image         string `json:"image"`
+	PullStartTime time.Time
+	PullEndTime   time.Time
+	PullLatency   int `json:"pullLatency"`
 }
 
 type imagePullMetric struct {
