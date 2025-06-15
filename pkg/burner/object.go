@@ -32,6 +32,7 @@ type object struct {
 	namespace  string
 	namespaced bool
 	ready      bool
+	isCRD      bool
 }
 
 func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion string) *object {

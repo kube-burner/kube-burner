@@ -1,0 +1,21 @@
+---
+global:
+  gc: false
+
+jobs:
+- name: test-templated-kind
+  jobType: create
+  jobIterations: 2
+  namespacedIterations: false
+  cleanup: true
+  podWait: false
+  qps: 10
+  burst: 10
+  objects:
+  # Create CRDs first with unique templated kinds per iteration
+  - objectTemplate: objectTemplates/crd-template.yml
+    replicas: 1
+
+  # Create CRs that refer to the templated CRDs
+  - objectTemplate: objectTemplates/cr-template.yml
+    replicas: 1
