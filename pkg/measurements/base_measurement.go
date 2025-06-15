@@ -23,6 +23,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +41,7 @@ type BaseMeasurement struct {
 	ClientSet                kubernetes.Interface
 	RestConfig               *rest.Config
 	Metadata                 map[string]any
-	watchers                 []*metrics.Watcher
+	watchers                 []*watchers.Watcher
 	metrics                  sync.Map
 	MeasurementName          string
 	latencyQuantiles         []any
@@ -61,10 +62,10 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 	bm.latencyQuantiles, bm.normLatencies = nil, nil
 	bm.metrics = sync.Map{}
 
-	bm.watchers = make([]*metrics.Watcher, len(measurementWatchers))
+	bm.watchers = make([]*watchers.Watcher, len(measurementWatchers))
 	for i, measurementWatcher := range measurementWatchers {
 		log.Infof("Creating %v latency watcher for %s", measurementWatcher.resource, bm.JobConfig.Name)
-		bm.watchers[i] = metrics.NewWatcher(
+		bm.watchers[i] = watchers.NewWatcher(
 			measurementWatcher.restClient,
 			measurementWatcher.name,
 			measurementWatcher.resource,
