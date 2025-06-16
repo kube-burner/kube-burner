@@ -92,4 +92,4 @@ manifest-build:
 test: lint test-k8s
 
 test-k8s:
-	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) $(if $(PARALLEL_TESTS),-j $(PARALLEL_TESTS),) -F pretty -T --print-output-on-failure test-k8s.bats
+	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) $(if $(PARALLEL_TESTS),-j "$(PARALLEL_TESTS)",) -F pretty -T --print-output-on-failure test-k8s.bats
