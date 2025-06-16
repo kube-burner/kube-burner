@@ -76,15 +76,8 @@ jobs:
     - name: Execute Tests
       run: |
         chmod +x /tmp/kube-burner
-        # Determine optimal number of parallel tests
-        PARALLEL_TESTS=$(nproc)
-        if [ $PARALLEL_TESTS -gt 4 ]; then
-          PARALLEL_TESTS=4
-        fi
-        echo "Running $PARALLEL_TESTS test suites in parallel"
-        
-        # Run bats with parallel execution
-        make test-k8s PARALLEL_TESTS="$PARALLEL_TESTS"
+        echo "Running 4 test suites in parallel"
+        make test-k8s PARALLEL_TESTS="4"
       env:
         TERM: linux
         KIND_VERSION: v0.19.0
