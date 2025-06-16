@@ -44,11 +44,12 @@ func GetBoolValue(m map[string]any, key string) *bool {
 		case bool:
 			ret = &v
 		case string:
-			if v == "true" {
+			switch v {
+			case "true":
 				convertedValue = true
-			} else if v == "false" {
+			case "false":
 				convertedValue = false
-			} else {
+			default:
 				log.Fatalf("cannot convert %v to bool", v)
 			}
 			ret = &convertedValue

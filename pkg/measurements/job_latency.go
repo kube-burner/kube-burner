@@ -89,7 +89,7 @@ func (j *jobLatency) handleCreateJob(obj any) {
 	job := obj.(*batchv1.Job)
 	jobLabels := job.GetLabels()
 	j.metrics.LoadOrStore(string(job.UID), jobMetric{
-		Timestamp:    job.CreationTimestamp.Time.UTC(),
+		Timestamp:    job.CreationTimestamp.UTC(),
 		Namespace:    job.Namespace,
 		Name:         job.Name,
 		MetricName:   jobLatencyMeasurement,
@@ -111,7 +111,7 @@ func (j *jobLatency) handleUpdateJob(obj any) {
 					switch c.Type {
 					case batchv1.JobComplete:
 						jm.startTime = job.Status.StartTime.Time
-						jm.jobComplete = c.LastTransitionTime.Time.UTC()
+						jm.jobComplete = c.LastTransitionTime.UTC()
 					}
 				}
 			}
@@ -164,12 +164,12 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 		for _, c := range job.Status.Conditions {
 			switch c.Type {
 			case batchv1.JobComplete:
-				startTime = job.Status.StartTime.Time.UTC()
-				completed = c.LastTransitionTime.Time.UTC()
+				startTime = job.Status.StartTime.UTC()
+				completed = c.LastTransitionTime.UTC()
 			}
 		}
 		j.metrics.Store(string(job.UID), jobMetric{
-			Timestamp:   job.Status.StartTime.Time.UTC(),
+			Timestamp:   job.Status.StartTime.UTC(),
 			Namespace:   job.Namespace,
 			Name:        job.Name,
 			MetricName:  jobLatencyMeasurement,

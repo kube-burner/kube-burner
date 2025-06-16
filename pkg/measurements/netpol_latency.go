@@ -190,7 +190,7 @@ func addPodsByLabel(clientSet kubernetes.Interface, ns string, ps *metav1.LabelS
 // We later do a diff with successful connection timestamp and define that as a network policy programming latency.
 func (n *netpolLatency) handleCreateNetpol(obj any) {
 	netpol := obj.(*networkingv1.NetworkPolicy)
-	npCreationTime[netpol.Name] = netpol.CreationTimestamp.Time.UTC()
+	npCreationTime[netpol.Name] = netpol.CreationTimestamp.UTC()
 }
 
 // Render the network policy from the object template using iteration details as input

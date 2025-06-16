@@ -146,7 +146,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		s.metrics.Store(string(svc.UID), svcMetric{
 			Name:              svc.Name,
 			Namespace:         svc.Namespace,
-			Timestamp:         svc.CreationTimestamp.Time.UTC(),
+			Timestamp:         svc.CreationTimestamp.UTC(),
 			MetricName:        svcLatencyMeasurement,
 			ServiceType:       svc.Spec.Type,
 			ReadyLatency:      svcLatency,

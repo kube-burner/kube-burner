@@ -98,7 +98,7 @@ func (dv *dvLatency) handleCreateDV(obj any) {
 	dataVolume := obj.(*cdiv1beta1.DataVolume)
 	dvLabels := dataVolume.GetLabels()
 	dv.metrics.LoadOrStore(string(dataVolume.UID), dvMetric{
-		Timestamp:    dataVolume.CreationTimestamp.Time.UTC(),
+		Timestamp:    dataVolume.CreationTimestamp.UTC(),
 		Namespace:    dataVolume.Namespace,
 		Name:         dataVolume.Name,
 		MetricName:   dvLatencyMeasurement,
@@ -124,27 +124,27 @@ func (dv *dvLatency) handleUpdateDV(obj any) {
 				if dvm.dvBound.IsZero() {
 					// DataVolume should not reach Bound at the time of creation
 					// Workaround for issue https://issues.redhat.com/browse/CNV-59653
-					if c.LastTransitionTime.Time.UTC() == dvm.Timestamp {
+					if c.LastTransitionTime.UTC().Equal(dvm.Timestamp) {
 						log.Debugf("DV [%v]: Disregard bound [%v] with timestamp [%v] equal to creation time", dataVolume.Name, c.Type, dvm.Timestamp)
 					} else {
 						log.Debugf("Updated bound time for dataVolume [%s]", dataVolume.Name)
-						dvm.dvBound = c.LastTransitionTime.Time.UTC()
+						dvm.dvBound = c.LastTransitionTime.UTC()
 					}
 				}
 			case cdiv1beta1.DataVolumeRunning:
 				if dvm.dvRunning.IsZero() {
 					log.Debugf("Updated running time for dataVolume [%s]", dataVolume.Name)
-					dvm.dvRunning = c.LastTransitionTime.Time.UTC()
+					dvm.dvRunning = c.LastTransitionTime.UTC()
 				}
 			case cdiv1beta1.DataVolumeReady:
 				if dvm.dvReady.IsZero() {
 					// DataVolume should not reach Ready at the time of creation
 					// Workaround for issue https://issues.redhat.com/browse/CNV-59653
-					if c.LastTransitionTime.Time.UTC() == dvm.Timestamp {
+					if c.LastTransitionTime.UTC().Equal(dvm.Timestamp) {
 						log.Debugf("DV [%v]: Disregard bound [%v] with timestamp [%v] equal to creation time", dataVolume.Name, c.Type, dvm.Timestamp)
 					} else {
 						log.Debugf("Updated ready time for dataVolume [%s]", dataVolume.Name)
-						dvm.dvReady = c.LastTransitionTime.Time.UTC()
+						dvm.dvReady = c.LastTransitionTime.UTC()
 					}
 				}
 			}
@@ -203,15 +203,15 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 		for _, c := range dataVolume.Status.Conditions {
 			switch c.Type {
 			case cdiv1beta1.DataVolumeBound:
-				bound = c.LastTransitionTime.Time.UTC()
+				bound = c.LastTransitionTime.UTC()
 			case cdiv1beta1.DataVolumeRunning:
-				running = c.LastTransitionTime.Time.UTC()
+				running = c.LastTransitionTime.UTC()
 			case cdiv1beta1.DataVolumeReady:
-				ready = c.LastTransitionTime.Time.UTC()
+				ready = c.LastTransitionTime.UTC()
 			}
 		}
 		dv.metrics.Store(string(dataVolume.UID), dvMetric{
-			Timestamp:  dataVolume.CreationTimestamp.Time.UTC(),
+			Timestamp:  dataVolume.CreationTimestamp.UTC(),
 			Namespace:  dataVolume.Namespace,
 			Name:       dataVolume.Name,
 			MetricName: dvLatencyMeasurement,

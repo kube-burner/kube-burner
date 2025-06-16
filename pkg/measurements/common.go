@@ -103,7 +103,7 @@ func getGroupVersionClient(restConfig *rest.Config, gv schema.GroupVersion, type
 	scheme.AddKnownTypes(gv, types...)
 
 	shallowCopy := *restConfig
-	shallowCopy.ContentConfig.GroupVersion = &gv
+	shallowCopy.GroupVersion = &gv
 
 	shallowCopy.APIPath = "/apis"
 	shallowCopy.NegotiatedSerializer = codecs.WithoutConversion()
