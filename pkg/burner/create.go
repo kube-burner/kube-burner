@@ -130,13 +130,11 @@ func (ex *Executor) RunCreateJob(ctx context.Context, iterationStart, iterationE
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.generateNamespace(i)
 			// If preCreateNamespaces is not enabled, we actually create the namespace
-			if !ex.PreCreateNamespaces {
-				if !namespacesCreated[ns] {
-					if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
-						log.Error(err.Error())
-						if !errors.IsAlreadyExists(err) {
-							continue
-						}
+			if !ex.PreCreateNamespaces && !namespacesCreated[ns] {
+				if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
+					log.Error(err.Error())
+					if !errors.IsAlreadyExists(err) {
+						continue
 					}
 				}
 			}
