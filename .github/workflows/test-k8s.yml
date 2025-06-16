@@ -84,7 +84,7 @@ jobs:
         echo "Running $PARALLEL_TESTS test suites in parallel"
         
         # Run bats with parallel execution
-        PARALLEL_TESTS=$PARALLEL_TESTS make test-k8s
+        make test-k8s PARALLEL_TESTS="$PARALLEL_TESTS"
       env:
         TERM: linux
         KIND_VERSION: v0.19.0
