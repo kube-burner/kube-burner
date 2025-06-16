@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   workflow_call:
   pull_request:
+    branches:
+      - main
+      - master
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -73,11 +76,7 @@ jobs:
     - name: Execute Tests
       run: |
         chmod +x /tmp/kube-burner
-        # Determine optimal number of parallel tests
-        PARALLEL_TESTS=$(nproc)
-        if [ $PARALLEL_TESTS -gt 4 ]; then
-          PARALLEL_TESTS=4
-        fi
+        PARALLEL_TESTS=4
         echo "Running $PARALLEL_TESTS test suites in parallel"
         
         # Run bats with parallel execution
