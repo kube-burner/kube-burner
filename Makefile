@@ -8,6 +8,7 @@ BIN_DIR = bin
 BIN_PATH = $(BIN_DIR)/$(ARCH)/$(BIN_NAME)
 CGO = 0
 TEST_BINARY ?= $(CURDIR)/$(BIN_PATH)
+PARALLEL_TESTS ?= 4
 
 GIT_COMMIT = $(shell git rev-parse HEAD)
 VERSION ?= $(shell hack/tag_name.sh)
@@ -92,4 +93,4 @@ manifest-build:
 test: lint test-k8s
 
 test-k8s:
-	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -j 4 -F pretty -T --print-output-on-failure test-k8s.bats
+	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -j ${PARALLEL_TESTS} -F pretty -T --print-output-on-failure test-k8s.bats
