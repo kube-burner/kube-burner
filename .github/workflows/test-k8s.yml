@@ -72,11 +72,13 @@ jobs:
         assert-install: false
         detik-install: false
         file-install: false
+    
+    - name: Install parallel
+      run: |
+        sudo apt-get update && sudo apt-get install -y parallel
 
     - name: Execute Tests
       run: |
-        set -x
-        sudo apt-get update && sudo apt-get install -y parallel
         chmod +x /tmp/kube-burner
         make test-k8s
       env:
