@@ -76,8 +76,6 @@ jobs:
     - name: Execute Tests
       run: |
         chmod +x /tmp/kube-burner
-        echo "Running 4 test suites in parallel"
-        export PARALLEL_TESTS=4
         make test-k8s
       env:
         TERM: linux
