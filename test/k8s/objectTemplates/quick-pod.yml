@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: quick-pod-{{.Iteration}}-{{.Replica}}
-  namespace: {{.Namespace}}
+  namespace: timeout-test-0
 spec:
   containers:
   - name: sleep
