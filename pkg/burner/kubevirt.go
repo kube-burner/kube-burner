@@ -119,7 +119,7 @@ func (ex *Executor) setupKubeVirtJob(mapper meta.RESTMapper) {
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		ex.objects = append(ex.objects, newObject(o, mapper, kubeVirtAPIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, mapper, kubeVirtAPIVersionV1, ex.embedCfg))
 	}
 }
 
