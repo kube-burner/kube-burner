@@ -49,7 +49,7 @@ jobs:
     preLoadImages: true
     preLoadPeriod: 2s
     cleanup: true
-    namespace: namespaced
+    namespace: namespaced-{{ .UUID }}
     podWait: false
     waitWhenFinished: true
     verifyObjects: true
