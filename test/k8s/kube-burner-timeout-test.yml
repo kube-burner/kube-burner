@@ -12,9 +12,9 @@ jobs:
     waitTimeoutAction: collect-metrics-then-exit
     podWait: true
     objects:
-      - objectTemplate: timeout-pod.yaml
+      - objectTemplate: timeout-pod.yml
         replicas: 3
-      - objectTemplate: quick-pod.yaml
+      - objectTemplate: quick-pod.yml
         replicas: 2 
     jobIterations: 1
     namespacedIterations: true
