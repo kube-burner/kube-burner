@@ -89,7 +89,7 @@ func (n *nodeLatency) handleCreateNode(obj any) {
 	node := obj.(*corev1.Node)
 	labels := node.Labels
 	n.metrics.LoadOrStore(string(node.UID), NodeMetric{
-		Timestamp:  node.CreationTimestamp.Time.UTC(),
+		Timestamp:  node.CreationTimestamp.UTC(),
 		Name:       node.Name,
 		MetricName: nodeLatencyMeasurement,
 		UUID:       n.Uuid,
@@ -107,20 +107,20 @@ func (n *nodeLatency) handleUpdateNode(obj any) {
 			switch c.Type {
 			case corev1.NodeMemoryPressure:
 				if c.Status == corev1.ConditionFalse {
-					nm.NodeMemoryPressure = c.LastTransitionTime.Time.UTC()
+					nm.NodeMemoryPressure = c.LastTransitionTime.UTC()
 				}
 			case corev1.NodeDiskPressure:
 				if c.Status == corev1.ConditionFalse {
-					nm.NodeDiskPressure = c.LastTransitionTime.Time.UTC()
+					nm.NodeDiskPressure = c.LastTransitionTime.UTC()
 				}
 			case corev1.NodePIDPressure:
 				if c.Status == corev1.ConditionFalse {
-					nm.NodePIDPressure = c.LastTransitionTime.Time.UTC()
+					nm.NodePIDPressure = c.LastTransitionTime.UTC()
 				}
 			case corev1.NodeReady:
 				if c.Status == corev1.ConditionTrue {
 					log.Debugf("Node %s is ready", node.Name)
-					nm.NodeReady = c.LastTransitionTime.Time.UTC()
+					nm.NodeReady = c.LastTransitionTime.UTC()
 				}
 			}
 		}
@@ -169,17 +169,17 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 		for _, c := range node.Status.Conditions {
 			switch c.Type {
 			case corev1.NodeMemoryPressure:
-				nodeMemoryPressure = c.LastTransitionTime.Time.UTC()
+				nodeMemoryPressure = c.LastTransitionTime.UTC()
 			case corev1.NodeDiskPressure:
-				nodeDiskPressure = c.LastTransitionTime.Time.UTC()
+				nodeDiskPressure = c.LastTransitionTime.UTC()
 			case corev1.NodePIDPressure:
-				nodePIDPressure = c.LastTransitionTime.Time.UTC()
+				nodePIDPressure = c.LastTransitionTime.UTC()
 			case corev1.NodeReady:
-				nodeReady = c.LastTransitionTime.Time.UTC()
+				nodeReady = c.LastTransitionTime.UTC()
 			}
 		}
 		n.metrics.Store(string(node.UID), NodeMetric{
-			Timestamp:          node.CreationTimestamp.Time.UTC(),
+			Timestamp:          node.CreationTimestamp.UTC(),
 			Name:               node.Name,
 			MetricName:         nodeLatencyMeasurement,
 			UUID:               n.Uuid,

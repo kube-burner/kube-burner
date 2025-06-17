@@ -261,7 +261,7 @@ func FetchConfigMap(configMap, namespace string) (string, string, error) {
 	for name, data := range configMapData.Data {
 		// We write the configMap data into the CWD
 		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
-			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
+			return metricProfile, alertProfile, fmt.Errorf("error writing configmap into disk: %v", err)
 		}
 		if name == "metrics.yml" {
 			metricProfile = "metrics.yml"
@@ -280,7 +280,7 @@ func validateDNS1123() error {
 		}
 		if job.JobType == CreationJob && len(job.Namespace) > 0 {
 			if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
-				return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, errs)
+				return fmt.Errorf("namespace %s name validation error: %s", job.Namespace, errs)
 			}
 		}
 	}

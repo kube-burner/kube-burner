@@ -97,7 +97,7 @@ func (p *podLatency) handleCreatePod(obj any) {
 	pod := obj.(*corev1.Pod)
 	podLabels := pod.GetLabels()
 	p.metrics.LoadOrStore(string(pod.UID), podMetric{
-		Timestamp:    pod.CreationTimestamp.Time.UTC(),
+		Timestamp:    pod.CreationTimestamp.UTC(),
 		Namespace:    pod.Namespace,
 		Name:         pod.Name,
 		MetricName:   podLatencyMeasurement,
@@ -120,24 +120,24 @@ func (p *podLatency) handleUpdatePod(obj any) {
 					switch c.Type {
 					case corev1.PodScheduled:
 						if pm.scheduled.IsZero() {
-							pm.scheduled = c.LastTransitionTime.Time.UTC()
+							pm.scheduled = c.LastTransitionTime.UTC()
 							pm.NodeName = pod.Spec.NodeName
 						}
 					case corev1.PodReadyToStartContainers:
 						if pm.readyToStartContainers.IsZero() {
-							pm.readyToStartContainers = c.LastTransitionTime.Time.UTC()
+							pm.readyToStartContainers = c.LastTransitionTime.UTC()
 						}
 					case corev1.PodInitialized:
 						if pm.initialized.IsZero() {
-							pm.initialized = c.LastTransitionTime.Time.UTC()
+							pm.initialized = c.LastTransitionTime.UTC()
 						}
 					case corev1.ContainersReady:
 						if pm.containersReady.IsZero() {
-							pm.containersReady = c.LastTransitionTime.Time.UTC()
+							pm.containersReady = c.LastTransitionTime.UTC()
 						}
 					case corev1.PodReady:
 						log.Debugf("Pod %s is ready", pod.Name)
-						pm.podReady = c.LastTransitionTime.Time.UTC()
+						pm.podReady = c.LastTransitionTime.UTC()
 					}
 				}
 			}
@@ -190,17 +190,17 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 		for _, c := range pod.Status.Conditions {
 			switch c.Type {
 			case corev1.PodScheduled:
-				scheduled = c.LastTransitionTime.Time.UTC()
+				scheduled = c.LastTransitionTime.UTC()
 			case corev1.PodInitialized:
-				initialized = c.LastTransitionTime.Time.UTC()
+				initialized = c.LastTransitionTime.UTC()
 			case corev1.ContainersReady:
-				containersReady = c.LastTransitionTime.Time.UTC()
+				containersReady = c.LastTransitionTime.UTC()
 			case corev1.PodReady:
-				podReady = c.LastTransitionTime.Time.UTC()
+				podReady = c.LastTransitionTime.UTC()
 			}
 		}
 		p.metrics.Store(string(pod.UID), podMetric{
-			Timestamp:       pod.Status.StartTime.Time.UTC(),
+			Timestamp:       pod.Status.StartTime.UTC(),
 			Namespace:       pod.Namespace,
 			Name:            pod.Name,
 			MetricName:      podLatencyMeasurement,

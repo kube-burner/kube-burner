@@ -245,11 +245,11 @@ func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any
 
 	switch diskType {
 	case "disk":
-		hotplugRequest.Disk.DiskDevice.Disk = &kubevirtV1.DiskTarget{
+		hotplugRequest.Disk.Disk = &kubevirtV1.DiskTarget{
 			Bus: "scsi",
 		}
 	case "lun":
-		hotplugRequest.Disk.DiskDevice.LUN = &kubevirtV1.LunTarget{
+		hotplugRequest.Disk.LUN = &kubevirtV1.LunTarget{
 			Bus: "scsi",
 		}
 	default:

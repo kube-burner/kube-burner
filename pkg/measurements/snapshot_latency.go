@@ -92,7 +92,7 @@ func (vsl *volumeSnapshotLatency) handleCreateVolumeSnapshot(obj any) {
 	volumeSnapshot := obj.(*volumesnapshotv1.VolumeSnapshot)
 	vsLabels := volumeSnapshot.GetLabels()
 	vsl.metrics.LoadOrStore(string(volumeSnapshot.UID), volumeSnapshotMetric{
-		Timestamp:    volumeSnapshot.CreationTimestamp.Time.UTC(),
+		Timestamp:    volumeSnapshot.CreationTimestamp.UTC(),
 		Namespace:    volumeSnapshot.Namespace,
 		Name:         volumeSnapshot.Name,
 		MetricName:   volumeSnapshotLatencyMeasurement,
@@ -165,7 +165,7 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 	vsl.metrics = sync.Map{}
 	for _, volumeSnapshot := range volumeSnapshots {
 		vsl.metrics.Store(string(volumeSnapshot.UID), volumeSnapshotMetric{
-			Timestamp:  volumeSnapshot.CreationTimestamp.Time.UTC(),
+			Timestamp:  volumeSnapshot.CreationTimestamp.UTC(),
 			Namespace:  volumeSnapshot.Namespace,
 			Name:       volumeSnapshot.Name,
 			MetricName: volumeSnapshotLatencyMeasurement,
