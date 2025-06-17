@@ -46,9 +46,26 @@ $(BIN_PATH): $(SOURCES)
 		echo "CI environment detected, using simplified build"; \
 		./hack/ci_build.sh; \
 	else \
-		GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner; \
+		GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v \
+			-ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) \
+			-X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) \
+			-X $(KUBE_BURNER_VERSION).Version=$(VERSION)" \
+			-o $(BIN_PATH) ./cmd/kube-burner; \
 	fi
+
+build-release: $(SOURCES)
+	@echo -e "\033[2mBuilding hardened release binary $(BIN_PATH)\033[0m"
+	@echo "GOPATH=$(GOPATH)"
+	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -trimpath \
+		-ldflags "-s -w -X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) \
+		-X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) \
+		-X $(KUBE_BURNER_VERSION).Version=$(VERSION)" \
+		-o $(BIN_PATH) ./cmd/kube-burner
 
 lint:
 	@echo "Executing pre-commit for all files"
 	pre-commit run --all-files
+
+install: build
+	@echo "Installing $(BIN_PATH) -> /usr/local/bin/$(BIN_NAME)"
+	sudo install -m 0755 $(BIN_PATH) /usr/local/bin/$(BIN_NAME)

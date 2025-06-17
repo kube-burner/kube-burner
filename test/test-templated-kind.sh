@@ -19,16 +19,16 @@ cd /workspaces/kube-burner/test/k8s
 # Verify CRDs creation - wait for them to be established
 for i in {1..2}; do
   echo "Checking for CRD testcrds${i}.testcrd.example.com..."
-  if kubectl get crd testcrds${i}.testcrd.example.com &>/dev/null; then
+  if kubectl get crd "testcrds${i}.testcrd.example.com" &>/dev/null; then
     echo "SUCCESS: CRD testcrds${i}.testcrd.example.com was created successfully"
     
     # Check if the CRD is established by checking its status conditions
-    established=$(kubectl get crd testcrds${i}.testcrd.example.com -o jsonpath='{.status.conditions[?(@.type=="Established")].status}')
+    established=$(kubectl get crd "testcrds${i}.testcrd.example.com" -o jsonpath='{.status.conditions[?(@.type=="Established")].status}')
     if [ "$established" == "True" ]; then
       echo "CRD testcrds${i}.testcrd.example.com is established"
     else
       echo "WARNING: CRD testcrds${i}.testcrd.example.com exists but is not yet established"
-      kubectl get crd testcrds${i}.testcrd.example.com -o yaml | grep -A10 status
+      kubectl get crd "testcrds${i}.testcrd.example.com" -o yaml | grep -A10 status
     fi
   else
     echo "FAILURE: CRD testcrds${i}.testcrd.example.com was not created"
@@ -39,7 +39,7 @@ done
 # Verify CR creation
 for i in {1..2}; do
   echo "Checking for CR test1 of kind TestCRD${i}..."
-  if kubectl get testcrds${i} test1 &>/dev/null; then
+  if kubectl get "testcrds${i}" test1 &>/dev/null; then
     echo "SUCCESS: CR test1 of kind TestCRD${i} was created successfully"
   else
     echo "FAILURE: CR test1 of kind TestCRD${i} was not created"
