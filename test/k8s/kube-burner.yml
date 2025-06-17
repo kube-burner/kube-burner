@@ -81,13 +81,17 @@ jobs:
 
     - objectTemplate: objectTemplates/pod.yml
       replicas: 1
+      namespace: namespaced
 
     - objectTemplate: objectTemplates/job.yml
       replicas: 1
+      namespace: namespaced
 
     - objectTemplate: objectTemplates/service.yml
       replicas: 1
+      namespace: namespaced
 
     - objectTemplate: objectTemplates/secret.yml
       replicas: 1
+      namespace: namespaced
       runOnce: true
