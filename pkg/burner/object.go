@@ -34,7 +34,7 @@ type object struct {
 	ready      bool
 }
 
-func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion string) *object {
+func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
 	if obj.APIVersion == "" {
 		obj.APIVersion = defaultAPIVersion
 	}
@@ -57,7 +57,7 @@ func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion stri
 
 	if obj.ObjectTemplate != "" {
 		log.Debugf("Rendering template: %s", obj.ObjectTemplate)
-		f, err := fileutils.GetMetricsReader(obj.ObjectTemplate, nil)
+		f, err := fileutils.GetWorkloadReader(obj.ObjectTemplate, embedCfg)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
 		}
