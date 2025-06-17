@@ -12,8 +12,25 @@ BUILD_DATE=$(date '+%Y-%m-%d-%H:%M:%S')
 echo "Building CI binary with version: ${VERSION}"
 echo "Git commit: ${GIT_COMMIT}"
 
-# Create a minimal main.go file
+# Create a separate go.mod file specifically for the CI build
 mkdir -p cmd/ci-build/
+cat > cmd/ci-build/go.mod << 'EOT'
+module github.com/cloud-bulldozer/kube-burner/cmd/ci-build
+
+go 1.22
+
+require (
+	github.com/cloud-bulldozer/go-commons/v2 v2.1.1
+	github.com/spf13/cobra v1.8.1
+)
+
+require (
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
+)
+EOT
+
+# Create a minimal main.go file
 cat > cmd/ci-build/main.go << 'EOT'
 // Copyright 2020 The Kube-burner Authors.
 //
@@ -60,7 +77,10 @@ func main() {
 }
 EOT
 
+# Run tidy on the CI-specific module
+cd cmd/ci-build && go mod tidy && cd ../..
+
 # Build the CI binary
-GOARCH=amd64 CGO_ENABLED=0 go build -v -ldflags "-X github.com/cloud-bulldozer/go-commons/v2/version.GitCommit=${GIT_COMMIT} -X github.com/cloud-bulldozer/go-commons/v2/version.BuildDate=${BUILD_DATE} -X github.com/cloud-bulldozer/go-commons/v2/version.Version=${VERSION}" -o bin/amd64/kube-burner ./cmd/ci-build
+cd cmd/ci-build && GOARCH=amd64 CGO_ENABLED=0 go build -v -ldflags "-X github.com/cloud-bulldozer/go-commons/v2/version.GitCommit=${GIT_COMMIT} -X github.com/cloud-bulldozer/go-commons/v2/version.BuildDate=${BUILD_DATE} -X github.com/cloud-bulldozer/go-commons/v2/version.Version=${VERSION}" -o ../../bin/amd64/kube-burner .
 
 echo "CI build completed successfully"
