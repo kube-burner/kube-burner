@@ -83,6 +83,19 @@ func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+// UnmarshalYAML implements Unmarshaller to customize watcher defaults
+func (w *Watcher) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawWatcher Watcher
+	watcher := rawWatcher{
+		Replicas: 1,
+	}
+	if err := unmarshal(&watcher); err != nil {
+		return err
+	}
+	*w = Watcher(watcher)
+	return nil
+}
+
 // UnmarshalYAML implements Unmarshaller to customize job defaults
 func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawJob Job
