@@ -23,9 +23,9 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/cloud-bulldozer/go-commons/v2/prometheus"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util/fileutils"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"

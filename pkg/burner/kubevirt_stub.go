@@ -1,22 +1,20 @@
-//go:build !no_kubevirt
-// +build !no_kubevirt
+// Copyright 2020 The Kube-burner Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//go:build !kubevirt
+// +build !kubevirt
 
 package burner
 
-import (
-	"time"
-
-	"github.com/kube-burner/kube-burner/pkg/config"
-)
-
-func (ex *Executor) setupKubeVirtJob(mapper interface{}) {
-	// Stub implementation that does nothing
-}
-
-func waitForKubeVirtVMIs(ex *Executor, readySelector map[string]string, timeout time.Duration, errorsChannel chan config.ErrorMap) {
-	// Stub implementation that does nothing
-}
-
-func (ex *Executor) setupKubeVirtClient() error {
-	return nil
-}
+// This stub file exists to provide build compatibility when kubevirt is not enabled

@@ -4,7 +4,7 @@ set -e
 
 cd /workspaces/kube-burner
 echo "Building kube-burner..."
-GOFLAGS="-buildvcs=false" CGO_ENABLED=0 go build -tags no_kubevirt -o bin/kube-burner ./cmd/kube-burner
+go build -o bin/kube-burner ./cmd/kube-burner
 
 # Use the existing kind cluster
 echo "Using the test-kube-burner cluster..."

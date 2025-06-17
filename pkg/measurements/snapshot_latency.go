@@ -31,9 +31,9 @@ import (
 	"k8s.io/utils/ptr"
 	"kubevirt.io/client-go/kubecli"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util/fileutils"
 )
 
 const (

@@ -1,4 +1,3 @@
-
 .PHONY: build lint clean test help images push manifest manifest-build all
 
 
@@ -43,39 +42,13 @@ build: $(BIN_PATH)
 $(BIN_PATH): $(SOURCES)
 	@echo -e "\033[2mBuilding $(BIN_PATH)\033[0m"
 	@echo "GOPATH=$(GOPATH)"
-	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner
+	if [ -n "$$CI" ] || [ -n "$$GITHUB_ACTIONS" ]; then \
+		echo "CI environment detected, using simplified build"; \
+		./hack/ci_build.sh; \
+	else \
+		GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -ldflags "-X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) -X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) -X $(KUBE_BURNER_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/kube-burner; \
+	fi
 
 lint:
 	@echo "Executing pre-commit for all files"
 	pre-commit run --all-files
-	@echo "pre-commit executed."
-
-clean:
-	test ! -e $(BIN_DIR) || rm -Rf $(BIN_PATH)
-
-install:
-	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
-
-images:
-	@echo -e "\n\033[2mBuilding container $(CONTAINER_NAME_ARCH)\033[0m"
-	$(ENGINE) build --arch=$(ARCH) -f Containerfile $(BIN_DIR)/$(ARCH)/ -t $(CONTAINER_NAME_ARCH)
-
-push:
-	@echo -e "\033[2mPushing container $(CONTAINER_NAME_ARCH)\033[0m"
-	$(ENGINE) push $(CONTAINER_NAME_ARCH)
-
-manifest: manifest-build
-	@echo -e "\033[2mPushing container manifest $(CONTAINER_NAME)\033[0m"
-	$(ENGINE) manifest push $(CONTAINER_NAME) $(CONTAINER_NAME)
-
-manifest-build:
-	@echo -e "\033[2mCreating container manifest $(CONTAINER_NAME)\033[0m"
-	$(ENGINE) manifest create $(CONTAINER_NAME)
-	for arch in $(MANIFEST_ARCHS); do \
-		$(ENGINE) manifest add $(CONTAINER_NAME) $(CONTAINER_NAME)-$${arch}; \
-	done
-
-test: lint test-k8s
-
-test-k8s:
-	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats

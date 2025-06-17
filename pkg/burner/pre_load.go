@@ -21,7 +21,7 @@ import (
 
 	"maps"
 
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"

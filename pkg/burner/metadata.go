@@ -21,7 +21,7 @@ import (
 	"maps"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
-	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
 

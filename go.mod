@@ -1,4 +1,4 @@
-module github.com/kube-burner/kube-burner
+module github.com/cloud-bulldozer/kube-burner
 
 go 1.24.0
 
@@ -6,7 +6,6 @@ toolchain go1.24.1
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/cloud-bulldozer/go-commons/v2 v2.1.1
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.16
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
@@ -20,11 +19,11 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.1
 	k8s.io/apimachinery v0.33.1
-	k8s.io/client-go v0.33.1
+	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kubectl v0.27.2
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
-	kubevirt.io/api v1.4.0
-	kubevirt.io/client-go v1.4.0
+	kubevirt.io/api v0.58.0
+	kubevirt.io/client-go v0.58.0
 	kubevirt.io/containerized-data-importer-api v1.61.1
 )
 
@@ -40,6 +39,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/cloud-bulldozer/go-commons/v2 v2.1.1 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

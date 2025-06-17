@@ -19,7 +19,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/cloud-bulldozer/kube-burner/pkg/util/fileutils"
 )
 
 func RunShellCmd(shellCmdLine string, embedCfg *fileutils.EmbedConfiguration) (*bytes.Buffer, *bytes.Buffer, error) {
