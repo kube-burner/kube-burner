@@ -52,7 +52,7 @@ func (wm *WatcherManager) Start(kind string, labelSelector map[string]string, in
 		watcherName := kindLower + "_watcher_" + indexNum + "_replica_" + replicaNum
 		restClient, err := util.ResourceToRESTClient(wm.clientSet, kindLower)
 		if err != nil {
-			wm.recordError(fmt.Errorf("Error getting REST client for %s: %w", kindLower, err))
+			wm.recordError(fmt.Errorf("error getting REST client for %s: %w", kindLower, err))
 			return
 		}
 		watcher := NewWatcher(
@@ -67,7 +67,7 @@ func (wm *WatcherManager) Start(kind string, labelSelector map[string]string, in
 		)
 
 		if err := watcher.StartAndCacheSync(); err != nil {
-			wm.recordError(fmt.Errorf("Error starting %s: %w", watcherName, err))
+			wm.recordError(fmt.Errorf("error starting %s: %w", watcherName, err))
 			return
 		}
 		log.Infof("Started %s", watcherName)
