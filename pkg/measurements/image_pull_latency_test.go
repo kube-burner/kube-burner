@@ -51,14 +51,20 @@ func TestImagePullLatency(t *testing.T) {
 					Name:  "test-container",
 					Image: "test-image",
 				},
+				{
+					Name:  "test-container-2",
+					Image: "test-image-2",
+				},
 			},
 		},
 	}
 
+	now := time.Now()
+
 	// Test pod creation
 	ipl.handleCreatePod(pod)
 
-	// Test pod update with pulling state
+	// Test pod update with pulling state for both containers
 	pod.Status.ContainerStatuses = []corev1.ContainerStatus{
 		{
 			Name:  "test-container",
@@ -69,36 +75,64 @@ func TestImagePullLatency(t *testing.T) {
 				},
 			},
 		},
-	}
-	ipl.handleUpdatePod(pod)
-
-	// Set a specific StartedAt value to simulate time passing
-	startedAt := metav1.NewTime(time.Now().Add(-200 * time.Millisecond))
-
-	// Test pod update with running state
-	pod.Status.ContainerStatuses[0].State = corev1.ContainerState{
-		Running: &corev1.ContainerStateRunning{
-			StartedAt: startedAt,
+		{
+			Name:  "test-container-2",
+			Image: "test-image-2",
+			State: corev1.ContainerState{
+				Waiting: &corev1.ContainerStateWaiting{
+					Reason: "Pulling",
+				},
+			},
 		},
 	}
 	ipl.handleUpdatePod(pod)
 
-	// Verify metrics
+	// Set specific StartedAt values to simulate different pull times
+	startedAt1 := metav1.NewTime(now.Add(200 * time.Millisecond))
+	startedAt2 := metav1.NewTime(now.Add(400 * time.Millisecond))
+
+	// Test pod update with running state for both containers
+	pod.Status.ContainerStatuses[0].State = corev1.ContainerState{
+		Running: &corev1.ContainerStateRunning{
+			StartedAt: startedAt1,
+		},
+	}
+	pod.Status.ContainerStatuses[1].State = corev1.ContainerState{
+		Running: &corev1.ContainerStateRunning{
+			StartedAt: startedAt2,
+		},
+	}
+	ipl.handleUpdatePod(pod)
+
+	// Verify metrics for both containers
 	metrics := ipl.metrics
 	if value, exists := metrics.Load("test-uid"); exists {
 		ipm := value.(imagePullMetric)
-		containerMetric, ok := ipm.ContainerMetrics["test-container"]
-		if !ok {
+		containerMetric1, ok1 := ipm.ContainerMetrics["test-container"]
+		containerMetric2, ok2 := ipm.ContainerMetrics["test-container-2"]
+		if !ok1 {
 			t.Errorf("Expected container metrics for 'test-container'")
 		}
-		if containerMetric.PullLatency <= 0 {
-			t.Errorf("Expected positive pull latency, got %d", containerMetric.PullLatency)
+		if !ok2 {
+			t.Errorf("Expected container metrics for 'test-container-2'")
 		}
-		if containerMetric.ContainerName != "test-container" {
-			t.Errorf("Expected container name 'test-container', got %s", containerMetric.ContainerName)
+		if containerMetric1.PullLatency != 200 {
+			t.Errorf("Expected pull latency 200ms for test-container, got %d", containerMetric1.PullLatency)
 		}
-		if containerMetric.Image != "test-image" {
-			t.Errorf("Expected image 'test-image', got %s", containerMetric.Image)
+		if containerMetric2.PullLatency != 400 {
+			t.Errorf("Expected pull latency 400ms for test-container-2, got %d", containerMetric2.PullLatency)
+		}
+		if containerMetric1.ContainerName != "test-container" {
+			t.Errorf("Expected container name 'test-container', got %s", containerMetric1.ContainerName)
+		}
+		if containerMetric2.ContainerName != "test-container-2" {
+			t.Errorf("Expected container name 'test-container-2', got %s", containerMetric2.ContainerName)
+		}
+		if containerMetric1.Image != "test-image" {
+			t.Errorf("Expected image 'test-image' for test-container, got %s", containerMetric1.Image)
+		}
+		if containerMetric2.Image != "test-image-2" {
+			t.Errorf("Expected image 'test-image-2' for test-container-2, got %s", containerMetric2.Image)
 		}
 	} else {
 		t.Error("Expected metrics to exist for test pod")
