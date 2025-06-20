@@ -91,6 +91,11 @@ func initCmd() *cobra.Command {
 			os.Exit(rc)
 		},
 		Args: cobra.NoArgs,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
@@ -137,7 +142,7 @@ func initCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewString(), "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
@@ -311,6 +316,11 @@ func indexCmd() *cobra.Command {
 		PostRun: func(cmd *cobra.Command, args []string) {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
 			configSpec.GlobalConfig.UUID = uuid
@@ -364,7 +374,7 @@ func indexCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewString(), "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
@@ -439,6 +449,11 @@ func alertCmd() *cobra.Command {
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
@@ -484,7 +499,7 @@ func alertCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewString(), "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
