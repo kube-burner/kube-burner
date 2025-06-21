@@ -15,7 +15,13 @@
 package burner
 
 import (
+	"time"
+	"context"
 	"sync"
+	"fmt"
+    "strings"
+
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"maps"
 
@@ -122,3 +128,81 @@ func (ex *Executor) renderTemplateForObject(obj *object, iteration, replicaIndex
 
 	return renderedObj
 }
+
+func (ex *Executor) RunPreCreateNamespaces(ctx context.Context, iterationStart, iterationEnd int, nsLabels, nsAnnotations map[string]string, waitListNamespaces *[]string, namespacesCreated map[string]bool) error {
+	if !ex.PreCreateNamespaces || !ex.nsRequired || !ex.NamespacedIterations {
+		return nil
+	}
+
+	nsLabels = map[string]string{
+		"kube-burner-job":   ex.Name,
+		"kube-burner-uuid":  ex.uuid,
+		"kube-burner-runid": ex.runid,
+	}
+	maps.Copy(nsLabels, ex.NamespaceLabels)
+
+	for i := iterationStart; i < iterationEnd; i++ {
+		ns := ex.generateNamespace(i)
+		if namespacesCreated[ns] {
+			continue
+		}
+		if err := util.CreateNamespace(ex.clientSet, ns, nsLabels, nil); err != nil {
+			log.Errorf("Failed to create namespace %s: %v", ns, err)
+			continue
+		}
+		log.Infof("Created namespace: %s", ns)
+
+		namespacesCreated[ns] = true
+
+		// Static wait (optional)
+		if ex.NamespaceWaitDuration > 0 {
+			log.Infof("Sleeping %v after creating namespace %s", ex.NamespaceWaitDuration, ns)
+			time.Sleep(ex.NamespaceWaitDuration)
+		}
+
+		// Condition-based wait (optional)
+		if ex.NamespaceWaitForCondition != nil {
+			err := ex.waitForNamespaceCondition(ctx, ns, ex.NamespaceWaitForCondition.Resource, ex.NamespaceWaitForCondition.Timeout)
+			if err != nil {
+				log.Errorf("Namespace %s did not meet readiness condition: %v", ns, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (ex *Executor) waitForNamespaceCondition(ctx context.Context, ns string, resource string, timeout time.Duration) error {
+	log.Infof("Waiting for resource %s to appear in namespace %s (timeout: %s)", resource, ns, timeout)
+
+	start := time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		switch strings.ToLower(resource) {
+			case "networkpolicy":
+				policies, err := ex.clientSet.NetworkingV1().NetworkPolicies(ns).List(ctx, metav1.ListOptions{})
+				if err == nil && len(policies.Items) > 0 {
+					log.Infof("Detected %d NetworkPolicy in namespace %s", len(policies.Items), ns)
+					return nil
+				}
+			case "configmap":
+				cms, err := ex.clientSet.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{})
+				if err == nil && len(cms.Items) > 0 {
+					log.Infof("Detected %d ConfigMap in namespace %s", len(cms.Items), ns)
+					return nil
+				}
+			default:
+				return fmt.Errorf("unsupported resource type: %s", resource)
+			}
+
+			if time.Since(start) > timeout {
+				return fmt.Errorf("timeout reached waiting for %s in namespace %s", resource, ns)
+			}
+			time.Sleep(500 * time.Millisecond) // polling interval
+	}
+}
+
