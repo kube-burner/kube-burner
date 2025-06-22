@@ -56,11 +56,6 @@ jobs:
     errorOnVerify: true
     jobIterationDelay: 5s
     maxWaitTimeout: 2m
-    churn: {{ .CHURN }}
-    churnCycles: {{ .CHURN_CYCLES}}
-    churnPercent: 20
-    churnDuration: 1m
-    churnDelay: 5s
     namespaceLabels:
       foo: bar
       complex.label/test: true
