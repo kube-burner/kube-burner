@@ -267,3 +267,23 @@ teardown_file() {
     check_metrics_not_created_for_job ${job} ${metric}
   done
 }
+
+@test "Verify measurements configuration" {
+  export LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner-measurements.yml --uuid="${UUID}" --log-level=debug
+
+  # Verify all jobs have podLatency
+  local jobs_with_pod=("precedence-measurements" "merge-measurements")
+  for job in "${jobs_with_pod[@]}"; do
+    check_metric_recorded ${job} podLatency podReadyLatency
+    check_quantile_recorded ${job} podLatency Ready
+  done
+
+  # Verify only merge-measurements adds serviceLatency
+  check_metric_recorded merge-measurements svcLatency ready
+  check_quantile_recorded merge-measurements svcLatency Ready
+  check_metrics_not_created_for_job precedence-measurements svcLatency
+
+  # Verify all expected metric files were created
+  check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-merge-measurements.json
+}
