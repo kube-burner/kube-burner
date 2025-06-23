@@ -34,6 +34,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/rest"
 )
@@ -129,7 +130,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn duration: %v", job.ChurnDuration)
 					log.Infof("Churn percent: %v", job.ChurnPercent)
 					log.Infof("Churn delay: %v", job.ChurnDelay)
-					log.Infof("Churn deletion strategy: %v", job.ChurnDeletionStrategy)
+					log.Infof("Using deletion strategy: %v", job.deletionStrategy)
 				}
 				job.RunCreateJob(ctx, 0, job.JobIterations, &waitListNamespaces)
 				if ctx.Err() != nil {
@@ -405,10 +406,23 @@ func garbageCollectJob(ctx context.Context, jobExecutor Executor, labelSelector 
 	if wg != nil {
 		defer wg.Done()
 	}
-	err := util.CleanupNamespaces(ctx, jobExecutor.clientSet, labelSelector)
-	// Just report error and continue
-	if err != nil {
-		log.Error(err.Error())
+	if jobExecutor.deletionStrategy == config.GVRDeletionStrategy {
+		namespaces, err := jobExecutor.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			log.Error(err.Error())
+		} else {
+			namespacesToDelete := make([]string, 0, len(namespaces.Items))
+			for _, ns := range namespaces.Items {
+				namespacesToDelete = append(namespacesToDelete, ns.Name)
+			}
+			CleanupNamespacesUsingGVR(ctx, jobExecutor, namespacesToDelete)
+		}
+	} else {
+		err := util.CleanupNamespaces(ctx, jobExecutor.clientSet, labelSelector)
+		// Just report error and continue
+		if err != nil {
+			log.Error(err.Error())
+		}
 	}
 	for _, obj := range jobExecutor.objects {
 		jobExecutor.limiter.Wait(ctx)
