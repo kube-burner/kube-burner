@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"sync"
@@ -62,6 +63,8 @@ var (
 		config.ExecutionModeParallel:   {},
 		config.ExecutionModeSequential: {},
 	}
+
+	objectOperations int32 = 0
 )
 
 // Runs the with the given configuration and metrics scraper, with the specified timeout.
@@ -313,11 +316,17 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
 			}
+			var achievedQps float64
+			elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
+			if elapsedTime > 0 {
+				achievedQps = math.Round((float64(objectOperations)/elapsedTime)*1000) / 1000
+			}
 			jobSummaries = append(jobSummaries, JobSummary{
 				UUID:                uuid,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,
-				ElapsedTime:         job.End.Sub(job.Start).Round(time.Second).Seconds(),
+				ElapsedTime:         elapsedTime,
+				AchievedQps:         achievedQps,
 				ChurnStartTimestamp: job.ChurnStart,
 				ChurnEndTimestamp:   job.ChurnEnd,
 				JobConfig:           job.JobConfig,

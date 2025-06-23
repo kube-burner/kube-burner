@@ -18,6 +18,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
@@ -95,6 +96,7 @@ func patchHandler(ex *Executor, obj *object, originalItem unstructured.Unstructu
 				originalItem.GetName(), ns, err)
 		}
 	} else {
+		atomic.AddInt32(&objectOperations, 1)
 		log.Debugf("Patched %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 	}
 }
