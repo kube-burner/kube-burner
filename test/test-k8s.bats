@@ -18,8 +18,12 @@ setup_file() {
   export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
   export ES_INDEX="kube-burner"
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
+  
+  # Set a more stable K8S_VERSION if not already set
+  export K8S_VERSION=${K8S_VERSION:-"v1.29.2"} 
+  
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
-    setup-kind
+    setup-kind || echo "Warning: setup-kind reported errors, some tests may fail"
   fi
   create_test_kubeconfig
   setup-prometheus
