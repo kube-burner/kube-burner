@@ -201,6 +201,8 @@ teardown_file() {
 }
 
 @test "kube-burner init: jobType kubevirt" {
+  # Skip if KubeVirt is not available
+  kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
   run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid="${UUID}" --log-level=debug
 }
 
