@@ -25,7 +25,12 @@ setup-kind() {
   echo "Deploying cluster"
   "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1
   echo "Deploying kubevirt operator"
-  KUBEVIRT_VERSION=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
+  # Get latest stable KubeVirt version, fallback if not found
+  KUBEVIRT_VERSION=${KUBEVIRT_VERSION:-$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)}
+  if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
+    KUBEVIRT_VERSION="v1.2.0" # fallback to a known stable version
+    echo "Warning: Could not fetch latest KubeVirt version, falling back to $KUBEVIRT_VERSION"
+  fi
   kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml
   kubectl create -f objectTemplates/kubevirt-cr.yaml
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator
