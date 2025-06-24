@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 )
 
 func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
@@ -65,17 +66,23 @@ func (ex *Executor) setupCreateJob(mapper meta.RESTMapper) {
 		}
 		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
 		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		if err != nil {
-			log.Fatal(err)
-		}
+
 		obj := &object{
-			gvr:        mapping.Resource,
 			objectSpec: t,
 			Object:     o,
 			namespace:  uns.GetNamespace(),
-			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+			gvk:        *gvk,
 		}
-		obj.Kind = gvk.Kind
+
+		if err != nil {
+			log.Debugf("REST mapping failed for %s, will use deferred mapping: %v", gvk.Kind, err)
+			obj.deferredMapping = true
+			obj.namespaced = true
+		} else {
+			obj.gvr = mapping.Resource
+			obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+		}
+
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
 		if obj.namespaced && obj.namespace == "" {
 			ex.nsRequired = true
@@ -202,6 +209,25 @@ func (ex *Executor) generateNamespace(iteration int) string {
 
 func (ex *Executor) replicaHandler(ctx context.Context, labels map[string]string, obj *object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
+
+	if obj.deferredMapping {
+		maxRetries := 30
+		retryDelay := 1 * time.Second
+
+		for retry := 0; retry < maxRetries; retry++ {
+			// Re-create the mapper with fresh discovery for each retry
+			mapper := newRESTMapper(discovery.NewDiscoveryClientForConfigOrDie(ex.restConfig))
+			if err := obj.resolveDeferredMapping(mapper); err != nil {
+				if retry == maxRetries-1 {
+					log.Fatalf("Failed to resolve deferred mapping for %s after %d retries: %v", obj.gvk.Kind, maxRetries, err)
+				}
+				log.Debugf("Retry %d: Failed to resolve deferred mapping for %s, retrying in %v: %v", retry+1, obj.gvk.Kind, retryDelay, err)
+				time.Sleep(retryDelay)
+				continue
+			}
+			break
+		}
+	}
 
 	for r := 1; r <= obj.Replicas; r++ {
 		if ctx.Err() != nil {

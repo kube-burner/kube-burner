@@ -27,11 +27,13 @@ import (
 
 type object struct {
 	config.Object
-	gvr        schema.GroupVersionResource
-	objectSpec []byte
-	namespace  string
-	namespaced bool
-	ready      bool
+	gvr             schema.GroupVersionResource
+	objectSpec      []byte
+	namespace       string
+	namespaced      bool
+	ready           bool
+	deferredMapping bool
+	gvk             schema.GroupVersionKind
 }
 
 func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
@@ -42,17 +44,20 @@ func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion stri
 	if len(obj.LabelSelector) == 0 {
 		log.Fatalf("Empty labelSelectors not allowed with: %s", obj.Kind)
 	}
-
 	gvk := schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 	mapping, err := mapper.RESTMapping(gvk.GroupKind())
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	o := object{
-		Object:     obj,
-		gvr:        mapping.Resource,
-		namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		Object: obj,
+		gvk:    gvk,
+	}
+	if err != nil {
+		log.Debugf("REST mapping failed for %s, will use deferred mapping: %v", gvk.Kind, err)
+		o.deferredMapping = true
+		o.namespaced = true
+	} else {
+		o.gvr = mapping.Resource
+		o.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+		o.deferredMapping = false
 	}
 
 	if obj.ObjectTemplate != "" {
@@ -69,4 +74,21 @@ func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion stri
 	}
 
 	return &o
+}
+
+func (o *object) resolveDeferredMapping(mapper meta.RESTMapper) error {
+	if !o.deferredMapping {
+		return nil
+	}
+	mapping, err := mapper.RESTMapping(o.gvk.GroupKind())
+	if err != nil {
+		return err
+	}
+	// updating the object
+	o.gvr = mapping.Resource
+	o.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+	o.deferredMapping = false
+
+	log.Debugf("Successfully resolved deferred mapping for %s", o.gvk.Kind)
+	return nil
 }
