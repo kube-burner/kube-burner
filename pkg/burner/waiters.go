@@ -242,15 +242,19 @@ func (ex *JobExecutor) waitForBuild(ns string, obj object) error {
 }
 
 func (ex *JobExecutor) verifyCondition(ns string, obj object) error {
+	gvr := obj.gvr
+	if obj.waitGVR != nil {
+		gvr = *obj.waitGVR
+	}
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
 		ex.limiter.Wait(context.TODO())
 		if obj.namespaced {
-			objs, err = ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+			objs, err = ex.dynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 			})
 		} else {
-			objs, err = ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), metav1.ListOptions{
+			objs, err = ex.dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: labels.Set(obj.WaitOptions.LabelSelector).String(),
 			})
 		}

@@ -28,6 +28,7 @@ import (
 type object struct {
 	config.Object
 	gvr        schema.GroupVersionResource
+	waitGVR    *schema.GroupVersionResource
 	objectSpec []byte
 	namespace  string
 	namespaced bool
@@ -49,9 +50,23 @@ func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion stri
 		log.Fatal(err)
 	}
 
+	var waitGVR *schema.GroupVersionResource
+	if obj.WaitOptions.Kind != "" {
+		if obj.WaitOptions.APIVersion == "" {
+			obj.WaitOptions.APIVersion = obj.APIVersion
+		}
+		gvk = schema.FromAPIVersionAndKind(obj.WaitOptions.APIVersion, obj.WaitOptions.Kind)
+		mapping, err = mapper.RESTMapping(gvk.GroupKind())
+		if err != nil {
+			log.Fatal(err)
+		}
+		waitGVR = &mapping.Resource
+	}
+
 	o := object{
 		Object:     obj,
 		gvr:        mapping.Resource,
+		waitGVR:    waitGVR,
 		namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 	}
 
