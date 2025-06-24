@@ -20,10 +20,30 @@ setup-kind() {
   else
     curl -LsS https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}/kind-linux-${ARCH}" -o ${KIND_FOLDER}/kind-linux-${ARCH}
     chmod +x ${KIND_FOLDER}/kind-linux-${ARCH}
+    # Check for the existence of the specified K8S_VERSION node image
     IMAGE=kindest/node:"${K8S_VERSION}"
   fi
+  
+  # Verify if Kind node image exists, fall back to a known stable version if not
+  if ! docker pull ${IMAGE} &>/dev/null; then
+    echo "Warning: Could not pull Kind node image ${IMAGE}, falling back to v1.29.2"
+    K8S_VERSION="v1.29.2"
+    IMAGE=kindest/node:"${K8S_VERSION}"
+    docker pull ${IMAGE} || { echo "Error: Could not pull fallback image"; exit 1; }
+  fi
   echo "Deploying cluster"
-  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1
+  # Attempt to create the kind cluster, retry with fallback version if it fails
+  if ! "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1; then
+    echo "Warning: Failed to create cluster with image ${IMAGE}, will try with a fallback"
+    # Cleanup failed attempt
+    "${KIND_FOLDER}/kind-linux-${ARCH}" delete cluster --name kind
+    # Try with fallback version
+    K8S_VERSION="v1.29.2"
+    IMAGE=kindest/node:"${K8S_VERSION}"
+    echo "Retrying with ${IMAGE}"
+    docker pull ${IMAGE} || { echo "Error: Could not pull fallback image"; exit 1; }
+    "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1 || { echo "Error: Failed to create cluster with fallback image"; exit 1; }
+  fi
   echo "Deploying kubevirt operator"
   # Get latest stable KubeVirt version, fallback if not found
   KUBEVIRT_VERSION=${KUBEVIRT_VERSION:-$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)}
@@ -37,7 +57,13 @@ setup-kind() {
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator || echo "Warning: KubeVirt operator not available, some tests requiring KubeVirt may fail"
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt || echo "Warning: KubeVirt CR not available, some tests requiring KubeVirt may fail"
   # Install CDI
-  CDI_VERSION=${CDI_VERSION:-$(basename "$(curl -s -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)")}
+  # First try with curl command that follows redirects
+  CDI_VERSION=${CDI_VERSION:-$(basename "$(curl -s -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)" 2>/dev/null || echo "")}
+  # If that fails, try Github API
+  if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
+    CDI_VERSION=${CDI_VERSION:-$(curl -s https://api.github.com/repos/kubevirt/containerized-data-importer/releases/latest | jq -r .tag_name 2>/dev/null || echo "")}
+  fi
+  # If both fail, use hardcoded fallback
   if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
     CDI_VERSION="v1.58.0" # fallback to a known stable version
     echo "Warning: Could not fetch latest CDI version, falling back to $CDI_VERSION"
