@@ -85,6 +85,8 @@ teardown_file() {
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; vm-latency-indexing=true" {
+  # Skip if KubeVirt is not available
+  kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid="${UUID}" --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
@@ -227,14 +229,19 @@ teardown_file() {
 }
 
 @test "kube-burner init: datavolume latency" {
+  # Skip if KubeVirt is not available
+  kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
+  # Skip if CDI is not available
+  kubectl get cdi cdi &>/dev/null || skip "CDI is not available"
+  
   if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
     echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    return 1
+    skip "VOLUME_SNAPSHOT_CLASS_NAME not set"
   fi
   export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
   if [[ -z "$STORAGE_CLASS_NAME" ]]; then
     echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    return 1
+    skip "STORAGE_CLASS_NAME not set"
   fi
 
   run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid="${UUID}" --log-level=debug
