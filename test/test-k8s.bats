@@ -267,3 +267,28 @@ teardown_file() {
     check_metrics_not_created_for_job ${job} ${metric}
   done
 }
+
+@test "kube-burner init: deferred crd mapping" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-deferred-crd.yml --uuid="${UUID}" --log-level=debug
+  
+  # Verifying CRDs exist (cluster-scoped)
+  run kubectl get crd testcrd0s.testcrd.example.com
+  [ "$status" -eq 0 ]
+  run kubectl get crd testseconds.testcrd.example.com
+  [ "$status" -eq 0 ]
+  
+  run kubectl get testcrd0s -n test-deferred-0
+  [ "$status" -eq 0 ]
+  run kubectl get testseconds -n test-deferred-0
+  [ "$status" -eq 0 ]
+  
+  # Verify specific objects exist
+  run kubectl get testcrd0s/test1 -n test-deferred-0
+  [ "$status" -eq 0 ]
+  run kubectl get testseconds/test1 -n test-deferred-0
+  [ "$status" -eq 0 ]
+  
+  # Cleanup
+  kubectl delete crd testcrd0s.testcrd.example.com testseconds.testcrd.example.com --ignore-not-found
+  check_destroyed_ns kube-burner-job=test-crd-cr,kube-burner-uuid="${UUID}"
+}
