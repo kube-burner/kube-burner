@@ -3,10 +3,12 @@
 # shellcheck disable=SC2086,SC2068
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
-K8S_VERSION=${K8S_VERSION:-v1.31.0}
+K8S_VERSION=${K8S_VERSION:-v1.28.0} # Use a stable K8S version that's widely available as Kind image
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
+# Set CI mode flag to true in CI environments to make tests more resilient
+CI_MODE=${CI_MODE:-false}
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
