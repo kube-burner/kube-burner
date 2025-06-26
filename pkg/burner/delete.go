@@ -42,7 +42,7 @@ func (ex *Executor) setupDeleteJob(mapper meta.RESTMapper) {
 	ex.WaitWhenFinished = false
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1, ex.embedCfg))
 	}
 }
 

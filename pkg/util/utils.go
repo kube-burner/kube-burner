@@ -17,10 +17,13 @@ package util
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // RetryWithExponentialBackOff a utility for retrying the given function with exponential backoff.
@@ -44,11 +47,12 @@ func GetBoolValue(m map[string]any, key string) *bool {
 		case bool:
 			ret = &v
 		case string:
-			if v == "true" {
+			switch v {
+			case "true":
 				convertedValue = true
-			} else if v == "false" {
+			case "false":
 				convertedValue = false
-			} else {
+			default:
 				log.Fatalf("cannot convert %v to bool", v)
 			}
 			ret = &convertedValue
@@ -111,4 +115,65 @@ func GetStringValue(m map[string]any, key string) *string {
 		}
 	}
 	return ret
+}
+
+// ResourceToRESTClient maps resource kind to appropriate REST client
+func ResourceToRESTClient(clientset kubernetes.Interface, kind string) (*rest.RESTClient, error) {
+	kind = strings.ToLower(kind)
+	switch kind {
+	// CoreV1 resources
+	case "pod",
+		"service",
+		"endpoint",
+		"configmap",
+		"secret",
+		"persistentvolume",
+		"persistentvolumeclaim",
+		"node",
+		"namespace",
+		"event",
+		"serviceaccount",
+		"limitrange",
+		"resourcequota":
+		return clientset.CoreV1().RESTClient().(*rest.RESTClient), nil
+
+	// AppsV1 resources
+	case "deployment",
+		"statefulset",
+		"daemonset",
+		"replicaset":
+		return clientset.AppsV1().RESTClient().(*rest.RESTClient), nil
+
+	// BatchV1 resources
+	case "job",
+		"cronjob":
+		return clientset.BatchV1().RESTClient().(*rest.RESTClient), nil
+
+	// NetworkingV1 resources
+	case "ingress",
+		"networkpolicy":
+		return clientset.NetworkingV1().RESTClient().(*rest.RESTClient), nil
+
+	// RBACV1 resources
+	case "role",
+		"clusterrole",
+		"rolebinding",
+		"clusterrolebinding":
+		return clientset.RbacV1().RESTClient().(*rest.RESTClient), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported resource kind: %s", kind)
+	}
+}
+
+// NaivePlural gives naive plurals
+func NaivePlural(kind string) string {
+	kindLower := strings.ToLower(kind)
+	if strings.HasSuffix(kindLower, "ss") {
+		return kindLower + "es"
+	}
+	if strings.HasSuffix(kindLower, "cy") {
+		return strings.TrimSuffix(kindLower, "cy") + "cies"
+	}
+	return kindLower + "s"
 }

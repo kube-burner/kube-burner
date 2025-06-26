@@ -83,6 +83,19 @@ func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+// UnmarshalYAML implements Unmarshaller to customize watcher defaults
+func (w *Watcher) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawWatcher Watcher
+	watcher := rawWatcher{
+		Replicas: 1,
+	}
+	if err := unmarshal(&watcher); err != nil {
+		return err
+	}
+	*w = Watcher(watcher)
+	return nil
+}
+
 // UnmarshalYAML implements Unmarshaller to customize job defaults
 func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawJob Job
@@ -104,7 +117,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
 		ChurnDeletionStrategy:  "default",
-		MetricsClosing:         "afterJob",
+		MetricsClosing:         AfterJobPause,
 	}
 
 	if err := unmarshal(&raw); err != nil {
@@ -187,8 +200,8 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		if job.JobIterations < 1 && (job.JobType == CreationJob || job.JobType == ReadJob) {
 			log.Fatalf("Job %s has < 1 iterations", job.Name)
 		}
-		if job.MetricsClosing != "afterJob" && job.MetricsClosing != "afterJobPause" && job.MetricsClosing != "afterMeasurements" {
-			log.Fatalf("Invalid value %s for MetricsClosing", job.MetricsClosing)
+		if _, ok := metricsClosing[job.MetricsClosing]; !ok {
+			log.Fatalf("Invalid value for metricsClosing: %s", job.MetricsClosing)
 		}
 		if job.JobType == DeletionJob {
 			configSpec.Jobs[i].PreLoadImages = false
@@ -261,7 +274,7 @@ func FetchConfigMap(configMap, namespace string) (string, string, error) {
 	for name, data := range configMapData.Data {
 		// We write the configMap data into the CWD
 		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
-			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
+			return metricProfile, alertProfile, fmt.Errorf("error writing configmap into disk: %v", err)
 		}
 		if name == "metrics.yml" {
 			metricProfile = "metrics.yml"
@@ -280,7 +293,7 @@ func validateDNS1123() error {
 		}
 		if job.JobType == CreationJob && len(job.Namespace) > 0 {
 			if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
-				return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, errs)
+				return fmt.Errorf("namespace %s name validation error: %s", job.Namespace, errs)
 			}
 		}
 	}

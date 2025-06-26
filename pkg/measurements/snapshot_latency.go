@@ -33,6 +33,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 )
 
 const (
@@ -81,9 +82,9 @@ func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurem
 	}, nil
 }
 
-func (vslmf volumeSnapshotLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config) Measurement {
+func (vslmf volumeSnapshotLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
 	return &volumeSnapshotLatency{
-		BaseMeasurement: vslmf.NewBaseLatency(jobConfig, clientSet, restConfig, volumeSnapshotLatencyMeasurement, volumeSnapshotLatencyQuantilesMeasurement),
+		BaseMeasurement: vslmf.NewBaseLatency(jobConfig, clientSet, restConfig, volumeSnapshotLatencyMeasurement, volumeSnapshotLatencyQuantilesMeasurement, embedCfg),
 	}
 }
 
@@ -91,7 +92,7 @@ func (vsl *volumeSnapshotLatency) handleCreateVolumeSnapshot(obj any) {
 	volumeSnapshot := obj.(*volumesnapshotv1.VolumeSnapshot)
 	vsLabels := volumeSnapshot.GetLabels()
 	vsl.metrics.LoadOrStore(string(volumeSnapshot.UID), volumeSnapshotMetric{
-		Timestamp:    volumeSnapshot.CreationTimestamp.Time.UTC(),
+		Timestamp:    volumeSnapshot.CreationTimestamp.UTC(),
 		Namespace:    volumeSnapshot.Namespace,
 		Name:         volumeSnapshot.Name,
 		MetricName:   volumeSnapshotLatencyMeasurement,
@@ -164,7 +165,7 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 	vsl.metrics = sync.Map{}
 	for _, volumeSnapshot := range volumeSnapshots {
 		vsl.metrics.Store(string(volumeSnapshot.UID), volumeSnapshotMetric{
-			Timestamp:  volumeSnapshot.CreationTimestamp.Time.UTC(),
+			Timestamp:  volumeSnapshot.CreationTimestamp.UTC(),
 			Namespace:  volumeSnapshot.Namespace,
 			Name:       volumeSnapshot.Name,
 			MetricName: volumeSnapshotLatencyMeasurement,

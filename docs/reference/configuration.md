@@ -110,6 +110,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `qps`                        | Limit object creation queries per second                                                                                              | Integer  | 0        |
 | `burst`                      | Maximum burst for throttle                                                                                                            | Integer  | 0        |
 | `objects`                    | List of objects the job will create. Detailed on the [objects section](#objects)                                                      | List     | []       |
+| `watchers`                   | List of watchers to be created for the job. Detailed on the [watchers section](#watchers)                                                      | List     | []       |
 | `verifyObjects`              | Verify object count after running each job                                                                                            | Boolean  | true     |
 | `errorOnVerify`              | Set RC to 1 when objects verification fails                                                                                           | Boolean  | true     |
 | `skipIndexing`               | Skip metric indexing on this job                                                                                                      | Boolean  | false    |
@@ -129,7 +130,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
 | `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | 0s       |
 | `metricsAggregate`           | Aggregate the metrics collected for this job with those of the next one                                                               | Boolean  | false    |
-| `metricsClosing`  | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                             | String   | afterJob |
+| `metricsClosing`             | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                  | String   | afterJobPause |
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
@@ -143,6 +144,20 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
 Examples of valid configuration files can be found in the [examples folder](https://github.com/kube-burner/kube-burner/tree/master/examples).
+
+
+### Watchers
+
+We have watchers support during the benchmark workload. It is at a job level and will be usefull in scenarios where we want to monitor overhead created by watchers on a cluster.
+
+!!! note 
+    This feature doesn't effect the overall QPS/Burst as it uses its own client instance.
+
+| Option            | Description                                             | Type    | Default |
+|-------------------|---------------------------------------------------------|---------|---------|
+| `kind`            | Object kind to consider for watch                       | String  |    ""   |
+| `labelSelector`   | Objects with these labels will be considered for watch  | Object  |    {}   |
+| `replicas`        | Number of watcher replicas to create                    | Integer |     0   |
 
 ### Objects
 
@@ -588,5 +603,5 @@ jobs:
 This config defines when the metrics collection should stop. The option supports three values:
 
 - `afterJob` - collect metrics after the job completes
-- `afterJobPause` - collect metrics after the jobPause duration ends
+- `afterJobPause` - collect metrics after the jobPause duration ends (Default)
 - `afterMeasurements` - collect metrics after all measurements are finished

@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -30,7 +31,9 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/rest"
 )
@@ -82,11 +85,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	globalWaitMap := make(map[string][]string)
 	executorMap := make(map[string]Executor)
 	returnMap := make(map[string]returnPair)
+	timeoutGCStarted := false
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
 	defer cancel()
 	go func() {
 		var innerRC int
+		clientSet, _ := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobList = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		handlePreloadImages(jobList, kubeClientProvider)
@@ -98,10 +103,18 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				Start:     time.Now().UTC(),
 				JobConfig: job.Job,
 			})
+			watcherManager := watchers.NewWatcherManager(clientSet, rate.NewLimiter(rate.Limit(job.QPS), job.Burst))
+			for idx, watcher := range job.Watchers {
+				for replica := range watcher.Replicas {
+					watcherManager.Start(watcher.Kind, watcher.LabelSelector, idx+1, replica+1)
+				}
+			}
+			watcherStartErrors := watcherManager.Wait()
+			slices.Concat(errs, watcherStartErrors)
 			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = job.Name
-				measurementsInstance = measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider)
+				measurementsInstance = measurementsFactory.NewMeasurements(&job.Job, kubeClientProvider, embedCfg)
 				measurementsInstance.Start()
 			}
 			log.Infof("Triggering job: %s", job.Name)
@@ -159,14 +172,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 			}
 			jobEnd := time.Now().UTC()
-			if job.MetricsClosing == "afterJob" {
+			if job.MetricsClosing == config.AfterJob {
 				executedJobs[len(executedJobs)-1].End = jobEnd
 			}
 			if job.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", job.JobPause)
 				time.Sleep(job.JobPause)
 			}
-			if job.MetricsClosing == "afterJobPause" {
+			if job.MetricsClosing == config.AfterJobPause {
 				executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 			}
 			if !globalConfig.WaitWhenFinished {
@@ -180,7 +193,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Error(err.Error())
 					innerRC = rcMeasurement
 				}
-				if job.MetricsClosing == "afterMeasurements" {
+				if job.MetricsClosing == config.AfterMeasurements {
 					executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 				}
 				if !job.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
@@ -192,6 +205,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				measurementsInstance = nil
 			}
+			watcherStopErrs := watcherManager.StopAll()
+			slices.Concat(errs, watcherStopErrs)
 		}
 		if globalConfig.WaitWhenFinished {
 			runWaitList(globalWaitMap, executorMap)
@@ -257,12 +272,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				gcWg.Add(1)
 				go garbageCollectJob(gcCtx, job, fmt.Sprintf("kube-burner-job=%s", job.Name), &gcWg)
 			}
+			timeoutGCStarted = true
 		}
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	if globalConfig.GC {
 		// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
-		if !globalConfig.GCMetrics {
+		// Also wait if timeout GC was started, regardless of GCMetrics setting
+		if !globalConfig.GCMetrics || timeoutGCStarted {
 			log.Info("Garbage collecting jobs")
 			gcWg.Wait()
 		}
@@ -319,7 +336,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 		prometheusClient.ScrapeJobsMetrics(executedJobs...)
 	}
 	for _, indexer := range configSpec.MetricsEndpoints {
-		if indexer.IndexerConfig.Type == indexers.LocalIndexer && indexer.IndexerConfig.CreateTarball {
+		if indexer.Type == indexers.LocalIndexer && indexer.CreateTarball {
 			metrics.CreateTarball(indexer.IndexerConfig)
 		}
 	}
@@ -333,12 +350,17 @@ func verifyJobTimeout(job *config.Job, defaultTimeout time.Duration) {
 }
 
 func verifyQPSBurst(job *config.Job) {
-	if job.QPS == 0 || job.Burst == 0 {
-		log.Infof("QPS or Burst rates not set, using default client-go values: %v %v", rest.DefaultQPS, rest.DefaultBurst)
+	if job.QPS <= 0 {
+		log.Warnf("Invalid QPS (%v); using default: %v", job.QPS, rest.DefaultQPS)
 		job.QPS = rest.DefaultQPS
-		job.Burst = rest.DefaultBurst
 	} else {
 		log.Infof("QPS: %v", job.QPS)
+	}
+
+	if job.Burst <= 0 {
+		log.Warnf("Invalid Burst (%v); using default: %v", job.Burst, rest.DefaultBurst)
+		job.Burst = rest.DefaultBurst
+	} else {
 		log.Infof("Burst: %v", job.Burst)
 	}
 }

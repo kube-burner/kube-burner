@@ -32,7 +32,7 @@ import (
 func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 	tarball, err := os.Create(indexerConfig.TarballName)
 	if err != nil {
-		return fmt.Errorf("Could not create tarball file: %v", err)
+		return fmt.Errorf("could not create tarball file: %v", err)
 	}
 	gzipWriter := gzip.NewWriter(tarball)
 	tarWriter := tar.NewWriter(gzipWriter)
@@ -50,13 +50,13 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 		hdr, _ := tar.FileInfoHeader(info, info.Name())
 		err = tarWriter.WriteHeader(hdr)
 		if err != nil {
-			return fmt.Errorf("Could not write file header into tarball: %v", err)
+			return fmt.Errorf("could not write file header into tarball: %v", err)
 		}
 		m, _ := os.Open(path)
 		defer m.Close()
 		_, err = io.Copy(tarWriter, m)
 		if err != nil {
-			return fmt.Errorf("Could not write file into tarball: %v", err)
+			return fmt.Errorf("could not write file into tarball: %v", err)
 		}
 		return nil
 	})
@@ -72,12 +72,12 @@ func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)
 	if err != nil {
-		return fmt.Errorf("Could not open tarball file: %v", err)
+		return fmt.Errorf("could not open tarball file: %v", err)
 	}
 	defer tarballFile.Close()
 	gzipReader, err := gzip.NewReader(tarballFile)
 	if err != nil {
-		return fmt.Errorf("Could not create gzip reader: %v", err)
+		return fmt.Errorf("could not create gzip reader: %v", err)
 	}
 	tr := tar.NewReader(gzipReader)
 	for {
@@ -91,7 +91,7 @@ func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 		json.Unmarshal(rawData.Bytes(), &metrics)
 		rawData.Reset()
 		if err != nil {
-			return fmt.Errorf("Tarball read error: %v", err)
+			return fmt.Errorf("tarball read error: %v", err)
 		}
 		log.Infof("Reading metrics from %s", hdr.Name)
 		resp, err := (*indexer).Index(metrics, indexers.IndexingOpts{})
