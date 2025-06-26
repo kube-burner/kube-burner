@@ -71,14 +71,20 @@ teardown() {
 }
 
 teardown_file() {
+  # Cleanup kubernetes resources if using a temporary cluster
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
-    destroy-kind
+    destroy-kind || echo "Warning: destroy-kind failed but continuing"
   fi
-  $OCI_BIN rm -f prometheus
+  
+  # Remove prometheus container
+  $OCI_BIN rm -f prometheus || echo "Warning: Failed to remove prometheus container"
+  
+  # Cleanup OpenSearch and monitoring network if not using production ES server 
+  # and grafana is not deployed
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
-    if [ "$DEPLOY_GRAFANA" = "false" ]; then
-      $OCI_BIN rm -f opensearch
-      $OCI_BIN network rm -f monitoring
+    if [[ "$DEPLOY_GRAFANA" == "false" ]]; then
+      $OCI_BIN rm -f opensearch || echo "Warning: Failed to remove opensearch container"
+      $OCI_BIN network rm -f monitoring || echo "Warning: Failed to remove monitoring network"
     fi
   fi
 }
