@@ -3,7 +3,7 @@
 # shellcheck disable=SC2086,SC2068
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
-K8S_VERSION=${K8S_VERSION:-v1.28.0} # Use a stable K8S version that's widely available as Kind image
+K8S_VERSION=${K8S_VERSION:-v1.31.0} # Use recent K8S version, CI tests against the 3 latest minors
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
