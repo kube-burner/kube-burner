@@ -19,14 +19,11 @@ setup_file() {
   export ES_INDEX="kube-burner"
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
   
-  # Set a more stable K8S_VERSION if not already set - use v1.28.0 as it's widely available
-  export K8S_VERSION=${K8S_VERSION:-"v1.28.0"}
+  # Set K8S_VERSION if not already set - use v1.31.0 as default
+  export K8S_VERSION=${K8S_VERSION:-"v1.31.0"}
   
-  # In CI mode, we'll try to use a stable K8S version regardless of what was specified
-  if [[ "$CI_MODE" == "true" && "$K8S_VERSION" =~ v1.3[1-9] ]]; then
-    echo "Warning: Using a fallback K8S version v1.28.0 instead of $K8S_VERSION for CI stability"
-    export K8S_VERSION="v1.28.0"
-  fi
+  # In CI, we don't need to override the K8S_VERSION as the CI pipeline
+  # tests against multiple K8S versions automatically
   
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
     setup-kind || {
