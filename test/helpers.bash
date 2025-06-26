@@ -36,11 +36,11 @@ setup-kind() {
     exit 1
   }
   echo "Deploying kubevirt operator"
-  # Get latest stable KubeVirt version, fallback if not found
+  # Use the specified KubeVirt version or fetch the latest
   KUBEVIRT_VERSION=${KUBEVIRT_VERSION:-$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)}
   if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
-    KUBEVIRT_VERSION="v1.2.0" # fallback to a known stable version
-    echo "Warning: Could not fetch latest KubeVirt version, falling back to $KUBEVIRT_VERSION"
+    echo "Error: Could not determine KubeVirt version"
+    exit 1
   fi
   # Make KubeVirt installation non-fatal for tests that don't need it
   kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml || echo "Warning: Failed to install KubeVirt operator, some tests requiring KubeVirt may fail"
@@ -48,16 +48,16 @@ setup-kind() {
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator || echo "Warning: KubeVirt operator not available, some tests requiring KubeVirt may fail"
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt || echo "Warning: KubeVirt CR not available, some tests requiring KubeVirt may fail"
   # Install CDI
-  # First try with curl command that follows redirects
+  # Use the specified CDI version or attempt to fetch the latest
   CDI_VERSION=${CDI_VERSION:-$(basename "$(curl -s -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)" 2>/dev/null || echo "")}
   # If that fails, try Github API
   if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
     CDI_VERSION=${CDI_VERSION:-$(curl -s https://api.github.com/repos/kubevirt/containerized-data-importer/releases/latest | jq -r .tag_name 2>/dev/null || echo "")}
   fi
-  # If both fail, use hardcoded fallback
+  # Fail if version cannot be determined
   if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
-    CDI_VERSION="v1.58.0" # fallback to a known stable version
-    echo "Warning: Could not fetch latest CDI version, falling back to $CDI_VERSION"
+    echo "Error: Could not determine CDI version"
+    exit 1
   fi
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml || echo "Warning: Failed to install CDI operator, some tests requiring CDI may fail"
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml || echo "Warning: Failed to create CDI CR, some tests requiring CDI may fail"
@@ -65,8 +65,8 @@ setup-kind() {
   # Install Snapshot CRDs and Controller
   SNAPSHOTTER_VERSION=${SNAPSHOTTER_VERSION:-$(curl -s https://api.github.com/repos/kubernetes-csi/external-snapshotter/releases/latest | jq -r .tag_name)}
   if [[ -z "$SNAPSHOTTER_VERSION" || "$SNAPSHOTTER_VERSION" == "null" ]]; then
-    SNAPSHOTTER_VERSION="v6.3.2" # fallback to a known stable version
-    echo "Warning: Could not fetch latest snapshotter version, falling back to $SNAPSHOTTER_VERSION"
+    echo "Error: Could not determine snapshotter version"
+    exit 1
   fi
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml || echo "Warning: Failed to install volumesnapshotclasses CRD"
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml || echo "Warning: Failed to install volumesnapshotcontents CRD"
