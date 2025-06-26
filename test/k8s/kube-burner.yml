@@ -52,6 +52,7 @@ jobs:
       labelSelector: {foo: bar}
       replicas: 2
     namespacedIterations: true
+    preCreateNamespaces: {{ .PRE_CREATE_NS }}
     preLoadImages: true
     preLoadPeriod: 2s
     cleanup: true
