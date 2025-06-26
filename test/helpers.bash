@@ -4,7 +4,7 @@
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
 K8S_VERSION=${K8S_VERSION:-v1.31.0} # Use recent K8S version, CI tests against the 3 latest minors
-OCI_BIN=${OCI_BIN:-podman}
+OCI_BIN=${OCI_BIN:-docker}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
 # Set CI mode flag to true in CI environments to make tests more resilient
@@ -35,35 +35,76 @@ setup-kind() {
     echo "Error: Failed to create cluster with image ${IMAGE}"
     exit 1
   }
-  echo "Deploying kubevirt operator"
-  # Determine KubeVirt version with retries
-  if [[ -z "$KUBEVIRT_VERSION" ]]; then
-    # Retry up to 3 times with increasing delays
-    for retry in 1 2 3; do
-      echo "Fetching latest KubeVirt version (attempt $retry/3)..."
-      KUBEVIRT_VERSION=$(curl -s -m 10 https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
-      if [[ -n "$KUBEVIRT_VERSION" && "$KUBEVIRT_VERSION" != "null" ]]; then
-        break
-      fi
-      echo "Failed to fetch KubeVirt version, retrying in $retry seconds..."
-      sleep $retry
-    done
+  # Check if we should skip KubeVirt installation
+  if [[ "${SKIP_KUBEVIRT_INSTALL:-false}" == "true" ]]; then
+    echo "Skipping KubeVirt installation as requested"
+    export SKIP_KUBEVIRT_TESTS="true"
+  else
+    echo "Deploying KubeVirt operator"
+    # Determine KubeVirt version with retries
+    if [[ -z "$KUBEVIRT_VERSION" ]]; then
+      # Retry up to 3 times with increasing delays
+      for retry in 1 2 3; do
+        echo "Fetching latest KubeVirt version (attempt $retry/3)..."
+        KUBEVIRT_VERSION=$(curl -s -m 10 https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
+        if [[ -n "$KUBEVIRT_VERSION" && "$KUBEVIRT_VERSION" != "null" ]]; then
+          break
+        fi
+        echo "Failed to fetch KubeVirt version, retrying in $retry seconds..."
+        sleep $retry
+      done
+    fi
+    
+    # If version cannot be determined, set SKIP_KUBEVIRT_TESTS flag
+    if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
+      echo "Error: Could not determine KubeVirt version after multiple attempts"
+      echo "KubeVirt-dependent tests will be skipped"
+      export SKIP_KUBEVIRT_TESTS="true"
+      return
+    fi
+    
+    echo "Using KubeVirt version: $KUBEVIRT_VERSION"
+    
+    # Install KubeVirt with proper error checking
+    echo "Installing KubeVirt operator..."
+    if ! kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml; then
+      echo "Error: Failed to install KubeVirt operator"
+      export SKIP_KUBEVIRT_TESTS="true"
+      return
+    fi
+    
+    echo "Creating KubeVirt CR..."
+    if ! kubectl create -f objectTemplates/kubevirt-cr.yaml; then
+      echo "Error: Failed to create KubeVirt CR"
+      export SKIP_KUBEVIRT_TESTS="true"
+      return
+    fi
+    
+    echo "Waiting for KubeVirt operator to be available..."
+    if ! kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator; then
+      echo "Error: KubeVirt operator did not become available"
+      export SKIP_KUBEVIRT_TESTS="true"
+      return
+    fi
+    
+    echo "Waiting for KubeVirt CR to be available..."
+    if ! kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt; then
+      echo "Error: KubeVirt CR did not become available"
+      export SKIP_KUBEVIRT_TESTS="true"
+      return
+    fi
+    
+    echo "KubeVirt successfully installed and available"
   fi
-  
-  # Fail if version still cannot be determined after retries
-  if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
-    echo "Error: Could not determine KubeVirt version after multiple attempts"
-    exit 1
+  # Install CDI if KubeVirt was successfully installed
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    echo "Skipping CDI installation as KubeVirt installation was skipped or failed"
+    export SKIP_CDI_TESTS="true"
+    return
   fi
+
+  echo "Installing CDI..."
   
-  echo "Using KubeVirt version: $KUBEVIRT_VERSION"
-  
-  # Make KubeVirt installation non-fatal for tests that don't need it
-  kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml || echo "Warning: Failed to install KubeVirt operator, some tests requiring KubeVirt may fail"
-  kubectl create -f objectTemplates/kubevirt-cr.yaml || echo "Warning: Failed to create KubeVirt CR, some tests requiring KubeVirt may fail"
-  kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator || echo "Warning: KubeVirt operator not available, some tests requiring KubeVirt may fail"
-  kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt || echo "Warning: KubeVirt CR not available, some tests requiring KubeVirt may fail"
-  # Install CDI
   # Determine CDI version with retries if not specified
   if [[ -z "$CDI_VERSION" ]]; then
     # Retry up to 3 times with increasing delays
@@ -86,16 +127,38 @@ setup-kind() {
     done
   fi
   
-  # Fail if version still cannot be determined after retries
+  # If version cannot be determined, set SKIP_CDI_TESTS flag
   if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
     echo "Error: Could not determine CDI version after multiple attempts"
-    exit 1
+    echo "CDI-dependent tests will be skipped"
+    export SKIP_CDI_TESTS="true"
+    return
   fi
   
   echo "Using CDI version: $CDI_VERSION"
-  kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml || echo "Warning: Failed to install CDI operator, some tests requiring CDI may fail"
-  kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml || echo "Warning: Failed to create CDI CR, some tests requiring CDI may fail"
-  kubectl wait --for=condition=Available --timeout=600s cdi cdi || echo "Warning: CDI not available, some tests requiring CDI may fail"
+  
+  echo "Installing CDI operator..."
+  if ! kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml; then
+    echo "Error: Failed to install CDI operator"
+    export SKIP_CDI_TESTS="true"
+    return
+  fi
+  
+  echo "Creating CDI CR..."
+  if ! kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml; then
+    echo "Error: Failed to create CDI CR"
+    export SKIP_CDI_TESTS="true"
+    return
+  fi
+  
+  echo "Waiting for CDI to be available..."
+  if ! kubectl wait --for=condition=Available --timeout=600s cdi cdi; then
+    echo "Error: CDI did not become available"
+    export SKIP_CDI_TESTS="true"
+    return
+  fi
+  
+  echo "CDI successfully installed and available"
   # Install Snapshot CRDs and Controller
   # Determine snapshotter version with retries if not specified
   if [[ -z "$SNAPSHOTTER_VERSION" ]]; then
@@ -113,33 +176,130 @@ setup-kind() {
     done
   fi
   
-  # Fail if version still cannot be determined after retries
+  # If version cannot be determined, set SKIP_SNAPSHOTTER_TESTS flag
   if [[ -z "$SNAPSHOTTER_VERSION" || "$SNAPSHOTTER_VERSION" == "null" ]]; then
     echo "Error: Could not determine snapshotter version after multiple attempts"
-    exit 1
+    echo "Snapshotter-dependent tests will be skipped"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
   fi
   
   echo "Using snapshotter version: $SNAPSHOTTER_VERSION"
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml || echo "Warning: Failed to install volumesnapshotclasses CRD"
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml || echo "Warning: Failed to install volumesnapshotcontents CRD"
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml || echo "Warning: Failed to install volumesnapshots CRD"
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml || echo "Warning: Failed to install snapshot controller RBAC"
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml || echo "Warning: Failed to install snapshot controller"
+  
+  # Install snapshotter components with proper error checking
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml; then
+    echo "Error: Failed to install volumesnapshotclasses CRD"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml; then
+    echo "Error: Failed to install volumesnapshotcontents CRD"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml; then
+    echo "Error: Failed to install volumesnapshots CRD"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml; then
+    echo "Error: Failed to install snapshot controller RBAC"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml; then
+    echo "Error: Failed to install snapshot controller"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  echo "Snapshot controller and CRDs successfully installed"
+  # Don't proceed with CSI and K10 setup if snapshotter tests will be skipped
+  if [[ "${SKIP_SNAPSHOTTER_TESTS:-false}" == "true" ]]; then
+    echo "Skipping CSI driver and K10 setup as snapshotter tests will be skipped"
+    return
+  fi
+
   # Add Host Path CSI Driver and StorageClass
+  echo "Installing Host Path CSI Driver..."
   CSI_DRIVER_HOST_PATH_DIR=$(mktemp -d)
-  git clone https://github.com/kubernetes-csi/csi-driver-host-path.git ${CSI_DRIVER_HOST_PATH_DIR}
-  ${CSI_DRIVER_HOST_PATH_DIR}/deploy/kubernetes-latest/deploy.sh
-  kubectl apply -f ${CSI_DRIVER_HOST_PATH_DIR}/examples/csi-storageclass.yaml
+  if ! git clone --quiet https://github.com/kubernetes-csi/csi-driver-host-path.git ${CSI_DRIVER_HOST_PATH_DIR}; then
+    echo "Error: Failed to clone csi-driver-host-path repository"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! ${CSI_DRIVER_HOST_PATH_DIR}/deploy/kubernetes-latest/deploy.sh; then
+    echo "Error: Failed to deploy Host Path CSI Driver"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! kubectl apply -f ${CSI_DRIVER_HOST_PATH_DIR}/examples/csi-storageclass.yaml; then
+    echo "Error: Failed to apply CSI StorageClass"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
   # Install Helm
-  HELM_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/helm/helm/releases/latest)")
-  curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz
-  tar xzvf ${KIND_FOLDER}/helm.tgz -C ${KIND_FOLDER}
+  echo "Installing Helm..."
+  HELM_VERSION=""
+  for retry in 1 2 3; do
+    echo "Fetching latest Helm version (attempt $retry/3)..."
+    HELM_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/helm/helm/releases/latest)")
+    if [[ -n "$HELM_VERSION" && "$HELM_VERSION" != "null" ]]; then
+      break
+    fi
+    echo "Failed to fetch Helm version, retrying in $retry seconds..."
+    sleep $retry
+  done
+  
+  if [[ -z "$HELM_VERSION" || "$HELM_VERSION" == "null" ]]; then
+    echo "Error: Could not determine Helm version after multiple attempts"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz; then
+    echo "Error: Failed to download Helm"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! tar xzf ${KIND_FOLDER}/helm.tgz -C ${KIND_FOLDER}; then
+    echo "Error: Failed to extract Helm archive"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
   HELM_EXEC=${KIND_FOLDER}/linux-${ARCH}/helm
   chmod +x ${HELM_EXEC}
+  
   # Install K10
-  ${HELM_EXEC} repo add kasten https://charts.kasten.io/
-  kubectl create ns kasten-io
-  ${HELM_EXEC} install k10 kasten/k10 --namespace=kasten-io
+  echo "Installing K10..."
+  if ! ${HELM_EXEC} repo add kasten https://charts.kasten.io/; then
+    echo "Error: Failed to add Kasten Helm repository"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! kubectl create ns kasten-io; then
+    echo "Error: Failed to create kasten-io namespace"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! ${HELM_EXEC} install k10 kasten/k10 --namespace=kasten-io; then
+    echo "Error: Failed to install K10 via Helm"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  echo "K10 successfully installed"
   export STORAGE_CLASS_WITH_SNAPSHOT_NAME="csi-hostpath-sc"
   export VOLUME_SNAPSHOT_CLASS_NAME="csi-hostpath-snapclass"
 }

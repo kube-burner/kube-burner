@@ -103,7 +103,10 @@ teardown_file() {
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; vm-latency-indexing=true" {
-  # Skip if KubeVirt is not available
+  # Skip if KubeVirt is not available or installation was skipped
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    skip "KubeVirt installation was skipped or failed"
+  fi
   kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid="${UUID}" --log-level=debug
@@ -221,7 +224,10 @@ teardown_file() {
 }
 
 @test "kube-burner init: jobType kubevirt" {
-  # Skip if KubeVirt is not available
+  # Skip if KubeVirt is not available or installation was skipped
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    skip "KubeVirt installation was skipped or failed"
+  fi
   kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
   run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid="${UUID}" --log-level=debug
 }
@@ -247,10 +253,22 @@ teardown_file() {
 }
 
 @test "kube-burner init: datavolume latency" {
-  # Skip if KubeVirt is not available
+  # Skip if KubeVirt is not available or installation was skipped
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    skip "KubeVirt installation was skipped or failed"
+  fi
   kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
+  # Skip if CDI tests should be skipped
+  if [[ "${SKIP_CDI_TESTS:-false}" == "true" ]]; then
+    skip "CDI installation was skipped or failed"
+  fi
   # Skip if CDI is not available
   kubectl get cdi cdi &>/dev/null || skip "CDI is not available"
+  
+  # Skip if Snapshotter tests should be skipped
+  if [[ "${SKIP_SNAPSHOTTER_TESTS:-false}" == "true" ]]; then
+    skip "Snapshotter installation was skipped or failed"
+  fi
   
   if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
     echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
