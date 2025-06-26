@@ -26,16 +26,11 @@ setup_file() {
   # tests against multiple K8S versions automatically
   
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
+    # Create the Kind cluster using the specified K8S version
+    # If it fails, the entire test suite should fail
     setup-kind || {
-      # In CI mode, we don't want to fail the entire test suite if setup-kind fails
-      if [[ "$CI_MODE" == "true" ]]; then
-        echo "Warning: setup-kind failed but continuing in CI mode"
-        # Create a minimal dummy kind cluster for testing that doesn't require special images
-        KIND_VERSION=${KIND_VERSION:-v0.19.0} kind create cluster || echo "Warning: Simple cluster creation also failed"
-      else
-        echo "Error: setup-kind failed"
-        return 1
-      fi
+      echo "Error: setup-kind failed"
+      return 1
     }
   fi
   create_test_kubeconfig

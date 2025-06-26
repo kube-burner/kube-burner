@@ -22,30 +22,19 @@ setup-kind() {
   else
     curl -LsS https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}/kind-linux-${ARCH}" -o ${KIND_FOLDER}/kind-linux-${ARCH}
     chmod +x ${KIND_FOLDER}/kind-linux-${ARCH}
-    # Check for the existence of the specified K8S_VERSION node image
+    # Use the specified K8S_VERSION node image
     IMAGE=kindest/node:"${K8S_VERSION}"
   fi
   
-  # Verify if Kind node image exists, fall back to a known stable version if not
-  if ! docker pull ${IMAGE} &>/dev/null; then
-    echo "Warning: Could not pull Kind node image ${IMAGE}, falling back to v1.29.2"
-    K8S_VERSION="v1.29.2"
-    IMAGE=kindest/node:"${K8S_VERSION}"
-    docker pull ${IMAGE} || { echo "Error: Could not pull fallback image"; exit 1; }
-  fi
+  # Pull the image - fail if not available
+  docker pull ${IMAGE} || { echo "Error: Could not pull image ${IMAGE}"; exit 1; }
+  
   echo "Deploying cluster"
-  # Attempt to create the kind cluster, retry with fallback version if it fails
-  if ! "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1; then
-    echo "Warning: Failed to create cluster with image ${IMAGE}, will try with a fallback"
-    # Cleanup failed attempt
-    "${KIND_FOLDER}/kind-linux-${ARCH}" delete cluster --name kind
-    # Try with fallback version
-    K8S_VERSION="v1.29.2"
-    IMAGE=kindest/node:"${K8S_VERSION}"
-    echo "Retrying with ${IMAGE}"
-    docker pull ${IMAGE} || { echo "Error: Could not pull fallback image"; exit 1; }
-    "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1 || { echo "Error: Failed to create cluster with fallback image"; exit 1; }
-  fi
+  # Create the kind cluster with the specified image
+  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1 || { 
+    echo "Error: Failed to create cluster with image ${IMAGE}"
+    exit 1
+  }
   echo "Deploying kubevirt operator"
   # Get latest stable KubeVirt version, fallback if not found
   KUBEVIRT_VERSION=${KUBEVIRT_VERSION:-$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)}
