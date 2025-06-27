@@ -19,9 +19,9 @@ setup_file() {
   export ES_INDEX="kube-burner"
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
   
-  # K8S_VERSION is defined in helpers.bash and may be overridden by environment variables
-  # The CI pipeline will override this value from the matrix of versions to test
-  # tests against multiple K8S versions automatically
+  # K8S_VERSION is defined in helpers.bash
+  # No special logic overrides K8S_VERSION - it's used exactly as provided
+  # CI pipeline explicitly sets K8S_VERSION for each test matrix item
   
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
     # Create the Kind cluster using the specified K8S version
@@ -101,11 +101,11 @@ teardown_file() {
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; vm-latency-indexing=true" {
-  # Skip if KubeVirt is not available or installation was skipped
+  # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
     skip "KubeVirt installation was skipped or failed"
   fi
-  kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid="${UUID}" --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
@@ -222,11 +222,11 @@ teardown_file() {
 }
 
 @test "kube-burner init: jobType kubevirt" {
-  # Skip if KubeVirt is not available or installation was skipped
+  # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
     skip "KubeVirt installation was skipped or failed"
   fi
-  kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
   run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid="${UUID}" --log-level=debug
 }
 
@@ -251,17 +251,17 @@ teardown_file() {
 }
 
 @test "kube-burner init: datavolume latency" {
-  # Skip if KubeVirt is not available or installation was skipped
+  # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
     skip "KubeVirt installation was skipped or failed"
   fi
-  kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
   # Skip if CDI tests should be skipped
   if [[ "${SKIP_CDI_TESTS:-false}" == "true" ]]; then
     skip "CDI installation was skipped or failed"
   fi
-  # Skip if CDI is not available
-  kubectl get cdi cdi &>/dev/null || skip "CDI is not available"
+  # We only skip if explicitly told to do so by SKIP_CDI_TESTS flag
+  # This ensures tests fail properly in CI rather than being silently skipped
   
   # Skip if Snapshotter tests should be skipped
   if [[ "${SKIP_SNAPSHOTTER_TESTS:-false}" == "true" ]]; then
@@ -295,11 +295,11 @@ teardown_file() {
 }
 
 @test "kube-burner init: metrics aggregation" {
-  # Skip if KubeVirt is not available or installation was skipped
+  # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
     skip "KubeVirt installation was skipped or failed"
   fi
-  kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
   
   export STORAGE_CLASS_NAME
   STORAGE_CLASS_NAME=$(get_default_storage_class)
