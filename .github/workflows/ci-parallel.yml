@@ -72,10 +72,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bats jq podman
+          sudo apt-get install -y bats jq podman uuid-runtime
           
       - name: Make binary executable
         run: chmod +x /tmp/kube-burner
         
       - name: Run bats tests for ${{ matrix.test-group }}
         run: make test-k8s TEST_FILTER="${{ matrix.test-group }}" TEST_BINARY=/tmp/kube-burner
+        env:
+          OCI_BIN: podman
+          CI_MODE: true

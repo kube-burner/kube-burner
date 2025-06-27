@@ -324,31 +324,106 @@ destroy-kind() {
 
 setup-prometheus() {
   echo "Setting up prometheus instance"
-  $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest
-  sleep 10
+  # Retry the prometheus container start in CI mode
+  if [[ "$CI_MODE" == "true" ]]; then
+    for retry in 1 2 3; do
+      echo "Starting prometheus container (attempt $retry/3)..."
+      if $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest; then
+        echo "Prometheus container started successfully"
+        sleep 10
+        return 0
+      fi
+      echo "Failed to start prometheus container, retrying in $retry seconds..."
+      $OCI_BIN rm -f prometheus 2>/dev/null || true
+      sleep $retry
+    done
+    echo "Error: Could not start prometheus container after multiple attempts"
+    return 1
+  else
+    # Standard mode - no retries
+    $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest
+    sleep 10
+  fi
 }
 
 setup-shared-network() {
   echo "Setting up shared network for monitoring"
-  $OCI_BIN network create monitoring
+  # Retry network creation in CI mode
+  if [[ "$CI_MODE" == "true" ]]; then
+    for retry in 1 2 3; do
+      echo "Creating monitoring network (attempt $retry/3)..."
+      if $OCI_BIN network create monitoring; then
+        echo "Monitoring network created successfully"
+        return 0
+      fi
+      echo "Failed to create monitoring network, retrying in $retry seconds..."
+      $OCI_BIN network rm -f monitoring 2>/dev/null || true
+      sleep $retry
+    done
+    echo "Error: Could not create monitoring network after multiple attempts"
+    return 1
+  else
+    # Standard mode - no retries
+    $OCI_BIN network create monitoring
+  fi
 }
 
 setup-opensearch() {
   echo "Setting up open-search"
   # Use version 1 to avoid the password requirement
-  $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
-  sleep 10
+  # Retry opensearch container start in CI mode
+  if [[ "$CI_MODE" == "true" ]]; then
+    for retry in 1 2 3; do
+      echo "Starting opensearch container (attempt $retry/3)..."
+      if $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1; then
+        echo "Opensearch container started successfully"
+        sleep 10
+        return 0
+      fi
+      echo "Failed to start opensearch container, retrying in $retry seconds..."
+      $OCI_BIN rm -f opensearch 2>/dev/null || true
+      sleep $retry
+    done
+    echo "Error: Could not start opensearch container after multiple attempts"
+    return 1
+  else
+    # Standard mode - no retries
+    $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
+    sleep 10
+  fi
 }
 
 setup-grafana() {
   export GRAFANA_URL="http://localhost:3000"
   export GRAFANA_ROLE="admin"
   echo "Setting up Grafana"
-  $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
-    --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
-    docker.io/grafana/grafana:latest
-  sleep 10
-  echo "Grafana is running at $GRAFANA_URL"
+  
+  # Retry grafana container start in CI mode
+  if [[ "$CI_MODE" == "true" ]]; then
+    for retry in 1 2 3; do
+      echo "Starting Grafana container (attempt $retry/3)..."
+      if $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
+          --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
+          docker.io/grafana/grafana:latest; then
+        echo "Grafana container started successfully"
+        sleep 10
+        echo "Grafana is running at $GRAFANA_URL"
+        return 0
+      fi
+      echo "Failed to start Grafana container, retrying in $retry seconds..."
+      $OCI_BIN rm -f grafana 2>/dev/null || true
+      sleep $retry
+    done
+    echo "Error: Could not start Grafana container after multiple attempts"
+    return 1
+  else
+    # Standard mode - no retries
+    $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
+      --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
+      docker.io/grafana/grafana:latest
+    sleep 10
+    echo "Grafana is running at $GRAFANA_URL"
+  fi
 }
 
 configure-grafana-datasource() {

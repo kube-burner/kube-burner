@@ -297,6 +297,12 @@ teardown_file() {
 }
 
 @test "kube-burner init: metrics aggregation" {
+  # Skip if KubeVirt is not available or installation was skipped
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    skip "KubeVirt installation was skipped or failed"
+  fi
+  kubectl get -n kubevirt kv/kubevirt &>/dev/null || skip "KubeVirt is not available"
+  
   export STORAGE_CLASS_NAME
   STORAGE_CLASS_NAME=$(get_default_storage_class)
   run_cmd ${KUBE_BURNER} init -c kube-burner-metrics-aggregate.yml --uuid="${UUID}" --log-level=debug
