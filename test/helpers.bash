@@ -4,7 +4,9 @@
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
 # Central definition of K8S_VERSION used by all tests
-K8S_VERSION=${K8S_VERSION:-v1.31.0} # Use recent K8S version, CI tests against the 3 latest minors
+# This value is used as the default but may be overridden by environment variables
+# In CI, this is overridden by the workflow matrix to test multiple K8S versions
+K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-docker}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}

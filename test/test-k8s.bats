@@ -19,8 +19,8 @@ setup_file() {
   export ES_INDEX="kube-burner"
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
   
-  # K8S_VERSION is defined in helpers.bash
-  # In CI, we don't need to override the K8S_VERSION as the CI pipeline
+  # K8S_VERSION is defined in helpers.bash and may be overridden by environment variables
+  # The CI pipeline will override this value from the matrix of versions to test
   # tests against multiple K8S versions automatically
   
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
