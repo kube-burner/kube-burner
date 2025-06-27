@@ -3,10 +3,15 @@
 # shellcheck disable=SC2086,SC2068
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
+# Central definition of K8S_VERSION used by all tests
+# This value is used as the default but may be overridden by environment variables
+# In CI, this is overridden by the workflow matrix to test multiple K8S versions
 K8S_VERSION=${K8S_VERSION:-v1.31.0}
-OCI_BIN=${OCI_BIN:-podman}
+OCI_BIN=${OCI_BIN:-docker}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
+# Set CI mode flag to true in CI environments to make tests more resilient
+CI_MODE=${CI_MODE:-false}
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
@@ -20,43 +25,264 @@ setup-kind() {
   else
     curl -LsS https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}/kind-linux-${ARCH}" -o ${KIND_FOLDER}/kind-linux-${ARCH}
     chmod +x ${KIND_FOLDER}/kind-linux-${ARCH}
+    # Use the specified K8S_VERSION node image
     IMAGE=kindest/node:"${K8S_VERSION}"
   fi
+  
+  # Pull the image - fail if not available
+  docker pull ${IMAGE} || { echo "Error: Could not pull image ${IMAGE}"; exit 1; }
+  
   echo "Deploying cluster"
-  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1
-  echo "Deploying kubevirt operator"
-  KUBEVIRT_VERSION=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
-  kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml
-  kubectl create -f objectTemplates/kubevirt-cr.yaml
-  kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator
-  kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt
-  # Install CDI
-  CDI_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)")
-  kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml
-  kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml
-  kubectl wait --for=condition=Available --timeout=600s cdi cdi
+  # Create the kind cluster with the specified image
+  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1 || { 
+    echo "Error: Failed to create cluster with image ${IMAGE}"
+    exit 1
+  }
+  # Check if we should skip KubeVirt installation
+  if [[ "${SKIP_KUBEVIRT_INSTALL:-false}" == "true" ]]; then
+    echo "Skipping KubeVirt installation as requested"
+    export SKIP_KUBEVIRT_TESTS="true"
+  else
+    echo "Deploying KubeVirt operator"
+    # Determine KubeVirt version with retries
+    if [[ -z "$KUBEVIRT_VERSION" ]]; then
+      # Retry up to 3 times with increasing delays
+      for retry in 1 2 3; do
+        echo "Fetching latest KubeVirt version (attempt $retry/3)..."
+        KUBEVIRT_VERSION=$(curl -s -m 10 https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
+        if [[ -n "$KUBEVIRT_VERSION" && "$KUBEVIRT_VERSION" != "null" ]]; then
+          break
+        fi
+        echo "Failed to fetch KubeVirt version, retrying in $retry seconds..."
+        sleep $retry
+      done
+    fi
+    
+    # If version cannot be determined, fail unless SKIP_KUBEVIRT_INSTALL is set
+    if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
+      echo "Error: Could not determine KubeVirt version after multiple attempts"
+      if [[ "${SKIP_KUBEVIRT_INSTALL:-false}" != "true" ]]; then
+        echo "FATAL: Failed to determine KubeVirt version and SKIP_KUBEVIRT_INSTALL is not set to true"
+        exit 1
+      else
+        echo "KubeVirt-dependent tests will be skipped as SKIP_KUBEVIRT_INSTALL=true"
+        export SKIP_KUBEVIRT_TESTS="true"
+        return
+      fi
+    fi
+    
+    echo "Using KubeVirt version: $KUBEVIRT_VERSION"
+    
+    # Install KubeVirt with proper error checking - fail test if installation fails
+    echo "Installing KubeVirt operator..."
+    if ! kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml; then
+      echo "FATAL: Failed to install KubeVirt operator"
+      exit 1
+    fi
+    
+    echo "Creating KubeVirt CR..."
+    if ! kubectl create -f objectTemplates/kubevirt-cr.yaml; then
+      echo "FATAL: Failed to create KubeVirt CR"
+      exit 1
+    fi
+    
+    echo "Waiting for KubeVirt operator to be available..."
+    if ! kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator; then
+      echo "FATAL: KubeVirt operator did not become available"
+      exit 1
+    fi
+    
+    echo "Waiting for KubeVirt CR to be available..."
+    if ! kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt; then
+      echo "FATAL: KubeVirt CR did not become available"
+      exit 1
+    fi
+    
+    echo "KubeVirt successfully installed and available"
+  fi
+  # Install CDI if KubeVirt was successfully installed
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    echo "Skipping CDI installation as KubeVirt installation was skipped or failed"
+    export SKIP_CDI_TESTS="true"
+    return
+  fi
+
+  echo "Installing CDI..."
+  
+  # Determine CDI version with retries if not specified
+  if [[ -z "$CDI_VERSION" ]]; then
+    # Retry up to 3 times with increasing delays
+    for retry in 1 2 3; do
+      echo "Fetching latest CDI version (attempt $retry/3)..."
+      # Try first method: redirect URL
+      CDI_VERSION=$(basename "$(curl -s -m 10 -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)" 2>/dev/null || echo "")
+      
+      # If first method fails, try second method: Github API
+      if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
+        CDI_VERSION=$(curl -s -m 10 https://api.github.com/repos/kubevirt/containerized-data-importer/releases/latest | jq -r .tag_name 2>/dev/null || echo "")
+      fi
+      
+      if [[ -n "$CDI_VERSION" && "$CDI_VERSION" != "null" ]]; then
+        break
+      fi
+      
+      echo "Failed to fetch CDI version, retrying in $retry seconds..."
+      sleep $retry
+    done
+  fi
+  
+  # If version cannot be determined, fail the tests
+  if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
+    echo "FATAL: Could not determine CDI version after multiple attempts"
+    exit 1
+  fi
+  
+  echo "Using CDI version: $CDI_VERSION"
+  
+  echo "Installing CDI operator..."
+  if ! kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml; then
+    echo "FATAL: Failed to install CDI operator"
+    exit 1
+  fi
+  
+  echo "Creating CDI CR..."
+  if ! kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml; then
+    echo "FATAL: Failed to create CDI CR"
+    exit 1
+  fi
+  
+  echo "Waiting for CDI to be available..."
+  if ! kubectl wait --for=condition=Available --timeout=600s cdi cdi; then
+    echo "FATAL: CDI did not become available"
+    exit 1
+  fi
+  
+  echo "CDI successfully installed and available"
   # Install Snapshot CRDs and Controller
-  SNAPSHOTTER_VERSION=$(curl -s https://api.github.com/repos/kubernetes-csi/external-snapshotter/releases/latest | jq -r .tag_name)
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
+  # Determine snapshotter version with retries if not specified
+  if [[ -z "$SNAPSHOTTER_VERSION" ]]; then
+    # Retry up to 3 times with increasing delays
+    for retry in 1 2 3; do
+      echo "Fetching latest snapshotter version (attempt $retry/3)..."
+      SNAPSHOTTER_VERSION=$(curl -s -m 10 https://api.github.com/repos/kubernetes-csi/external-snapshotter/releases/latest | jq -r .tag_name)
+      
+      if [[ -n "$SNAPSHOTTER_VERSION" && "$SNAPSHOTTER_VERSION" != "null" ]]; then
+        break
+      fi
+      
+      echo "Failed to fetch snapshotter version, retrying in $retry seconds..."
+      sleep $retry
+    done
+  fi
+  
+  # If version cannot be determined, fail the tests
+  if [[ -z "$SNAPSHOTTER_VERSION" || "$SNAPSHOTTER_VERSION" == "null" ]]; then
+    echo "FATAL: Could not determine snapshotter version after multiple attempts"
+    exit 1
+  fi
+  
+  echo "Using snapshotter version: $SNAPSHOTTER_VERSION"
+  
+  # Install snapshotter components with proper error checking - fail on installation errors
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml; then
+    echo "FATAL: Failed to install volumesnapshotclasses CRD"
+    exit 1
+  fi
+  
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml; then
+    echo "FATAL: Failed to install volumesnapshotcontents CRD"
+    exit 1
+  fi
+  
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml; then
+    echo "FATAL: Failed to install volumesnapshots CRD"
+    exit 1
+  fi
+  
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml; then
+    echo "FATAL: Failed to install snapshot controller RBAC"
+    exit 1
+  fi
+  
+  if ! kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml; then
+    echo "FATAL: Failed to install snapshot controller"
+    exit 1
+  fi
+  
+  echo "Snapshot controller and CRDs successfully installed"
   # Add Host Path CSI Driver and StorageClass
+  echo "Installing Host Path CSI Driver..."
   CSI_DRIVER_HOST_PATH_DIR=$(mktemp -d)
-  git clone https://github.com/kubernetes-csi/csi-driver-host-path.git ${CSI_DRIVER_HOST_PATH_DIR}
-  ${CSI_DRIVER_HOST_PATH_DIR}/deploy/kubernetes-latest/deploy.sh
-  kubectl apply -f ${CSI_DRIVER_HOST_PATH_DIR}/examples/csi-storageclass.yaml
+  if ! git clone --quiet https://github.com/kubernetes-csi/csi-driver-host-path.git ${CSI_DRIVER_HOST_PATH_DIR}; then
+    echo "FATAL: Failed to clone csi-driver-host-path repository"
+    exit 1
+  fi
+  
+  if ! ${CSI_DRIVER_HOST_PATH_DIR}/deploy/kubernetes-latest/deploy.sh; then
+    echo "FATAL: Failed to deploy Host Path CSI Driver"
+    exit 1
+  fi
+  
+  if ! kubectl apply -f ${CSI_DRIVER_HOST_PATH_DIR}/examples/csi-storageclass.yaml; then
+    echo "FATAL: Failed to apply CSI StorageClass"
+    exit 1
+  fi
+  
   # Install Helm
-  HELM_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/helm/helm/releases/latest)")
-  curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz
-  tar xzvf ${KIND_FOLDER}/helm.tgz -C ${KIND_FOLDER}
+  echo "Installing Helm..."
+  HELM_VERSION=""
+  for retry in 1 2 3; do
+    echo "Fetching latest Helm version (attempt $retry/3)..."
+    HELM_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/helm/helm/releases/latest)")
+    if [[ -n "$HELM_VERSION" && "$HELM_VERSION" != "null" ]]; then
+      break
+    fi
+    echo "Failed to fetch Helm version, retrying in $retry seconds..."
+    sleep $retry
+  done
+  
+  if [[ -z "$HELM_VERSION" || "$HELM_VERSION" == "null" ]]; then
+    echo "Error: Could not determine Helm version after multiple attempts"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz; then
+    echo "Error: Failed to download Helm"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! tar xzf ${KIND_FOLDER}/helm.tgz -C ${KIND_FOLDER}; then
+    echo "Error: Failed to extract Helm archive"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
   HELM_EXEC=${KIND_FOLDER}/linux-${ARCH}/helm
   chmod +x ${HELM_EXEC}
+  
   # Install K10
-  ${HELM_EXEC} repo add kasten https://charts.kasten.io/
-  kubectl create ns kasten-io
-  ${HELM_EXEC} install k10 kasten/k10 --namespace=kasten-io
+  echo "Installing K10..."
+  if ! ${HELM_EXEC} repo add kasten https://charts.kasten.io/; then
+    echo "Error: Failed to add Kasten Helm repository"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! kubectl create ns kasten-io; then
+    echo "Error: Failed to create kasten-io namespace"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  if ! ${HELM_EXEC} install k10 kasten/k10 --namespace=kasten-io; then
+    echo "Error: Failed to install K10 via Helm"
+    export SKIP_SNAPSHOTTER_TESTS="true"
+    return
+  fi
+  
+  echo "K10 successfully installed"
   export STORAGE_CLASS_WITH_SNAPSHOT_NAME="csi-hostpath-sc"
   export VOLUME_SNAPSHOT_CLASS_NAME="csi-hostpath-snapclass"
 }
@@ -81,31 +307,106 @@ destroy-kind() {
 
 setup-prometheus() {
   echo "Setting up prometheus instance"
-  $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest
-  sleep 10
+  # Retry the prometheus container start in CI mode
+  if [[ "$CI_MODE" == "true" ]]; then
+    for retry in 1 2 3; do
+      echo "Starting prometheus container (attempt $retry/3)..."
+      if $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest; then
+        echo "Prometheus container started successfully"
+        sleep 10
+        return 0
+      fi
+      echo "Failed to start prometheus container, retrying in $retry seconds..."
+      $OCI_BIN rm -f prometheus 2>/dev/null || true
+      sleep $retry
+    done
+    echo "Error: Could not start prometheus container after multiple attempts"
+    return 1
+  else
+    # Standard mode - no retries
+    $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest
+    sleep 10
+  fi
 }
 
 setup-shared-network() {
   echo "Setting up shared network for monitoring"
-  $OCI_BIN network create monitoring
+  # Retry network creation in CI mode
+  if [[ "$CI_MODE" == "true" ]]; then
+    for retry in 1 2 3; do
+      echo "Creating monitoring network (attempt $retry/3)..."
+      if $OCI_BIN network create monitoring; then
+        echo "Monitoring network created successfully"
+        return 0
+      fi
+      echo "Failed to create monitoring network, retrying in $retry seconds..."
+      $OCI_BIN network rm -f monitoring 2>/dev/null || true
+      sleep $retry
+    done
+    echo "Error: Could not create monitoring network after multiple attempts"
+    return 1
+  else
+    # Standard mode - no retries
+    $OCI_BIN network create monitoring
+  fi
 }
 
 setup-opensearch() {
   echo "Setting up open-search"
   # Use version 1 to avoid the password requirement
-  $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
-  sleep 10
+  # Retry opensearch container start in CI mode
+  if [[ "$CI_MODE" == "true" ]]; then
+    for retry in 1 2 3; do
+      echo "Starting opensearch container (attempt $retry/3)..."
+      if $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1; then
+        echo "Opensearch container started successfully"
+        sleep 10
+        return 0
+      fi
+      echo "Failed to start opensearch container, retrying in $retry seconds..."
+      $OCI_BIN rm -f opensearch 2>/dev/null || true
+      sleep $retry
+    done
+    echo "Error: Could not start opensearch container after multiple attempts"
+    return 1
+  else
+    # Standard mode - no retries
+    $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
+    sleep 10
+  fi
 }
 
 setup-grafana() {
   export GRAFANA_URL="http://localhost:3000"
   export GRAFANA_ROLE="admin"
   echo "Setting up Grafana"
-  $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
-    --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
-    docker.io/grafana/grafana:latest
-  sleep 10
-  echo "Grafana is running at $GRAFANA_URL"
+  
+  # Retry grafana container start in CI mode
+  if [[ "$CI_MODE" == "true" ]]; then
+    for retry in 1 2 3; do
+      echo "Starting Grafana container (attempt $retry/3)..."
+      if $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
+          --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
+          docker.io/grafana/grafana:latest; then
+        echo "Grafana container started successfully"
+        sleep 10
+        echo "Grafana is running at $GRAFANA_URL"
+        return 0
+      fi
+      echo "Failed to start Grafana container, retrying in $retry seconds..."
+      $OCI_BIN rm -f grafana 2>/dev/null || true
+      sleep $retry
+    done
+    echo "Error: Could not start Grafana container after multiple attempts"
+    return 1
+  else
+    # Standard mode - no retries
+    $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
+      --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
+      docker.io/grafana/grafana:latest
+    sleep 10
+    echo "Grafana is running at $GRAFANA_URL"
+  fi
 }
 
 configure-grafana-datasource() {

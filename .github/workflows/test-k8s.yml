@@ -58,15 +58,20 @@ jobs:
         support-install: false
         assert-install: false
         detik-install: false
-        file-install: false
+        file-install: false      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq podman uuid-runtime
 
-    - name: Execute Tests
-      run: |
-        chmod +x /tmp/kube-burner
-        make test-k8s
-      env:
-        TERM: linux
-        KIND_VERSION: v0.19.0
-        K8S_VERSION: ${{matrix.k8s-version}}
-        PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
-        TEST_BINARY: /tmp/kube-burner
+      - name: Execute Tests
+        run: |
+          chmod +x /tmp/kube-burner
+          make test-k8s
+        env:
+          TERM: linux
+          KIND_VERSION: v0.19.0
+          K8S_VERSION: ${{matrix.k8s-version}}
+          OCI_BIN: podman
+          CI_MODE: true
+          PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
+          TEST_BINARY: /tmp/kube-burner
