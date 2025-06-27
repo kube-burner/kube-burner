@@ -19,9 +19,7 @@ setup_file() {
   export ES_INDEX="kube-burner"
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
   
-  # Set K8S_VERSION if not already set - use v1.31.0 as default
-  export K8S_VERSION=${K8S_VERSION:-"v1.31.0"}
-  
+  # K8S_VERSION is defined in helpers.bash
   # In CI, we don't need to override the K8S_VERSION as the CI pipeline
   # tests against multiple K8S versions automatically
   
