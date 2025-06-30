@@ -97,5 +97,4 @@ test-k8s:
 	$(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) \
 	-F pretty -T --print-output-on-failure \
 	-j $(shell nproc) \
-	$(if $(CI),|| true,) \
 	test-k8s.bats
