@@ -1,54 +1,12 @@
 name: CI Parallel Tests
+# Only run when called from another workflow
 on:
   workflow_call:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'test/**'
-      - 'pkg/**'
-      - 'cmd/**'
-      - 'Makefile'
-      - '.github/workflows/ci-parallel.yml'
-  push:
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'test/**'
-      - 'pkg/**'
-      - 'cmd/**'
-      - 'Makefile'
-      - '.github/workflows/ci-parallel.yml'
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.23
-
-      - name: Build kube-burner
-        run: make build
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: kube-burner-parallel
-          path: bin/amd64/kube-burner
-          retention-days: 1
 
   test:
-    needs: build
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -66,7 +24,7 @@ jobs:
       - name: Download kube-burner binary
         uses: actions/download-artifact@v4
         with:
-          name: kube-burner-parallel
+          name: kube-burner
           path: /tmp/
       
       - name: Install dependencies

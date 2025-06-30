@@ -242,21 +242,18 @@ setup-kind() {
   done
   
   if [[ -z "$HELM_VERSION" || "$HELM_VERSION" == "null" ]]; then
-    echo "Error: Could not determine Helm version after multiple attempts"
-    export SKIP_SNAPSHOTTER_TESTS="true"
-    return
+    echo "FATAL: Could not determine Helm version after multiple attempts"
+    exit 1
   fi
   
   if ! curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz; then
-    echo "Error: Failed to download Helm"
-    export SKIP_SNAPSHOTTER_TESTS="true"
-    return
+    echo "FATAL: Failed to download Helm"
+    exit 1
   fi
   
   if ! tar xzf ${KIND_FOLDER}/helm.tgz -C ${KIND_FOLDER}; then
-    echo "Error: Failed to extract Helm archive"
-    export SKIP_SNAPSHOTTER_TESTS="true"
-    return
+    echo "FATAL: Failed to extract Helm archive"
+    exit 1
   fi
   
   HELM_EXEC=${KIND_FOLDER}/linux-${ARCH}/helm
@@ -265,21 +262,18 @@ setup-kind() {
   # Install K10
   echo "Installing K10..."
   if ! ${HELM_EXEC} repo add kasten https://charts.kasten.io/; then
-    echo "Error: Failed to add Kasten Helm repository"
-    export SKIP_SNAPSHOTTER_TESTS="true"
-    return
+    echo "FATAL: Failed to add Kasten Helm repository"
+    exit 1
   fi
   
   if ! kubectl create ns kasten-io; then
-    echo "Error: Failed to create kasten-io namespace"
-    export SKIP_SNAPSHOTTER_TESTS="true"
-    return
+    echo "FATAL: Failed to create kasten-io namespace"
+    exit 1
   fi
   
   if ! ${HELM_EXEC} install k10 kasten/k10 --namespace=kasten-io; then
-    echo "Error: Failed to install K10 via Helm"
-    export SKIP_SNAPSHOTTER_TESTS="true"
-    return
+    echo "FATAL: Failed to install K10 via Helm"
+    exit 1
   fi
   
   echo "K10 successfully installed"
