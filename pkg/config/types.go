@@ -211,6 +211,8 @@ type Job struct {
 }
 
 type WaitOptions struct {
+	// APIVersion apiVersion to consider for wait
+	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// Kind object kind to consider for wait
 	Kind string `yaml:"kind" json:"kind,omitempty"`
 	// LabelSelector objects with these labels will be considered

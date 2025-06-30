@@ -154,7 +154,7 @@ Examples of valid configuration files can be found in the [examples folder](http
 
 We have watchers support during the benchmark workload. It is at a job level and will be usefull in scenarios where we want to monitor overhead created by watchers on a cluster.
 
-!!! note 
+!!! note
     This feature doesn't effect the overall QPS/Burst as it uses its own client instance.
 
 | Option            | Description                                             | Type    | Default |
@@ -209,6 +209,7 @@ If you want to override the default waiter behaviors, you can specify wait optio
 
 | Option       | Description                                             | Type    | Default |
 |--------------|---------------------------------------------------------|---------|---------|
+| `apiVersion` | Object apiVersion to consider for wait | String | "" |
 | `kind` | Object kind to consider for wait | String | "" |
 | `labelSelector` | Objects with these labels will be considered for wait | Object | {} |
 | `customStatusPaths` | list of jq path/values to verify readiness of the object | Object  | [] |

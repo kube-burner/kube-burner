@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubevirtV1 "kubevirt.io/api/core/v1"
 	"kubevirt.io/client-go/kubecli"
 
@@ -83,13 +84,7 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 			timeGreaterThan:      false,
 		},
 	},
-	config.KubeVirtOpMigrate: {
-		conditionCheckConfig: ConditionCheckConfig{
-			conditionType:        conditionTypeReady,
-			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
-			timeGreaterThan:      true,
-		},
-	},
+	config.KubeVirtOpMigrate:      nil,
 	config.KubeVirtOpAddVolume:    nil,
 	config.KubeVirtOpRemoveVolume: nil,
 }
@@ -117,17 +112,26 @@ func (ex *JobExecutor) setupKubeVirtJob(mapper meta.RESTMapper) {
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		ex.objects = append(ex.objects, newObject(o, mapper, kubeVirtAPIVersionV1, ex.embedCfg))
+		obj := newObject(o, mapper, kubeVirtAPIVersionV1, ex.embedCfg)
+
+		if o.KubeVirtOp == config.KubeVirtOpMigrate && obj.waitGVR == nil {
+			obj.waitGVR = &schema.GroupVersionResource{
+				Group:    "kubevirt.io",
+				Version:  "v1",
+				Resource: "virtualmachineinstances",
+			}
+		}
+		// If LabelSelector was not set at the wait block, use the same selector used for the operation
+		if len(obj.WaitOptions.LabelSelector) == 0 {
+			obj.WaitOptions.LabelSelector = obj.LabelSelector
+		}
+
+		ex.objects = append(ex.objects, obj)
 	}
 }
 
 func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
-
-	// If LabelSelector was not set at the wait block, use the same selector used for the operation
-	if len(obj.WaitOptions.LabelSelector) == 0 {
-		obj.WaitOptions.LabelSelector = obj.LabelSelector
-	}
 
 	operationConfig := supportedOps[obj.KubeVirtOp]
 	var err error
@@ -161,6 +165,18 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	case config.KubeVirtOpUnpause:
 		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Unpause(context.Background(), item.GetName(), &kubevirtV1.UnpauseOptions{})
 	case config.KubeVirtOpMigrate:
+		if len(obj.WaitOptions.CustomStatusPaths) == 0 {
+			obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
+				{
+					Key:   ".migrationState.completed | tostring | ascii_downcase",
+					Value: "true",
+				},
+				{
+					Key:   fmt.Sprintf("(.migrationState.endTimestamp // \"1970-01-01T00:00:00Z\") | strptime(\"%%Y-%%m-%%dT%%H:%%M:%%SZ\") | mktime > %d | tostring", objectTimeUTC),
+					Value: "true",
+				},
+			}
+		}
 		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Migrate(context.Background(), item.GetName(), &kubevirtV1.MigrateOptions{})
 	case config.KubeVirtOpAddVolume:
 		err = addVolume(ex, item.GetName(), item.GetNamespace(), obj.InputVars)
