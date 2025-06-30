@@ -1,0 +1,8 @@
+---
+apiVersion: testcrd.example.com/v1
+kind: TestCRD0
+metadata:
+  name: test{{.Replica}}
+spec:
+  workload: {{randAlpha 5}}
+  iterations: {{.Iteration}}
