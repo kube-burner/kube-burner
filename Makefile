@@ -92,7 +92,6 @@ test: lint test-k8s
 
 test-k8s:
 	cd test && \
-	CI_MODE=true \
 	KUBE_BURNER=$(TEST_BINARY) bats \
 	$(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) \
 	-F pretty -T --print-output-on-failure \
