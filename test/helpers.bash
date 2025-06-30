@@ -10,7 +10,8 @@ K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-docker}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
-# Set CI mode flag to true in CI environments to make tests more resilient
+# Set CI mode flag to true in CI environments to handle infrastructure transient errors
+# This adds retries for environment setup, not for the actual tests
 CI_MODE=${CI_MODE:-false}
 
 setup-kind() {
