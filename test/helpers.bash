@@ -40,7 +40,8 @@ setup-kind() {
   }
   # Check if we should skip KubeVirt installation
   if [[ "${SKIP_KUBEVIRT_INSTALL:-false}" == "true" ]]; then
-    echo "Skipping KubeVirt installation as requested"
+    echo "Skipping KubeVirt installation as explicitly requested by SKIP_KUBEVIRT_INSTALL=true"
+    # User explicitly asked to skip installation, so we respect that for tests as well
     export SKIP_KUBEVIRT_TESTS="true"
   else
     echo "Deploying KubeVirt operator"
@@ -58,17 +59,11 @@ setup-kind() {
       done
     fi
     
-    # If version cannot be determined, fail unless SKIP_KUBEVIRT_INSTALL is set
+    # If version cannot be determined, fail the tests
     if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
       echo "Error: Could not determine KubeVirt version after multiple attempts"
-      if [[ "${SKIP_KUBEVIRT_INSTALL:-false}" != "true" ]]; then
-        echo "FATAL: Failed to determine KubeVirt version and SKIP_KUBEVIRT_INSTALL is not set to true"
-        exit 1
-      else
-        echo "KubeVirt-dependent tests will be skipped as SKIP_KUBEVIRT_INSTALL=true"
-        export SKIP_KUBEVIRT_TESTS="true"
-        return
-      fi
+      echo "FATAL: Failed to determine KubeVirt version"
+      exit 1
     fi
     
     echo "Using KubeVirt version: $KUBEVIRT_VERSION"
@@ -102,8 +97,14 @@ setup-kind() {
   fi
   # Install CDI if KubeVirt was successfully installed
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
-    echo "Skipping CDI installation as KubeVirt installation was skipped or failed"
-    export SKIP_CDI_TESTS="true"
+    echo "Skipping CDI installation as KubeVirt installation was explicitly skipped via SKIP_KUBEVIRT_INSTALL=true"
+    # Only propagate the skip if it was due to user explicitly requesting to skip install
+    if [[ "${SKIP_KUBEVIRT_INSTALL:-false}" == "true" ]]; then
+      export SKIP_CDI_TESTS="true"
+    else
+      echo "FATAL: Cannot install CDI due to KubeVirt installation failure"
+      exit 1
+    fi
     return
   fi
 
