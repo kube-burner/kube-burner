@@ -304,11 +304,14 @@ setup-prometheus() {
       $OCI_BIN rm -f prometheus 2>/dev/null || true
       sleep $retry
     done
-    echo "Error: Could not start prometheus container after multiple attempts"
-    return 1
+    echo "FATAL: Could not start prometheus container after multiple attempts"
+    exit 1
   else
     # Standard mode - no retries
-    $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest
+    if ! $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest; then
+      echo "FATAL: Failed to start prometheus container"
+      exit 1
+    fi
     sleep 10
   fi
 }
@@ -327,11 +330,14 @@ setup-shared-network() {
       $OCI_BIN network rm -f monitoring 2>/dev/null || true
       sleep $retry
     done
-    echo "Error: Could not create monitoring network after multiple attempts"
-    return 1
+    echo "FATAL: Could not create monitoring network after multiple attempts"
+    exit 1
   else
     # Standard mode - no retries
-    $OCI_BIN network create monitoring
+    if ! $OCI_BIN network create monitoring; then
+      echo "FATAL: Failed to create monitoring network"
+      exit 1
+    fi
   fi
 }
 
@@ -351,11 +357,14 @@ setup-opensearch() {
       $OCI_BIN rm -f opensearch 2>/dev/null || true
       sleep $retry
     done
-    echo "Error: Could not start opensearch container after multiple attempts"
-    return 1
+    echo "FATAL: Could not start opensearch container after multiple attempts"
+    exit 1
   else
     # Standard mode - no retries
-    $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1
+    if ! $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1; then
+      echo "FATAL: Failed to start opensearch container"
+      exit 1
+    fi
     sleep 10
   fi
 }
@@ -381,13 +390,16 @@ setup-grafana() {
       $OCI_BIN rm -f grafana 2>/dev/null || true
       sleep $retry
     done
-    echo "Error: Could not start Grafana container after multiple attempts"
-    return 1
+    echo "FATAL: Could not start Grafana container after multiple attempts"
+    exit 1
   else
     # Standard mode - no retries
-    $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
+    if ! $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
       --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
-      docker.io/grafana/grafana:latest
+      docker.io/grafana/grafana:latest; then
+      echo "FATAL: Failed to start Grafana container"
+      exit 1
+    fi
     sleep 10
     echo "Grafana is running at $GRAFANA_URL"
   fi
@@ -395,7 +407,7 @@ setup-grafana() {
 
 configure-grafana-datasource() {
   echo "Configuring Elasticsearch as Grafana Data Source"
-  curl -X POST "$GRAFANA_URL/api/datasources" \
+  if ! curl -X POST "$GRAFANA_URL/api/datasources" \
     -H "Content-Type: application/json" \
     -H "Authorization: Basic $(echo -n "$GRAFANA_ROLE:$GRAFANA_ROLE" | base64)" \
     --data "{
@@ -407,7 +419,10 @@ configure-grafana-datasource() {
       \"jsonData\": {
         \"timeField\": \"timestamp\"
       }
-    }"
+    }"; then
+    echo "FATAL: Failed to configure Grafana data source"
+    exit 1
+  fi
 }
 
 deploy-grafana-dashboards() {
@@ -427,55 +442,55 @@ deploy-grafana-dashboards() {
 check_ns() {
   echo "Checking the number of namespaces labeled with \"${1}\" is \"${2}\""
   if [[ $(kubectl get ns -l "${1}" -o json | jq '.items | length') != "${2}" ]]; then
-    echo "Number of namespaces labeled with ${1} less than expected"
-    return 1
+    echo "FATAL: Number of namespaces labeled with ${1} less than expected"
+    exit 1
   fi
 }
 
 check_destroyed_ns() {
   echo "Checking namespace \"${1}\" has been destroyed"
   if [[ $(kubectl get ns -l "${1}" -o json | jq '.items | length') != 0 ]]; then
-    echo "Namespaces labeled with \"${1}\" not destroyed"
-    return 1
+    echo "FATAL: Namespaces labeled with \"${1}\" not destroyed"
+    exit 1
   fi
 }
 
 check_destroyed_pods() {
   echo "Checking pods have been destroyed in namespace ${1}"
   if [[ $(kubectl get pod -n "${1}" -l "${2}" -o json | jq '.items | length') != 0 ]]; then
-    echo "Pods in namespace ${1} not destroyed"
-    return 1
+    echo "FATAL: Pods in namespace ${1} not destroyed"
+    exit 1
   fi
 }
 
 check_running_pods() {
   running_pods=$(kubectl get pod -A -l ${1} --field-selector=status.phase==Running -o json | jq '.items | length')
   if [[ "${running_pods}" != "${2}" ]]; then
-    echo "Running pods in cluster labeled with ${1} different from expected: Expected=${2}, observed=${running_pods}"
-    return 1
+    echo "FATAL: Running pods in cluster labeled with ${1} different from expected: Expected=${2}, observed=${running_pods}"
+    exit 1
   fi
 }
 
 check_running_pods_in_ns() {
     running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced --field-selector=status.phase==Running -o json | jq '.items | length')
     if [[ "${running_pods}" != "${2}" ]]; then
-      echo "Running pods in namespace $1 different from expected. Expected=${2}, observed=${running_pods}"
-      return 1
+      echo "FATAL: Running pods in namespace $1 different from expected. Expected=${2}, observed=${running_pods}"
+      exit 1
     fi
 }
 
 check_file_list() {
   for f in "${@}"; do
     if [[ ! -f ${f} ]]; then
-      echo "File ${f} not found"
+      echo "FATAL: File ${f} not found"
       echo "Content of $(dirname ${f}):"
       ls -l "$(dirname ${f})"
-      return 1
+      exit 1
     fi
     if [[ $(jq .[0].metricName ${f}) == "" ]]; then
-      echo "Incorrect format in ${f}"
+      echo "FATAL: Incorrect format in ${f}"
       cat "${f}"
-      return 1
+      exit 1
     fi
   done
   return 0
@@ -484,8 +499,8 @@ check_file_list() {
 check_files_dont_exist() {
   for f in "${@}"; do
     if [[ -f ${f} ]]; then
-      echo "File ${f} found"
-      return 1
+      echo "FATAL: File ${f} found when it shouldn't exist"
+      exit 1
     fi
   done
   return 0
@@ -523,11 +538,11 @@ check_metric_value() {
     RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error')
     RETURN_CODE=$?
     if [ "${RETURN_CODE}" -ne 0 ]; then
-      echo "Return code: ${RETURN_CODE}"
-      return 1
+      echo "FATAL: Return code: ${RETURN_CODE}"
+      exit 1
     elif [ "${RESULT}" == 0 ]; then
-      echo "${metric} not found in ${endpoint}"
-      return 1
+      echo "FATAL: ${metric} not found in ${endpoint}"
+      exit 1
     else
       return 0
     fi
@@ -542,8 +557,8 @@ run_cmd(){
 check_file_exists() {
   for f in "${@}"; do
       if [[ ! -f ${f} ]]; then
-          echo "File ${f} not found"
-          return 1
+          echo "FATAL: File ${f} not found"
+          exit 1
       fi
   done
   return 0
@@ -557,8 +572,8 @@ check_deployment_count() {
 
   ACTUAL_COUNT=$(kubectl get deployment -n ${NAMESPACE} -l ${LABEL_KEY}=${LABEL_VALUE} -o json | jq '.items | length')
   if [[ "${ACTUAL_COUNT}" != "${EXPECTED_COUNT}" ]]; then
-    echo "Expected ${EXPECTED_COUNT} replicas to be patches with ${LABEL_KEY}=${LABEL_VALUE_END} but found only ${ACTUAL_COUNT}"
-    return 1
+    echo "FATAL: Expected ${EXPECTED_COUNT} replicas to be patches with ${LABEL_KEY}=${LABEL_VALUE_END} but found only ${ACTUAL_COUNT}"
+    exit 1
   fi
   echo "Found the expected ${EXPECTED_COUNT} deployments"
 }
@@ -574,8 +589,8 @@ check_metric_recorded() {
   local m
   m=$(cat ${METRICS_FOLDER}/${type}Measurement-${job}.json | jq .[0].${metric})
   if [[ ${m} -eq 0 ]]; then
-      echo "metric ${type}/${metric} was not recorded for ${job}"
-      return 1
+      echo "FATAL: metric ${type}/${metric} was not recorded for ${job}"
+      exit 1
   fi
 }
 
@@ -586,8 +601,8 @@ check_quantile_recorded() {
 
   MEASUREMENT=$(cat ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json | jq --arg name "${quantileName}" '[.[] | select(.quantileName == $name)][0].avg')
   if [[ ${MEASUREMENT} -eq 0 ]]; then
-    echo "Quantile for ${type}/${quantileName} was not recorded for ${job}"
-    return 1
+    echo "FATAL: Quantile for ${type}/${quantileName} was not recorded for ${job}"
+    exit 1
   fi
 }
 
@@ -599,12 +614,12 @@ check_metrics_not_created_for_job() {
   QUANTILE_FILE=${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json
 
   if [ -f "${METRICS_FILE}" ]; then
-    echo "Metrics file for ${job} was created"
-    return 1
+    echo "FATAL: Metrics file for ${job} was created when it shouldn't have been"
+    exit 1
   fi
 
   if [ -f "${QUANTILE_FILE}" ]; then
-    echo "Quantile file for ${job} was created"
-    return 1
+    echo "FATAL: Quantile file for ${job} was created when it shouldn't have been"
+    exit 1
   fi
 }
