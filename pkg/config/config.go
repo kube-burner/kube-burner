@@ -319,7 +319,7 @@ func validateGC() error {
 		return nil
 	}
 	for _, job := range configSpec.Jobs {
-		if job.GC && configSpec.GlobalConfig.WaitWhenFinished {
+		if job.GC {
 			return fmt.Errorf("jobs GC and global waitWhenFinished cannot be enabled at the same time")
 		}
 	}
