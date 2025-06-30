@@ -2,10 +2,13 @@ name: CI Parallel Tests
 # Only run when called from another workflow
 on:
   workflow_call:
+    inputs:
+      k8s-version:
+        required: true
+        type: string
   workflow_dispatch:
 
 jobs:
-
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -20,6 +23,10 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       
       - name: Download kube-burner binary
         uses: actions/download-artifact@v4
@@ -38,5 +45,5 @@ jobs:
       - name: Run bats tests for ${{ matrix.test-group }}
         run: make test-k8s TEST_FILTER="${{ matrix.test-group }}" TEST_BINARY=/tmp/kube-burner
         env:
-          OCI_BIN: podman
           CI_MODE: true
+          K8S_VERSION: ${{ inputs.k8s-version }}
