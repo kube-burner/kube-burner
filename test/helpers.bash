@@ -30,9 +30,6 @@ setup-kind() {
     IMAGE=kindest/node:"${K8S_VERSION}"
   fi
   
-  # Pull the image - fail if not available
-  docker pull ${IMAGE} || { echo "Error: Could not pull image ${IMAGE}"; exit 1; }
-  
   echo "Deploying cluster"
   # Create the kind cluster with the specified image
   "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1 || { 
