@@ -64,7 +64,7 @@ var (
 	}
 )
 
-func (ex *Executor) waitForObjects(ns string) {
+func (ex *JobExecutor) waitForObjects(ns string) {
 	for _, obj := range ex.objects {
 		ex.waitForObject(ns, obj)
 
@@ -76,7 +76,7 @@ func (ex *Executor) waitForObjects(ns string) {
 	}
 }
 
-func (ex *Executor) waitForObject(ns string, obj *object) {
+func (ex *JobExecutor) waitForObject(ns string, obj *object) {
 	if !obj.Wait || obj.ready {
 		return
 	}
@@ -123,7 +123,7 @@ func (ex *Executor) waitForObject(ns string, obj *object) {
 	}
 }
 
-func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) error {
+func (ex *JobExecutor) waitForReplicas(ns string, obj object, waitPath statusPath) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		ex.waitLimiter.Wait(context.TODO())
 		resources, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
@@ -152,7 +152,7 @@ func (ex *Executor) waitForReplicas(ns string, obj object, waitPath statusPath) 
 	return err
 }
 
-func (ex *Executor) waitForPVC(ns string, obj object) error {
+func (ex *JobExecutor) waitForPVC(ns string, obj object) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		ex.limiter.Wait(context.TODO())
 		pvcs, err := ex.clientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{
@@ -173,7 +173,7 @@ func (ex *Executor) waitForPVC(ns string, obj object) error {
 	return err
 }
 
-func (ex *Executor) waitForPod(ns string, obj object) error {
+func (ex *JobExecutor) waitForPod(ns string, obj object) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		// We need to paginate these requests to ensure we don't miss any pods
 		listOptions := metav1.ListOptions{
@@ -207,7 +207,7 @@ func (ex *Executor) waitForPod(ns string, obj object) error {
 	return err
 }
 
-func (ex *Executor) waitForBuild(ns string, obj object) error {
+func (ex *JobExecutor) waitForBuild(ns string, obj object) error {
 	buildStatus := []string{"New", "Pending", "Running"}
 	var build types.UnstructuredContent
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
@@ -241,7 +241,7 @@ func (ex *Executor) waitForBuild(ns string, obj object) error {
 	return err
 }
 
-func (ex *Executor) verifyCondition(ns string, obj object) error {
+func (ex *JobExecutor) verifyCondition(ns string, obj object) error {
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
 		ex.limiter.Wait(context.TODO())
@@ -313,7 +313,7 @@ func (ex *Executor) verifyCondition(ns string, obj object) error {
 	return err
 }
 
-func (ex *Executor) waitForVolumeSnapshot(ns string, obj object) error {
+func (ex *JobExecutor) waitForVolumeSnapshot(ns string, obj object) error {
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
 		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
 			{

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (ex *Executor) setupDeleteJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupDeleteJob(mapper meta.RESTMapper) {
 	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
@@ -46,7 +46,7 @@ func (ex *Executor) setupDeleteJob(mapper meta.RESTMapper) {
 	}
 }
 
-func deleteHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func deleteHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 	ex.limiter.Wait(context.TODO())
 	var err error
@@ -62,7 +62,7 @@ func deleteHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 	}
 }
 
-func verifyDelete(ex *Executor, obj *object) {
+func verifyDelete(ex *JobExecutor, obj *object) {
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,

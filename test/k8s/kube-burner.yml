@@ -67,6 +67,7 @@ jobs:
     churnPercent: 20
     churnDuration: 1m
     churnDelay: 5s
+    gc: {{env "JOBGC" }}
     namespaceLabels:
       foo: bar
       complex.label/test: true

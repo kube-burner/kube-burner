@@ -19,11 +19,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
-
-	"maps"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
@@ -189,6 +188,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateDNS1123(); err != nil {
 		return configSpec, err
 	}
+	if err := validateGC(); err != nil {
+		return configSpec, err
+	}
 	for i, job := range configSpec.Jobs {
 		if len(job.Namespace) > 62 {
 			log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
@@ -306,6 +308,19 @@ func jobIsDuped() error {
 		jobCount[job.Name]++
 		if jobCount[job.Name] > 1 {
 			return fmt.Errorf("Job names must be unique")
+		}
+	}
+	return nil
+}
+
+// validateGC checks if GC and global waitWhenFinished are enabled at the same time
+func validateGC() error {
+	if !configSpec.GlobalConfig.WaitWhenFinished {
+		return nil
+	}
+	for _, job := range configSpec.Jobs {
+		if job.GC {
+			return fmt.Errorf("jobs GC and global waitWhenFinished cannot be enabled at the same time")
 		}
 	}
 	return nil
