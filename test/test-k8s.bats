@@ -27,8 +27,8 @@ setup_file() {
     # Create the Kind cluster using the specified K8S version
     # If it fails, the entire test suite should fail
     setup-kind || {
-      echo "Error: setup-kind failed"
-      return 1
+      echo "FATAL: setup-kind failed"
+      exit 1
     }
   fi
   create_test_kubeconfig
