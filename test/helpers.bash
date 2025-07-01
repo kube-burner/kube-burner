@@ -33,7 +33,7 @@ setup-kind() {
   echo "Deploying cluster"
   # Create the kind cluster with the specified image
   "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1 || { 
-    echo "Error: Failed to create cluster with image ${IMAGE}"
+    echo "FATAL: Failed to create cluster with image ${IMAGE}"
     exit 1
   }
   # Check if we should skip KubeVirt installation
@@ -61,8 +61,7 @@ setup-kind() {
     
     # If version cannot be determined, fail the tests
     if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
-      echo "Error: Could not determine KubeVirt version after multiple attempts"
-      echo "FATAL: Failed to determine KubeVirt version"
+      echo "FATAL: Could not determine KubeVirt version after multiple attempts"
       exit 1
     fi
     
