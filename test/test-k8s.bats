@@ -62,29 +62,46 @@ setup() {
 }
 
 teardown() {
+  echo "Cleaning up namespaces for test UUID ${UUID}"
   kubectl delete ns -l kube-burner-uuid="${UUID}" --ignore-not-found
+  
+  # Re-create service checker if it was deleted during the test
+  # This ensures it's available for the next test
+  if ! kubectl get pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" >/dev/null 2>&1; then
+    echo "Service checker pod not found, recreating..."
+    setup-service-checker
+  fi
 }
 
 teardown_file() {
+  echo "Running teardown_file cleanup..."
+  
   # Cleanup kubernetes resources if using a temporary cluster
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
-    destroy-kind || echo "Warning: destroy-kind failed but continuing"
+    echo "Destroying kind cluster..."
+    destroy-kind || echo "Warning: destroy-kind failed but continuing with other cleanup"
   fi
   
   # Remove service checker namespace
-  kubectl delete namespace ${SERVICE_LATENCY_NS} --ignore-not-found || echo "Warning: Failed to remove service checker namespace"
+  echo "Removing service checker namespace..."
+  kubectl delete namespace ${SERVICE_LATENCY_NS} --grace-period=0 --force --ignore-not-found || \
+    echo "Warning: Failed to remove service checker namespace ${SERVICE_LATENCY_NS}"
 
   # Remove prometheus container
+  echo "Removing prometheus container..."
   $OCI_BIN rm -f prometheus || echo "Warning: Failed to remove prometheus container"
   
   # Cleanup OpenSearch and monitoring network if not using production ES server 
   # and grafana is not deployed
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
     if [[ "$DEPLOY_GRAFANA" == "false" ]]; then
+      echo "Removing opensearch container and monitoring network..."
       $OCI_BIN rm -f opensearch || echo "Warning: Failed to remove opensearch container"
       $OCI_BIN network rm -f monitoring || echo "Warning: Failed to remove monitoring network"
     fi
   fi
+  
+  echo "Teardown cleanup completed"
 }
 
 @test "kube-burner init: churn=true; absolute-path=true" {
