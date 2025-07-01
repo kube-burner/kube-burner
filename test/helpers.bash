@@ -15,7 +15,8 @@ KUBE_BURNER=${KUBE_BURNER:-kube-burner}
 # 1. All setup failures result in explicit test failure (exit 1), NEVER silent skipping
 # 2. Tests are ONLY skipped when user explicitly sets SKIP_* variables
 # 3. All errors use "FATAL:" prefix for consistency and easy identification
-# 4. No automatic retry logic or fallbacks - we fail fast and explicitly
+# 4. For external dependencies that may be unreliable (GitHub API calls), we use fallback versions
+#    after retries fail rather than failing the tests entirely
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
@@ -61,12 +62,12 @@ setup-kind() {
         echo "Failed to fetch KubeVirt version, retrying in $retry seconds..."
         sleep $retry
       done
-    fi
-    
-    # If version cannot be determined, fail the tests
-    if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
-      echo "FATAL: Could not determine KubeVirt version after multiple attempts"
-      exit 1
+      
+      # If version still cannot be determined, use a known good version
+      if [[ -z "$KUBEVIRT_VERSION" || "$KUBEVIRT_VERSION" == "null" ]]; then
+        echo "Could not determine latest KubeVirt version via GitHub API, using fallback version v1.0.0"
+        KUBEVIRT_VERSION="v1.0.0"
+      fi
     fi
     
     echo "Using KubeVirt version: $KUBEVIRT_VERSION"
@@ -121,12 +122,12 @@ setup-kind() {
         echo "Failed to fetch CDI version, retrying in $retry seconds..."
         sleep $retry
       done
-    fi
-    
-    # If version cannot be determined, fail the tests
-    if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
-      echo "FATAL: Could not determine CDI version after multiple attempts"
-      exit 1
+      
+      # If version still cannot be determined, use a known good version
+      if [[ -z "$CDI_VERSION" || "$CDI_VERSION" == "null" ]]; then
+        echo "Could not determine latest CDI version via GitHub API, using fallback version v1.55.0"
+        CDI_VERSION="v1.55.0"
+      fi
     fi
     
     echo "Using CDI version: $CDI_VERSION"
@@ -165,12 +166,12 @@ setup-kind() {
         echo "Failed to fetch snapshotter version, retrying in $retry seconds..."
         sleep $retry
       done
-    fi
-    
-    # If version cannot be determined, fail the tests
-    if [[ -z "$SNAPSHOTTER_VERSION" || "$SNAPSHOTTER_VERSION" == "null" ]]; then
-      echo "FATAL: Could not determine snapshotter version after multiple attempts"
-      exit 1
+      
+      # If version still cannot be determined, use a known good version
+      if [[ -z "$SNAPSHOTTER_VERSION" || "$SNAPSHOTTER_VERSION" == "null" ]]; then
+        echo "Could not determine latest snapshotter version via GitHub API, using fallback version v6.2.1"
+        SNAPSHOTTER_VERSION="v6.2.1"
+      fi
     fi
     
     echo "Using snapshotter version: $SNAPSHOTTER_VERSION"
@@ -234,8 +235,8 @@ setup-kind() {
     done
     
     if [[ -z "$HELM_VERSION" || "$HELM_VERSION" == "null" ]]; then
-      echo "FATAL: Could not determine Helm version after multiple attempts"
-      exit 1
+      echo "Could not determine latest Helm version via GitHub API, using fallback version v3.12.3"
+      HELM_VERSION="v3.12.3"
     fi
     
     if ! curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz; then
