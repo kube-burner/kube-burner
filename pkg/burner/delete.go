@@ -60,9 +60,8 @@ func deleteHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	}
 	if err != nil {
 		log.Errorf("Error found removing %s/%s: %s", item.GetKind(), item.GetName(), err)
-	} else {
-		atomic.AddInt32(&ex.objectOperations, 1)
 	}
+	atomic.AddInt32(&ex.objectOperations, 1)
 }
 
 func verifyDelete(ex *JobExecutor, obj *object) {

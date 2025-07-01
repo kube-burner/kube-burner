@@ -52,7 +52,6 @@ func readHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, i
 	}
 	if err != nil {
 		log.Errorf("Error found reading %s/%s: %s", item.GetKind(), item.GetName(), err)
-	} else {
-		atomic.AddInt32(&ex.objectOperations, 1)
 	}
+	atomic.AddInt32(&ex.objectOperations, 1)
 }
