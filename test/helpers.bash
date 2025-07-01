@@ -10,7 +10,12 @@ K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-docker}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
-# No special CI mode handling needed - all tests fail fast if there are setup issues
+
+# ERROR HANDLING POLICY:
+# 1. All setup failures result in explicit test failure (exit 1), NEVER silent skipping
+# 2. Tests are ONLY skipped when user explicitly sets SKIP_* variables
+# 3. All errors use "FATAL:" prefix for consistency and easy identification
+# 4. No automatic retry logic or fallbacks - we fail fast and explicitly
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
@@ -34,12 +39,13 @@ setup-kind() {
     echo "FATAL: Failed to create cluster with image ${IMAGE}"
     exit 1
   }
-  # Check if we should skip KubeVirt installation
+  # Check if we should skip KubeVirt installation - ONLY skips if user explicitly requests it
   if [[ "${SKIP_KUBEVIRT_INSTALL:-false}" == "true" ]]; then
     echo "Skipping KubeVirt installation as explicitly requested by SKIP_KUBEVIRT_INSTALL=true"
     # User explicitly asked to skip installation, so we respect that for tests as well
+    # NOTE: We only set SKIP_*_TESTS variables when user explicitly requests it, never due to failures
     export SKIP_KUBEVIRT_TESTS="true"
-    # Skip CDI tests as well if we're skipping KubeVirt
+    # Skip CDI tests as well if we're skipping KubeVirt (also user-requested)
     export SKIP_CDI_TESTS="true"
   else
     echo "Deploying KubeVirt operator"
