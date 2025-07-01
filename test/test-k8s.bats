@@ -256,26 +256,28 @@ teardown_file() {
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
     skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
   fi
-  # Skip if CDI tests should be skipped
+  
+  # Only skip if explicitly told to do so by SKIP_CDI_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_CDI_TESTS:-false}" == "true" ]]; then
     skip "CDI tests explicitly skipped by user (SKIP_CDI_TESTS=true)"
   fi
-  # We only skip if explicitly told to do so by SKIP_CDI_TESTS flag
-  # This ensures tests fail properly in CI rather than being silently skipped
   
-  # Skip if Snapshotter tests should be skipped
+  # Only skip if explicitly told to do so by SKIP_SNAPSHOTTER_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_SNAPSHOTTER_TESTS:-false}" == "true" ]]; then
     skip "Snapshotter tests explicitly skipped by user (SKIP_SNAPSHOTTER_TESTS=true)"
   fi
   
+  # We skip if required variables are not set - this is a user configuration issue
   if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
     echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    skip "VOLUME_SNAPSHOT_CLASS_NAME not set"
+    skip "Test skipped: VOLUME_SNAPSHOT_CLASS_NAME not set (required user configuration)"
   fi
   export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
   if [[ -z "$STORAGE_CLASS_NAME" ]]; then
     echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    skip "STORAGE_CLASS_NAME not set"
+    skip "Test skipped: STORAGE_CLASS_NAME not set (required user configuration)"
   fi
 
   run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid="${UUID}" --log-level=debug
