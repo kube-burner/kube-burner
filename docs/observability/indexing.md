@@ -121,8 +121,7 @@ This document looks like:
     "preLoadPeriod": 15000000000,
     "churnPercent": 10,
     "churnDuration": 3600000000000,
-    "churnDelay": 120000000000,
-    "churnDeletionStrategy": "default"
+    "churnDelay": 120000000000
   }
 }
 ```
