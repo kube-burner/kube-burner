@@ -46,4 +46,3 @@ jobs:
         run: make test-k8s TEST_FILTER="${{ matrix.test-group }}" TEST_BINARY=/tmp/kube-burner
         env:
           K8S_VERSION: ${{ inputs.k8s-version }}
-          CI_MODE: "true"
