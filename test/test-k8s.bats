@@ -104,7 +104,7 @@ teardown_file() {
   # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
   # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
-    skip "KubeVirt installation was skipped or failed"
+    skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
   fi
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid="${UUID}" --log-level=debug
@@ -225,7 +225,7 @@ teardown_file() {
   # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
   # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
-    skip "KubeVirt installation was skipped or failed"
+    skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
   fi
   run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid="${UUID}" --log-level=debug
 }
@@ -254,18 +254,18 @@ teardown_file() {
   # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
   # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
-    skip "KubeVirt installation was skipped or failed"
+    skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
   fi
   # Skip if CDI tests should be skipped
   if [[ "${SKIP_CDI_TESTS:-false}" == "true" ]]; then
-    skip "CDI installation was skipped or failed"
+    skip "CDI tests explicitly skipped by user (SKIP_CDI_TESTS=true)"
   fi
   # We only skip if explicitly told to do so by SKIP_CDI_TESTS flag
   # This ensures tests fail properly in CI rather than being silently skipped
   
   # Skip if Snapshotter tests should be skipped
   if [[ "${SKIP_SNAPSHOTTER_TESTS:-false}" == "true" ]]; then
-    skip "Snapshotter installation was skipped or failed"
+    skip "Snapshotter tests explicitly skipped by user (SKIP_SNAPSHOTTER_TESTS=true)"
   fi
   
   if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
@@ -298,7 +298,7 @@ teardown_file() {
   # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
   # This ensures we catch real failures in CI instead of silently skipping
   if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
-    skip "KubeVirt installation was skipped or failed"
+    skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
   fi
   
   export STORAGE_CLASS_NAME
