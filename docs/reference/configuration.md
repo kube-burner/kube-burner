@@ -44,6 +44,7 @@ In this section is described global job configuration, it holds the following pa
 | `clusterHealth` | Checks if all the nodes are in "Ready" state                                             | Boolean        | false      |
 | `timeout` | Global benchmark timeout                                             | Duration        | 4hr      |
 | `functionTemplates` | Function template files to render at runtime                                             | List        | []      |
+| `deletionStrategy` | Global deletion strategy to apply, `default` or `gvr` (where `default` deletes entire namespaces and `gvr` deletes objects within namespaces)   | String   | default  |
 
 !!! note
     The precedence order to wait on resources is Global.waitWhenFinished > Job.waitWhenFinished > Job.podWait
@@ -128,7 +129,6 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `churnPercent`               | Percentage of the jobIterations to churn each period                                                                                  | Integer  | 10       |
 | `churnDuration`              | Length of time that the job is churned for                                                                                            | Duration | 1h       |
 | `churnDelay`                 | Length of time to wait between each churn period                                                                                      | Duration | 5m       |
-| `churnDeletionStrategy`      | Churn deletion strategy to apply, `default` or `gvr` (where `default` churns namespaces and `gvr` churns objects within namespaces)   | String   | default  |
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
 | `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |

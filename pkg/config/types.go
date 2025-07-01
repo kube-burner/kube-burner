@@ -100,6 +100,8 @@ type GlobalConfig struct {
 	Timeout time.Duration `yaml:"timeout"`
 	// Function templates to render at runtime
 	FunctionTemplates []string `yaml:"functionTemplates"`
+	// DeletionStrategy global deletion strategy for all created objects
+	DeletionStrategy string `yaml:"deletionStrategy" json:"deletionStrategy,omitempty"`
 }
 
 // Object defines an object that kube-burner will create
@@ -191,8 +193,6 @@ type Job struct {
 	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration,omitempty"`
 	// Churn delay between sets
 	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
-	// Churn deletion strategy
-	ChurnDeletionStrategy string `yaml:"churnDeletionStrategy" json:"churnDeletionStrategy,omitempty"`
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
