@@ -10,9 +10,7 @@ K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-docker}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
-# Set CI mode flag to true in CI environments to handle infrastructure transient errors
-# This adds retries for environment setup, not for the actual tests
-CI_MODE=${CI_MODE:-false}
+# No special CI mode handling needed - all tests fail fast if there are setup issues
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
@@ -290,82 +288,33 @@ destroy-kind() {
 
 setup-prometheus() {
   echo "Setting up prometheus instance"
-  # Retry the prometheus container start in CI mode
-  if [[ "$CI_MODE" == "true" ]]; then
-    for retry in 1 2 3; do
-      echo "Starting prometheus container (attempt $retry/3)..."
-      if $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest; then
-        echo "Prometheus container started successfully"
-        sleep 10
-        return 0
-      fi
-      echo "Failed to start prometheus container, retrying in $retry seconds..."
-      $OCI_BIN rm -f prometheus 2>/dev/null || true
-      sleep $retry
-    done
-    echo "FATAL: Could not start prometheus container after multiple attempts"
+  # Direct approach - fail fast if there's an issue
+  if ! $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest; then
+    echo "FATAL: Failed to start prometheus container"
     exit 1
-  else
-    # Standard mode - no retries
-    if ! $OCI_BIN run --rm -d --name prometheus --publish=9090:9090 docker.io/prom/prometheus:latest; then
-      echo "FATAL: Failed to start prometheus container"
-      exit 1
-    fi
-    sleep 10
   fi
+  echo "Prometheus container started successfully"
+  sleep 10
 }
 
 setup-shared-network() {
   echo "Setting up shared network for monitoring"
-  # Retry network creation in CI mode
-  if [[ "$CI_MODE" == "true" ]]; then
-    for retry in 1 2 3; do
-      echo "Creating monitoring network (attempt $retry/3)..."
-      if $OCI_BIN network create monitoring; then
-        echo "Monitoring network created successfully"
-        return 0
-      fi
-      echo "Failed to create monitoring network, retrying in $retry seconds..."
-      $OCI_BIN network rm -f monitoring 2>/dev/null || true
-      sleep $retry
-    done
-    echo "FATAL: Could not create monitoring network after multiple attempts"
+  if ! $OCI_BIN network create monitoring; then
+    echo "FATAL: Failed to create monitoring network"
     exit 1
-  else
-    # Standard mode - no retries
-    if ! $OCI_BIN network create monitoring; then
-      echo "FATAL: Failed to create monitoring network"
-      exit 1
-    fi
   fi
+  echo "Monitoring network created successfully"
 }
 
 setup-opensearch() {
   echo "Setting up open-search"
   # Use version 1 to avoid the password requirement
-  # Retry opensearch container start in CI mode
-  if [[ "$CI_MODE" == "true" ]]; then
-    for retry in 1 2 3; do
-      echo "Starting opensearch container (attempt $retry/3)..."
-      if $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1; then
-        echo "Opensearch container started successfully"
-        sleep 10
-        return 0
-      fi
-      echo "Failed to start opensearch container, retrying in $retry seconds..."
-      $OCI_BIN rm -f opensearch 2>/dev/null || true
-      sleep $retry
-    done
-    echo "FATAL: Could not start opensearch container after multiple attempts"
+  if ! $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1; then
+    echo "FATAL: Failed to start opensearch container"
     exit 1
-  else
-    # Standard mode - no retries
-    if ! $OCI_BIN run --rm -d --name opensearch --network monitoring --env="discovery.type=single-node" --env="plugins.security.disabled=true" --publish=9200:9200 docker.io/opensearchproject/opensearch:1; then
-      echo "FATAL: Failed to start opensearch container"
-      exit 1
-    fi
-    sleep 10
   fi
+  echo "Opensearch container started successfully"
+  sleep 10
 }
 
 setup-grafana() {
@@ -373,35 +322,16 @@ setup-grafana() {
   export GRAFANA_ROLE="admin"
   echo "Setting up Grafana"
   
-  # Retry grafana container start in CI mode
-  if [[ "$CI_MODE" == "true" ]]; then
-    for retry in 1 2 3; do
-      echo "Starting Grafana container (attempt $retry/3)..."
-      if $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
-          --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
-          docker.io/grafana/grafana:latest; then
-        echo "Grafana container started successfully"
-        sleep 10
-        echo "Grafana is running at $GRAFANA_URL"
-        return 0
-      fi
-      echo "Failed to start Grafana container, retrying in $retry seconds..."
-      $OCI_BIN rm -f grafana 2>/dev/null || true
-      sleep $retry
-    done
-    echo "FATAL: Could not start Grafana container after multiple attempts"
+  if ! $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
+    --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
+    docker.io/grafana/grafana:latest; then
+    echo "FATAL: Failed to start Grafana container"
     exit 1
-  else
-    # Standard mode - no retries
-    if ! $OCI_BIN run --rm -d --name grafana --network monitoring -p 3000:3000 \
-      --env GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ROLE} \
-      docker.io/grafana/grafana:latest; then
-      echo "FATAL: Failed to start Grafana container"
-      exit 1
-    fi
-    sleep 10
-    echo "Grafana is running at $GRAFANA_URL"
   fi
+  
+  echo "Grafana container started successfully"
+  sleep 10
+  echo "Grafana is running at $GRAFANA_URL"
 }
 
 configure-grafana-datasource() {
@@ -543,7 +473,8 @@ check_metric_value() {
       echo "FATAL: ${metric} not found in ${endpoint}"
       exit 1
     else
-      return 0
+      # Found the metric - continue to next one or return from function
+      continue
     fi
   done
 }
