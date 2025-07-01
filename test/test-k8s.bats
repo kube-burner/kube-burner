@@ -33,6 +33,7 @@ setup_file() {
   fi
   create_test_kubeconfig
   setup-prometheus
+  setup-service-checker
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
     $OCI_BIN rm -f opensearch
     $OCI_BIN network rm -f monitoring
@@ -54,6 +55,10 @@ setup() {
   export LOCAL_INDEXING=""
   export ALERTING=""
   export TIMESERIES_INDEXER=""
+  
+  # Re-create service checker before each test to ensure it's available
+  # This prevents segfaults in service latency tests
+  setup-service-checker
 }
 
 teardown() {
@@ -66,6 +71,9 @@ teardown_file() {
     destroy-kind || echo "Warning: destroy-kind failed but continuing"
   fi
   
+  # Remove service checker namespace
+  kubectl delete namespace ${SERVICE_LATENCY_NS} --ignore-not-found || echo "Warning: Failed to remove service checker namespace"
+
   # Remove prometheus container
   $OCI_BIN rm -f prometheus || echo "Warning: Failed to remove prometheus container"
   

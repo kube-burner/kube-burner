@@ -10,6 +10,8 @@ K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-docker}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
+SERVICE_LATENCY_NS="kube-burner-service-latency"
+SERVICE_CHECKER_POD="svc-checker"
 
 # ERROR HANDLING POLICY:
 # 1. All setup failures result in explicit test failure (exit 1), NEVER silent skipping
@@ -17,6 +19,62 @@ KUBE_BURNER=${KUBE_BURNER:-kube-burner}
 # 3. All errors use "FATAL:" prefix for consistency and easy identification
 # 4. For external dependencies that may be unreliable (GitHub API calls), we use fallback versions
 #    after retries fail rather than failing the tests entirely
+
+# This function ensures the service-checker pod is properly set up for service latency tests
+setup-service-checker() {
+  echo "Setting up service checker pod for service latency tests"
+  
+  # Create namespace if it doesn't exist
+  if ! kubectl get namespace "${SERVICE_LATENCY_NS}" >/dev/null 2>&1; then
+    echo "Creating service latency namespace: ${SERVICE_LATENCY_NS}"
+    if ! kubectl create namespace "${SERVICE_LATENCY_NS}"; then
+      echo "FATAL: Failed to create service latency namespace"
+      exit 1
+    fi
+  else
+    echo "Service latency namespace ${SERVICE_LATENCY_NS} already exists"
+  fi
+  
+  # Check if pod already exists and delete if needed
+  if kubectl get pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" >/dev/null 2>&1; then
+    echo "Deleting existing service checker pod"
+    kubectl delete pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" --grace-period=0 --force
+  fi
+  
+  # Create the service checker pod
+  echo "Creating service checker pod"
+  cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${SERVICE_CHECKER_POD}
+  namespace: ${SERVICE_LATENCY_NS}
+spec:
+  terminationGracePeriodSeconds: 0
+  containers:
+  - name: ${SERVICE_CHECKER_POD}
+    image: quay.io/cloud-bulldozer/fedora-nc:latest
+    command: ["sleep", "inf"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+      runAsUser: 1000
+EOF
+
+  # Wait for pod to be ready
+  echo "Waiting for service checker pod to be ready"
+  if ! kubectl wait --for=condition=Ready --timeout=60s pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}; then
+    echo "FATAL: Service checker pod did not become ready"
+    kubectl describe pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}
+    exit 1
+  fi
+  
+  echo "Service checker pod is ready"
+}
 
 setup-kind() {
   KIND_FOLDER=$(mktemp -d)
