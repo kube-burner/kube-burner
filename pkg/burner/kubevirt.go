@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -187,6 +188,7 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	if err != nil {
 		log.Errorf("Failed to execute op [%s] on the VM [%s]: %v", obj.KubeVirtOp, item.GetName(), err)
 	} else {
+		atomic.AddInt32(&ex.objectOperations, 1)
 		log.Debugf("Successfully executed op [%s] on the VM [%s]", obj.KubeVirtOp, item.GetName())
 	}
 
