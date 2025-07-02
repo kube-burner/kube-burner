@@ -110,6 +110,14 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	percent := 1
 	var namespacesCreated = make(map[string]bool)
 	var namespacesWaited = make(map[string]bool)
+
+	// Pre-create namespaces if required
+	if ex.Job.PreCreateNamespaces {
+		if err := ex.RunPreCreateNamespaces(ctx, iterationStart, iterationEnd, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated); err != nil {
+			log.Fatalf("Failed to pre-create namespaces: %v", err)
+		}
+	}
+
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
 			return
@@ -290,7 +298,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		return true, err
 	}, 1*time.Second, 3, 0, timeout)
 }
-
+ 
 // RunCreateJobWithChurn executes a churn creation job
 func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 	if ctx.Err() != nil {

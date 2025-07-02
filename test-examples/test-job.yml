@@ -1,0 +1,38 @@
+# global:
+#   gc: false 
+
+# jobs:
+# - name: test-ns-pod
+#   jobType: create
+#   jobIterations: 1
+#   namespacedIterations: false   # We control namespace creation ourselves
+#   cleanup: true
+#   qps: 5
+#   burst: 5
+#   objects:
+#     - objectTemplate: namespace.yml
+#       replicas: 1
+#     - objectTemplate: pod.yml
+#       replicas: 1
+
+
+global:
+  gc: false
+
+jobs:
+  - name: precreate-ns-job
+    jobType: create
+    namespace: test-ns
+    jobIterations: 2
+    namespacedIterations: false
+    preCreateNamespaces: true
+    namespaceWaitDuration: 5s
+    namespaceWaitForCondition:
+      resource: networkpolicy
+      timeout: 15s
+    qps: 5
+    burst: 5
+    cleanup: true
+    objects:
+      - objectTemplate: test-examples/pod.yml
+        replicas: 1
