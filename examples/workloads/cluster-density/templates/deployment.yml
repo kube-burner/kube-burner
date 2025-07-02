@@ -18,11 +18,7 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/worker: ""
       containers:
-      - args:
-        - /bin/sh
-        - -c
-        - sleep infinity
-        image: registry.k8s.io/busybox:1.35
+      - image: registry.k8s.io/pause:3.10
         volumeMounts:
         - name: secret-1
           mountPath: /secret1
