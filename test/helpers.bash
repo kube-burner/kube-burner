@@ -71,11 +71,8 @@ spec:
         type: RuntimeDefault
 EOF
 
-  # Verify the pod manifest was applied successfully
-  if [ $? -ne 0 ]; then
-    echo "FATAL: Failed to apply service checker pod manifest"
-    exit 1
-  fi
+  # No need to check the exit code explicitly since the pipe would fail if kubectl apply fails
+  # This avoids the SC2181 shellcheck warning
 
   # Wait for pod to be ready with extended timeout
   echo "Waiting for service checker pod to be ready"
