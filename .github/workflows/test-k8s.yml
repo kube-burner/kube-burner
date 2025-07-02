@@ -3,17 +3,6 @@ name: Execute tests on k8s and OCP
 on:
   workflow_dispatch:
   workflow_call:
-  pull_request:
-    branches: [ main ]
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
-
 jobs:
   fetch-latest-kind-node-tags:
     runs-on: ubuntu-latest
@@ -41,15 +30,48 @@ jobs:
           tags_json=$(echo "$latest_three" | jq -c -R -s 'split("\n") | map(select(length > 0))')
           echo "tags=$tags_json" >> "$GITHUB_OUTPUT"
 
-  build:
-    uses: ./.github/workflows/builders.yml
-    
   test-k8s:
-    needs: [fetch-latest-kind-node-tags, build]
+    needs: fetch-latest-kind-node-tags
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         k8s-version: ${{ fromJson(needs.fetch-latest-kind-node-tags.outputs.tags) }}
-      fail-fast: false
-    uses: ./.github/workflows/ci-parallel.yml
-    with:
-      k8s-version: ${{ matrix.k8s-version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Download kube-burner binary
+        uses: actions/download-artifact@v4
+        with:
+          name: kube-burner
+          path: /tmp/
+
+      - name: Install bats
+        uses: bats-core/bats-action@3.0.1
+        with:
+          bats-version: 1.10.0
+          support-install: false
+          assert-install: false
+          detik-install: false
+          file-install: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq podman uuid-runtime
+
+      - name: Execute Tests
+        run: |
+          chmod +x /tmp/kube-burner
+          make test-k8s
+        env:
+          TERM: linux
+          KIND_VERSION: v0.19.0
+          K8S_VERSION: ${{matrix.k8s-version}}
+          OCI_BIN: podman
+          PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
+          TEST_BINARY: /tmp/kube-burner
