@@ -47,9 +47,9 @@ setup-service-checker() {
     kubectl wait --for=delete pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} --timeout=30s || true
   fi
   
-  # Use the image that the service_latency.go code is expecting
-  # This ensures compatibility between our checker pod and the code that uses it
-  echo "Creating service checker pod with fedora-nc image"
+  # Use an image with netcat pre-installed to avoid dependency issues
+  # The busybox image has 'nc' built in which is more reliable in CI environments
+  echo "Creating service checker pod with busybox image (includes netcat)"
   cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Pod
@@ -60,7 +60,7 @@ spec:
   terminationGracePeriodSeconds: 0
   containers:
   - name: ${SERVICE_CHECKER_POD}
-    image: quay.io/cloud-bulldozer/fedora-nc:latest
+    image: busybox:latest
     command: ["sleep", "inf"]
     securityContext:
       allowPrivilegeEscalation: false
