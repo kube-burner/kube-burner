@@ -35,30 +35,51 @@ setup-service-checker() {
     echo "Service latency namespace ${SERVICE_LATENCY_NS} already exists"
   fi
   
-  # Check if pod already exists and delete if needed
+  # Delete the service checker pod if it exists
+  echo "Deleting service checker pod (if it exists)"
+  kubectl delete pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" --grace-period=0 --force --ignore-not-found
+
+  # Check if pod still exists after delete attempt
   if kubectl get pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" >/dev/null 2>&1; then
-    echo "Deleting existing service checker pod"
-    kubectl delete pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" --grace-period=0 --force --ignore-not-found || true
-    # Wait for pod to be deleted
-    echo "Waiting for service checker pod to be deleted..."
-    kubectl wait --for=delete pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} --timeout=30s || true
+    echo "Waiting for service checker pod to be fully deleted..."
+    if ! kubectl wait --for=delete pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} --timeout=60s; then
+      echo "FATAL: Service checker pod could not be deleted after 60 seconds"
+      kubectl describe pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}
+      exit 1
+    fi
   fi
+  
+  # Brief pause to ensure cluster state is consistent before creating new pod
+  sleep 2
   
   # Use an image with netcat pre-installed to avoid dependency issues
   # The busybox image has 'nc' built in which is more reliable in CI environments
   echo "Creating service checker pod with busybox image (includes netcat)"
-  cat <<EOF | kubectl apply -f -
+  
+  # Create pod manifest with improved reliability settings
+  cat > /tmp/svc-checker-pod.yaml <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
   name: ${SERVICE_CHECKER_POD}
   namespace: ${SERVICE_LATENCY_NS}
+  labels:
+    app: kube-burner-service-checker
 spec:
   terminationGracePeriodSeconds: 0
+  priorityClassName: system-node-critical
   containers:
   - name: ${SERVICE_CHECKER_POD}
-    image: busybox:latest
-    command: ["sleep", "inf"]
+    image: busybox:stable
+    imagePullPolicy: IfNotPresent
+    command: ["sleep", "86400"]  # Sleep for 24 hours
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
     securityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -68,27 +89,47 @@ spec:
         type: RuntimeDefault
 EOF
 
-  # No need to check the exit code explicitly since the pipe would fail if kubectl apply fails
-  # This avoids the SC2181 shellcheck warning
-
-  # Wait for pod to be ready with extended timeout
-  echo "Waiting for service checker pod to be ready"
-  if ! kubectl wait --for=condition=Ready --timeout=120s pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}; then
-    echo "FATAL: Service checker pod did not become ready"
-    kubectl describe pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}
-    # Fail fast - if the service checker pod is not ready, service latency tests will segfault
-    # No point in continuing
+  # Apply the pod manifest
+  if ! kubectl apply -f /tmp/svc-checker-pod.yaml; then
+    echo "FATAL: Failed to create service checker pod"
     exit 1
   fi
+
+  # Wait for pod to be ready with extended timeout and better diagnostics
+  echo "Waiting for service checker pod to be ready"
+  for i in {1..5}; do
+    if kubectl wait --for=condition=Ready --timeout=30s pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}; then
+      echo "Service checker pod is ready (attempt $i)"
+      break
+    fi
+    
+    if [ $i -eq 5 ]; then
+      echo "FATAL: Service checker pod did not become ready after 5 attempts"
+      kubectl describe pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}
+      kubectl get events --sort-by='.lastTimestamp' -n ${SERVICE_LATENCY_NS}
+      exit 1
+    fi
+    
+    echo "Service checker pod not ready yet, retrying (attempt $i)..."
+    kubectl get pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} -o yaml
+    sleep 5
+  done
   
-  # Verify the nc command exists and works in the pod
+  # Verify the nc command exists and is functional in the pod
   echo "Verifying netcat is available in the service checker pod"
   if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which nc >/dev/null 2>&1; then
     echo "FATAL: netcat (nc) command not found in service checker pod"
+    kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- ls -la /bin /usr/bin
     exit 1
   fi
   
-  echo "Service checker pod is ready with netcat available"
+  # Test netcat functionality
+  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- nc -h >/dev/null 2>&1; then
+    echo "FATAL: netcat command exists but appears to be non-functional"
+    exit 1
+  fi
+  
+  echo "Service checker pod is ready with netcat available and functional"
 }
 
 setup-kind() {
