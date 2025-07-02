@@ -117,6 +117,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		ChurnDelay:             5 * time.Minute,
 		ChurnDeletionStrategy:  "default",
 		MetricsClosing:         AfterJobPause,
+		Measurements:           []mtypes.Measurement{},
 	}
 
 	if err := unmarshal(&raw); err != nil {
