@@ -132,6 +132,7 @@ func (ex *JobExecutor) setupKubeVirtJob(mapper meta.RESTMapper) {
 
 func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
+	ex.limiter.Wait(context.TODO())
 
 	operationConfig := supportedOps[obj.KubeVirtOp]
 	var err error
