@@ -197,9 +197,13 @@ teardown_file() {
   export LABEL_VALUE_END="end"
   export REPLICAS=50
 
+  # Create a failing deployment to test that kube-burner is not waiting on it
+  run_cmd kubectl create deployment failing-up --image=quay.io/cloud-bulldozer/sampleapp:nonexistent --replicas=1
+
   run_cmd ${KUBE_BURNER} init -c  kube-burner-sequential-patch.yml --uuid="${UUID}" --log-level=debug
   check_deployment_count ${NAMESPACE} ${LABEL_KEY} ${LABEL_VALUE_END} ${REPLICAS}
-  kubectl delete ns ${NAMESPACE}
+  run_cmd kubectl delete ns ${NAMESPACE}
+  run_cmd kubectl delete deployment failing-up
 }
 
 @test "kube-burner init: jobType kubevirt" {
