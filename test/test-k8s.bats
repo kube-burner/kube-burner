@@ -67,7 +67,10 @@ teardown() {
   
   # Re-create service checker if it was deleted during the test
   # This ensures it's available for the next test
-  if ! kubectl get pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" >/dev/null 2>&1; then
+  if ! kubectl get namespace "${SERVICE_LATENCY_NS}" >/dev/null 2>&1; then
+    echo "Service checker namespace not found, recreating..."
+    setup-service-checker
+  elif ! kubectl get pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" >/dev/null 2>&1; then
     echo "Service checker pod not found, recreating..."
     setup-service-checker
   fi

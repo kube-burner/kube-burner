@@ -38,10 +38,7 @@ setup-service-checker() {
   # Check if pod already exists and delete if needed
   if kubectl get pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" >/dev/null 2>&1; then
     echo "Deleting existing service checker pod"
-    if ! kubectl delete pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" --grace-period=0 --force; then
-      echo "FATAL: Failed to delete existing service checker pod"
-      exit 1
-    fi
+    kubectl delete pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" --grace-period=0 --force --ignore-not-found || true
     # Wait for pod to be deleted
     echo "Waiting for service checker pod to be deleted..."
     kubectl wait --for=delete pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} --timeout=30s || true
