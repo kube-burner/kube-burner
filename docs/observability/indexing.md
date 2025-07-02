@@ -95,6 +95,7 @@ This document looks like:
   "endTimestamp": "2023-08-29T00:18:15.817272025Z",
   "uuid": "83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16",
   "elapsedTime": 48,
+  "achievedQps": 0.333,
   "cleanupTimestamp": "2023-08-29T00:18:18.015107794Z",
   "cleanupEndTimestamp": "2023-08-29T00:18:49.014541929Z",
   "metricName": "jobSummary",
