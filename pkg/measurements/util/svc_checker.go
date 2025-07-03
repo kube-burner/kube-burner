@@ -38,8 +38,9 @@ func (lc *SvcLatencyChecker) Ping(address string, port int32, timeout time.Durat
 	var stdout, stderr bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	// We use 50ms precision thanks to sleep 0.1
-	cmd := []string{"bash", "-c", fmt.Sprintf("while true; do nc -w 0.1s -z %s %d && break; sleep 0.05; done", address, port)}
+	// Using BusyBox's sh instead of bash (BusyBox doesn't have bash)
+	// BusyBox nc doesn't support -w flag, so we use timeout with -z for zero I/O mode
+	cmd := []string{"sh", "-c", fmt.Sprintf("while true; do nc -z %s %d && break; sleep 0.05; done", address, port)}
 	req := lc.clientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(lc.Pod.Name).
