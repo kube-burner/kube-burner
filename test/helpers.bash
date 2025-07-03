@@ -215,8 +215,9 @@ EOF
     exit 1
   fi
   
-  # Do a quick test of netcat functionality
-  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- nc -h >/dev/null 2>&1; then
+  # BusyBox nc doesn't support -h flag, so we'll check a simpler way
+  # Just verify that we can run nc and get a valid return code
+  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "echo | nc -w 1 localhost 1 || [ \$? -eq 1 ]"; then
     echo "FATAL: netcat command exists but appears to be non-functional"
     # Fallback to netcat-openbsd if the default netcat doesn't work
     if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which netcat >/dev/null 2>&1; then
