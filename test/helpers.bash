@@ -102,9 +102,10 @@ setup-service-checker() {
   echo "Creating service checker pod with busybox image"
   
   # Use kubectl run for more reliable pod creation with fewer moving parts
+  # Use the smallest busybox image and reduce resource requirements
   if ! kubectl run ${SERVICE_CHECKER_POD} \
     --namespace=${SERVICE_LATENCY_NS} \
-    --image=busybox:stable \
+    --image=busybox:1.35-musl \
     --restart=Never \
     --labels=app=kube-burner-service-checker \
     --overrides='{
@@ -113,17 +114,17 @@ setup-service-checker() {
         "containers": [
           {
             "name": "svc-checker",
-            "image": "busybox:stable",
+            "image": "busybox:1.35-musl",
             "command": ["sh", "-c", "trap \"exit 0\" TERM; sleep infinity"],
             "imagePullPolicy": "IfNotPresent",
             "resources": {
               "requests": {
-                "memory": "64Mi",
-                "cpu": "50m"
+                "memory": "16Mi",
+                "cpu": "10m"
               },
               "limits": {
-                "memory": "128Mi",
-                "cpu": "100m"
+                "memory": "32Mi",
+                "cpu": "50m"
               }
             },
             "securityContext": {
@@ -159,16 +160,16 @@ spec:
   terminationGracePeriodSeconds: 0
   containers:
   - name: ${SERVICE_CHECKER_POD}
-    image: busybox:stable
+    image: busybox:1.35-musl
     command: ["sh", "-c", "sleep infinity"]
     imagePullPolicy: IfNotPresent
     resources:
       requests:
-        memory: "64Mi"
-        cpu: "50m"
+        memory: "16Mi"
+        cpu: "10m"
       limits:
-        memory: "128Mi"
-        cpu: "100m"
+        memory: "32Mi"
+        cpu: "50m"
     securityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -188,20 +189,47 @@ EOF
   # Simple but effective pod readiness check
   echo "Waiting for service checker pod to be ready"
   
-  # Use a single, longer wait command with clear output
-  if ! kubectl wait --for=condition=Ready pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} --timeout=60s; then
-    echo "FATAL: Service checker pod did not become ready in time"
-    # Collect diagnostic information
-    echo "--- Pod Details ---"
-    kubectl describe pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}
-    echo "--- Pod Status ---"
-    kubectl get pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} -o yaml
-    echo "--- Events ---"
-    kubectl get events --sort-by='.lastTimestamp' -n ${SERVICE_LATENCY_NS}
-    echo "--- Node Status ---"
-    kubectl get nodes
-    exit 1
-  fi
+  # Use a longer wait timeout and retry approach for slow environments (like CI)
+  local wait_attempts=3
+  local wait_timeout=120s
+  
+  for attempt in $(seq 1 $wait_attempts); do
+    echo "Waiting for service checker pod to be ready (attempt $attempt/$wait_attempts, timeout: $wait_timeout)"
+    if kubectl wait --for=condition=Ready pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} --timeout=$wait_timeout; then
+      echo "Service checker pod is ready on attempt $attempt"
+      break
+    fi
+    
+    # If we've tried all attempts and failed, gather diagnostics and fail
+    if [ $attempt -eq $wait_attempts ]; then
+      echo "FATAL: Service checker pod did not become ready after $wait_attempts attempts"
+      # Collect diagnostic information
+      echo "--- Pod Details ---"
+      kubectl describe pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}
+      echo "--- Pod Status ---"
+      kubectl get pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS} -o yaml
+      echo "--- Events ---"
+      kubectl get events --sort-by='.lastTimestamp' -n ${SERVICE_LATENCY_NS}
+      echo "--- Node Status ---"
+      kubectl get nodes
+      echo "--- Docker Info ---"
+      $OCI_BIN info
+      echo "--- Node Resources ---"
+      kubectl describe nodes
+      exit 1
+    fi
+    
+    # Let's try to help the pod along
+    echo "Pod not ready yet. Checking pull status..."
+    kubectl get pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}
+    
+    # If possible, prefetch the image on all nodes to help things along
+    echo "Attempting to ensure image is available on nodes..."
+    for node in $(kubectl get nodes -o name | cut -d/ -f2); do
+      echo "Checking node $node for busybox image..."
+      kubectl describe node $node | grep -i busybox || true
+    done
+  done
   
   echo "Service checker pod is ready, verifying functionality"
   
