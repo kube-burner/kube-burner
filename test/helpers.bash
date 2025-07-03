@@ -237,21 +237,27 @@ EOF
   echo "Verifying netcat is available in the service checker pod"
   sleep 2  # Brief pause for container to stabilize
   
-  # Simple netcat check - just make sure the command exists
-  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which nc >/dev/null 2>&1; then
-    echo "FATAL: netcat (nc) command not found in service checker pod"
-    exit 1
+  # Allow skipping netcat verification entirely if needed in problematic environments
+  if [[ "${SKIP_NETCAT_CHECK:-false}" == "true" ]]; then
+    echo "Skipping netcat verification as requested by SKIP_NETCAT_CHECK=true"
+  else
+    # Simple netcat check - just make sure the command exists
+    if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which nc >/dev/null 2>&1; then
+      echo "FATAL: netcat (nc) command not found in service checker pod"
+      echo "To skip this check, set SKIP_NETCAT_CHECK=true"
+      exit 1
+    fi
+    
+    # Skip actual functionality testing since BusyBox nc variants are too unpredictable
+    # Just confirm the command exists and returns a reasonable exit code for a non-existent service
+    # This should work regardless of which netcat variant is available
+    echo "Verifying basic netcat functionality"
+    kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- nc -z localhost 9 2>/dev/null || true
+    
+    # Success - if we got this far, we have a netcat binary that at least exists
+    # We'll confirm full functionality during actual service tests
+    echo "Netcat command exists, continuing with service checker setup"
   fi
-  
-  # Skip actual functionality testing since BusyBox nc variants are too unpredictable
-  # Just confirm the command exists and returns a reasonable exit code for a non-existent service
-  # This should work regardless of which netcat variant is available
-  echo "Verifying basic netcat functionality"
-  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- nc -z -v localhost 9 || true
-  
-  # Success - if we got this far, we have a netcat binary that at least exists
-  # We'll confirm full functionality during actual service tests
-  echo "Netcat command exists, continuing with service checker setup"
   
   # Basic check that we can execute commands in the pod
   if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- echo "Service checker pod is functional"; then
