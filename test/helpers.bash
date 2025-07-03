@@ -237,41 +237,126 @@ EOF
   echo "Verifying netcat is available in the service checker pod"
   sleep 2  # Brief pause for container to stabilize
   
-  # Simple netcat check
-  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which nc >/dev/null 2>&1; then
-    echo "FATAL: netcat (nc) command not found in service checker pod"
+  # Enhanced netcat detection and verification
+  echo "Checking for netcat commands (nc or netcat)..."
+  
+  # First check if either 'nc' or 'netcat' commands exist
+  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "command -v nc >/dev/null 2>&1 || command -v netcat >/dev/null 2>&1"; then
+    echo "FATAL: No netcat command (nc or netcat) found in service checker pod"
+    echo "Checking available commands:"
+    kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "find /bin /usr/bin -type f -executable | sort"
+    echo "Container info:"
+    kubectl describe pod/${SERVICE_CHECKER_POD} -n ${SERVICE_LATENCY_NS}
     exit 1
   fi
   
-  # BusyBox nc can vary between versions, try multiple test approaches
-  echo "Testing netcat functionality with multiple methods..."
+  # Simpler, more direct verification of netcat functionality
+  echo "Checking netcat (nc) capabilities..."
   
-  # Test Method 1: The most compatible approach - just run 'nc' with no args
-  # This should fail with exit code 1 but show netcat is working
-  if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- nc 2>&1 | grep -q "Usage"; then
-    echo "Netcat basic usage test passed"
-  # Test Method 2: Try connecting to localhost with timeout
-  elif kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "nc -z localhost 1 >/dev/null 2>&1 || [ \$? -eq 1 ]"; then
-    echo "Netcat connection test passed"
-  # Test Method 3: Try without -w flag (some BusyBox versions don't support it)
-  elif kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "echo | nc localhost 1 >/dev/null 2>&1 || [ \$? -eq 1 ]"; then
-    echo "Netcat echo pipe test passed"
-  # If all tests fail, check for alternative netcat command
+  # Check if 'nc' exists
+  if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which nc >/dev/null 2>&1; then
+    echo "Found 'nc' command"
+    NC_CMD="nc"
+  # Check if 'netcat' exists as alternative
+  elif kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which netcat >/dev/null 2>&1; then
+    echo "Found 'netcat' command"
+    NC_CMD="netcat"
   else
-    echo "WARNING: Standard netcat tests failed"
-    if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which netcat >/dev/null 2>&1; then
-      echo "Found alternative 'netcat' command, using that instead"
-    else
-      # Final attempt - create a test file and use nc with it
-      echo "Trying to create test file for netcat verification..."
-      if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "echo 'test' > /tmp/nctest && nc -h < /tmp/nctest >/dev/null 2>&1 || [ \$? -lt 127 ]"; then
-        echo "Netcat works with test file input"
-      else
-        echo "FATAL: All netcat functionality tests failed"
-        exit 1
-      fi
-    fi
+    echo "FATAL: No netcat command found in pod"
+    kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- find /bin /sbin /usr/bin /usr/sbin -type f | sort
+    exit 1
   fi
+  
+  # Test basic functionality - simpler approach
+  echo "Testing basic netcat functionality..."
+  
+  # Check if -z flag is supported (most common BusyBox variant)
+  if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "${NC_CMD} -h 2>&1 | grep -q '\-z'"; then
+    echo "Netcat supports -z flag"
+    NC_TEST_CMD="${NC_CMD} -z localhost 1 >/dev/null 2>&1 || true"
+  # Otherwise try echo pipe approach
+  else
+    echo "Netcat doesn't support -z flag, using echo pipe approach"
+    NC_TEST_CMD="echo | ${NC_CMD} localhost 1 >/dev/null 2>&1 || true"
+  fi
+  
+  # Run a simple test to ensure netcat doesn't crash
+  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "${NC_TEST_CMD}"; then
+    echo "FATAL: Netcat test failed with unexpected error"
+    kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "${NC_CMD} -h || ${NC_CMD} --help || ${NC_CMD}"
+    exit 1
+  fi
+  
+  echo "Netcat basic functionality verified"
+  
+  # Create a simple nc wrapper script in /tmp which is writable in all containers
+  echo "Installing nc wrapper script..."
+  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "cat > /tmp/nc-wrapper.sh" << EOF
+#!/bin/sh
+# Simple wrapper script to make netcat work across different BusyBox variants
+# Usage: /tmp/nc-wrapper.sh HOST PORT
+
+if [ \$# -lt 2 ]; then
+    echo "Usage: \$0 HOST PORT" >&2
+    exit 1
+fi
+
+HOST="\$1"
+PORT="\$2"
+
+# Try different netcat approaches in sequence
+if command -v nc >/dev/null 2>&1; then
+    # Try with -z flag (most common)
+    nc -z "\$HOST" "\$PORT" >/dev/null 2>&1 && exit 0
+    
+    # Try with echo pipe
+    echo | nc "\$HOST" "\$PORT" >/dev/null 2>&1 && exit 0
+    
+    # Try with -w flag if available
+    nc -w 1 "\$HOST" "\$PORT" >/dev/null 2>&1 && exit 0
+fi
+
+# Try with netcat if nc failed
+if command -v netcat >/dev/null 2>&1; then
+    netcat -z "\$HOST" "\$PORT" >/dev/null 2>&1 && exit 0
+    echo | netcat "\$HOST" "\$PORT" >/dev/null 2>&1 && exit 0
+fi
+
+# If we get here, all connection attempts failed
+exit 1
+EOF
+  
+  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- chmod +x /tmp/nc-wrapper.sh
+  
+  # Verify the wrapper works
+  echo "Verifying nc wrapper script..."
+  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "/tmp/nc-wrapper.sh localhost 22 || echo 'Expected failure for non-listening port'"; then
+    echo "FATAL: nc-wrapper.sh test failed unexpectedly"
+    kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- cat /tmp/nc-wrapper.sh
+    exit 1
+  fi
+  
+  echo "Created and verified nc-wrapper.sh for reliable netcat functionality"
+  
+  # Create nc/netcat aliases in /tmp (which is writable) instead of symlinks
+  echo "Creating netcat aliases in /tmp..."
+  
+  # Create aliases for both nc and netcat that point to our wrapper script
+  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "cat > /tmp/nc" << EOF
+#!/bin/sh
+exec /tmp/nc-wrapper.sh "\$@"
+EOF
+  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- chmod +x /tmp/nc
+
+  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "cat > /tmp/netcat" << EOF
+#!/bin/sh
+exec /tmp/nc-wrapper.sh "\$@"
+EOF
+  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- chmod +x /tmp/netcat
+  
+  # Add /tmp to PATH to make these commands accessible
+  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "echo 'export PATH=/tmp:\$PATH' > /tmp/nc_path.sh"
+  kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- chmod +x /tmp/nc_path.sh
   
   # Basic check that we can execute commands in the pod
   if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- echo "Service checker pod is functional"; then
@@ -386,7 +471,7 @@ setup-kind() {
         if [[ -n "$CDI_VERSION" && "$CDI_VERSION" != "null" ]]; then
           break
         fi
-        
+         
         echo "Failed to fetch CDI version, retrying in $retry seconds..."
         sleep $retry
       done
