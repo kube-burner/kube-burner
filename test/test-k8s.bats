@@ -65,15 +65,8 @@ teardown() {
   echo "Cleaning up namespaces for test UUID ${UUID}"
   kubectl delete ns -l kube-burner-uuid="${UUID}" --ignore-not-found
   
-  # Re-create service checker if it was deleted during the test
-  # This ensures it's available for the next test
-  if ! kubectl get namespace "${SERVICE_LATENCY_NS}" >/dev/null 2>&1; then
-    echo "Service checker namespace not found, recreating..."
-    setup-service-checker
-  elif ! kubectl get pod -n "${SERVICE_LATENCY_NS}" "${SERVICE_CHECKER_POD}" >/dev/null 2>&1; then
-    echo "Service checker pod not found, recreating..."
-    setup-service-checker
-  fi
+  # Don't recreate service checker in teardown as it can cause race conditions 
+  # between parallel tests. Service checker will be recreated in setup() for each test.
 }
 
 teardown_file() {
