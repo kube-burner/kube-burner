@@ -38,10 +38,22 @@ func (lc *SvcLatencyChecker) Ping(address string, port int32, timeout time.Durat
 	var stdout, stderr bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	// BusyBox netcat is extremely limited, using most basic form possible
-	// Avoiding any flags except -z (zero I/O mode) which is essential
-	// This should work with all known netcat variants including BusyBox
-	cmd := []string{"sh", "-c", fmt.Sprintf("for i in $(seq 1 200); do nc -z %s %d 2>/dev/null && exit 0; sleep 0.05; done; exit 1", address, port)}
+	// Using BusyBox's sh (no bash in BusyBox)
+	// Use the most basic and compatible approach for any BusyBox variant
+	// Multiple methods for different busybox nc implementations:
+	// 1. Try with -z (zero I/O mode) which most implementations support
+	// 2. Without -z, use echo as input, works with all nc variants
+	// Add timeout via loop+sleep which is compatible with all BusyBox versions
+	cmd := []string{"sh", "-c", fmt.Sprintf(`
+		for i in $(seq 1 200); do 
+			# First try with -z flag (most compatible)
+			nc -z %s %d 2>/dev/null && exit 0
+			# If that fails, try echo | nc approach
+			echo | nc %s %d 2>/dev/null && exit 0
+			sleep 0.05
+		done
+		# If we get here, connection failed after all attempts
+		exit 1`, address, port, address, port)}
 	req := lc.clientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(lc.Pod.Name).

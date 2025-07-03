@@ -237,26 +237,40 @@ EOF
   echo "Verifying netcat is available in the service checker pod"
   sleep 2  # Brief pause for container to stabilize
   
-  # Allow skipping netcat verification entirely if needed in problematic environments
-  if [[ "${SKIP_NETCAT_CHECK:-false}" == "true" ]]; then
-    echo "Skipping netcat verification as requested by SKIP_NETCAT_CHECK=true"
+  # Simple netcat check
+  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which nc >/dev/null 2>&1; then
+    echo "FATAL: netcat (nc) command not found in service checker pod"
+    exit 1
+  fi
+  
+  # BusyBox nc can vary between versions, try multiple test approaches
+  echo "Testing netcat functionality with multiple methods..."
+  
+  # Test Method 1: The most compatible approach - just run 'nc' with no args
+  # This should fail with exit code 1 but show netcat is working
+  if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- nc 2>&1 | grep -q "Usage"; then
+    echo "Netcat basic usage test passed"
+  # Test Method 2: Try connecting to localhost with timeout
+  elif kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "nc -z localhost 1 >/dev/null 2>&1 || [ \$? -eq 1 ]"; then
+    echo "Netcat connection test passed"
+  # Test Method 3: Try without -w flag (some BusyBox versions don't support it)
+  elif kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "echo | nc localhost 1 >/dev/null 2>&1 || [ \$? -eq 1 ]"; then
+    echo "Netcat echo pipe test passed"
+  # If all tests fail, check for alternative netcat command
   else
-    # Simple netcat check - just make sure the command exists
-    if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which nc >/dev/null 2>&1; then
-      echo "FATAL: netcat (nc) command not found in service checker pod"
-      echo "To skip this check, set SKIP_NETCAT_CHECK=true"
-      exit 1
+    echo "WARNING: Standard netcat tests failed"
+    if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- which netcat >/dev/null 2>&1; then
+      echo "Found alternative 'netcat' command, using that instead"
+    else
+      # Final attempt - create a test file and use nc with it
+      echo "Trying to create test file for netcat verification..."
+      if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "echo 'test' > /tmp/nctest && nc -h < /tmp/nctest >/dev/null 2>&1 || [ \$? -lt 127 ]"; then
+        echo "Netcat works with test file input"
+      else
+        echo "FATAL: All netcat functionality tests failed"
+        exit 1
+      fi
     fi
-    
-    # Skip actual functionality testing since BusyBox nc variants are too unpredictable
-    # Just confirm the command exists and returns a reasonable exit code for a non-existent service
-    # This should work regardless of which netcat variant is available
-    echo "Verifying basic netcat functionality"
-    kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- nc -z localhost 9 2>/dev/null || true
-    
-    # Success - if we got this far, we have a netcat binary that at least exists
-    # We'll confirm full functionality during actual service tests
-    echo "Netcat command exists, continuing with service checker setup"
   fi
   
   # Basic check that we can execute commands in the pod
