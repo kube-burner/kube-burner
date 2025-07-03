@@ -18,11 +18,22 @@ setup_file() {
   export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
   export ES_INDEX="kube-burner"
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
+  
+  # K8S_VERSION is defined in helpers.bash
+  # No special logic overrides K8S_VERSION - it's used exactly as provided
+  # CI pipeline explicitly sets K8S_VERSION for each test matrix item
+  
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
-    setup-kind
+    # Create the Kind cluster using the specified K8S version
+    # If it fails, the entire test suite should fail
+    setup-kind || {
+      echo "FATAL: setup-kind failed"
+      exit 1
+    }
   fi
   create_test_kubeconfig
   setup-prometheus
+  setup-service-checker
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
     $OCI_BIN rm -f opensearch
     $OCI_BIN network rm -f monitoring
@@ -44,23 +55,49 @@ setup() {
   export LOCAL_INDEXING=""
   export ALERTING=""
   export TIMESERIES_INDEXER=""
+  
+  # Re-create service checker before each test to ensure it's available
+  # This prevents segfaults in service latency tests
+  setup-service-checker
 }
 
 teardown() {
+  echo "Cleaning up namespaces for test UUID ${UUID}"
   kubectl delete ns -l kube-burner-uuid="${UUID}" --ignore-not-found
+  
+  # Don't recreate service checker in teardown as it can cause race conditions 
+  # between parallel tests. Service checker will be recreated in setup() for each test.
 }
 
 teardown_file() {
+  echo "Running teardown_file cleanup..."
+  
+  # Cleanup kubernetes resources if using a temporary cluster
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
-    destroy-kind
+    echo "Destroying kind cluster..."
+    destroy-kind || echo "Warning: destroy-kind failed but continuing with other cleanup"
   fi
-  $OCI_BIN rm -f prometheus
+  
+  # Remove service checker namespace
+  echo "Removing service checker namespace..."
+  kubectl delete namespace ${SERVICE_LATENCY_NS} --grace-period=0 --force --ignore-not-found || \
+    echo "Warning: Failed to remove service checker namespace ${SERVICE_LATENCY_NS}"
+
+  # Remove prometheus container
+  echo "Removing prometheus container..."
+  $OCI_BIN rm -f prometheus || echo "Warning: Failed to remove prometheus container"
+  
+  # Cleanup OpenSearch and monitoring network if not using production ES server 
+  # and grafana is not deployed
   if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
-    if [ "$DEPLOY_GRAFANA" = "false" ]; then
-      $OCI_BIN rm -f opensearch
-      $OCI_BIN network rm -f monitoring
+    if [[ "$DEPLOY_GRAFANA" == "false" ]]; then
+      echo "Removing opensearch container and monitoring network..."
+      $OCI_BIN rm -f opensearch || echo "Warning: Failed to remove opensearch container"
+      $OCI_BIN network rm -f monitoring || echo "Warning: Failed to remove monitoring network"
     fi
   fi
+  
+  echo "Teardown cleanup completed"
 }
 
 @test "kube-burner init: churn=true; absolute-path=true; job-gc=true" {
@@ -87,6 +124,11 @@ teardown_file() {
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; vm-latency-indexing=true" {
+  # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
+  fi
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid="${UUID}" --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
@@ -207,6 +249,11 @@ teardown_file() {
 }
 
 @test "kube-burner init: jobType kubevirt" {
+  # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
+  fi
   run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid="${UUID}" --log-level=debug
 }
 
@@ -231,14 +278,33 @@ teardown_file() {
 }
 
 @test "kube-burner init: datavolume latency" {
+  # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
+  fi
+  
+  # Only skip if explicitly told to do so by SKIP_CDI_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
+  if [[ "${SKIP_CDI_TESTS:-false}" == "true" ]]; then
+    skip "CDI tests explicitly skipped by user (SKIP_CDI_TESTS=true)"
+  fi
+  
+  # Only skip if explicitly told to do so by SKIP_SNAPSHOTTER_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
+  if [[ "${SKIP_SNAPSHOTTER_TESTS:-false}" == "true" ]]; then
+    skip "Snapshotter tests explicitly skipped by user (SKIP_SNAPSHOTTER_TESTS=true)"
+  fi
+  
+  # We skip if required variables are not set - this is a user configuration issue
   if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
     echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    return 1
+    skip "Test skipped: VOLUME_SNAPSHOT_CLASS_NAME not set (required user configuration)"
   fi
   export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
   if [[ -z "$STORAGE_CLASS_NAME" ]]; then
     echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    return 1
+    skip "Test skipped: STORAGE_CLASS_NAME not set (required user configuration)"
   fi
 
   run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid="${UUID}" --log-level=debug
@@ -258,6 +324,12 @@ teardown_file() {
 }
 
 @test "kube-burner init: metrics aggregation" {
+  # Only skip if explicitly told to do so by SKIP_KUBEVIRT_TESTS
+  # This ensures we catch real failures in CI instead of silently skipping
+  if [[ "${SKIP_KUBEVIRT_TESTS:-false}" == "true" ]]; then
+    skip "KubeVirt tests explicitly skipped by user (SKIP_KUBEVIRT_TESTS=true)"
+  fi
+  
   export STORAGE_CLASS_NAME
   STORAGE_CLASS_NAME=$(get_default_storage_class)
   run_cmd ${KUBE_BURNER} init -c kube-burner-metrics-aggregate.yml --uuid="${UUID}" --log-level=debug
