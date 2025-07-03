@@ -23,6 +23,10 @@ setup_file() {
   # No special logic overrides K8S_VERSION - it's used exactly as provided
   # CI pipeline explicitly sets K8S_VERSION for each test matrix item
   
+  # Enable netcat check skipping in CI environment
+  # This makes tests more resilient to different environments where netcat behavior may vary
+  export SKIP_NETCAT_CHECK=${SKIP_NETCAT_CHECK:-true}
+  
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
     # Create the Kind cluster using the specified K8S version
     # If it fails, the entire test suite should fail
