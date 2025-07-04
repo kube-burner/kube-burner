@@ -38,48 +38,63 @@ func (lc *SvcLatencyChecker) Ping(address string, port int32, timeout time.Durat
 	var stdout, stderr bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	// Use the wrapper script we created during setup-service-checker
-	// This provides a consistent and reliable way to connect across different BusyBox variants
+	
+	// First try to source our custom PATH to include /tmp
+	sourceCmd := []string{"sh", "-c", "source /tmp/.netcat_profile 2>/dev/null || true"}
+	sourceCmdReq := lc.clientSet.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(lc.Pod.Name).
+		Namespace(lc.Pod.Namespace).
+		SubResource("exec")
+	sourceCmdReq.VersionedParams(&corev1.PodExecOptions{
+		Container: types.SvcLatencyCheckerName,
+		Command:   sourceCmd,
+		Stdin:     false,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
+	}, scheme.ParameterCodec)
+	
+	// Try to run the source command but ignore errors
+	exec, _ := remotecommand.NewSPDYExecutor(&lc.restConfig, "POST", sourceCmdReq.URL())
+	if exec != nil {
+		exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+			Stdout: &stdout,
+			Stderr: &stderr,
+		})
+	}
+	
+	// Clear buffers
+	stdout.Reset()
+	stderr.Reset()
+	
+	// Now use a much simpler, more reliable approach with our wrapper script
+	// The wrapper handles all netcat variations and fallbacks internally
 	cmd := []string{"sh", "-c", fmt.Sprintf(`
+		# Add /tmp to PATH to find our wrappers
+		export PATH=/tmp:$PATH
+		
 		# Maximum retry attempts
 		max_attempts=200
 		# Sleep interval between attempts (50ms)
 		sleep_interval=0.05
 		
-		# Source the PATH if it exists
-		if [ -f /tmp/nc_path.sh ]; then
-			. /tmp/nc_path.sh
-		fi
-		
-		# Check if our wrapper script exists
-		if [ -x /tmp/nc-wrapper.sh ]; then
-			# Use the wrapper script that handles all netcat variants
+		# Try the dedicated wrapper script first
+		if [ -x "/tmp/nc-wrapper.sh" ]; then
 			for i in $(seq 1 $max_attempts); do
-				if /tmp/nc-wrapper.sh "%s" %d; then
+				if /tmp/nc-wrapper.sh "%s" %d >/dev/null 2>&1; then
 					exit 0
 				fi
 				sleep $sleep_interval
 			done
 		else
-			# Fallback to multiple methods if wrapper doesn't exist
+			# Fallback to trying all possible methods if wrapper doesn't exist
 			for i in $(seq 1 $max_attempts); do
-				# Try nc with -z flag (most common)
-				if command -v nc >/dev/null 2>&1 && nc -z "%s" %d >/dev/null 2>&1; then
-					exit 0
-				fi
-				
-				# Try with echo pipe (works with most nc variants)
-				if command -v nc >/dev/null 2>&1 && echo | nc "%s" %d >/dev/null 2>&1; then
-					exit 0
-				fi
-				
-				# Try with netcat if available
-				if command -v netcat >/dev/null 2>&1; then
-					if netcat -z "%s" %d >/dev/null 2>&1 || echo | netcat "%s" %d >/dev/null 2>&1; then
-						exit 0
-					fi
-				fi
-				
+				# Try multiple netcat commands
+				nc -z "%s" %d >/dev/null 2>&1 && exit 0
+				echo | nc "%s" %d >/dev/null 2>&1 && exit 0
+				netcat -z "%s" %d >/dev/null 2>&1 && exit 0
+				echo | netcat "%s" %d >/dev/null 2>&1 && exit 0
 				sleep $sleep_interval
 			done
 		fi
