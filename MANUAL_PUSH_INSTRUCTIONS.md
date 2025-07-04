@@ -1,45 +1,87 @@
-# Manual Push Instructions
+# Instructions for Pushing to the Main Repository
 
-It appears we're having issues with the terminal output when trying to push changes automatically. Here's how to manually push your changes:
+You need to push your commits from your fork (`7908837174/kube-burner-kallal`) to the main upstream repository (`kube-burner/kube-burner`). Here's how to do it:
 
 ## 1. Verify the changes are ready
 
-The changes we've made to `test/helpers.bash` and `test/run-tests.sh` include:
+Your changes to `test/helpers.bash` and other files include:
 
-- Added a file locking mechanism in the service checker setup to prevent race conditions
+- Added a directory-based locking mechanism in the service checker setup to prevent race conditions (more reliable than flock)
 - Enhanced netcat verification with multiple fallback methods for BusyBox compatibility
 - Fixed pod deletion and creation logic with better diagnostics
 - Optimized resource requirements for the service checker pod
 - Fixed shellcheck issues in test scripts
-- Improved error handling
+- Improved error handling with explicit failures instead of silent skipping
+- Added timeout and stale lock cleanup for service checker lock
+- Added unique test UUIDs for parallel test runs
 
-## 2. Manual git commands to push changes
+## 2. Set up remotes and push to your fork
 
-Run these commands in a terminal outside of this session:
+First, you need to push your changes to your fork. Run these commands in a terminal:
 
 ```bash
 # Navigate to the repository
 cd /workspaces/kube-burner
 
-# Add the modified files
-git add test/helpers.bash test/run-tests.sh
+# Make sure git is configured
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
 
-# Create a commit with sign-off (DCO)
-git commit -s -m "Fix service checker pod setup and stabilize test infrastructure" \
-  -m "- Add file locking mechanism to prevent race conditions in parallel test runs" \
-  -m "- Enhance netcat verification with multiple fallback methods for BusyBox compatibility" \
-  -m "- Fix pod deletion and creation logic with better error diagnostics" \
-  -m "- Optimize resource requirements for service checker pod" \
-  -m "- Improve error handling with explicit failures instead of silent skipping" \
-  -m "- Fix shellcheck issues in test scripts"
+# Set up remotes properly
+git remote set-url origin https://github.com/7908837174/kube-burner-kallal.git
+git remote add upstream https://github.com/kube-burner/kube-burner.git || git remote set-url upstream https://github.com/kube-burner/kube-burner.git
 
-# Push to the main branch
-git push origin main
+# Fetch latest from both remotes
+git fetch origin
+git fetch upstream
+
+# Make sure you're on the main branch
+git checkout main
+
+# Push your changes to your fork
+git push --force origin main
+```
 ```
 
-## 3. Verify the push was successful
+## 3. Create a Pull Request to the main repository
 
-After pushing, check your GitHub repository to ensure the changes appear in the PR.
+There are two ways to create a pull request from your fork to the main repository:
+
+### Option 1: Using the GitHub web interface
+
+1. Go to: https://github.com/kube-burner/kube-burner/compare/main...7908837174:kube-burner-kallal:main
+
+2. Click "Create pull request"
+
+3. Fill in the details:
+   - Title: "Fix service checker pod setup and stabilize test infrastructure"
+   - Description:
+     ```
+     - Add file locking mechanism to prevent race conditions
+     - Enhance netcat verification with multiple fallback methods
+     - Fix pod deletion and creation logic with better diagnostics
+     - Optimize resource requirements for service checker pod
+     - Improve error handling with explicit failures
+     - Fix shellcheck issues in test scripts
+     ```
+
+4. Submit the PR
+
+### Option 2: Using GitHub CLI
+
+If you have the GitHub CLI installed and configured:
+
+```bash
+gh pr create --repo kube-burner/kube-burner \
+  --head 7908837174:kube-burner-kallal:main \
+  --base main \
+  --title "Fix service checker pod setup and stabilize test infrastructure" \
+  --body "- Add file locking mechanism to prevent race conditions
+- Enhance netcat verification with multiple fallback methods
+- Fix pod deletion and creation logic with better diagnostics
+- Improve error handling with explicit failures
+- Fix shellcheck issues in test scripts"
+```
 
 ## 4. Key changes we've made
 
