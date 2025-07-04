@@ -38,8 +38,71 @@ func (lc *SvcLatencyChecker) Ping(address string, port int32, timeout time.Durat
 	var stdout, stderr bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	// We use 50ms precision thanks to sleep 0.1
-	cmd := []string{"bash", "-c", fmt.Sprintf("while true; do nc -w 0.1s -z %s %d && break; sleep 0.05; done", address, port)}
+	
+	// First try to source our custom PATH to include /tmp
+	sourceCmd := []string{"sh", "-c", "source /tmp/.netcat_profile 2>/dev/null || true"}
+	sourceCmdReq := lc.clientSet.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(lc.Pod.Name).
+		Namespace(lc.Pod.Namespace).
+		SubResource("exec")
+	sourceCmdReq.VersionedParams(&corev1.PodExecOptions{
+		Container: types.SvcLatencyCheckerName,
+		Command:   sourceCmd,
+		Stdin:     false,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
+	}, scheme.ParameterCodec)
+	
+	// Try to run the source command but ignore errors
+	exec, _ := remotecommand.NewSPDYExecutor(&lc.restConfig, "POST", sourceCmdReq.URL())
+	if exec != nil {
+		exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+			Stdout: &stdout,
+			Stderr: &stderr,
+		})
+	}
+	
+	// Clear buffers
+	stdout.Reset()
+	stderr.Reset()
+	
+	// Now use a much simpler, more reliable approach with our wrapper script
+	// The wrapper handles all netcat variations and fallbacks internally
+	cmd := []string{"sh", "-c", fmt.Sprintf(`
+		# Add /tmp to PATH to find our wrappers
+		export PATH=/tmp:$PATH
+		
+		# Maximum retry attempts
+		max_attempts=200
+		# Sleep interval between attempts (50ms)
+		sleep_interval=0.05
+		
+		# Try the dedicated wrapper script first
+		if [ -x "/tmp/nc-wrapper.sh" ]; then
+			for i in $(seq 1 $max_attempts); do
+				if /tmp/nc-wrapper.sh "%s" %d >/dev/null 2>&1; then
+					exit 0
+				fi
+				sleep $sleep_interval
+			done
+		else
+			# Fallback to trying all possible methods if wrapper doesn't exist
+			for i in $(seq 1 $max_attempts); do
+				# Try multiple netcat commands
+				nc -z "%s" %d >/dev/null 2>&1 && exit 0
+				echo | nc "%s" %d >/dev/null 2>&1 && exit 0
+				netcat -z "%s" %d >/dev/null 2>&1 && exit 0
+				echo | netcat "%s" %d >/dev/null 2>&1 && exit 0
+				sleep $sleep_interval
+			done
+		fi
+		
+		# If we get here, connection failed after all attempts
+		echo "Failed to connect to %s:%d after $max_attempts attempts" >&2
+		exit 1
+	`, address, port, address, port, address, port, address, port, address, port)}
 	req := lc.clientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(lc.Pod.Name).
