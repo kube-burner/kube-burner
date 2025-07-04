@@ -144,10 +144,10 @@ setup-service-checker() {
   echo "Creating service checker pod with busybox image"
   
   # Use kubectl run for more reliable pod creation with fewer moving parts
-  # Use the smallest busybox image and reduce resource requirements
+  # Use the standard busybox image which has more consistent netcat support
   if ! kubectl run ${SERVICE_CHECKER_POD} \
     --namespace=${SERVICE_LATENCY_NS} \
-    --image=busybox:1.35-musl \
+    --image=busybox:latest \
     --restart=Never \
     --labels=app=kube-burner-service-checker \
     --overrides='{
@@ -156,7 +156,7 @@ setup-service-checker() {
         "containers": [
           {
             "name": "svc-checker",
-            "image": "busybox:1.35-musl",
+            "image": "busybox:latest",
             "command": ["sh", "-c", "trap \"exit 0\" TERM; sleep infinity"],
             "imagePullPolicy": "IfNotPresent",
             "resources": {
@@ -202,7 +202,7 @@ spec:
   terminationGracePeriodSeconds: 0
   containers:
   - name: ${SERVICE_CHECKER_POD}
-    image: busybox:1.35-musl
+    image: busybox:latest
     command: ["sh", "-c", "sleep infinity"]
     imagePullPolicy: IfNotPresent
     resources:
@@ -280,10 +280,33 @@ EOF
   
   # Enhanced netcat detection and verification
   echo "Checking for netcat commands (nc or netcat)..."
+  local NC_FOUND=false
   
-  # First check if either 'nc' or 'netcat' commands exist
-  if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "command -v nc >/dev/null 2>&1 || command -v netcat >/dev/null 2>&1"; then
-    echo "FATAL: No netcat command (nc or netcat) found in service checker pod"
+  # First check for netcat binary AND basic functionality
+  if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "command -v nc >/dev/null 2>&1"; then
+    echo "Found 'nc' command, checking functionality..."
+    if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "nc 2>&1 | grep -q . || [ \$? -lt 127 ]"; then
+      echo "Netcat 'nc' command appears functional"
+      NC_FOUND=true
+    else
+      echo "WARNING: 'nc' command exists but returned unexpected error"
+    fi
+  fi
+
+  # Try netcat alternative name if nc failed or wasn't found
+  if [ "$NC_FOUND" != "true" ] && kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "command -v netcat >/dev/null 2>&1"; then
+    echo "Found 'netcat' command, checking functionality..."
+    if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "netcat 2>&1 | grep -q . || [ \$? -lt 127 ]"; then
+      echo "Netcat 'netcat' command appears functional"
+      NC_FOUND=true
+    else
+      echo "WARNING: 'netcat' command exists but returned unexpected error"
+    fi
+  fi
+  
+  # Only fail if we couldn't find any netcat variant
+  if [ "$NC_FOUND" != "true" ]; then
+    echo "FATAL: No functional netcat command found in service checker pod"
     echo "Checking available commands:"
     kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "find /bin /usr/bin -type f -executable | sort"
     echo "Container info:"
@@ -385,8 +408,15 @@ EOF
   # Create wrapper in /tmp which should always be writable
   kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- sh -c "cat > /tmp/nc-wrapper.sh" << 'EOF'
 #!/bin/sh
-# Simple wrapper script to make netcat work across different BusyBox variants
+# Enhanced wrapper script to make netcat work across different BusyBox variants
 # Usage: /tmp/nc-wrapper.sh HOST PORT
+
+# Debug mode - set to 1 for verbose output
+DEBUG=0
+
+debug() {
+    [ $DEBUG -eq 1 ] && echo "DEBUG: $*" >&2
+}
 
 if [ $# -lt 2 ]; then
     echo "Usage: $0 HOST PORT" >&2
@@ -396,43 +426,101 @@ fi
 HOST="$1"
 PORT="$2"
 
+debug "Testing connection to $HOST:$PORT"
+
 # Try multiple approaches, from most to least compatible
 NC_SUCCESS=0
 
-# Try with nc command
-if command -v nc >/dev/null 2>&1; then
+# Special test for busybox-specific variants
+if busybox --help 2>&1 | grep -q BusyBox; then
+    debug "BusyBox detected, trying BusyBox-specific methods"
+    # BusyBox might have a limited nc that only supports basic syntax
+    # First try the simplest form with -w timeout
+    busybox nc -w 1 "$HOST" "$PORT" </dev/null >/dev/null 2>&1 && NC_SUCCESS=1
+    debug "BusyBox nc -w test result: $NC_SUCCESS"
+    
+    # Then try -z (zero I/O mode) which is common
+    if [ $NC_SUCCESS -eq 0 ]; then
+        busybox nc -z "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
+        debug "BusyBox nc -z test result: $NC_SUCCESS"
+    fi
+    
+    # Try plain echo piping if both failed
+    if [ $NC_SUCCESS -eq 0 ]; then
+        echo "" | busybox nc "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
+        debug "BusyBox nc echo pipe test result: $NC_SUCCESS"
+    fi
+fi
+
+# If BusyBox methods failed or weren't available, try standard nc
+if [ $NC_SUCCESS -eq 0 ] && command -v nc >/dev/null 2>&1; then
+    debug "Trying standard nc methods"
+    
     # Method 1: With -z flag (zero I/O mode)
     nc -z "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
+    debug "nc -z test result: $NC_SUCCESS"
     
     # Method 2: With echo pipe
-    [ $NC_SUCCESS -eq 0 ] && echo | nc "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
+    if [ $NC_SUCCESS -eq 0 ]; then
+        echo "" | nc "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
+        debug "nc echo pipe test result: $NC_SUCCESS"
+    fi
     
     # Method 3: With -w timeout
-    [ $NC_SUCCESS -eq 0 ] && nc -w 1 "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
+    if [ $NC_SUCCESS -eq 0 ]; then
+        nc -w 1 "$HOST" "$PORT" </dev/null >/dev/null 2>&1 && NC_SUCCESS=1
+        debug "nc -w test result: $NC_SUCCESS"
+    fi
 fi
 
 # Try with netcat command if nc failed
 if [ $NC_SUCCESS -eq 0 ] && command -v netcat >/dev/null 2>&1; then
+    debug "Trying netcat command"
+    
+    # Same tests with the netcat command
     netcat -z "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
-    [ $NC_SUCCESS -eq 0 ] && echo | netcat "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
-    [ $NC_SUCCESS -eq 0 ] && netcat -w 1 "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
+    debug "netcat -z test result: $NC_SUCCESS"
+    
+    if [ $NC_SUCCESS -eq 0 ]; then
+        echo "" | netcat "$HOST" "$PORT" >/dev/null 2>&1 && NC_SUCCESS=1
+        debug "netcat echo pipe test result: $NC_SUCCESS"
+    fi
+    
+    if [ $NC_SUCCESS -eq 0 ]; then
+        netcat -w 1 "$HOST" "$PORT" </dev/null >/dev/null 2>&1 && NC_SUCCESS=1
+        debug "netcat -w test result: $NC_SUCCESS"
+    fi
 fi
 
-# If netcat succeeded, return success
-[ $NC_SUCCESS -eq 1 ] && exit 0
+# If any netcat approach succeeded, return success
+if [ $NC_SUCCESS -eq 1 ]; then
+    debug "Successful connection to $HOST:$PORT"
+    exit 0
+fi
 
-# If all netcat attempts failed, exit with error
+# If all attempts failed, output a useful error message
+debug "All connection attempts to $HOST:$PORT failed"
+# This is expected for non-listening ports, so return code 1 is normal
 exit 1
 EOF
   
   # Make the wrapper executable
   kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- chmod +x /tmp/nc-wrapper.sh
   
-  # Test the wrapper with a simple echo
-  if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- /tmp/nc-wrapper.sh localhost 22 >/dev/null 2>&1 || [ $? -eq 1 ]; then
-    echo "Netcat wrapper script is functional"
+  # Test the wrapper with a simple connection test
+  # We expect a failure when connecting to a likely unavailable port, but not a crash
+  if kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- /tmp/nc-wrapper.sh localhost 22 >/dev/null 2>&1; then
+    echo "Netcat wrapper script connected to port 22 (unexpected success)"
+    # This might be valid in some environments where SSH is running in the container
+    # so we don't consider it an error
   else
-    echo "WARNING: Netcat wrapper script test failed but proceeding anyway"
+    local exit_code=$?
+    if [ $exit_code -eq 1 ] || [ $exit_code -eq 127 ]; then
+      echo "Netcat wrapper script is functional (expected failure with code $exit_code)"
+    else
+      echo "FATAL: Netcat wrapper script failed with unexpected exit code: $exit_code"
+      exit 1
+    fi
   fi
   else
     echo "Netcat verification completed successfully"

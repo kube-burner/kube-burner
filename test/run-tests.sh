@@ -8,7 +8,7 @@ chmod +x ../bin/amd64/kube-burner 2>/dev/null || echo "No binary in bin/amd64/"
 chmod +x /tmp/kube-burner 2>/dev/null || echo "No binary in /tmp/"
 
 # Ensure all test scripts are executable
-chmod +x ./*.bats ./*.bash
+chmod +x -- ./*.bats ./*.bash
 
 # Determine which binary to use
 if [ -x "/tmp/kube-burner" ]; then
