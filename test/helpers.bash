@@ -27,24 +27,44 @@ setup-service-checker() {
   test_uuid="${UUID:-$(uuidgen | cut -c1-8)}"
   
   # Use a mutex-like approach to prevent parallel setup-service-checker calls from interfering
-  local lock_file="/tmp/svc-checker-lock"
+  local lock_file="/tmp/svc-checker-lock-$test_uuid"
   
-  # Acquire lock with timeout
-  local timeout=30
+  # Acquire lock with timeout - using a unique lock file per test run
+  local timeout=20
   local start_time=$SECONDS
-  while [ -f "$lock_file" ] && [ $((SECONDS - start_time)) -lt $timeout ]; do
-    echo "Waiting for lock to be released... $((timeout - SECONDS + start_time))s left"
-    sleep 1
+  
+  # Check for other test runs' lock files
+  for other_lock in /tmp/svc-checker-lock-*; do
+    if [ -f "$other_lock" ] && [ "$other_lock" != "$lock_file" ]; then
+      other_uuid=$(cat "$other_lock" 2>/dev/null || echo "unknown")
+      echo "Found lock file $other_lock (uuid: $other_uuid)"
+      
+      # Check if the lock is stale (older than 5 minutes)
+      if [ -n "$(find "$other_lock" -mmin +5 2>/dev/null)" ]; then
+        echo "Removing stale lock file $other_lock (older than 5 minutes)"
+        rm -f "$other_lock"
+      else 
+        echo "Waiting for other test run to complete setup..."
+        # Wait briefly to allow other test to progress
+        sleep 3
+      fi
+    fi
   done
   
-  # If lock still exists after timeout, proceed anyway but log the issue
-  if [ -f "$lock_file" ]; then
-    echo "WARNING: Lock file still exists after timeout, proceeding anyway"
-    rm -f "$lock_file" # Force remove stale lock
-  fi
-  
-  # Create lock file
+  # Create our lock file first
   echo "$test_uuid" > "$lock_file"
+  echo "Created lock file: $lock_file"
+  
+  # Function to clean up lock on exit
+  cleanup_lock() {
+    if [ -f "$lock_file" ]; then
+      echo "Cleaning up lock file: $lock_file"
+      rm -f "$lock_file"
+    fi
+  }
+  
+  # Set trap to ensure lock is removed on exit
+  trap cleanup_lock EXIT
   
   echo "Setting up service checker pod for service latency tests (uuid: $test_uuid)"
   
@@ -53,7 +73,7 @@ setup-service-checker() {
     echo "Creating service latency namespace: ${SERVICE_LATENCY_NS}"
     if ! kubectl create namespace "${SERVICE_LATENCY_NS}"; then
       echo "FATAL: Failed to create service latency namespace"
-      rm -f "$lock_file" # Release lock on failure
+      # Lock cleanup is handled by trap
       exit 1
     fi
   else
@@ -189,8 +209,8 @@ EOF
   echo "Waiting for service checker pod to be ready"
   
   # Use a longer wait timeout and retry approach for slow environments (like CI)
-  local wait_attempts=3
-  local wait_timeout=120s
+  local wait_attempts=5
+  local wait_timeout=180s
   
   for attempt in $(seq 1 $wait_attempts); do
     echo "Waiting for service checker pod to be ready (attempt $attempt/$wait_attempts, timeout: $wait_timeout)"
@@ -445,14 +465,13 @@ EOF
   # Basic check that we can execute commands in the pod
   if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- echo "Service checker pod is functional"; then
     echo "FATAL: Cannot execute commands in the service checker pod"
-    rm -f "/tmp/svc-checker-lock" # Release lock on failure
+    # Lock cleanup is handled by trap
     exit 1
   fi
   
   echo "Service checker pod is ready with netcat available"
   
-  # Release the lock
-  rm -f "/tmp/svc-checker-lock"
+  # Lock cleanup is handled by trap, no need to explicitly remove it here
 }
 
 setup-kind() {
