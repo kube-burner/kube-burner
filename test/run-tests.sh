@@ -8,7 +8,7 @@ chmod +x ../bin/amd64/kube-burner 2>/dev/null || echo "No binary in bin/amd64/"
 chmod +x /tmp/kube-burner 2>/dev/null || echo "No binary in /tmp/"
 
 # Ensure all test scripts are executable
-chmod +x *.bats *.bash
+chmod +x ./*.bats ./*.bash
 
 # Determine which binary to use
 if [ -x "/tmp/kube-burner" ]; then
@@ -27,7 +27,7 @@ fi
 
 # Echo which binary we're using and its permissions
 echo "Using kube-burner binary: $KUBE_BURNER"
-ls -la $KUBE_BURNER
+ls -la "$KUBE_BURNER"
 
 # Run tests with reduced parallelism for stability
 echo "Running tests with KUBE_BURNER=$KUBE_BURNER"
@@ -41,8 +41,8 @@ if [[ "$1" == "--single" ]]; then
 fi
 
 # Run with reduced parallelism for better stability
-PARALLELISM=${PARALLELISM:-2}
+PARALLELISM="${PARALLELISM:-2}"
 echo "Running full test suite with parallelism: $PARALLELISM"
 
 # Execute the tests
-KUBE_BURNER=$KUBE_BURNER bats -F pretty -T --print-output-on-failure -j $PARALLELISM test-k8s.bats
+KUBE_BURNER=$KUBE_BURNER bats -F pretty -T --print-output-on-failure -j "$PARALLELISM" test-k8s.bats
