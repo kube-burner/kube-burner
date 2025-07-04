@@ -26,45 +26,67 @@ setup-service-checker() {
   local test_uuid
   test_uuid="${UUID:-$(uuidgen | cut -c1-8)}"
   
-  # Use a mutex-like approach to prevent parallel setup-service-checker calls from interfering
-  local lock_file="/tmp/svc-checker-lock-$test_uuid"
+  # Simple file-based lock system - more reliable across environments
+  local lock_dir="/tmp/kube-burner-locks"
+  local lock_file="${lock_dir}/service-checker.lock"
   
-  # Acquire lock with timeout - using a unique lock file per test run
-  local timeout=20
-  local start_time=$SECONDS
+  # Ensure lock directory exists
+  mkdir -p "${lock_dir}" 2>/dev/null || true
   
-  # Check for other test runs' lock files
-  for other_lock in /tmp/svc-checker-lock-*; do
-    if [ -f "$other_lock" ] && [ "$other_lock" != "$lock_file" ]; then
-      other_uuid=$(cat "$other_lock" 2>/dev/null || echo "unknown")
-      echo "Found lock file $other_lock (uuid: $other_uuid)"
+  echo "Setting up service checker pod (uuid: $test_uuid)"
+  
+  # Use a timeout for acquiring the lock
+  local timeout=60
+  local wait_interval=2
+  local elapsed=0
+  local lock_acquired=0
+  
+  echo "Attempting to acquire lock..."
+  
+  # Clean up any stale locks older than 5 minutes
+  find "${lock_dir}" -name "*.lock" -mmin +5 -delete 2>/dev/null || true
+  
+  # Try to acquire lock with simple atomic operation
+  while [ ${elapsed} -lt ${timeout} ] && [ ${lock_acquired} -eq 0 ]; do
+    # Atomic check and create using mkdir
+    if mkdir "${lock_file}.${test_uuid}" 2>/dev/null; then
+      # Successfully created the directory = lock acquired
+      echo "${test_uuid} - $(date)" > "${lock_file}.${test_uuid}/owner"
+      lock_acquired=1
+      echo "Lock acquired by test ${test_uuid}"
+    else
+      # Check for owner of existing lock
+      if [ -f "${lock_file}.*/owner" ] 2>/dev/null; then
+        owner=$(cat "${lock_file}.*/owner" 2>/dev/null || echo "unknown")
+        echo "Lock held by ${owner}, waiting..."
+      else
+        echo "Lock exists but owner unknown, waiting..."
+      fi
       
-      # Check if the lock is stale (older than 5 minutes)
-      if [ -n "$(find "$other_lock" -mmin +5 2>/dev/null)" ]; then
-        echo "Removing stale lock file $other_lock (older than 5 minutes)"
-        rm -f "$other_lock"
-      else 
-        echo "Waiting for other test run to complete setup..."
-        # Wait briefly to allow other test to progress
-        sleep 3
+      # Wait before trying again
+      sleep ${wait_interval}
+      elapsed=$((elapsed + wait_interval))
+      
+      # If we've waited too long, force proceeding
+      if [ ${elapsed} -ge ${timeout} ]; then
+        echo "WARNING: Timed out waiting for lock after ${timeout}s, proceeding anyway"
+        # Create our own lock anyway - tests will have to coordinate
+        mkdir -p "${lock_file}.${test_uuid}" 2>/dev/null || true
+        echo "${test_uuid} - FORCED - $(date)" > "${lock_file}.${test_uuid}/owner"
+        lock_acquired=1
       fi
     fi
   done
   
-  # Create our lock file first
-  echo "$test_uuid" > "$lock_file"
-  echo "Created lock file: $lock_file"
-  
-  # Function to clean up lock on exit
-  cleanup_lock() {
-    if [ -f "$lock_file" ]; then
-      echo "Cleaning up lock file: $lock_file"
-      rm -f "$lock_file"
-    fi
+  # Set up cleanup function
+  cleanup_test_lock() {
+    # Clean up the lock directory
+    rm -rf "${lock_file}.${test_uuid}" 2>/dev/null || true
+    echo "Lock for test ${test_uuid} released"
   }
   
-  # Set trap to ensure lock is removed on exit
-  trap cleanup_lock EXIT
+  # Ensure cleanup on exit
+  trap cleanup_test_lock EXIT
   
   echo "Setting up service checker pod for service latency tests (uuid: $test_uuid)"
   
@@ -465,13 +487,12 @@ EOF
   # Basic check that we can execute commands in the pod
   if ! kubectl exec -n ${SERVICE_LATENCY_NS} ${SERVICE_CHECKER_POD} -- echo "Service checker pod is functional"; then
     echo "FATAL: Cannot execute commands in the service checker pod"
-    # Lock cleanup is handled by trap
     exit 1
   fi
   
   echo "Service checker pod is ready with netcat available"
   
-  # Lock cleanup is handled by trap, no need to explicitly remove it here
+  # Our test-specific marker file will be cleaned up by the trap
 }
 
 setup-kind() {
