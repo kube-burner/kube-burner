@@ -39,6 +39,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	objectMappingWaitTime = 5 * time.Second
+)
+
 func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 	var f io.Reader
 	var err error
@@ -57,6 +61,10 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
+		obj := &object{
+			objectSpec: t,
+			Object:     o,
+		}
 		// Deserialize YAML
 		uns := &unstructured.Unstructured{}
 		cleanTemplate, err := util.CleanupTemplate(t)
@@ -65,15 +73,14 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 		}
 		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
 		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		if err != nil {
-			log.Fatal(err)
-		}
-		obj := &object{
-			gvr:        mapping.Resource,
-			objectSpec: t,
-			Object:     o,
-			namespace:  uns.GetNamespace(),
-			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		obj.namespace = uns.GetNamespace()
+		if err == nil {
+			obj.gvr = mapping.Resource
+			obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+		} else {
+			obj.gvr = schema.GroupVersionResource{}
+			obj.namespaced = true
+			obj.gvk = gvk
 		}
 		obj.Kind = gvk.Kind
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
@@ -131,6 +138,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			}
 		}
 		for objectIndex, obj := range ex.objects {
+			if obj.gvr == (schema.GroupVersionResource{}) {
+				log.Infof("Mapping for object %s not found, retrying in %s", obj.ObjectTemplate, objectMappingWaitTime)
+				time.Sleep(objectMappingWaitTime)
+				validateObject(obj, ex.mapper)
+			}
 			labels := map[string]string{
 				"kube-burner-uuid":                 ex.uuid,
 				"kube-burner-job":                  ex.Name,
