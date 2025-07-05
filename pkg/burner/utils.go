@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
 
@@ -111,6 +113,19 @@ func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructure
 	return o, gvk
 }
 
+// validateObject validates the object and sets the GVR
+func validateObject(obj *object, mapper meta.RESTMapper) {
+	mapper.(*restmapper.DeferredDiscoveryRESTMapper).Reset()
+	mapping, err := mapper.RESTMapping(obj.gvk.GroupKind())
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		obj.gvr = mapping.Resource
+		obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+		obj.Kind = obj.gvk.Kind
+	}
+}
+
 // Verify verifies the number of created objects
 func (ex *JobExecutor) Verify() bool {
 	var objList *unstructured.UnstructuredList
@@ -173,12 +188,10 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 }
 
 // newMapper returns a discovery RESTMapper
-func newRESTMapper(discoveryClient *discovery.DiscoveryClient) meta.RESTMapper {
-	apiGroupResouces, err := restmapper.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
+func newRESTMapper(config *rest.Config) meta.RESTMapper {
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+	cachedDiscovery := memory.NewMemCacheClient(discoveryClient)
+	return restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
 }
 
 func (ex *JobExecutor) Run(ctx context.Context) {
