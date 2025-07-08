@@ -88,7 +88,7 @@ func (jlmf jobLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 func (j *jobLatency) handleCreateJob(obj any) {
 	job := obj.(*batchv1.Job)
 	jobLabels := job.GetLabels()
-	j.metrics.LoadOrStore(string(job.UID), jobMetric{
+	j.Metrics.LoadOrStore(string(job.UID), jobMetric{
 		Timestamp:    job.CreationTimestamp.UTC(),
 		Namespace:    job.Namespace,
 		Name:         job.Name,
@@ -103,7 +103,7 @@ func (j *jobLatency) handleCreateJob(obj any) {
 
 func (j *jobLatency) handleUpdateJob(obj any) {
 	job := obj.(*batchv1.Job)
-	if value, exists := j.metrics.Load(string(job.UID)); exists {
+	if value, exists := j.Metrics.Load(string(job.UID)); exists {
 		jm := value.(jobMetric)
 		if jm.jobComplete.IsZero() {
 			for _, c := range job.Status.Conditions {
@@ -115,7 +115,7 @@ func (j *jobLatency) handleUpdateJob(obj any) {
 					}
 				}
 			}
-			j.metrics.Store(string(job.UID), jm)
+			j.Metrics.Store(string(job.UID), jm)
 		}
 	}
 }
@@ -158,7 +158,7 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 		}
 		jobs = append(jobs, jobList.Items...)
 	}
-	j.metrics = sync.Map{}
+	j.Metrics = sync.Map{}
 	for _, job := range jobs {
 		var startTime, completed time.Time
 		for _, c := range job.Status.Conditions {
@@ -168,7 +168,7 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 				completed = c.LastTransitionTime.UTC()
 			}
 		}
-		j.metrics.Store(string(job.UID), jobMetric{
+		j.Metrics.Store(string(job.UID), jobMetric{
 			Timestamp:   job.Status.StartTime.UTC(),
 			Namespace:   job.Namespace,
 			Name:        job.Name,
@@ -187,11 +187,11 @@ func (j *jobLatency) Stop() error {
 }
 
 func (j *jobLatency) GetMetrics() *sync.Map {
-	return &j.metrics
+	return &j.Metrics
 }
 
 func (j *jobLatency) normalizeMetrics() float64 {
-	j.metrics.Range(func(key, value any) bool {
+	j.Metrics.Range(func(key, value any) bool {
 		m := value.(jobMetric)
 		// If a job does not reach the Complete state (this timestamp isn't set), we skip that job
 		if m.jobComplete.IsZero() {
@@ -204,7 +204,7 @@ func (j *jobLatency) normalizeMetrics() float64 {
 			m.StartTimeLatency = 0
 		}
 		m.CompletionLatency = int(m.jobComplete.Sub(m.Timestamp).Milliseconds())
-		j.normLatencies = append(j.normLatencies, m)
+		j.NormLatencies = append(j.NormLatencies, m)
 		return true
 	})
 	return 0
