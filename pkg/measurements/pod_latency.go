@@ -23,11 +23,13 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -94,7 +96,11 @@ func (plmf podLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 }
 
 func (p *podLatency) handleCreatePod(obj any) {
-	pod := obj.(*corev1.Pod)
+	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Pod: %v", err)
+		return
+	}
 	podLabels := pod.GetLabels()
 	p.metrics.LoadOrStore(string(pod.UID), podMetric{
 		Timestamp:    pod.CreationTimestamp.UTC(),
@@ -110,7 +116,11 @@ func (p *podLatency) handleCreatePod(obj any) {
 }
 
 func (p *podLatency) handleUpdatePod(obj any) {
-	pod := obj.(*corev1.Pod)
+	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Pod: %v", err)
+		return
+	}
 	if value, exists := p.metrics.Load(string(pod.UID)); exists {
 		pm := value.(podMetric)
 		if pm.podReady.IsZero() {
@@ -149,12 +159,16 @@ func (p *podLatency) handleUpdatePod(obj any) {
 // start podLatency measurement
 func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	gvr, err := util.ResourceToGVR(p.RestConfig, "Pod", "v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "Pod", err)
+	}
 	p.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
 				name:          "podWatcher",
-				resource:      "pods",
+				resource:      gvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePod,

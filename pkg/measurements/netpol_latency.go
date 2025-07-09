@@ -31,7 +31,7 @@ import (
 	kconfig "github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/measurements/util"
+	mutil "github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -56,7 +57,7 @@ const (
 	netpolLatencyQuantilesMeasurement = "netpolLatencyQuantilesMeasurement"
 )
 
-var proxyPortForwarder *util.PodPortForwarder
+var proxyPortForwarder *mutil.PodPortForwarder
 var nsPodAddresses = make(map[string]map[string][]string)
 var proxyEndpoint string
 
@@ -189,7 +190,11 @@ func addPodsByLabel(clientSet kubernetes.Interface, ns string, ps *metav1.LabelS
 // Record the network policy creation timestamp when it is created.
 // We later do a diff with successful connection timestamp and define that as a network policy programming latency.
 func (n *netpolLatency) handleCreateNetpol(obj any) {
-	netpol := obj.(*networkingv1.NetworkPolicy)
+	netpol, err := kutil.ConvertAnyToTyped[networkingv1.NetworkPolicy](obj)
+	if err != nil {
+		log.Errorf("failed to convert to NetworkPolicy: %v", err)
+		return
+	}
 	npCreationTime[netpol.Name] = netpol.CreationTimestamp.UTC()
 }
 
@@ -475,7 +480,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 		}
 	}
 	if proxyPortForwarder == nil {
-		proxyPortForwarder, err = util.NewPodPortForwarder(n.ClientSet, *n.RestConfig, networkPolicyProxyPort, networkPolicyProxy, networkPolicyProxy)
+		proxyPortForwarder, err = mutil.NewPodPortForwarder(n.ClientSet, *n.RestConfig, networkPolicyProxyPort, networkPolicyProxy, networkPolicyProxy)
 		if err != nil {
 			return err
 		}
@@ -488,13 +493,16 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 	if len(connections) > 0 {
 		sendConnections()
 	}
-
+	gvr, err := kutil.ResourceToGVR(n.RestConfig, "NetworkPolicy", "networking.k8s.io/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "NetworkPolicy", err)
+	}
 	n.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    n.ClientSet.NetworkingV1().RESTClient().(*rest.RESTClient),
+				dynamicClient: dynamic.NewForConfigOrDie(n.RestConfig),
 				name:          "netpolWatcher",
-				resource:      "networkpolicies",
+				resource:      gvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", n.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNetpol,

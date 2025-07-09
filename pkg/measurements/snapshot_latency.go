@@ -21,10 +21,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kube-burner/kube-burner/pkg/util"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -89,7 +91,11 @@ func (vslmf volumeSnapshotLatencyMeasurementFactory) NewMeasurement(jobConfig *c
 }
 
 func (vsl *volumeSnapshotLatency) handleCreateVolumeSnapshot(obj any) {
-	volumeSnapshot := obj.(*volumesnapshotv1.VolumeSnapshot)
+	volumeSnapshot, err := util.ConvertAnyToTyped[volumesnapshotv1.VolumeSnapshot](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VolumeSnapshot: %v", err)
+		return
+	}
 	vsLabels := volumeSnapshot.GetLabels()
 	vsl.metrics.LoadOrStore(string(volumeSnapshot.UID), volumeSnapshotMetric{
 		Timestamp:    volumeSnapshot.CreationTimestamp.UTC(),
@@ -105,7 +111,11 @@ func (vsl *volumeSnapshotLatency) handleCreateVolumeSnapshot(obj any) {
 }
 
 func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
-	volumeSnapshot := obj.(*volumesnapshotv1.VolumeSnapshot)
+	volumeSnapshot, err := util.ConvertAnyToTyped[volumesnapshotv1.VolumeSnapshot](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VolumeSnapshot: %v", err)
+		return
+	}
 	if value, exists := vsl.metrics.Load(string(volumeSnapshot.UID)); exists {
 		vsm := value.(volumeSnapshotMetric)
 		if vsm.vsReady.IsZero() {
@@ -120,12 +130,16 @@ func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
 
 func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	gvr, err := util.ResourceToGVR(vsl.RestConfig, "VolumeSnapshot", "snapshot.storage.k8s.io/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "VolumeSnapshot", err)
+	}
 	vsl.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
+				dynamicClient: dynamic.NewForConfigOrDie(vsl.RestConfig),
 				name:          "vsWatcher",
-				resource:      "volumesnapshots",
+				resource:      gvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vsl.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vsl.handleCreateVolumeSnapshot,

@@ -16,15 +16,18 @@ package measurements
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -86,7 +89,11 @@ func (nlmf nodeLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, 
 }
 
 func (n *nodeLatency) handleCreateNode(obj any) {
-	node := obj.(*corev1.Node)
+	node, err := util.ConvertAnyToTyped[corev1.Node](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Node: %v", err)
+		return
+	}
 	labels := node.Labels
 	n.metrics.LoadOrStore(string(node.UID), NodeMetric{
 		Timestamp:  node.CreationTimestamp.UTC(),
@@ -100,7 +107,11 @@ func (n *nodeLatency) handleCreateNode(obj any) {
 }
 
 func (n *nodeLatency) handleUpdateNode(obj any) {
-	node := obj.(*corev1.Node)
+	node, err := util.ConvertAnyToTyped[corev1.Node](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Node: %v", err)
+		return
+	}
 	if value, exists := n.metrics.Load(string(node.UID)); exists {
 		nm := value.(NodeMetric)
 		for _, c := range node.Status.Conditions {
@@ -135,12 +146,16 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 	wg.Add(1)
 	n.Collect(&wg)
 	wg.Wait()
+	gvr, err := util.ResourceToGVR(n.RestConfig, "Node", "v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "Node", err)
+	}
 	n.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    n.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				dynamicClient: dynamic.NewForConfigOrDie(n.RestConfig),
 				name:          "nodeWatcher",
-				resource:      "nodes",
+				resource:      gvr,
 				labelSelector: "",
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNode,

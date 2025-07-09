@@ -26,39 +26,39 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 )
 
 // NewWatcherManager creates a new instance of watcher manager
-func NewWatcherManager(clientSet kubernetes.Interface, limiter *rate.Limiter) *WatcherManager {
+func NewWatcherManager(restConfig *rest.Config, limiter *rate.Limiter) *WatcherManager {
 	return &WatcherManager{
-		clientSet: clientSet,
-		limiter:   limiter,
-		watchers:  make(map[string]*Watcher),
+		restConfig: restConfig,
+		limiter:    limiter,
+		watchers:   make(map[string]*Watcher),
 	}
 }
 
 // Start method to start a watcher
-func (wm *WatcherManager) Start(kind string, labelSelector map[string]string, index, replica int) {
+func (wm *WatcherManager) Start(kind, apiVersion string, labelSelector map[string]string, index, replica int) {
 	wm.wg.Add(1)
 	go func() {
 		defer wm.wg.Done()
 		_ = wm.limiter.Wait(context.TODO())
 
 		kindLower := strings.ToLower(kind)
-		plural := util.NaivePlural(kind)
 		indexNum := strconv.Itoa(index)
 		replicaNum := strconv.Itoa(replica)
 		watcherName := kindLower + "_watcher_" + indexNum + "_replica_" + replicaNum
-		restClient, err := util.ResourceToRESTClient(wm.clientSet, kindLower)
+		gvr, err := util.ResourceToGVR(wm.restConfig, kind, apiVersion)
 		if err != nil {
-			wm.recordError(fmt.Errorf("error getting REST client for %s: %w", kindLower, err))
+			wm.recordError(fmt.Errorf("error getting GVR for %s: %w", kindLower, err))
 			return
 		}
 		watcher := NewWatcher(
-			restClient,
+			dynamic.NewForConfigOrDie(wm.restConfig),
 			watcherName,
-			plural,
+			gvr,
 			corev1.NamespaceAll,
 			func(options *metav1.ListOptions) {
 				options.LabelSelector = labels.SelectorFromSet(labelSelector).String()
