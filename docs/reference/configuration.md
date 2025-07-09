@@ -160,6 +160,7 @@ We have watchers support during the benchmark workload. It is at a job level and
 | Option            | Description                                             | Type    | Default |
 |-------------------|---------------------------------------------------------|---------|---------|
 | `kind`            | Object kind to consider for watch                       | String  |    ""   |
+| `apiVersion`      | Object apiVersion to consider for watch                 | String  |    ""   |
 | `labelSelector`   | Objects with these labels will be considered for watch  | Object  |    {}   |
 | `replicas`        | Number of watcher replicas to create                    | Integer |     0   |
 

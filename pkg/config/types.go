@@ -224,6 +224,8 @@ type WaitOptions struct {
 type Watcher struct {
 	// Kind object kind to consider for watch
 	Kind string `yaml:"kind" json:"kind,omitempty"`
+	// APIVersion object apiVersion to consider for watch
+	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with these labels will be considered
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// Replicas number of replicas to create of the given object

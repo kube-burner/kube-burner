@@ -18,7 +18,7 @@ import (
 	"sync"
 
 	"golang.org/x/time/rate"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -30,11 +30,11 @@ type Watcher struct {
 
 // WatcherManager type to manage watchers
 type WatcherManager struct {
-	clientSet kubernetes.Interface
-	limiter   *rate.Limiter
-	watchers  map[string]*Watcher
-	mu        sync.Mutex
-	wg        sync.WaitGroup
-	errMu     sync.Mutex
-	errs      []error
+	restConfig *rest.Config
+	limiter    *rate.Limiter
+	watchers   map[string]*Watcher
+	mu         sync.Mutex
+	wg         sync.WaitGroup
+	errMu      sync.Mutex
+	errs       []error
 }
