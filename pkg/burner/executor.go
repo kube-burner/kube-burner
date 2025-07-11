@@ -53,6 +53,7 @@ type JobExecutor struct {
 	functionTemplates []string
 	embedCfg          *fileutils.EmbedConfiguration
 	mapper            meta.RESTMapper
+	objectOperations  int32
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
@@ -64,6 +65,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		waitLimiter:       rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
 		embedCfg:          embedCfg,
+		objectOperations:  0,
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)

@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -294,6 +295,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 			log.Error("Retrying object creation")
 			return false, nil
 		}
+		atomic.AddInt32(&ex.objectOperations, 1)
 		if ns != "" {
 			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		} else {
