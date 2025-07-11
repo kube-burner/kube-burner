@@ -28,6 +28,7 @@ import (
 type object struct {
 	config.Object
 	gvr        schema.GroupVersionResource
+	gvk        *schema.GroupVersionKind
 	waitGVR    *schema.GroupVersionResource
 	objectSpec []byte
 	namespace  string
