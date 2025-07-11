@@ -27,6 +27,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -50,9 +52,9 @@ type BaseMeasurement struct {
 }
 
 type MeasurementWatcher struct {
-	restClient    *rest.RESTClient
+	dynamicClient dynamic.Interface
 	name          string
-	resource      string
+	resource      schema.GroupVersionResource
 	labelSelector string
 	handlers      *cache.ResourceEventHandlerFuncs
 }
@@ -66,7 +68,7 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 	for i, measurementWatcher := range measurementWatchers {
 		log.Infof("Creating %v latency watcher for %s", measurementWatcher.resource, bm.JobConfig.Name)
 		bm.watchers[i] = watchers.NewWatcher(
-			measurementWatcher.restClient,
+			measurementWatcher.dynamicClient,
 			measurementWatcher.name,
 			measurementWatcher.resource,
 			corev1.NamespaceAll,
