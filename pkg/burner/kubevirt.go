@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -190,6 +191,7 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	} else {
 		log.Debugf("Successfully executed op [%s] on the VM [%s]", obj.KubeVirtOp, item.GetName())
 	}
+	atomic.AddInt32(&ex.objectOperations, 1)
 
 	// Use predefined status paths when not set by the user
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 && operationConfig != nil {
