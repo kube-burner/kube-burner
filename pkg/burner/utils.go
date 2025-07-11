@@ -113,16 +113,18 @@ func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructure
 	return o, gvk
 }
 
-// validateObject validates the object and sets the GVR
-func validateObject(obj *object, mapper meta.RESTMapper) {
-	mapper.(*restmapper.DeferredDiscoveryRESTMapper).Reset()
-	mapping, err := mapper.RESTMapping(obj.gvk.GroupKind())
+// validateObject resets the REST mapper and resolves the object's fields before creation
+func (ex *JobExecutor) validateObject(obj *object) {
+	ex.mapper.(*restmapper.DeferredDiscoveryRESTMapper).Reset()
+	mapping, err := ex.mapper.RESTMapping(obj.gvk.GroupKind())
 	if err != nil {
 		log.Fatal(err)
-	} else {
-		obj.gvr = mapping.Resource
-		obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-		obj.Kind = obj.gvk.Kind
+	}
+	obj.gvr = mapping.Resource
+	obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+	obj.Kind = obj.gvk.Kind
+	if obj.namespaced && obj.namespace == "" {
+		ex.nsRequired = true
 	}
 }
 
