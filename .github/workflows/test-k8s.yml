@@ -3,6 +3,18 @@ name: Execute tests on k8s and OCP
 on:
   workflow_dispatch:
   workflow_call:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'examples/**'
+      - 'media/**'
+      - 'mkdocs.yml'
+      - '.gitignore'
+      - 'LICENSE'
 jobs:
   fetch-latest-kind-node-tags:
     runs-on: ubuntu-latest
@@ -34,6 +46,7 @@ jobs:
     needs: fetch-latest-kind-node-tags
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         k8s-version: ${{ fromJson(needs.fetch-latest-kind-node-tags.outputs.tags) }}
     steps:
