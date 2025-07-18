@@ -39,8 +39,8 @@ func (lc *SvcLatencyChecker) Ping(address string, port int32, timeout time.Durat
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	// We use 50ms precision thanks to sleep 0.05
-	// Use nc with -z flag for port scanning (works with alpine netcat)
-	cmd := []string{"sh", "-c", fmt.Sprintf("while true; do nc -z -w 1 %s %d && break; sleep 0.05; done", address, port)}
+	// Use nc with -w flag for timeout (works with fedora nmap-ncat)
+	cmd := []string{"bash", "-c", fmt.Sprintf("while true; do nc -w 1 -z %s %d && break; sleep 0.05; done", address, port)}
 	req := lc.clientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(lc.Pod.Name).
