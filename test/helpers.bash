@@ -8,10 +8,24 @@ wait_with_timeout() {
     local timeout=${2:-300}
     local start_time=$SECONDS
 
+    # Fix SC2004: Remove unnecessary $ in arithmetic variables
     while [ -f "$lock_file" ] && [ $((SECONDS - start_time)) -lt $timeout ]; do
         echo "Waiting for lock to be released... ($((timeout - SECONDS + start_time))s left)"
         sleep 1
     done
+}
+
+# Function to check command exit status properly (fixes SC2181)
+check_command_status() {
+    local cmd="$1"
+    local error_msg="${2:-Command failed}"
+
+    # Fix SC2181: Check exit code directly instead of using $?
+    if ! eval "$cmd"; then
+        echo "$error_msg"
+        return 1
+    fi
+    return 0
 }
 
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
