@@ -1,0 +1,53 @@
+name: CI Parallel Tests
+on:
+  workflow_call:
+    inputs:
+      k8s-version:
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-group:
+          - "churn"
+          - "gc"
+          - "indexing"
+          - "kubeconfig"
+          - "kubevirt"
+          - "alert"
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      
+      - name: Download kube-burner binary
+        uses: actions/download-artifact@v4
+        with:
+          name: kube-burner
+          path: /tmp/
+      
+      - name: Install bats
+        uses: bats-core/bats-action@3.0.1
+        with:
+          bats-version: 1.10.0
+          support-install: false
+          assert-install: false
+          detik-install: false
+          file-install: false
+          
+      - name: Make binary executable
+        run: chmod +x /tmp/kube-burner
+        
+      - name: Run bats tests for ${{ matrix.test-group }}
+        run: make test-k8s TEST_FILTER="${{ matrix.test-group }}" TEST_BINARY=/tmp/kube-burner
+        env:
+          TERM: linux
+          KIND_VERSION: v0.19.0
+          K8S_VERSION: ${{ inputs.k8s-version }}
+          PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
