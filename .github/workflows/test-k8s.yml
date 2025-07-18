@@ -33,9 +33,12 @@ jobs:
   test-k8s:
     needs: fetch-latest-kind-node-tags
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       matrix:
         k8s-version: ${{ fromJson(needs.fetch-latest-kind-node-tags.outputs.tags) }}
+      fail-fast: false
+      max-parallel: 1  # Run sequentially to avoid resource conflicts
     steps:
 
     - name: Check out code
@@ -61,12 +64,21 @@ jobs:
         file-install: false
 
     - name: Execute Tests
+      timeout-minutes: 45
       run: |
         chmod +x /tmp/kube-burner
-        make test-k8s
+        make test-k8s TEST_TIMEOUT=2400
       env:
         TERM: linux
         KIND_VERSION: v0.19.0
         K8S_VERSION: ${{matrix.k8s-version}}
         PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
         TEST_BINARY: /tmp/kube-burner
+
+    - name: Cleanup on failure
+      if: failure()
+      run: |
+        echo "Test failed, cleaning up..."
+        kubectl get pods --all-namespaces || true
+        kubectl get nodes || true
+        docker ps || true

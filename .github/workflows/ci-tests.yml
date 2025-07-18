@@ -8,19 +8,27 @@ on:
       - main
 
 jobs:
+  detect-changes:
+    uses: ./.github/workflows/detect-changes.yml
+
   codeql:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.source-changed == 'true'
     uses: ./.github/workflows/codeql.yml
 
   lint:
     uses: ./.github/workflows/linters.yml
 
   build:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.source-changed == 'true'
     uses: ./.github/workflows/builders.yml
 
   check-docs:
     uses: ./.github/workflows/check-docs-links.yml
 
   tests:
-    needs: build
-    uses: ./.github/workflows/test-k8s.yml
+    needs: [build, detect-changes]
+    if: needs.detect-changes.outputs.source-changed == 'true'
+    uses: ./.github/workflows/test-k8s-optimized.yml
     secrets: inherit

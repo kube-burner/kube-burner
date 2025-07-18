@@ -1,0 +1,58 @@
+name: Optimized K8s Tests
+on:
+  workflow_call:
+
+# Cancel previous runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fetch-latest-kind-node-tags:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tags: ${{ steps.fetch-versions.outputs.tags }}
+    steps:
+      - name: Fetch latest patch version for the latest 3 minor versions of kindest/node
+        id: fetch-versions
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+
+          # Fetch tags from Docker Hub API with retry logic
+          for i in {1..3}; do
+            if all_tags=$(curl -s --max-time 30 "https://hub.docker.com/v2/repositories/kindest/node/tags/?page_size=100" | jq -r '.results[].name'); then
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 5
+          done
+
+          # Filter semantic versioning tags
+          semver_tags=$(echo "$all_tags" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$')
+
+          # Get the latest patch versions of the latest 3 minor versions
+          latest_three=$(echo "$semver_tags" | sort -V | awk -F. '{print $1"."$2}' | uniq | tail -n 3 | while read minor; do
+            echo "$semver_tags" | grep "^$minor" | sort -V | tail -n 1
+          done)
+
+          echo "Latest patch versions of the latest 3 minor versions:"
+          echo "$latest_three"
+
+          # Convert the output to a JSON array for use in other steps
+          tags_json=$(echo "$latest_three" | jq -c -R -s 'split("\n") | map(select(length > 0))')
+          echo "tags=$tags_json" >> "$GITHUB_OUTPUT"
+
+  test-k8s-parallel:
+    needs: fetch-latest-kind-node-tags
+    if: success()
+    strategy:
+      matrix:
+        k8s-version: ${{ fromJson(needs.fetch-latest-kind-node-tags.outputs.tags) }}
+      fail-fast: false
+      max-parallel: 2  # Limit concurrent K8s versions to avoid resource contention
+    uses: ./.github/workflows/ci-parallel.yml
+    with:
+      k8s-version: ${{ matrix.k8s-version }}
+    secrets: inherit

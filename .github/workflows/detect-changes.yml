@@ -1,0 +1,106 @@
+name: Detect Changes
+on:
+  workflow_call:
+    outputs:
+      source-changed:
+        description: "Whether source code files have changed"
+        value: ${{ jobs.detect-changes.outputs.source-changed }}
+      docs-only:
+        description: "Whether only documentation files have changed"
+        value: ${{ jobs.detect-changes.outputs.docs-only }}
+      tests-changed:
+        description: "Whether test files have changed"
+        value: ${{ jobs.detect-changes.outputs.tests-changed }}
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      source-changed: ${{ steps.changes.outputs.source }}
+      docs-only: ${{ steps.changes.outputs.docs-only }}
+      tests-changed: ${{ steps.changes.outputs.tests }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Detect file changes
+        id: changes
+        run: |
+          # Get the list of changed files
+          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
+            # For PRs, compare against the base branch
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          else
+            # For push events, compare against the previous commit
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Initialize flags
+          SOURCE_CHANGED=false
+          TESTS_CHANGED=false
+          DOCS_ONLY=true
+          
+          # Check each changed file
+          while IFS= read -r file; do
+            if [[ -z "$file" ]]; then
+              continue
+            fi
+            
+            case "$file" in
+              # Source code files
+              *.go|go.mod|go.sum|Makefile|Containerfile)
+                SOURCE_CHANGED=true
+                DOCS_ONLY=false
+                ;;
+              # Test files
+              test/*|*.bats|*.bash)
+                TESTS_CHANGED=true
+                DOCS_ONLY=false
+                ;;
+              # CI/CD files
+              .github/workflows/*|.github/actions/*)
+                SOURCE_CHANGED=true
+                DOCS_ONLY=false
+                ;;
+              # Configuration files
+              *.yml|*.yaml|*.json|*.toml)
+                # Only consider config files in root or specific directories as source changes
+                if [[ "$file" =~ ^(examples/|test/k8s/|hack/) ]] || [[ "$file" == *.yml ]] || [[ "$file" == *.yaml ]]; then
+                  SOURCE_CHANGED=true
+                  DOCS_ONLY=false
+                fi
+                ;;
+              # Documentation files (these don't affect DOCS_ONLY flag)
+              *.md|docs/*|*.txt|LICENSE|NOTICE|CHANGELOG*)
+                # These are docs, don't change DOCS_ONLY
+                ;;
+              # Any other file is considered source
+              *)
+                SOURCE_CHANGED=true
+                DOCS_ONLY=false
+                ;;
+            esac
+          done <<< "$CHANGED_FILES"
+          
+          # If no files changed, treat as source change for safety
+          if [[ -z "$CHANGED_FILES" ]]; then
+            SOURCE_CHANGED=true
+            DOCS_ONLY=false
+          fi
+          
+          echo "source=$SOURCE_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "tests=$TESTS_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "docs-only=$DOCS_ONLY" >> "$GITHUB_OUTPUT"
+          
+          echo "Source changed: $SOURCE_CHANGED"
+          echo "Tests changed: $TESTS_CHANGED"
+          echo "Docs only: $DOCS_ONLY"

@@ -37,7 +37,19 @@ help:
 	@echo '    [ARCH=arch] make images       	Build images for arch, default amd64'
 	@echo '    [ARCH=arch] make push         	Push images for arch, default amd64'
 	@echo '    make manifest                 	Create and push manifest for the different architectures supported'
+	@echo '    make test                     	Run linting and all tests'
+	@echo '    make test-k8s                 	Run Kubernetes tests'
+	@echo '    make test-group-<group>       	Run specific test group (churn, gc, indexing, etc.)'
 	@echo '    make help                     	Show this message'
+	@echo
+	@echo 'Test Groups:'
+	@echo '    churn, gc, indexing, kubeconfig, kubevirt, alert, crd, delete,'
+	@echo '    read, sequential, userdata, datavolume, metrics'
+	@echo
+	@echo 'Environment Variables:'
+	@echo '    TEST_BINARY                   	Path to kube-burner binary for tests'
+	@echo '    TEST_FILTER                   	Filter pattern for bats tests'
+	@echo '    TEST_TIMEOUT                  	Timeout for individual tests (default: no timeout)'
 
 build: $(BIN_PATH)
 
@@ -92,4 +104,56 @@ manifest-build:
 test: lint test-k8s
 
 test-k8s:
-	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats
+	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure $(if $(TEST_TIMEOUT),--timeout $(TEST_TIMEOUT),) test-k8s.bats
+
+# Test group mappings for parallel execution
+test-group-churn:
+	$(MAKE) test-k8s TEST_FILTER="churn=true"
+
+test-group-gc:
+	$(MAKE) test-k8s TEST_FILTER="gc=false"
+
+test-group-indexing:
+	$(MAKE) test-k8s TEST_FILTER="indexing=true"
+
+test-group-kubeconfig:
+	$(MAKE) test-k8s TEST_FILTER="kubeconfig"
+
+test-group-kubevirt:
+	$(MAKE) test-k8s TEST_FILTER="kubevirt"
+
+test-group-alert:
+	$(MAKE) test-k8s TEST_FILTER="check-alerts|alerting=true"
+
+test-group-crd:
+	$(MAKE) test-k8s TEST_FILTER="crd"
+
+test-group-delete:
+	$(MAKE) test-k8s TEST_FILTER="delete=true"
+
+test-group-read:
+	$(MAKE) test-k8s TEST_FILTER="read"
+
+test-group-sequential:
+	$(MAKE) test-k8s TEST_FILTER="sequential patch"
+
+test-group-userdata:
+	$(MAKE) test-k8s TEST_FILTER="user data file"
+
+test-group-datavolume:
+	$(MAKE) test-k8s TEST_FILTER="datavolume latency"
+
+test-group-metrics:
+	$(MAKE) test-k8s TEST_FILTER="metrics aggregation|metrics-endpoint=true"
+
+# Validate test groups by listing available tests
+validate-test-groups:
+	@echo "Validating test groups..."
+	@cd test && bats --list test-k8s.bats | grep -E "@test" || true
+	@echo "Test group validation complete"
+
+# Run a quick smoke test to ensure basic functionality
+smoke-test:
+	@echo "Running smoke test..."
+	$(MAKE) test-group-gc TEST_BINARY=$(TEST_BINARY)
+	@echo "Smoke test passed"
