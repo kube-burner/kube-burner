@@ -114,13 +114,13 @@ test-group-gc:
 	$(MAKE) test-k8s TEST_FILTER="gc=false"
 
 test-group-indexing:
-	$(MAKE) test-k8s TEST_FILTER="indexing=true|local-indexing=true"
+	$(MAKE) test-k8s TEST_FILTER="local-indexing=true"
 
 test-group-kubeconfig:
 	$(MAKE) test-k8s TEST_FILTER="kubeconfig"
 
 test-group-kubevirt:
-	$(MAKE) test-k8s TEST_FILTER="kubevirt|vm-latency"
+	$(MAKE) test-k8s TEST_FILTER="vm-latency-indexing=true|jobType kubevirt"
 
 test-group-alert:
 	$(MAKE) test-k8s TEST_FILTER="check-alerts|alerting=true"
@@ -145,6 +145,16 @@ test-group-datavolume:
 
 test-group-metrics:
 	$(MAKE) test-k8s TEST_FILTER="metrics aggregation|metrics-endpoint=true"
+
+# Additional test groups for better distribution
+test-group-health:
+	$(MAKE) test-k8s TEST_FILTER="health check|log file output"
+
+test-group-wait:
+	$(MAKE) test-k8s TEST_FILTER="waitOptions for Deployment"
+
+test-group-index:
+	$(MAKE) test-k8s TEST_FILTER="index.*tarball=true"
 
 # Validate test groups by listing available tests
 validate-test-groups:
