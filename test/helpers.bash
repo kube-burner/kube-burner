@@ -2,6 +2,18 @@
 # vi: ft=bash
 # shellcheck disable=SC2086,SC2068
 
+# Function to wait with proper arithmetic (fixes SC2004)
+wait_with_timeout() {
+    local lock_file=$1
+    local timeout=${2:-300}
+    local start_time=$SECONDS
+
+    while [ -f "$lock_file" ] && [ $((SECONDS - start_time)) -lt $timeout ]; do
+        echo "Waiting for lock to be released... ($((timeout - SECONDS + start_time))s left)"
+        sleep 1
+    done
+}
+
 KIND_VERSION=${KIND_VERSION:-v0.19.0}
 K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-podman}
