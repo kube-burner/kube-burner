@@ -71,6 +71,9 @@ The PR branch needs to update its test setup code to either:
 ## 📋 All Issues Fixed
 
 - ✅ **Shellcheck SC2181** - Fixed in `test/helpers.bash`
+- ✅ **Shellcheck SC2035** - Fixed glob patterns in `test/run-tests.sh`
+- ✅ **Shellcheck SC2086** - Fixed variable quoting in `test/run-tests.sh`
+- ✅ **Shellcheck SC2004** - Fixed arithmetic expressions in `test/helpers.bash`
 - ✅ **CI Parallel Workflow** - Added clean `ci-parallel.yml`
 - ✅ **Service Latency Code** - Updated to use fedora-nc image
 - ✅ **Netcat Compatibility** - Fixed command for fedora nmap-ncat
