@@ -114,13 +114,13 @@ test-group-gc:
 	$(MAKE) test-k8s TEST_FILTER="gc=false"
 
 test-group-indexing:
-	$(MAKE) test-k8s TEST_FILTER="indexing=true"
+	$(MAKE) test-k8s TEST_FILTER="indexing=true|local-indexing=true"
 
 test-group-kubeconfig:
 	$(MAKE) test-k8s TEST_FILTER="kubeconfig"
 
 test-group-kubevirt:
-	$(MAKE) test-k8s TEST_FILTER="kubevirt"
+	$(MAKE) test-k8s TEST_FILTER="kubevirt|vm-latency"
 
 test-group-alert:
 	$(MAKE) test-k8s TEST_FILTER="check-alerts|alerting=true"
