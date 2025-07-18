@@ -235,10 +235,8 @@ check_metric_value() {
   sleep 3 # There's some delay on the documents to show up in OpenSearch
   for metric in "${@}"; do
     endpoint="${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${metric}"
-    RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error')
-    RETURN_CODE=$?
-    if [ "${RETURN_CODE}" -ne 0 ]; then
-      echo "Return code: ${RETURN_CODE}"
+    if ! RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error'); then
+      echo "Failed to query endpoint or parse JSON"
       return 1
     elif [ "${RESULT}" == 0 ]; then
       echo "${metric} not found in ${endpoint}"
