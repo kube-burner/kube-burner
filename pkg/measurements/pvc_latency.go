@@ -90,7 +90,7 @@ func (p *pvcLatency) handleCreatePVC(obj any) {
 	pvc := obj.(*corev1.PersistentVolumeClaim)
 	log.Tracef("handleCreatePVC: %s", pvc.Name)
 	pvcLabels := pvc.GetLabels()
-	p.metrics.LoadOrStore(string(pvc.UID), pvcMetric{
+	p.Metrics.LoadOrStore(string(pvc.UID), pvcMetric{
 		Timestamp:    time.Now().UTC(),
 		Namespace:    pvc.Namespace,
 		Name:         pvc.Name,
@@ -109,7 +109,7 @@ func (p *pvcLatency) handleCreatePVC(obj any) {
 func (p *pvcLatency) handleUpdatePVC(obj any) {
 	pvc := obj.(*corev1.PersistentVolumeClaim)
 	log.Tracef("handleUpdatePVC: %s", pvc.Name)
-	if value, exists := p.metrics.Load(string(pvc.UID)); exists {
+	if value, exists := p.Metrics.Load(string(pvc.UID)); exists {
 		pm := value.(pvcMetric)
 		log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
 		if pm.bound == 0 || pm.lost == 0 {
@@ -132,7 +132,7 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 					pm.lost = time.Now().UTC().UnixMilli()
 				}
 			}
-			p.metrics.Store(string(pvc.UID), pm)
+			p.Metrics.Store(string(pvc.UID), pm)
 		} else {
 			log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
 		}
@@ -188,7 +188,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 	totalPVCs := 0
 	erroredPVCs := 0
 
-	p.metrics.Range(func(key, value any) bool {
+	p.Metrics.Range(func(key, value any) bool {
 		m := value.(pvcMetric)
 		// If a pvc does not reach the stable state, we skip that one
 		if m.bound == 0 && m.lost == 0 {
@@ -220,7 +220,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 
 		totalPVCs++
 		erroredPVCs += errorFlag
-		p.normLatencies = append(p.normLatencies, m)
+		p.NormLatencies = append(p.NormLatencies, m)
 		return true
 	})
 	if totalPVCs == 0 {
