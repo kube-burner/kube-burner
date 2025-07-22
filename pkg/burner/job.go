@@ -35,6 +35,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/rest"
 )
@@ -130,7 +131,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn duration: %v", jobExecutor.ChurnDuration)
 					log.Infof("Churn percent: %v", jobExecutor.ChurnPercent)
 					log.Infof("Churn delay: %v", jobExecutor.ChurnDelay)
-					log.Infof("Churn deletion strategy: %v", jobExecutor.ChurnDeletionStrategy)
+					log.Infof("Using deletion strategy: %v", jobExecutor.deletionStrategy)
 				}
 				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces)
 				if ctx.Err() != nil {
@@ -419,10 +420,27 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
-	err := util.CleanupNamespaces(ctx, ex.clientSet, labelSelector)
-	// Just report error and continue
-	if err != nil {
-		log.Error(err.Error())
+	if ex.deletionStrategy == config.GVRDeletionStrategy {
+		namespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			log.Error(err.Error())
+		} else {
+			namespacesToDelete := make([]string, 0, len(namespaces.Items))
+			for _, ns := range namespaces.Items {
+				namespacesToDelete = append(namespacesToDelete, ns.Name)
+			}
+			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
+			err := util.CleanupNamespaces(ctx, ex.clientSet, labelSelector)
+			if err != nil {
+				log.Error(err.Error())
+			}
+		}
+	} else {
+		err := util.CleanupNamespaces(ctx, ex.clientSet, labelSelector)
+		// Just report error and continue
+		if err != nil {
+			log.Error(err.Error())
+		}
 	}
 	for _, obj := range ex.objects {
 		ex.limiter.Wait(ctx)
