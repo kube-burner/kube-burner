@@ -16,16 +16,19 @@ package measurements
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -105,7 +108,11 @@ func (vmimf vmimLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job,
 }
 
 func (vmiml *vmimLatency) handleCreateVMIM(obj any) {
-	migration := obj.(*kvv1.VirtualMachineInstanceMigration)
+	migration, err := util.ConvertAnyToTyped[kvv1.VirtualMachineInstanceMigration](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachineInstanceMigration: %v", err)
+		return
+	}
 	migrationLabels := migration.GetLabels()
 	vmiml.metrics.LoadOrStore(string(migration.GetUID()), vmimMetric{
 		Namespace:    migration.GetNamespace(),
@@ -121,7 +128,11 @@ func (vmiml *vmimLatency) handleCreateVMIM(obj any) {
 }
 
 func (vmiml *vmimLatency) handleUpdateVMIM(obj any) {
-	migration := obj.(*kvv1.VirtualMachineInstanceMigration)
+	migration, err := util.ConvertAnyToTyped[kvv1.VirtualMachineInstanceMigration](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachineInstanceMigration: %v", err)
+		return
+	}
 	if vmimM, ok := vmiml.metrics.Load(string(migration.GetUID())); ok {
 		vmimMetric := vmimM.(vmimMetric)
 
@@ -165,14 +176,17 @@ func (vmiml *vmimLatency) handleUpdateVMIM(obj any) {
 // Start starts vmimLatency measurement
 func (vmiml *vmimLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	restClient := newRESTClientWithRegisteredKubevirtResource(vmiml.RestConfig)
+	gvr, err := util.ResourceToGVR(vmiml.RestConfig, "VirtualMachineInstanceMigration", "kubevirt.io/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "VirtualMachineInstanceMigration", err)
+	}
 	vmiml.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient: restClient,
-				name:       "vmimWatcher",
-				resource:   "virtualmachineinstancemigrations",
-				// labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmim.Runid),
+				dynamicClient: dynamic.NewForConfigOrDie(vmiml.RestConfig),
+				name:          "vmimWatcher",
+				resource:      gvr,
+				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmiml.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmiml.handleCreateVMIM,
 					UpdateFunc: func(oldObj, newObj any) {
