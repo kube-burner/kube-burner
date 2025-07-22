@@ -23,12 +23,14 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -86,7 +88,11 @@ func (jlmf jobLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 }
 
 func (j *jobLatency) handleCreateJob(obj any) {
-	job := obj.(*batchv1.Job)
+	job, err := util.ConvertAnyToTyped[batchv1.Job](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Job: %v", err)
+		return
+	}
 	jobLabels := job.GetLabels()
 	j.metrics.LoadOrStore(string(job.UID), jobMetric{
 		Timestamp:    job.CreationTimestamp.UTC(),
@@ -102,7 +108,11 @@ func (j *jobLatency) handleCreateJob(obj any) {
 }
 
 func (j *jobLatency) handleUpdateJob(obj any) {
-	job := obj.(*batchv1.Job)
+	job, err := util.ConvertAnyToTyped[batchv1.Job](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Job: %v", err)
+		return
+	}
 	if value, exists := j.metrics.Load(string(job.UID)); exists {
 		jm := value.(jobMetric)
 		if jm.jobComplete.IsZero() {
@@ -123,12 +133,16 @@ func (j *jobLatency) handleUpdateJob(obj any) {
 // start jobLatency measurement
 func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	gvr, err := util.ResourceToGVR(j.RestConfig, "Job", "batch/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "Job", err)
+	}
 	j.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    j.ClientSet.BatchV1().RESTClient().(*rest.RESTClient),
+				dynamicClient: dynamic.NewForConfigOrDie(j.RestConfig),
 				name:          "jobWatcher",
-				resource:      "jobs",
+				resource:      gvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", j.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: j.handleCreateJob,

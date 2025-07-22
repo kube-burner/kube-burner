@@ -92,7 +92,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	defer cancel()
 	go func() {
 		var innerRC int
-		clientSet, _ := kubeClientProvider.DefaultClientSet()
+		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		handlePreloadImages(jobExecutors, kubeClientProvider)
@@ -104,10 +104,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
 			})
-			watcherManager := watchers.NewWatcherManager(clientSet, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
+			watcherManager := watchers.NewWatcherManager(restConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
 			for idx, watcher := range jobExecutor.Watchers {
 				for replica := range watcher.Replicas {
-					watcherManager.Start(watcher.Kind, watcher.LabelSelector, idx+1, replica+1)
+					watcherManager.Start(watcher.Kind, watcher.APIVersion, watcher.LabelSelector, idx+1, replica+1)
 				}
 			}
 			watcherStartErrors := watcherManager.Wait()

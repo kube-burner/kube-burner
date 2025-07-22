@@ -21,12 +21,12 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -111,7 +111,11 @@ func (vmilmf vmiLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job,
 }
 
 func (vmi *vmiLatency) handleCreateVM(obj any) {
-	vm := obj.(*kvv1.VirtualMachine)
+	vm, err := util.ConvertAnyToTyped[kvv1.VirtualMachine](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachine: %v", err)
+		return
+	}
 	vmLabels := vm.GetLabels()
 	vmi.metrics.LoadOrStore(string(vm.UID), vmiMetric{
 		Namespace:    vm.Namespace,
@@ -124,7 +128,11 @@ func (vmi *vmiLatency) handleCreateVM(obj any) {
 }
 
 func (vmi *vmiLatency) handleUpdateVM(obj any) {
-	vm := obj.(*kvv1.VirtualMachine)
+	vm, err := util.ConvertAnyToTyped[kvv1.VirtualMachine](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachine: %v", err)
+		return
+	}
 	if vmM, ok := vmi.metrics.Load(string(vm.UID)); ok {
 		vmMetric := vmM.(vmiMetric)
 		if vmMetric.vmReady.IsZero() {
@@ -141,7 +149,11 @@ func (vmi *vmiLatency) handleUpdateVM(obj any) {
 }
 
 func (vmi *vmiLatency) handleCreateVMI(obj any) {
-	vmiObj := obj.(*kvv1.VirtualMachineInstance)
+	vmiObj, err := util.ConvertAnyToTyped[kvv1.VirtualMachineInstance](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachineInstance: %v", err)
+		return
+	}
 	now := vmiObj.CreationTimestamp.UTC()
 	parentVMID := getParentVMMapID(vmiObj)
 	// in case there's a parent vm
@@ -167,7 +179,11 @@ func (vmi *vmiLatency) handleCreateVMI(obj any) {
 }
 
 func (vmi *vmiLatency) handleUpdateVMI(obj any) {
-	vmiObj := obj.(*kvv1.VirtualMachineInstance)
+	vmiObj, err := util.ConvertAnyToTyped[kvv1.VirtualMachineInstance](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachineInstance: %v", err)
+		return
+	}
 	// in case the parent is a VM object
 	mapID := getParentVMMapID(vmiObj)
 	// otherwise use VMI UID
@@ -200,7 +216,11 @@ func (vmi *vmiLatency) handleUpdateVMI(obj any) {
 }
 
 func (vmi *vmiLatency) handleCreateVMIPod(obj any) {
-	pod := obj.(*corev1.Pod)
+	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Pod: %v", err)
+		return
+	}
 	vmiName, err := getParentVMIName(pod)
 	if err != nil {
 		log.Warn(err.Error())
@@ -219,7 +239,11 @@ func (vmi *vmiLatency) handleCreateVMIPod(obj any) {
 }
 
 func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
-	pod := obj.(*corev1.Pod)
+	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Pod: %v", err)
+		return
+	}
 	vmiName, err := getParentVMIName(pod)
 	if err != nil {
 		log.Warn(err.Error())
@@ -262,13 +286,24 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
 // Start starts vmiLatency measurement
 func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	restClient := newRESTClientWithRegisteredKubevirtResource(vmi.RestConfig)
+	vmgvr, err := util.ResourceToGVR(vmi.RestConfig, "VirtualMachine", "kubevirt.io/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "VirtualMachine", err)
+	}
+	vmigvr, err := util.ResourceToGVR(vmi.RestConfig, "VirtualMachineInstance", "kubevirt.io/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "VirtualMachineInstance", err)
+	}
+	pgvr, err := util.ResourceToGVR(vmi.RestConfig, "Pod", "v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "Pod", err)
+	}
 	vmi.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    restClient,
+				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
 				name:          "vmWatcher",
-				resource:      "virtualmachines",
+				resource:      vmgvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVM,
@@ -278,9 +313,9 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				},
 			},
 			{
-				restClient:    restClient,
+				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
 				name:          "vmiWatcher",
-				resource:      "virtualmachineinstances",
+				resource:      vmigvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMI,
@@ -290,9 +325,9 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				},
 			},
 			{
-				restClient: vmi.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-				name:       "podWatcher",
-				resource:   "pods",
+				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
+				name:          "podWatcher",
+				resource:      pgvr,
 				labelSelector: labels.Set(
 					map[string]string{
 						"kubevirt.io":       "virt-launcher",
@@ -309,29 +344,6 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 		},
 	)
 	return nil
-}
-
-func newRESTClientWithRegisteredKubevirtResource(restConfig *rest.Config) *rest.RESTClient {
-	shallowCopy := *restConfig
-	setConfigDefaults(&shallowCopy)
-	restClient, err := rest.RESTClientFor(&shallowCopy)
-	if err != nil {
-		log.Errorf("Error creating custom rest client: %s", err)
-		panic(err)
-	}
-	return restClient
-}
-
-func setConfigDefaults(config *rest.Config) {
-	gv := kvv1.SchemeGroupVersion
-	config.GroupVersion = &gv
-	config.APIPath = "/apis"
-	scheme := runtime.NewScheme()
-	SchemeBuilder := runtime.NewSchemeBuilder(kvv1.AddKnownTypesGenerator(kvv1.GroupVersions))
-	AddToScheme := SchemeBuilder.AddToScheme
-	codecs := serializer.NewCodecFactory(scheme)
-	AddToScheme(scheme)
-	config.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: codecs}
 }
 
 func (vmi *vmiLatency) Collect(measurementWg *sync.WaitGroup) {
