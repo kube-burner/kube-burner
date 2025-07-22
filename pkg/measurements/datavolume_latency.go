@@ -33,7 +33,9 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"k8s.io/client-go/dynamic"
 )
 
 const (
@@ -95,7 +97,11 @@ func (dvlmf dvLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 }
 
 func (dv *dvLatency) handleCreateDV(obj any) {
-	dataVolume := obj.(*cdiv1beta1.DataVolume)
+	dataVolume, err := util.ConvertAnyToTyped[cdiv1beta1.DataVolume](obj)
+	if err != nil {
+		log.Errorf("failed to convert to DataVolume: %v", err)
+		return
+	}
 	dvLabels := dataVolume.GetLabels()
 	dv.metrics.LoadOrStore(string(dataVolume.UID), dvMetric{
 		Timestamp:    dataVolume.CreationTimestamp.UTC(),
@@ -111,7 +117,11 @@ func (dv *dvLatency) handleCreateDV(obj any) {
 }
 
 func (dv *dvLatency) handleUpdateDV(obj any) {
-	dataVolume := obj.(*cdiv1beta1.DataVolume)
+	dataVolume, err := util.ConvertAnyToTyped[cdiv1beta1.DataVolume](obj)
+	if err != nil {
+		log.Errorf("failed to convert to DataVolume: %v", err)
+		return
+	}
 	if value, exists := dv.metrics.Load(string(dataVolume.UID)); exists {
 		dvm := value.(dvMetric)
 		for _, c := range dataVolume.Status.Conditions {
@@ -155,12 +165,16 @@ func (dv *dvLatency) handleUpdateDV(obj any) {
 
 func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	gvr, err := util.ResourceToGVR(dv.RestConfig, "DataVolume", "cdi.kubevirt.io/v1beta1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "DataVolume", err)
+	}
 	dv.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    getGroupVersionClient(dv.RestConfig, cdiv1beta1.SchemeGroupVersion, &cdiv1beta1.DataVolumeList{}, &cdiv1beta1.DataVolume{}),
+				dynamicClient: dynamic.NewForConfigOrDie(dv.RestConfig),
 				name:          "dvWatcher",
-				resource:      "datavolumes",
+				resource:      gvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", dv.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: dv.handleCreateDV,

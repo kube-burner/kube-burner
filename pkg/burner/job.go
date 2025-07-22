@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"sync"
@@ -92,7 +93,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	defer cancel()
 	go func() {
 		var innerRC int
-		clientSet, _ := kubeClientProvider.DefaultClientSet()
+		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		handlePreloadImages(jobExecutors, kubeClientProvider)
@@ -104,10 +105,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
 			})
-			watcherManager := watchers.NewWatcherManager(clientSet, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
+			watcherManager := watchers.NewWatcherManager(restConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
 			for idx, watcher := range jobExecutor.Watchers {
 				for replica := range watcher.Replicas {
-					watcherManager.Start(watcher.Kind, watcher.LabelSelector, idx+1, replica+1)
+					watcherManager.Start(watcher.Kind, watcher.APIVersion, watcher.LabelSelector, idx+1, replica+1)
 				}
 			}
 			watcherStartErrors := watcherManager.Wait()
@@ -175,6 +176,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
 				executedJobs[len(executedJobs)-1].End = jobEnd
+				executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
 			}
 			if jobExecutor.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
@@ -182,6 +184,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if jobExecutor.MetricsClosing == config.AfterJobPause {
 				executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+				executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
 			}
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := jobEnd.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
@@ -196,6 +199,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if jobExecutor.MetricsClosing == config.AfterMeasurements {
 					executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+					executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
 				}
 				if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
 					msWg.Add(1)
@@ -317,11 +321,17 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
 			}
+			var achievedQps float64
+			elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
+			if elapsedTime > 0 {
+				achievedQps = math.Round((float64(job.ObjectOperations)/elapsedTime)*1000) / 1000
+			}
 			jobSummaries = append(jobSummaries, JobSummary{
 				UUID:                uuid,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,
-				ElapsedTime:         job.End.Sub(job.Start).Round(time.Second).Seconds(),
+				ElapsedTime:         elapsedTime,
+				AchievedQps:         achievedQps,
 				ChurnStartTimestamp: job.ChurnStart,
 				ChurnEndTimestamp:   job.ChurnEnd,
 				JobConfig:           job.JobConfig,

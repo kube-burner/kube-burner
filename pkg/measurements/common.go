@@ -24,12 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 )
 
@@ -92,26 +88,4 @@ func deployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, im
 		return true, nil
 	})
 	return err
-}
-
-func getGroupVersionClient(restConfig *rest.Config, gv schema.GroupVersion, types ...runtime.Object) *rest.RESTClient {
-	scheme := runtime.NewScheme()
-	codecs := serializer.NewCodecFactory(scheme)
-
-	// Add CDI objects to the scheme
-	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	scheme.AddKnownTypes(gv, types...)
-
-	shallowCopy := *restConfig
-	shallowCopy.GroupVersion = &gv
-
-	shallowCopy.APIPath = "/apis"
-	shallowCopy.NegotiatedSerializer = codecs.WithoutConversion()
-	shallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
-
-	cdiClient, err := rest.RESTClientFor(&shallowCopy)
-	if err != nil {
-		log.Fatalf("failed to create CDI Client - %v", err)
-	}
-	return cdiClient
 }

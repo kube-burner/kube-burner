@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -132,6 +133,7 @@ func (ex *JobExecutor) setupKubeVirtJob(mapper meta.RESTMapper) {
 
 func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
+	ex.limiter.Wait(context.TODO())
 
 	operationConfig := supportedOps[obj.KubeVirtOp]
 	var err error
@@ -177,7 +179,21 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 				},
 			}
 		}
-		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Migrate(context.Background(), item.GetName(), &kubevirtV1.MigrateOptions{})
+		vmim := &kubevirtV1.VirtualMachineInstanceMigration{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: fmt.Sprintf("%s-%s-%v-", item.GetName(), ex.Name, iteration),
+				Labels: map[string]string{
+					"kube-burner-uuid":                 ex.uuid,
+					"kube-burner-runid":                ex.runid,
+					"kube-burner-job":                  ex.Name,
+					config.KubeBurnerLabelJobIteration: fmt.Sprintf("%v", iteration),
+				},
+			},
+			Spec: kubevirtV1.VirtualMachineInstanceMigrationSpec{
+				VMIName: item.GetName(),
+			},
+		}
+		_, err = ex.kubeVirtClient.VirtualMachineInstanceMigration(item.GetNamespace()).Create(context.Background(), vmim, metav1.CreateOptions{})
 	case config.KubeVirtOpAddVolume:
 		err = addVolume(ex, item.GetName(), item.GetNamespace(), obj.InputVars)
 	case config.KubeVirtOpRemoveVolume:
@@ -189,6 +205,7 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	} else {
 		log.Debugf("Successfully executed op [%s] on the VM [%s]", obj.KubeVirtOp, item.GetName())
 	}
+	atomic.AddInt32(&ex.objectOperations, 1)
 
 	// Use predefined status paths when not set by the user
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 && operationConfig != nil {

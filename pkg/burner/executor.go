@@ -53,6 +53,7 @@ type JobExecutor struct {
 	functionTemplates []string
 	embedCfg          *fileutils.EmbedConfiguration
 	deletionStrategy  string
+	objectOperations  int32
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
@@ -65,6 +66,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
 		embedCfg:          embedCfg,
 		deletionStrategy:  configSpec.GlobalConfig.DeletionStrategy,
+		objectOperations:  0,
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
