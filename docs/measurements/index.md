@@ -697,6 +697,161 @@ Where `quantileName` matches with the pvc phases and can be:
 
 And the metrics, error rates, and their thresholds work the same way as in the other latency measurements.
 
+## VirtualMachineInstanceMigration Latency
+
+Collects latencies from different VirtualMachineInstanceMigration phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
+
+```yaml
+  measurements:
+  - name: vmimLatency
+```
+
+### Metrics
+
+The metrics collected are VirtualMachineInstanceMigration latency timeseries (`vmimLatencyMeasurement`) and 2-3 documents holding a summary with different VirtualMachineInstanceMigration latency quantiles of each lifecycle phase (`vmimLatencyQuantilesMeasurement`).
+
+One document, such as the following, is indexed per each VirtualMachineInstanceMigration created by the workload that enters in `Succeeded` phase during the workload:
+
+```json
+{
+  "timestamp": "2025-07-11T19:46:01Z",
+  "pendingLatency": 0,
+  "schedulingLatency": 3000,
+  "scheduledLatency": 10000,
+  "preparingTargetLatency": 10000,
+  "targetReadyLatency": 12000,
+  "runningLatency": 12000,
+  "succeededLatency": 14000,
+  "metricName": "vmimLatencyMeasurement",
+  "uuid": "3d655527-2562-4931-b40f-61adafbf49b0",
+  "namespace": "kubevirt-ops-0",
+  "vmimName": "kubevirt-ops-1-vm-op-1-k829h",
+  "vmiName": "kubevirt-ops-1",
+  "jobName": "vm-op",
+  "jobIteration": 1,
+  "replica": 0
+}
+```
+
+---
+
+VirtualMachineInstanceMigration latency quantile sample:
+
+```json
+[
+  {
+    "quantileName": "Pending",
+    "uuid": "3d655527-2562-4931-b40f-61adafbf49b0",
+    "P99": 0,
+    "P95": 0,
+    "P50": 0,
+    "min": 0,
+    "max": 0,
+    "avg": 0,
+    "timestamp": "2025-07-11T19:46:31.968793Z",
+    "metricName": "vmimLatencyQuantilesMeasurement",
+    "jobName": "vm-op",
+    "metadata": null
+  },
+  {
+    "quantileName": "Scheduling",
+    "uuid": "3d655527-2562-4931-b40f-61adafbf49b0",
+    "P99": 1500,
+    "P95": 1500,
+    "P50": 0,
+    "min": 0,
+    "max": 3000,
+    "avg": 1500,
+    "timestamp": "2025-07-11T19:46:31.968856Z",
+    "metricName": "vmimLatencyQuantilesMeasurement",
+    "jobName": "vm-op",
+    "metadata": null
+  },
+  {
+    "quantileName": "Scheduled",
+    "uuid": "3d655527-2562-4931-b40f-61adafbf49b0",
+    "P99": 8000,
+    "P95": 8000,
+    "P50": 6000,
+    "min": 6000,
+    "max": 10000,
+    "avg": 8000,
+    "timestamp": "2025-07-11T19:46:31.968861Z",
+    "metricName": "vmimLatencyQuantilesMeasurement",
+    "jobName": "vm-op",
+    "metadata": null
+  },
+  {
+    "quantileName": "PreparingTarget",
+    "uuid": "3d655527-2562-4931-b40f-61adafbf49b0",
+    "P99": 8000,
+    "P95": 8000,
+    "P50": 6000,
+    "min": 6000,
+    "max": 10000,
+    "avg": 8000,
+    "timestamp": "2025-07-11T19:46:31.968864Z",
+    "metricName": "vmimLatencyQuantilesMeasurement",
+    "jobName": "vm-op",
+    "metadata": null
+  },
+  {
+    "quantileName": "TargetReady",
+    "uuid": "3d655527-2562-4931-b40f-61adafbf49b0",
+    "P99": 10000,
+    "P95": 10000,
+    "P50": 8000,
+    "min": 8000,
+    "max": 12000,
+    "avg": 10000,
+    "timestamp": "2025-07-11T19:46:31.968868Z",
+    "metricName": "vmimLatencyQuantilesMeasurement",
+    "jobName": "vm-op",
+    "metadata": null
+  },
+  {
+    "quantileName": "Running",
+    "uuid": "3d655527-2562-4931-b40f-61adafbf49b0",
+    "P99": 10000,
+    "P95": 10000,
+    "P50": 8000,
+    "min": 8000,
+    "max": 12000,
+    "avg": 10000,
+    "timestamp": "2025-07-11T19:46:31.968872Z",
+    "metricName": "vmimLatencyQuantilesMeasurement",
+    "jobName": "vm-op",
+    "metadata": null
+  },
+  {
+    "quantileName": "Succeeded",
+    "uuid": "3d655527-2562-4931-b40f-61adafbf49b0",
+    "P99": 12000,
+    "P95": 12000,
+    "P50": 10000,
+    "min": 10000,
+    "max": 14000,
+    "avg": 12000,
+    "timestamp": "2025-07-11T19:46:31.968875Z",
+    "metricName": "vmimLatencyQuantilesMeasurement",
+    "jobName": "vm-op",
+    "metadata": null
+  }
+]
+```
+
+Where `quantileName` matches with the VirtualMachineInstance phases and can be:
+
+- `Pending`: The migration is accepted by the system
+- `Scheduling` The migration's target pod is being scheduled
+- `Scheduled`: The migration's target pod is running
+- `PreparingTarget`: The migration's target pod is being prepared for migration
+- `TargetReady`: The migration's target pod is prepared and ready for migration
+- `Running`: The migration is in progress
+- `Succeeded`: The migration passed
+
+And the metrics, error rates, and their thresholds work the same way as in the other latency measurements.
+
 ## Network Policy Latency
 
 Note: This measurement has requirement of having 2 jobs defined in the templates. It doesn't report the network policy latency measurement if only one job is used.
