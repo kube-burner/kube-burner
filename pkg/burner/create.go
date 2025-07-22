@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupCreateJob() {
 	var f io.Reader
 	var err error
 	log.Debugf("Preparing create job: %s", ex.Name)
@@ -58,10 +58,6 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
-		obj := &object{
-			objectSpec: t,
-			Object:     o,
-		}
 		// Deserialize YAML
 		uns := &unstructured.Unstructured{}
 		cleanTemplate, err := util.CleanupTemplate(t)
@@ -69,8 +65,12 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
 		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
-		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		obj.namespace = uns.GetNamespace()
+		mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
+		obj := &object{
+			objectSpec: t,
+			Object:     o,
+			namespace:  uns.GetNamespace(),
+		}
 		if err == nil {
 			obj.gvr = mapping.Resource
 			obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
@@ -122,13 +122,14 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		for objectIndex, obj := range ex.objects {
 			if obj.gvr == (schema.GroupVersionResource{}) {
-				ex.validateObject(obj)
+				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
+				ex.resolveObjectMapping(obj)
 				if ex.nsRequired {
-					if !ex.NamespacedIterations {
-						ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
-					} else {
-						ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+					nsName := ex.Namespace
+					if ex.NamespacedIterations {
+						nsName = ex.generateNamespace(i)
 					}
+					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 				}
 			}
 			labels := map[string]string{

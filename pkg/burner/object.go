@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/restmapper"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
@@ -36,7 +37,7 @@ type object struct {
 	ready      bool
 }
 
-func newObject(obj config.Object, mapper meta.RESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
+func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
 	if obj.APIVersion == "" {
 		obj.APIVersion = defaultAPIVersion
 	}

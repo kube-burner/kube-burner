@@ -113,9 +113,9 @@ func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructure
 	return o, gvk
 }
 
-// validateObject resets the REST mapper and resolves the object's fields before creation
-func (ex *JobExecutor) validateObject(obj *object) {
-	ex.mapper.(*restmapper.DeferredDiscoveryRESTMapper).Reset()
+// resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements
+func (ex *JobExecutor) resolveObjectMapping(obj *object) {
+	ex.mapper.Reset()
 	mapping, err := ex.mapper.RESTMapping(obj.gvk.GroupKind())
 	if err != nil {
 		log.Fatal(err)
@@ -190,7 +190,7 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 }
 
 // newMapper returns a discovery RESTMapper
-func newRESTMapper(config *rest.Config) meta.RESTMapper {
+func newRESTMapper(config *rest.Config) *restmapper.DeferredDiscoveryRESTMapper {
 	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
 	cachedDiscovery := memory.NewMemCacheClient(discoveryClient)
 	return restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)

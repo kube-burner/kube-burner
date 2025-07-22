@@ -24,11 +24,11 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"kubevirt.io/client-go/kubecli"
 )
 
@@ -52,7 +52,7 @@ type JobExecutor struct {
 	kubeVirtClient    kubecli.KubevirtClient
 	functionTemplates []string
 	embedCfg          *fileutils.EmbedConfiguration
-	mapper            meta.RESTMapper
+	mapper            *restmapper.DeferredDiscoveryRESTMapper
 	objectOperations  int32
 }
 
@@ -78,15 +78,15 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 
 	switch job.JobType {
 	case config.CreationJob:
-		ex.setupCreateJob(ex.mapper)
+		ex.setupCreateJob()
 	case config.DeletionJob:
-		ex.setupDeleteJob(ex.mapper)
+		ex.setupDeleteJob()
 	case config.PatchJob:
-		ex.setupPatchJob(ex.mapper)
+		ex.setupPatchJob()
 	case config.ReadJob:
-		ex.setupReadJob(ex.mapper)
+		ex.setupReadJob()
 	case config.KubeVirtJob:
-		ex.setupKubeVirtJob(ex.mapper)
+		ex.setupKubeVirtJob()
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}
