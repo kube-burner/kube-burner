@@ -33,6 +33,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/pkg/util/reader"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -82,6 +83,7 @@ func initCmd() *cobra.Command {
 	var timeout time.Duration
 	var userDataFile string
 	var allowMissingKeys bool
+	var overlayFiles []string
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -108,16 +110,16 @@ func initCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
-			if err != nil {
-				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
-			}
 			var userDataFileReader io.Reader
 			if userDataFile != "" {
 				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
 				if err != nil {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
+			}
+			configFileReader, err := reader.NewReader(configFile, overlayFiles, nil, userDataFileReader, allowMissingKeys, nil)
+			if err != nil {
+				log.Fatalf("Error creating reader for configuration file %s: %s", configFile, err)
 			}
 			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
 			if err != nil {
@@ -153,6 +155,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
+	cmd.Flags().StringArrayVar(&overlayFiles, "overlay", []string{}, "Overlay file(s) to apply on top of the base configuration file")
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
@@ -223,6 +226,7 @@ func measureCmd() *cobra.Command {
 	var jobName string
 	var userMetadata string
 	var kubeConfig, kubeContext string
+	var overlayFiles []string
 	indexerList := make(map[string]indexers.Indexer)
 	metadata := make(map[string]any)
 	cmd := &cobra.Command{
@@ -234,11 +238,11 @@ func measureCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
-			f, err := fileutils.GetWorkloadReader(configFile, nil)
+			f, err := reader.NewReader(configFile, overlayFiles, nil, nil, false, nil)
 			if err != nil {
-				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
+				log.Fatalf("Error creating reader for configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(configFile, time.Hour, f)
+			configSpec, err := config.Parse(uuid, time.Hour, f)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -295,6 +299,7 @@ func measureCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().StringArrayVar(&overlayFiles, "overlay", []string{}, "Overlay file(s) to apply on top of the base configuration file")
 	return cmd
 }
 
