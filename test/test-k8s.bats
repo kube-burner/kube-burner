@@ -276,7 +276,7 @@ teardown_file() {
 
 @test "kube-burner init: overlay" {
   export LOCAL_INDEXING=true
-  run_cmd ${KUBE_BURNER} init -c kube-burner-base.yml --overlay burner-overlay.yml --uuid="${UUID}" --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c kube-burner-base.yml --overlay kube-burner-overlay.yml --uuid="${UUID}" --log-level=debug
 
   # Verify that the overlay svcLatency measurement was added
   check_metric_recorded overlay svcLatency ready

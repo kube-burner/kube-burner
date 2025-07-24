@@ -44,7 +44,7 @@ var mergeOptions = []MergeOption{
 	},
 }
 
-// mergeYAML merges two YAML documents, applying the specified merge options
+// MergeYAML merges two YAML documents, applying the specified merge options
 func MergeYAML(baseYAML, overlayYAML []byte) ([]byte, error) {
 	var baseMap map[string]any
 	var overlayMap map[string]any
