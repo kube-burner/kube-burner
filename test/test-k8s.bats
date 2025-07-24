@@ -273,3 +273,18 @@ teardown_file() {
     check_metrics_not_created_for_job ${job} ${metric}
   done
 }
+
+@test "kube-burner init: overlay" {
+  export LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner-base.yml --overlay burner-overlay.yml --uuid="${UUID}" --log-level=debug
+
+  # Verify that the overlay svcLatency measurement was added
+  check_metric_recorded overlay svcLatency ready
+  check_quantile_recorded overlay svcLatency Ready
+
+  # Verify overridden deployment count
+  check_deployment_count overlay kube-burner-uuid ${UUID} 1
+
+  # Verify that metrics configuration from the overlay is present
+  check_file_list ${METRICS_FOLDER}/svcLatencyMeasurement-overlay.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-overlay.json
+}

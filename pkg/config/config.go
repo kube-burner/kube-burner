@@ -132,7 +132,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
-func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (map[string]any, error) {
+func GetInputData(userDataFileReader io.Reader, additionalVars map[string]any) (map[string]any, error) {
 	inputData := make(map[string]any)
 	// First copy from additionalVars
 	maps.Copy(inputData, additionalVars)
@@ -164,7 +164,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
 	}
-	inputData, err := getInputData(userDataFileReader, additionalVars)
+	inputData, err := GetInputData(userDataFileReader, additionalVars)
 	if err != nil {
 		return configSpec, err
 	}

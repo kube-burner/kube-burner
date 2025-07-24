@@ -33,6 +33,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/pkg/util/reader"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -109,25 +110,16 @@ func initCmd() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
-			var configFileReader io.Reader
-			if len(overlayFiles) > 0 {
-				overlayReader, err := util.NewOverlayReader(configFile, overlayFiles, nil)
-				if err != nil {
-					log.Fatalf("Error creating overlay reader for configuration file %s with overlays %v: %s", configFile, overlayFiles, err)
-				}
-				configFileReader = overlayReader
-			} else {
-				configFileReader, err = fileutils.GetWorkloadReader(configFile, nil)
-				if err != nil {
-					log.Fatalf("Error reading configuration file %s: %s", configFile, err)
-				}
-			}
 			var userDataFileReader io.Reader
 			if userDataFile != "" {
 				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
 				if err != nil {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
+			}
+			configFileReader, err := reader.NewReader(configFile, overlayFiles, nil, userDataFileReader, allowMissingKeys, nil)
+			if err != nil {
+				log.Fatalf("Error creating reader for configuration file %s: %s", configFile, err)
 			}
 			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
 			if err != nil {
@@ -246,19 +238,9 @@ func measureCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.SetupFileLogging(uuid)
-			var f io.Reader
-			if len(overlayFiles) > 0 {
-				overlayReader, err := util.NewOverlayReader(configFile, overlayFiles, nil)
-				if err != nil {
-					log.Fatalf("Error creating overlay reader for configuration file %s with overlays %v: %s", configFile, overlayFiles, err)
-				}
-				f = overlayReader
-			} else {
-				var err error
-				f, err = fileutils.GetWorkloadReader(configFile, nil)
-				if err != nil {
-					log.Fatalf("Error reading configuration file %s: %s", configFile, err)
-				}
+			f, err := reader.NewReader(configFile, overlayFiles, nil, nil, false, nil)
+			if err != nil {
+				log.Fatalf("Error creating reader for configuration file %s: %s", configFile, err)
 			}
 			configSpec, err := config.Parse(uuid, time.Hour, f)
 			if err != nil {
