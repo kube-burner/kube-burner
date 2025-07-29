@@ -103,7 +103,7 @@ func (dv *dvLatency) handleCreateDV(obj any) {
 		return
 	}
 	dvLabels := dataVolume.GetLabels()
-	dv.metrics.LoadOrStore(string(dataVolume.UID), dvMetric{
+	dv.Metrics.LoadOrStore(string(dataVolume.UID), dvMetric{
 		Timestamp:    dataVolume.CreationTimestamp.UTC(),
 		Namespace:    dataVolume.Namespace,
 		Name:         dataVolume.Name,
@@ -122,7 +122,7 @@ func (dv *dvLatency) handleUpdateDV(obj any) {
 		log.Errorf("failed to convert to DataVolume: %v", err)
 		return
 	}
-	if value, exists := dv.metrics.Load(string(dataVolume.UID)); exists {
+	if value, exists := dv.Metrics.Load(string(dataVolume.UID)); exists {
 		dvm := value.(dvMetric)
 		for _, c := range dataVolume.Status.Conditions {
 			// Nothing to update if the condition is not true
@@ -159,7 +159,7 @@ func (dv *dvLatency) handleUpdateDV(obj any) {
 				}
 			}
 		}
-		dv.metrics.Store(string(dataVolume.UID), dvm)
+		dv.Metrics.Store(string(dataVolume.UID), dvm)
 	}
 }
 
@@ -211,7 +211,7 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 		}
 		dataVolumes = append(dataVolumes, dvList.Items...)
 	}
-	dv.metrics = sync.Map{}
+	dv.Metrics = sync.Map{}
 	for _, dataVolume := range dataVolumes {
 		var bound, running, ready time.Time
 		for _, c := range dataVolume.Status.Conditions {
@@ -224,7 +224,7 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 				ready = c.LastTransitionTime.UTC()
 			}
 		}
-		dv.metrics.Store(string(dataVolume.UID), dvMetric{
+		dv.Metrics.Store(string(dataVolume.UID), dvMetric{
 			Timestamp:  dataVolume.CreationTimestamp.UTC(),
 			Namespace:  dataVolume.Namespace,
 			Name:       dataVolume.Name,
@@ -242,7 +242,7 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 	dataVolumeCount := 0
 	erroredDataVolumes := 0
 
-	dv.metrics.Range(func(key, value any) bool {
+	dv.Metrics.Range(func(key, value any) bool {
 		m := value.(dvMetric)
 		// Skip DataVolume if it did not reach the Ready state (this timestamp isn't set)
 		if m.dvReady.IsZero() {
@@ -279,7 +279,7 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 		}
 		dataVolumeCount++
 		erroredDataVolumes += errorFlag
-		dv.normLatencies = append(dv.normLatencies, m)
+		dv.NormLatencies = append(dv.NormLatencies, m)
 		return true
 	})
 	if dataVolumeCount == 0 {
