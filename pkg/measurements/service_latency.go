@@ -149,7 +149,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		}
 		svcLatency := time.Since(endpointsReadyTs)
 		log.Debugf("Service %v/%v latency was: %vms", svc.Namespace, svc.Name, svcLatency.Milliseconds())
-		s.metrics.Store(string(svc.UID), svcMetric{
+		s.Metrics.Store(string(svc.UID), svcMetric{
 			Name:              svc.Name,
 			Namespace:         svc.Namespace,
 			Timestamp:         svc.CreationTimestamp.UTC(),
@@ -168,7 +168,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 
-	s.latencyQuantiles, s.normLatencies = nil, nil
+	s.LatencyQuantiles, s.NormLatencies = nil, nil
 	if err := deployPodInNamespace(
 		s.ClientSet,
 		types.SvcLatencyNs,
@@ -226,7 +226,7 @@ func (s *serviceLatency) Stop() error {
 	}()
 	kutil.CleanupNamespaces(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
-	for _, q := range s.latencyQuantiles {
+	for _, q := range s.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
 		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", s.JobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
@@ -238,11 +238,11 @@ func (s *serviceLatency) normalizeMetrics() {
 	var latencies []float64
 	var ipAssignedLatencies []float64
 	sLen := 0
-	s.metrics.Range(func(key, value any) bool {
+	s.Metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(svcMetric)
 		latencies = append(latencies, float64(metric.ReadyLatency))
-		s.normLatencies = append(s.normLatencies, metric)
+		s.NormLatencies = append(s.NormLatencies, metric)
 		if metric.IPAssignedLatency != 0 {
 			ipAssignedLatencies = append(ipAssignedLatencies, float64(metric.IPAssignedLatency))
 		}
@@ -258,10 +258,10 @@ func (s *serviceLatency) normalizeMetrics() {
 		return latencySummary
 	}
 	if sLen > 0 {
-		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("Ready", latencies))
+		s.LatencyQuantiles = append(s.LatencyQuantiles, calcSummary("Ready", latencies))
 	}
 	if len(ipAssignedLatencies) > 0 {
-		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("IPAssigned", ipAssignedLatencies))
+		s.LatencyQuantiles = append(s.LatencyQuantiles, calcSummary("IPAssigned", ipAssignedLatencies))
 	}
 }
 
