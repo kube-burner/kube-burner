@@ -57,18 +57,58 @@ Tool aimed at stressing a kubernetes cluster by creating or deleting lots of obj
 }
 
 var completionCmd = &cobra.Command{
-	Use:   "completion",
-	Short: "Generates completion scripts for bash shell",
-	Long: `To load completion in the current shell run
-. <(kube-burner completion)
+	Use:   "completion [bash|zsh|fish|powershell]",
+	Short: "Generate completion script for your shell",
+	Long: `To load completions:
 
-To configure your bash shell to load completions for each session execute:
+Bash:
+  $ source <(kube-burner completion bash)
 
-# kube-burner completion > /etc/bash_completion.d/kube-burner
-	`,
-	Args: cobra.NoArgs,
+  # To load completions for each session, execute once:
+  # Linux:
+  $ kube-burner completion bash > /etc/bash_completion.d/kube-burner
+  # macOS:
+  $ kube-burner completion bash > /usr/local/etc/bash_completion.d/kube-burner
+
+Zsh:
+  # If shell completion is not already enabled in your environment,
+  # you will need to enable it.  You can execute the following once:
+
+  $ echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+  # To load completions for each session, execute once:
+  $ kube-burner completion zsh > "${fpath[1]}/_kube-burner"
+
+  # You will need to start a new shell for this setup to take effect.
+
+Fish:
+  $ kube-burner completion fish | source
+
+  # To load completions for each session, execute once:
+  $ kube-burner completion fish > ~/.config/fish/completions/kube-burner.fish
+
+PowerShell:
+  PS> kube-burner completion powershell | Out-String | Invoke-Expression
+
+  # To load completions for every new session, run:
+  PS> kube-burner completion powershell > kube-burner.ps1
+  # and source this file from your PowerShell profile.
+`,
+	DisableFlagsInUseLine: true,
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+	Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return rootCmd.GenBashCompletion(os.Stdout)
+		switch args[0] {
+		case "bash":
+			return rootCmd.GenBashCompletion(os.Stdout)
+		case "zsh":
+			return rootCmd.GenZshCompletion(os.Stdout)
+		case "fish":
+			return rootCmd.GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			return rootCmd.GenPowerShellCompletionWithDesc(os.Stdout)
+		}
+		return fmt.Errorf("unsupported shell type %q", args[0])
 	},
 }
 
@@ -110,13 +150,13 @@ func initCmd() *cobra.Command {
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
-				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
+				log.Fatalf("Error reading configuration file %s: %s\nPlease ensure the file exists and is accessible", configFile, err)
 			}
 			var userDataFileReader io.Reader
 			if userDataFile != "" {
 				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
 				if err != nil {
-					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
+					log.Fatalf("Error reading user data file %s: %s\nPlease ensure the file exists and is accessible", userDataFile, err)
 				}
 			}
 			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
