@@ -117,7 +117,7 @@ func (vmi *vmiLatency) handleCreateVM(obj any) {
 		return
 	}
 	vmLabels := vm.GetLabels()
-	vmi.metrics.LoadOrStore(string(vm.UID), vmiMetric{
+	vmi.Metrics.LoadOrStore(string(vm.UID), vmiMetric{
 		Namespace:    vm.Namespace,
 		MetricName:   vmiLatencyMeasurement,
 		VMName:       vm.Name,
@@ -133,7 +133,7 @@ func (vmi *vmiLatency) handleUpdateVM(obj any) {
 		log.Errorf("failed to convert to VirtualMachine: %v", err)
 		return
 	}
-	if vmM, ok := vmi.metrics.Load(string(vm.UID)); ok {
+	if vmM, ok := vmi.Metrics.Load(string(vm.UID)); ok {
 		vmMetric := vmM.(vmiMetric)
 		if vmMetric.vmReady.IsZero() {
 			for _, c := range vm.Status.Conditions {
@@ -144,7 +144,7 @@ func (vmi *vmiLatency) handleUpdateVM(obj any) {
 				}
 			}
 		}
-		vmi.metrics.Store(string(vm.UID), vmMetric)
+		vmi.Metrics.Store(string(vm.UID), vmMetric)
 	}
 }
 
@@ -158,17 +158,17 @@ func (vmi *vmiLatency) handleCreateVMI(obj any) {
 	parentVMID := getParentVMMapID(vmiObj)
 	// in case there's a parent vm
 	if parentVMID != "" {
-		if vmiM, ok := vmi.metrics.Load(parentVMID); ok {
+		if vmiM, ok := vmi.Metrics.Load(parentVMID); ok {
 			vmiMetric := vmiM.(vmiMetric)
 			if vmiMetric.vmiCreated.IsZero() {
 				vmiMetric.vmiCreated = now
 				vmiMetric.VMIName = vmiObj.Name
-				vmi.metrics.Store(parentVMID, vmiMetric)
+				vmi.Metrics.Store(parentVMID, vmiMetric)
 			}
 		}
 	} else {
 		vmiLabels := vmiObj.GetLabels()
-		vmi.metrics.Store(string(vmiObj.UID), vmiMetric{
+		vmi.Metrics.Store(string(vmiObj.UID), vmiMetric{
 			vmiCreated:   now,
 			VMIName:      vmiObj.Name,
 			JobIteration: getIntFromLabels(vmiLabels, config.KubeBurnerLabelJobIteration),
@@ -190,7 +190,7 @@ func (vmi *vmiLatency) handleUpdateVMI(obj any) {
 	if mapID == "" {
 		mapID = string(vmiObj.UID)
 	}
-	if vmiM, ok := vmi.metrics.Load(mapID); ok {
+	if vmiM, ok := vmi.Metrics.Load(mapID); ok {
 		vmiMetric := vmiM.(vmiMetric)
 		if vmiMetric.vmiRunning.IsZero() {
 			switch vmiObj.Status.Phase {
@@ -210,7 +210,7 @@ func (vmi *vmiLatency) handleUpdateVMI(obj any) {
 				log.Debugf("VMI %s is running", vmiObj.Name)
 				vmiMetric.vmiRunning = time.Now().UTC()
 			}
-			vmi.metrics.Store(mapID, vmiMetric)
+			vmi.Metrics.Store(mapID, vmiMetric)
 		}
 	}
 }
@@ -227,12 +227,12 @@ func (vmi *vmiLatency) handleCreateVMIPod(obj any) {
 		return
 	}
 	// Iterate over all vmi metrics to get the one with the same VMI name
-	vmi.metrics.Range(func(k, v any) bool {
+	vmi.Metrics.Range(func(k, v any) bool {
 		vmiMetric := v.(vmiMetric)
 		if vmiMetric.VMIName == vmiName {
 			vmiMetric.PodName = pod.Name
 			vmiMetric.podCreated = time.Now().UTC()
-			vmi.metrics.Store(k, vmiMetric)
+			vmi.Metrics.Store(k, vmiMetric)
 		}
 		return true
 	})
@@ -250,7 +250,7 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
 		return
 	}
 	// Iterate over all vmi metrics to get the one with the same VMI name
-	vmi.metrics.Range(func(k, v any) bool {
+	vmi.Metrics.Range(func(k, v any) bool {
 		vmiMetric := v.(vmiMetric)
 		if vmiMetric.VMIName == vmiName {
 			if vmiMetric.podReady.IsZero() {
@@ -277,7 +277,7 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
 					}
 				}
 			}
-			vmi.metrics.Store(k, vmiMetric)
+			vmi.Metrics.Store(k, vmiMetric)
 		}
 		return true
 	})
@@ -356,7 +356,7 @@ func (vmi *vmiLatency) Stop() error {
 }
 
 func (vmi *vmiLatency) normalizeMetrics() float64 {
-	vmi.metrics.Range(func(key, value any) bool {
+	vmi.Metrics.Range(func(key, value any) bool {
 		m := value.(vmiMetric)
 		if m.vmiRunning.IsZero() {
 			log.Tracef("VMI %v latency ignored as it did not reach Running state", m.VMIName)
@@ -376,7 +376,7 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 		m.UUID = vmi.Uuid
 		m.JobName = vmi.JobConfig.Name
 		m.Metadata = vmi.Metadata
-		vmi.normLatencies = append(vmi.normLatencies, m)
+		vmi.NormLatencies = append(vmi.NormLatencies, m)
 		return true
 	})
 	return 0

@@ -102,7 +102,7 @@ func (p *podLatency) handleCreatePod(obj any) {
 		return
 	}
 	podLabels := pod.GetLabels()
-	p.metrics.LoadOrStore(string(pod.UID), podMetric{
+	p.Metrics.LoadOrStore(string(pod.UID), podMetric{
 		Timestamp:    pod.CreationTimestamp.UTC(),
 		Namespace:    pod.Namespace,
 		Name:         pod.Name,
@@ -121,7 +121,7 @@ func (p *podLatency) handleUpdatePod(obj any) {
 		log.Errorf("failed to convert to Pod: %v", err)
 		return
 	}
-	if value, exists := p.metrics.Load(string(pod.UID)); exists {
+	if value, exists := p.Metrics.Load(string(pod.UID)); exists {
 		pm := value.(podMetric)
 		if pm.podReady.IsZero() {
 			for _, c := range pod.Status.Conditions {
@@ -151,7 +151,7 @@ func (p *podLatency) handleUpdatePod(obj any) {
 					}
 				}
 			}
-			p.metrics.Store(string(pod.UID), pm)
+			p.Metrics.Store(string(pod.UID), pm)
 		}
 	}
 }
@@ -198,7 +198,7 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 		}
 		pods = append(pods, podList.Items...)
 	}
-	p.metrics = sync.Map{}
+	p.Metrics = sync.Map{}
 	for _, pod := range pods {
 		var scheduled, initialized, containersReady, podReady time.Time
 		for _, c := range pod.Status.Conditions {
@@ -213,7 +213,7 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 				podReady = c.LastTransitionTime.UTC()
 			}
 		}
-		p.metrics.Store(string(pod.UID), podMetric{
+		p.Metrics.Store(string(pod.UID), podMetric{
 			Timestamp:       pod.Status.StartTime.UTC(),
 			Namespace:       pod.Namespace,
 			Name:            pod.Name,
@@ -238,7 +238,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 	totalPods := 0
 	erroredPods := 0
 
-	p.metrics.Range(func(key, value any) bool {
+	p.Metrics.Range(func(key, value any) bool {
 		m := value.(podMetric)
 		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {
@@ -282,7 +282,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 		}
 		totalPods++
 		erroredPods += errorFlag
-		p.normLatencies = append(p.normLatencies, m)
+		p.NormLatencies = append(p.NormLatencies, m)
 		return true
 	})
 	if totalPods == 0 {

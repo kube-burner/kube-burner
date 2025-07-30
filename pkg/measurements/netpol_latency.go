@@ -424,7 +424,7 @@ func (n *netpolLatency) processResults() {
 
 		// Use minVal for reporting as ping test tool might have delayed initiating ping tests from some remote addresses.
 		// This can happen when remote pod was busy pinging other pods before trying our network policy pod
-		n.metrics.Store(name, netpolMetric{
+		n.Metrics.Store(name, netpolMetric{
 			Name:            name,
 			Timestamp:       npCreationTime[name],
 			MetricName:      netpolLatencyMeasurement,
@@ -532,7 +532,7 @@ func (n *netpolLatency) Stop() error {
 	}()
 	kutil.CleanupNamespaces(ctx, n.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
 	n.normalizeMetrics()
-	for _, q := range n.latencyQuantiles {
+	for _, q := range n.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
 		log.Infof("%s: %s 50th: %d 99th: %d max: %d avg: %d", n.JobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
@@ -545,12 +545,12 @@ func (n *netpolLatency) normalizeMetrics() {
 	var latencies []float64
 	var minLatencies []float64
 	sLen := 0
-	n.metrics.Range(func(key, value any) bool {
+	n.Metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(netpolMetric)
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		minLatencies = append(minLatencies, float64(metric.MinReadyLatency))
-		n.normLatencies = append(n.normLatencies, metric)
+		n.NormLatencies = append(n.NormLatencies, metric)
 		return true
 	})
 	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
@@ -563,8 +563,8 @@ func (n *netpolLatency) normalizeMetrics() {
 		return latencySummary
 	}
 	if sLen > 0 {
-		n.latencyQuantiles = append(n.latencyQuantiles, calcSummary("Ready", latencies))
-		n.latencyQuantiles = append(n.latencyQuantiles, calcSummary("minReady", minLatencies))
+		n.LatencyQuantiles = append(n.LatencyQuantiles, calcSummary("Ready", latencies))
+		n.LatencyQuantiles = append(n.LatencyQuantiles, calcSummary("minReady", minLatencies))
 	}
 }
 

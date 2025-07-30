@@ -114,7 +114,7 @@ func (vmiml *vmimLatency) handleCreateVMIM(obj any) {
 		return
 	}
 	migrationLabels := migration.GetLabels()
-	vmiml.metrics.LoadOrStore(string(migration.GetUID()), vmimMetric{
+	vmiml.Metrics.LoadOrStore(string(migration.GetUID()), vmimMetric{
 		Namespace:    migration.GetNamespace(),
 		MetricName:   vmimLatencyMeasurement,
 		UUID:         vmiml.Uuid,
@@ -133,7 +133,7 @@ func (vmiml *vmimLatency) handleUpdateVMIM(obj any) {
 		log.Errorf("failed to convert to VirtualMachineInstanceMigration: %v", err)
 		return
 	}
-	if vmimM, ok := vmiml.metrics.Load(string(migration.GetUID())); ok {
+	if vmimM, ok := vmiml.Metrics.Load(string(migration.GetUID())); ok {
 		vmimMetric := vmimM.(vmimMetric)
 
 		for _, timestamp := range migration.Status.PhaseTransitionTimestamps {
@@ -169,7 +169,7 @@ func (vmiml *vmimLatency) handleUpdateVMIM(obj any) {
 			}
 		}
 
-		vmiml.metrics.Store(string(migration.GetUID()), vmimMetric)
+		vmiml.Metrics.Store(string(migration.GetUID()), vmimMetric)
 	}
 }
 
@@ -219,7 +219,7 @@ func (vmiml *vmimLatency) Collect(measurementWg *sync.WaitGroup) {
 		vmims = append(vmims, vmimList.Items...)
 	}
 
-	vmiml.metrics = sync.Map{}
+	vmiml.Metrics = sync.Map{}
 	for _, vmim := range vmims {
 		var pending, scheduling, scheduled, preparingTarget, targetReady, running, succeeded time.Time
 		for _, timestamp := range vmim.Status.PhaseTransitionTimestamps {
@@ -240,7 +240,7 @@ func (vmiml *vmimLatency) Collect(measurementWg *sync.WaitGroup) {
 				succeeded = timestamp.PhaseTransitionTimestamp.UTC()
 			}
 		}
-		vmiml.metrics.Store(string(vmim.GetUID()), vmimMetric{
+		vmiml.Metrics.Store(string(vmim.GetUID()), vmimMetric{
 			MetricName:          vmimLatencyMeasurement,
 			UUID:                vmiml.Uuid,
 			Namespace:           vmim.GetNamespace(),
@@ -270,7 +270,7 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 	count := 0
 	errored := 0
 
-	vmiml.metrics.Range(func(key, value any) bool {
+	vmiml.Metrics.Range(func(key, value any) bool {
 		m := value.(vmimMetric)
 
 		if m.succeededTime.IsZero() {
@@ -331,7 +331,7 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 
 		count++
 		errored += errorFlag
-		vmiml.normLatencies = append(vmiml.normLatencies, m)
+		vmiml.NormLatencies = append(vmiml.NormLatencies, m)
 		return true
 	})
 

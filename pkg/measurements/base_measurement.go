@@ -44,11 +44,11 @@ type BaseMeasurement struct {
 	RestConfig               *rest.Config
 	Metadata                 map[string]any
 	watchers                 []*watchers.Watcher
-	metrics                  sync.Map
+	Metrics                  sync.Map
 	MeasurementName          string
-	latencyQuantiles         []any
+	LatencyQuantiles         []any
 	QuantilesMeasurementName string
-	normLatencies            []any
+	NormLatencies            []any
 }
 
 type MeasurementWatcher struct {
@@ -61,8 +61,8 @@ type MeasurementWatcher struct {
 
 func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWatcher) {
 	// Reset latency slices, required in multi-job benchmarks
-	bm.latencyQuantiles, bm.normLatencies = nil, nil
-	bm.metrics = sync.Map{}
+	bm.LatencyQuantiles, bm.NormLatencies = nil, nil
+	bm.Metrics = sync.Map{}
 
 	bm.watchers = make([]*watchers.Watcher, len(measurementWatchers))
 	for i, measurementWatcher := range measurementWatchers {
@@ -104,9 +104,9 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 	}
 	bm.calculateQuantiles(getLatency)
 	if len(bm.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.latencyQuantiles)
+		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.LatencyQuantiles)
 	}
-	for _, q := range bm.latencyQuantiles {
+	for _, q := range bm.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		log.Infof("%s: %v 99th: %v max: %v avg: %v", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
@@ -117,13 +117,13 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 }
 
 func (bm *BaseMeasurement) GetMetrics() *sync.Map {
-	return &bm.metrics
+	return &bm.Metrics
 }
 
 func (bm *BaseMeasurement) Index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]any{
-		bm.MeasurementName:          bm.normLatencies,
-		bm.QuantilesMeasurementName: bm.latencyQuantiles,
+		bm.MeasurementName:          bm.NormLatencies,
+		bm.QuantilesMeasurementName: bm.LatencyQuantiles,
 	}
 	bm.indexLatencyMeasurement(jobName, metricMap, indexerList)
 }
@@ -164,7 +164,7 @@ func (bm *BaseMeasurement) indexLatencyMeasurement(jobName string, metricMap map
 // Receives a function to get the latencies for each condition
 func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]float64) {
 	quantileMap := map[string][]float64{}
-	for _, normLatency := range bm.normLatencies {
+	for _, normLatency := range bm.NormLatencies {
 		for condition, latency := range getLatency(normLatency) {
 			quantileMap[condition] = append(quantileMap[condition], latency)
 		}
@@ -178,8 +178,8 @@ func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]fl
 		return latencySummary
 	}
 
-	bm.latencyQuantiles = make([]any, 0, len(quantileMap))
+	bm.LatencyQuantiles = make([]any, 0, len(quantileMap))
 	for condition, latencies := range quantileMap {
-		bm.latencyQuantiles = append(bm.latencyQuantiles, calcSummary(condition, latencies))
+		bm.LatencyQuantiles = append(bm.LatencyQuantiles, calcSummary(condition, latencies))
 	}
 }
