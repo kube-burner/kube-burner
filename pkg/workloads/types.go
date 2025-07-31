@@ -34,6 +34,7 @@ type Config struct {
 type WorkloadHelper struct {
 	Config
 	kubeClientProvider *config.KubeClientProvider
+	OverlayPaths       []string
 	MetadataAgent      ocpmetadata.Metadata
 	SummaryMetadata    map[string]interface{}
 	MetricsMetadata    map[string]interface{}
