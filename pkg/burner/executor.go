@@ -52,6 +52,7 @@ type JobExecutor struct {
 	kubeVirtClient    kubecli.KubevirtClient
 	functionTemplates []string
 	embedCfg          *fileutils.EmbedConfiguration
+	deletionStrategy  string
 	objectOperations  int32
 }
 
@@ -64,6 +65,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		waitLimiter:       rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
 		embedCfg:          embedCfg,
+		deletionStrategy:  configSpec.GlobalConfig.DeletionStrategy,
 		objectOperations:  0,
 	}
 
