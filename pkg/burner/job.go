@@ -105,8 +105,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				JobConfig: jobExecutor.Job,
 			})
 			watcherRestConfig := restConfig
-			if jobExecutor.Job.KubeConfig != "" {
-				jobKubeClientProvider := config.NewKubeClientProvider(jobExecutor.Job.KubeConfig, jobExecutor.Job.KubeContext)
+			if jobExecutor.KubeConfig != "" {
+				jobKubeClientProvider := config.NewKubeClientProvider(jobExecutor.KubeConfig, jobExecutor.KubeContext)
 				_, watcherRestConfig = jobKubeClientProvider.ClientSet(jobExecutor.QPS, jobExecutor.Burst)
 			}
 			watcherManager := watchers.NewWatcherManager(watcherRestConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
@@ -121,8 +121,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
 				measurementKubeClientProvider := kubeClientProvider
-				if jobExecutor.Job.KubeConfig != "" {
-					measurementKubeClientProvider = config.NewKubeClientProvider(jobExecutor.Job.KubeConfig, jobExecutor.Job.KubeContext)
+				if jobExecutor.KubeConfig != "" {
+					measurementKubeClientProvider = config.NewKubeClientProvider(jobExecutor.KubeConfig, jobExecutor.KubeContext)
 				}
 				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, measurementKubeClientProvider, embedCfg)
 				measurementsInstance.Start()
@@ -313,8 +313,8 @@ func handlePreloadImages(executorList []JobExecutor, kubeClientProvider *config.
 	for _, executor := range executorList {
 		if executor.PreLoadImages && executor.JobType == config.CreationJob {
 			preloadClientSet := executor.clientSet
-			if executor.Job.KubeConfig != "" {
-				jobKubeClientProvider := config.NewKubeClientProvider(executor.Job.KubeConfig, executor.Job.KubeContext)
+			if executor.KubeConfig != "" {
+				jobKubeClientProvider := config.NewKubeClientProvider(executor.KubeConfig, executor.KubeContext)
 				preloadClientSet, _ = jobKubeClientProvider.ClientSet(executor.QPS, executor.Burst)
 			} else if preloadClientSet == nil {
 				preloadClientSet, _ = kubeClientProvider.DefaultClientSet()
