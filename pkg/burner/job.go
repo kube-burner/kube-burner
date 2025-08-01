@@ -104,12 +104,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
 			})
-			watcherClientSet := clientSet
+			watcherRestConfig := restConfig
 			if jobExecutor.Job.KubeConfig != "" {
 				jobKubeClientProvider := config.NewKubeClientProvider(jobExecutor.Job.KubeConfig, jobExecutor.Job.KubeContext)
-				watcherClientSet, _ = jobKubeClientProvider.ClientSet(jobExecutor.QPS, jobExecutor.Burst)
+				_, watcherRestConfig = jobKubeClientProvider.ClientSet(jobExecutor.QPS, jobExecutor.Burst)
 			}
-			watcherManager := watchers.NewWatcherManager(restConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
+			watcherManager := watchers.NewWatcherManager(watcherRestConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
 			for idx, watcher := range jobExecutor.Watchers {
 				for replica := range watcher.Replicas {
 					watcherManager.Start(watcher.Kind, watcher.APIVersion, watcher.LabelSelector, idx+1, replica+1)
