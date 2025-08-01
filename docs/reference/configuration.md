@@ -135,6 +135,9 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | 0s       |
 | `metricsAggregate`           | Aggregate the metrics collected for this job with those of the next one                                                               | Boolean  | false    |
 | `metricsClosing`             | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                  | String   | afterJobPause |
+| `kubeConfig`                 | Path to the kubeconfig file to use for this job. Overrides the global kubeconfig                                                     | String   | ""      |
+| `kubeContext`                | Context to use for this job. Overrides the global kubecontext                                                                       | String   | ""      |
+
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.

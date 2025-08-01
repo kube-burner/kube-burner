@@ -208,6 +208,10 @@ type Job struct {
 	MetricsClosing MetricsClosing `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
 	// Enables job's garbage collection
 	GC bool `yaml:"gc" json:"gc"`
+	// KubeConfig path to use for this job
+	KubeConfig string `yaml:"kubeConfig" json:"kubeConfig,omitempty"`
+	// KubeContext context to use for this job
+	KubeContext string `yaml:"kubeContext" json:"kubeContext,omitempty"`
 }
 
 type WaitOptions struct {
