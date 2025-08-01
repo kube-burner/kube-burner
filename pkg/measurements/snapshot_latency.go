@@ -21,10 +21,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kube-burner/kube-burner/pkg/util"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -89,9 +91,13 @@ func (vslmf volumeSnapshotLatencyMeasurementFactory) NewMeasurement(jobConfig *c
 }
 
 func (vsl *volumeSnapshotLatency) handleCreateVolumeSnapshot(obj any) {
-	volumeSnapshot := obj.(*volumesnapshotv1.VolumeSnapshot)
+	volumeSnapshot, err := util.ConvertAnyToTyped[volumesnapshotv1.VolumeSnapshot](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VolumeSnapshot: %v", err)
+		return
+	}
 	vsLabels := volumeSnapshot.GetLabels()
-	vsl.metrics.LoadOrStore(string(volumeSnapshot.UID), volumeSnapshotMetric{
+	vsl.Metrics.LoadOrStore(string(volumeSnapshot.UID), volumeSnapshotMetric{
 		Timestamp:    volumeSnapshot.CreationTimestamp.UTC(),
 		Namespace:    volumeSnapshot.Namespace,
 		Name:         volumeSnapshot.Name,
@@ -105,8 +111,12 @@ func (vsl *volumeSnapshotLatency) handleCreateVolumeSnapshot(obj any) {
 }
 
 func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
-	volumeSnapshot := obj.(*volumesnapshotv1.VolumeSnapshot)
-	if value, exists := vsl.metrics.Load(string(volumeSnapshot.UID)); exists {
+	volumeSnapshot, err := util.ConvertAnyToTyped[volumesnapshotv1.VolumeSnapshot](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VolumeSnapshot: %v", err)
+		return
+	}
+	if value, exists := vsl.Metrics.Load(string(volumeSnapshot.UID)); exists {
 		vsm := value.(volumeSnapshotMetric)
 		if vsm.vsReady.IsZero() {
 			if volumeSnapshot.Status != nil && ptr.Deref(volumeSnapshot.Status.ReadyToUse, false) {
@@ -114,18 +124,22 @@ func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
 				vsm.vsReady = time.Now().UTC()
 			}
 		}
-		vsl.metrics.Store(string(volumeSnapshot.UID), vsm)
+		vsl.Metrics.Store(string(volumeSnapshot.UID), vsm)
 	}
 }
 
 func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	gvr, err := util.ResourceToGVR(vsl.RestConfig, "VolumeSnapshot", "snapshot.storage.k8s.io/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "VolumeSnapshot", err)
+	}
 	vsl.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    getGroupVersionClient(vsl.RestConfig, volumesnapshotv1.SchemeGroupVersion, &volumesnapshotv1.VolumeSnapshotList{}, &volumesnapshotv1.VolumeSnapshot{}),
+				dynamicClient: dynamic.NewForConfigOrDie(vsl.RestConfig),
 				name:          "vsWatcher",
-				resource:      "volumesnapshots",
+				resource:      gvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vsl.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vsl.handleCreateVolumeSnapshot,
@@ -162,9 +176,9 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 		}
 		volumeSnapshots = append(volumeSnapshots, vsList.Items...)
 	}
-	vsl.metrics = sync.Map{}
+	vsl.Metrics = sync.Map{}
 	for _, volumeSnapshot := range volumeSnapshots {
-		vsl.metrics.Store(string(volumeSnapshot.UID), volumeSnapshotMetric{
+		vsl.Metrics.Store(string(volumeSnapshot.UID), volumeSnapshotMetric{
 			Timestamp:  volumeSnapshot.CreationTimestamp.UTC(),
 			Namespace:  volumeSnapshot.Namespace,
 			Name:       volumeSnapshot.Name,
@@ -180,7 +194,7 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 	volumeSnapshotCount := 0
 	erroredVolumeSnapshots := 0
 
-	vsl.metrics.Range(func(key, value any) bool {
+	vsl.Metrics.Range(func(key, value any) bool {
 		m := value.(volumeSnapshotMetric)
 		// Skip VolumeSnapshot if it did not reach the Ready state (this timestamp isn't set)
 		if m.vsReady.IsZero() {
@@ -203,7 +217,7 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 		}
 		volumeSnapshotCount++
 		erroredVolumeSnapshots += errorFlag
-		vsl.normLatencies = append(vsl.normLatencies, m)
+		vsl.NormLatencies = append(vsl.NormLatencies, m)
 		return true
 	})
 	if volumeSnapshotCount == 0 {
