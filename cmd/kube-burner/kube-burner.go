@@ -133,8 +133,16 @@ func initCmd() *cobra.Command {
 			if configSpec.GlobalConfig.ClusterHealth {
 				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
 				util.ClusterHealthCheck(clientSet)
+				checkedConfigs := make(map[string]bool)
+				for _, job := range configSpec.Jobs {
+					if job.KubeConfig != "" && !checkedConfigs[job.KubeConfig+job.KubeContext] {
+						jobKubeClientProvider := config.NewKubeClientProvider(job.KubeConfig, job.KubeContext)
+						jobClientSet, _ := jobKubeClientProvider.ClientSet(0, 0)
+						util.ClusterHealthCheck(jobClientSet)
+						checkedConfigs[job.KubeConfig+job.KubeContext] = true
+					}
+				}
 			}
-
 			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil, nil)
 			if err != nil {
 				log.Error(err.Error())
@@ -161,6 +169,8 @@ func initCmd() *cobra.Command {
 
 func healthCheck() *cobra.Command {
 	var kubeConfig, kubeContext string
+	var configFile string
+	var timeout time.Duration
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "health-check",
@@ -175,16 +185,36 @@ func healthCheck() *cobra.Command {
 			util.SetupFileLogging(uuid)
 			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
+			if configFile != "" {
+				configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
+				if err == nil {
+					configSpec, err := config.Parse(uuid, timeout, configFileReader)
+					if err == nil {
+						checkedConfigs := make(map[string]bool)
+						for _, job := range configSpec.Jobs {
+							if job.KubeConfig != "" && !checkedConfigs[job.KubeConfig+job.KubeContext] {
+								jobKubeClientProvider := config.NewKubeClientProvider(job.KubeConfig, job.KubeContext)
+								jobClientSet, _ := jobKubeClientProvider.ClientSet(0, 0)
+								util.ClusterHealthCheck(jobClientSet)
+								checkedConfigs[job.KubeConfig+job.KubeContext] = true
+							}
+						}
+					}
+				}
+			}
 		},
 	}
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	return cmd
 }
 
 func destroyCmd() *cobra.Command {
 	var uuid string
 	var timeout time.Duration
+	var configFile string
 	var kubeConfig, kubeContext string
 	var rc int
 	cmd := &cobra.Command{
@@ -205,10 +235,28 @@ func destroyCmd() *cobra.Command {
 			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
 			util.CleanupNamespaces(ctx, clientSet, labelSelector)
 			util.CleanupNonNamespacedResources(ctx, clientSet, dynamicClient, labelSelector)
+			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
+			if err == nil {
+				configSpec, err := config.Parse(uuid, timeout, configFileReader)
+				if err == nil {
+					checkedConfigs := make(map[string]bool)
+					for _, job := range configSpec.Jobs {
+						if job.KubeConfig != "" && !checkedConfigs[job.KubeConfig+job.KubeContext] {
+							jobKubeClientProvider := config.NewKubeClientProvider(job.KubeConfig, job.KubeContext)
+							jobClientSet, jobRestConfig := jobKubeClientProvider.ClientSet(job.QPS, job.Burst)
+							jobDynamicClient := dynamic.NewForConfigOrDie(jobRestConfig)
+							util.CleanupNamespaces(ctx, jobClientSet, labelSelector)
+							util.CleanupNonNamespacedResources(ctx, jobClientSet, jobDynamicClient, labelSelector)
+							checkedConfigs[job.KubeConfig+job.KubeContext] = true
+						}
+					}
+				}
+			}
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.MarkFlagRequired("uuid")
@@ -270,6 +318,15 @@ func measureCmd() *cobra.Command {
 				namespaceLabels[req.Key()] = req.Values().List()[0]
 			}
 			log.Infof("%v", namespaceLabels)
+			jobKubeConfig := kubeConfig
+			jobKubeContext := kubeContext
+			for _, job := range configSpec.Jobs {
+				if job.Name == jobName && job.KubeConfig != "" {
+					jobKubeConfig = job.KubeConfig
+					jobKubeContext = job.KubeContext
+					break
+				}
+			}
 			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
 				&config.Job{
 					Name:                 jobName,
@@ -277,7 +334,7 @@ func measureCmd() *cobra.Command {
 					NamespaceLabels:      namespaceLabels,
 					NamespaceAnnotations: namespaceAnnotations,
 				},
-				config.NewKubeClientProvider(kubeConfig, kubeContext),
+				config.NewKubeClientProvider(jobKubeConfig, jobKubeContext),
 				nil,
 			)
 			measurementsInstance.Collect()

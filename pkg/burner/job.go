@@ -104,7 +104,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
 			})
-			watcherManager := watchers.NewWatcherManager(clientSet, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
+			watcherClientSet := clientSet
+			if jobExecutor.Job.KubeConfig != "" {
+				jobKubeClientProvider := config.NewKubeClientProvider(jobExecutor.Job.KubeConfig, jobExecutor.Job.KubeContext)
+				watcherClientSet, _ = jobKubeClientProvider.ClientSet(jobExecutor.QPS, jobExecutor.Burst)
+			}
+			watcherManager := watchers.NewWatcherManager(watcherClientSet, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
 			for idx, watcher := range jobExecutor.Watchers {
 				for replica := range watcher.Replicas {
 					watcherManager.Start(watcher.Kind, watcher.LabelSelector, idx+1, replica+1)
@@ -115,7 +120,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
-				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg)
+				measurementKubeClientProvider := kubeClientProvider
+				if jobExecutor.Job.KubeConfig != "" {
+					measurementKubeClientProvider = config.NewKubeClientProvider(jobExecutor.Job.KubeConfig, jobExecutor.Job.KubeContext)
+				}
+				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, measurementKubeClientProvider, embedCfg)
 				measurementsInstance.Start()
 			}
 			log.Infof("Triggering job: %s", jobExecutor.Name)
@@ -301,10 +310,16 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 
 // If requests, preload the images used in the test into the node
 func handlePreloadImages(executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
-	clientSet, _ := kubeClientProvider.DefaultClientSet()
 	for _, executor := range executorList {
 		if executor.PreLoadImages && executor.JobType == config.CreationJob {
-			if err := preLoadImages(executor, clientSet); err != nil {
+			preloadClientSet := executor.clientSet
+			if executor.Job.KubeConfig != "" {
+				jobKubeClientProvider := config.NewKubeClientProvider(executor.Job.KubeConfig, executor.Job.KubeContext)
+				preloadClientSet, _ = jobKubeClientProvider.ClientSet(executor.QPS, executor.Burst)
+			} else if preloadClientSet == nil {
+				preloadClientSet, _ = kubeClientProvider.DefaultClientSet()
+			}
+			if err := preLoadImages(executor, preloadClientSet); err != nil {
 				log.Fatal(err.Error())
 			}
 		}
@@ -388,7 +403,13 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 	var executorList []JobExecutor
 	for _, job := range configSpec.Jobs {
 		verifyJobDefaults(&job, configSpec.GlobalConfig.Timeout)
-		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job, embedCfg))
+		var jobKubeClientProvider *config.KubeClientProvider
+		if job.KubeConfig != "" {
+			jobKubeClientProvider = config.NewKubeClientProvider(job.KubeConfig, job.KubeContext)
+		} else {
+			jobKubeClientProvider = kubeClientProvider
+		}
+		executorList = append(executorList, newExecutor(configSpec, jobKubeClientProvider, job, embedCfg))
 	}
 	return executorList
 }
