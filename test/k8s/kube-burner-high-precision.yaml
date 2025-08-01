@@ -1,0 +1,28 @@
+---
+global:
+  measurements:
+    - name: podLatency
+      highPrecisionMetrics: true
+      thresholds:
+        - conditionType: PodScheduled
+          metric: P99
+          threshold: 500ms
+        - conditionType: Ready
+          metric: P99
+          threshold: 2s
+
+metricsEndpoints:
+  - indexer:
+      type: local
+      metricsDirectory: metrics
+
+jobs:
+  - name: test-high-precision
+    jobIterations: 1
+    namespace: test-high-precision
+    namespacedIterations: true
+    podWait: false
+    cleanup: true
+    objects:
+      - objectTemplate: test/k8s/objectTemplates/pod.yml
+        replicas: 2
