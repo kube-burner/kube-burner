@@ -58,6 +58,7 @@ $(BIN_PATH): $(SOURCES)
 		-X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) \
 		-X $(KUBE_BURNER_VERSION).Version=$(VERSION)" \
 		-o $(BIN_PATH) ./cmd/kube-burner
+	sudo cp $(BIN_PATH) /usr/local/bin/kube-burner
 
 build-release: $(SOURCES)
 	@echo -e "\033[2mBuilding secure release binary $(BIN_PATH)\033[0m"
