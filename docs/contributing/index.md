@@ -21,9 +21,10 @@ GOPATH=/home/rsevilla/go/
 GOARCH=amd64 CGO_ENABLED=0 go build -v -ldflags "-X github.com/cloud-bulldozer/go-commons/version.GitCommit=4c9c3f43db83adb053efc58220ddd696d1d19a35 -X github.com/cloud-bulldozer/go-commons/version.BuildDate=2024-01-10-21:24:20 -X github.com/cloud-bulldozer/go-commons/version.Version=main" -o bin/amd64/kube-burner ./cmd/kube-burner
 github.com/kube-burner/kube-burner/cmd/kube-burner
 ```
+## Installing
 
-To get global access to the kube-burner globally from you terminal you can use this command:
+To make kube-burner globally accessible from your terminal, run the following command with sudo:
 
 ```console
-$ sudo cp bin/amd64/kube-burner /usr/local/bin/
+$ sudo make install
 ```
