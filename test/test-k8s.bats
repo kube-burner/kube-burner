@@ -273,3 +273,8 @@ teardown_file() {
     check_metrics_not_created_for_job ${job} ${metric}
   done
 }
+
+@test "kube-burner init: create CRD and CR together" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-cr-crd.yml --uuid="${UUID}"
+  check_running_pods_in_ns cr-crd 5
+}
