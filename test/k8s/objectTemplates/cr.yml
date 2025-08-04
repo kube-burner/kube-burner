@@ -1,6 +1,6 @@
 ---
 apiVersion: testcrd.example.com/v1
-kind: TestCRD
+kind: TestCR
 metadata:
   name: test{{.Replica}}
 spec:

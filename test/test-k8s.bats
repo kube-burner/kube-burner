@@ -78,8 +78,8 @@ teardown_file() {
   export GC=false
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
-  check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 10
-  check_running_pods_in_ns default 5
+  check_running_resources kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 10
+  check_running_resources_in_ns default 5
   ${KUBE_BURNER} destroy --uuid "${UUID}"
   kubectl delete pod -l kube-burner-uuid=${UUID} -n default
   check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}"
@@ -276,5 +276,5 @@ teardown_file() {
 
 @test "kube-burner init: create CRD and CR together" {
   run_cmd ${KUBE_BURNER} init -c kube-burner-cr-crd.yml --uuid="${UUID}"
-  check_running_pods_in_ns cr-crd 5
+  check_running_resources_in_ns testcrs cr-crd 5
 }
