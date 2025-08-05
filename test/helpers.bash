@@ -180,7 +180,7 @@ check_running_pods_in_ns() {
 }
 
 check_running_custom_resources_in_ns() {
-  running_resources=$(kubectl get "${1}" -n "${2}" -l kube-burner-job=namespaced -o json | jq '.items | length')
+  running_resources=$(kubectl get "${1}" -n "${2}" -l kube-burner-job=test-resources -o json | jq '.items | length')
   if [[ "${running_resources}" != "${3}" ]]; then
     echo "Running ${1}s in namespace $2 different from expected. Expected=${3}, observed=${running_resources}"
     return 1
