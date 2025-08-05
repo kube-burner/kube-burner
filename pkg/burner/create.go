@@ -356,7 +356,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 			log.Infof("Churning through iterations: %d to %d in namespace: %s", randStart, numToChurn+randStart, namespacesToDelete[0])
 			CleanupIterations(ctx, *ex, randStart, numToChurn+randStart, namespacesToDelete[0])
 		} else {
-			if ex.ChurnDeletionStrategy == "gvr" {
+			if ex.deletionStrategy == config.GVRDeletionStrategy {
 				CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 			}
 			util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
