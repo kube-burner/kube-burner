@@ -64,6 +64,7 @@ teardown_file() {
 }
 
 @test "kube-burner init: churn=true; absolute-path=true" {
+  # @serial
   export CHURN=true
   export CHURN_CYCLES=2
   cp kube-burner.yml /tmp/kube-burner.yml
@@ -73,6 +74,7 @@ teardown_file() {
 }
 
 @test "kube-burner init: gc=false" {
+  # @serial
   export GC=false
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
@@ -94,6 +96,7 @@ teardown_file() {
 }
 
 @test "kube-burner init: local-indexing=true; pod-latency-metrics-indexing=true" {
+  # @serial
   export LOCAL_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
@@ -102,6 +105,7 @@ teardown_file() {
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; alerting=true"  {
+  # @serial
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement alert
@@ -111,6 +115,7 @@ teardown_file() {
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; metrics-endpoint=true" {
+  # @serial
   export ES_INDEXING=true LOCAL_INDEXING=true TIMESERIES_INDEXER=local-indexing
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -e metrics-endpoints.yaml
   check_file_list ${METRICS_FOLDER}/jobSummary.json  ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
@@ -153,12 +158,14 @@ teardown_file() {
 }
 
 @test "kube-burner init: kubeconfig" {
+  # @serial
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug --kubeconfig="${TEST_KUBECONFIG}"
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
 @test "kube-burner init: kubeconfig kube-context" {
+  # @serial
   run_cmd kubectl --kubeconfig "${TEST_KUBECONFIG}" config unset current-context
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
@@ -175,11 +182,13 @@ teardown_file() {
 }
 
 @test "kube-burner log file output" {
+  # @serial
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_file_exists "kube-burner-${UUID}.log"
 }
 
 @test "kube-burner init: waitOptions for Deployment" {
+  # @serial
   export GC=false
   export WAIT_FOR_CONDITION="True"
   export WAIT_CUSTOM_STATUS_PATH='(.conditions.[] | select(.type == "Available")).status'
