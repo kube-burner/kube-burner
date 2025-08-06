@@ -1,3 +1,5 @@
+load helpers.bash
+
 setup_suite() {
   cd k8s
   export BATS_TEST_TIMEOUT=1800
