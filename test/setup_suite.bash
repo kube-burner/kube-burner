@@ -1,7 +1,7 @@
 load helpers.bash
 
 setup_suite() {
-  cd k8s
+  cd k8s || exit
   export BATS_TEST_TIMEOUT=1800
   export JOB_ITERATIONS=4
   export QPS=3
