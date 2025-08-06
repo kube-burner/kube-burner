@@ -100,6 +100,8 @@ type GlobalConfig struct {
 	Timeout time.Duration `yaml:"timeout"`
 	// Function templates to render at runtime
 	FunctionTemplates []string `yaml:"functionTemplates"`
+	// DeletionStrategy global deletion strategy for all created objects
+	DeletionStrategy string `yaml:"deletionStrategy" json:"deletionStrategy,omitempty"`
 }
 
 // Object defines an object that kube-burner will create
@@ -143,6 +145,8 @@ type Job struct {
 	Name string `yaml:"name" json:"name,omitempty"`
 	// Objects list of objects
 	Objects []Object `yaml:"objects" json:"-"`
+	// Watchers list of watchers
+	Watchers []Watcher `yaml:"watchers" json:"-"`
 	// JobType type of job
 	JobType JobType `yaml:"jobType" json:"jobType,omitempty"`
 	// Max number of queries per second
@@ -189,8 +193,6 @@ type Job struct {
 	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration,omitempty"`
 	// Churn delay between sets
 	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
-	// Churn deletion strategy
-	ChurnDeletionStrategy string `yaml:"churnDeletionStrategy" json:"churnDeletionStrategy,omitempty"`
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
@@ -204,15 +206,30 @@ type Job struct {
 	MetricsAggregate bool `yaml:"metricsAggregate" json:"metricsAggregate,omitempty"`
 	// MetricsClosing defines when to stop metrics collection
 	MetricsClosing MetricsClosing `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
+	// Enables job's garbage collection
+	GC bool `yaml:"gc" json:"gc"`
 }
 
 type WaitOptions struct {
+	// APIVersion apiVersion to consider for wait
+	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// Kind object kind to consider for wait
 	Kind string `yaml:"kind" json:"kind,omitempty"`
 	// LabelSelector objects with these labels will be considered
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// CustomStatusPaths defines the list of jq path specific status fields to check (e.g., [{"key":".[]conditions.type","value":"Available"}]).
 	CustomStatusPaths []StatusPath `yaml:"customStatusPaths" json:"customStatusPaths,omitempty"`
+}
+
+type Watcher struct {
+	// Kind object kind to consider for watch
+	Kind string `yaml:"kind" json:"kind,omitempty"`
+	// APIVersion object apiVersion to consider for watch
+	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
+	// LabelSelector objects with these labels will be considered
+	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
+	// Replicas number of replicas to create of the given object
+	Replicas int `yaml:"replicas" json:"replicas,omitempty"`
 }
 
 // StatusPath defines the structure for each key-value pair in CustomStatusPath.

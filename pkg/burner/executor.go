@@ -33,10 +33,10 @@ import (
 )
 
 // Executor contains the information required to execute a job
-type ItemHandler func(ex *Executor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup)
-type ObjectFinalizer func(ex *Executor, obj *object)
+type ItemHandler func(ex *JobExecutor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup)
+type ObjectFinalizer func(ex *JobExecutor, obj *object)
 
-type Executor struct {
+type JobExecutor struct {
 	config.Job
 	objects           []*object
 	uuid              string
@@ -52,10 +52,12 @@ type Executor struct {
 	kubeVirtClient    kubecli.KubevirtClient
 	functionTemplates []string
 	embedCfg          *fileutils.EmbedConfiguration
+	deletionStrategy  string
+	objectOperations  int32
 }
 
-func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) Executor {
-	ex := Executor{
+func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
+	ex := JobExecutor{
 		Job:               job,
 		limiter:           rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		uuid:              configSpec.GlobalConfig.UUID,
@@ -63,6 +65,8 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		waitLimiter:       rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
 		embedCfg:          embedCfg,
+		deletionStrategy:  configSpec.GlobalConfig.DeletionStrategy,
+		objectOperations:  0,
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
@@ -90,7 +94,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	return ex
 }
 
-func (ex *Executor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {
+func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {
 	// Processing template
 	templateData := map[string]any{
 		jobName:      ex.Name,

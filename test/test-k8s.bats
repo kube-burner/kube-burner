@@ -64,11 +64,13 @@ teardown_file() {
 }
 
 # bats test_tags=serial
-@test "kube-burner init: churn=true; absolute-path=true" {
+@test "kube-burner init: churn=true; absolute-path=true; job-gc=true" {
   export CHURN=true
   export CHURN_CYCLES=2
+  export GC=false
+  export JOBGC=true
   cp kube-burner.yml /tmp/kube-burner.yml
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
@@ -204,9 +206,13 @@ teardown_file() {
   export LABEL_VALUE_END="end"
   export REPLICAS=50
 
+  # Create a failing deployment to test that kube-burner is not waiting on it
+  run_cmd kubectl create deployment failing-up --image=quay.io/cloud-bulldozer/sampleapp:nonexistent --replicas=1
+
   run_cmd ${KUBE_BURNER} init -c  kube-burner-sequential-patch.yml --uuid="${UUID}" --log-level=debug
   check_deployment_count ${NAMESPACE} ${LABEL_KEY} ${LABEL_VALUE_END} ${REPLICAS}
-  kubectl delete ns ${NAMESPACE}
+  run_cmd kubectl delete ns ${NAMESPACE}
+  run_cmd kubectl delete deployment failing-up
 }
 
 @test "kube-burner init: jobType kubevirt" {

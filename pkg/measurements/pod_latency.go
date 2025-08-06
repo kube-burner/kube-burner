@@ -23,11 +23,13 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -94,10 +96,14 @@ func (plmf podLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 }
 
 func (p *podLatency) handleCreatePod(obj any) {
-	pod := obj.(*corev1.Pod)
+	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Pod: %v", err)
+		return
+	}
 	podLabels := pod.GetLabels()
-	p.metrics.LoadOrStore(string(pod.UID), podMetric{
-		Timestamp:    pod.CreationTimestamp.Time.UTC(),
+	p.Metrics.LoadOrStore(string(pod.UID), podMetric{
+		Timestamp:    pod.CreationTimestamp.UTC(),
 		Namespace:    pod.Namespace,
 		Name:         pod.Name,
 		MetricName:   podLatencyMeasurement,
@@ -110,8 +116,12 @@ func (p *podLatency) handleCreatePod(obj any) {
 }
 
 func (p *podLatency) handleUpdatePod(obj any) {
-	pod := obj.(*corev1.Pod)
-	if value, exists := p.metrics.Load(string(pod.UID)); exists {
+	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Pod: %v", err)
+		return
+	}
+	if value, exists := p.Metrics.Load(string(pod.UID)); exists {
 		pm := value.(podMetric)
 		if pm.podReady.IsZero() {
 			for _, c := range pod.Status.Conditions {
@@ -120,28 +130,28 @@ func (p *podLatency) handleUpdatePod(obj any) {
 					switch c.Type {
 					case corev1.PodScheduled:
 						if pm.scheduled.IsZero() {
-							pm.scheduled = c.LastTransitionTime.Time.UTC()
+							pm.scheduled = c.LastTransitionTime.UTC()
 							pm.NodeName = pod.Spec.NodeName
 						}
 					case corev1.PodReadyToStartContainers:
 						if pm.readyToStartContainers.IsZero() {
-							pm.readyToStartContainers = c.LastTransitionTime.Time.UTC()
+							pm.readyToStartContainers = c.LastTransitionTime.UTC()
 						}
 					case corev1.PodInitialized:
 						if pm.initialized.IsZero() {
-							pm.initialized = c.LastTransitionTime.Time.UTC()
+							pm.initialized = c.LastTransitionTime.UTC()
 						}
 					case corev1.ContainersReady:
 						if pm.containersReady.IsZero() {
-							pm.containersReady = c.LastTransitionTime.Time.UTC()
+							pm.containersReady = c.LastTransitionTime.UTC()
 						}
 					case corev1.PodReady:
 						log.Debugf("Pod %s is ready", pod.Name)
-						pm.podReady = c.LastTransitionTime.Time.UTC()
+						pm.podReady = c.LastTransitionTime.UTC()
 					}
 				}
 			}
-			p.metrics.Store(string(pod.UID), pm)
+			p.Metrics.Store(string(pod.UID), pm)
 		}
 	}
 }
@@ -149,12 +159,16 @@ func (p *podLatency) handleUpdatePod(obj any) {
 // start podLatency measurement
 func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
+	gvr, err := util.ResourceToGVR(p.RestConfig, "Pod", "v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "Pod", err)
+	}
 	p.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
 				name:          "podWatcher",
-				resource:      "pods",
+				resource:      gvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePod,
@@ -184,23 +198,23 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 		}
 		pods = append(pods, podList.Items...)
 	}
-	p.metrics = sync.Map{}
+	p.Metrics = sync.Map{}
 	for _, pod := range pods {
 		var scheduled, initialized, containersReady, podReady time.Time
 		for _, c := range pod.Status.Conditions {
 			switch c.Type {
 			case corev1.PodScheduled:
-				scheduled = c.LastTransitionTime.Time.UTC()
+				scheduled = c.LastTransitionTime.UTC()
 			case corev1.PodInitialized:
-				initialized = c.LastTransitionTime.Time.UTC()
+				initialized = c.LastTransitionTime.UTC()
 			case corev1.ContainersReady:
-				containersReady = c.LastTransitionTime.Time.UTC()
+				containersReady = c.LastTransitionTime.UTC()
 			case corev1.PodReady:
-				podReady = c.LastTransitionTime.Time.UTC()
+				podReady = c.LastTransitionTime.UTC()
 			}
 		}
-		p.metrics.Store(string(pod.UID), podMetric{
-			Timestamp:       pod.Status.StartTime.Time.UTC(),
+		p.Metrics.Store(string(pod.UID), podMetric{
+			Timestamp:       pod.Status.StartTime.UTC(),
 			Namespace:       pod.Namespace,
 			Name:            pod.Name,
 			MetricName:      podLatencyMeasurement,
@@ -224,7 +238,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 	totalPods := 0
 	erroredPods := 0
 
-	p.metrics.Range(func(key, value any) bool {
+	p.Metrics.Range(func(key, value any) bool {
 		m := value.(podMetric)
 		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {
@@ -268,7 +282,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 		}
 		totalPods++
 		erroredPods += errorFlag
-		p.normLatencies = append(p.normLatencies, m)
+		p.NormLatencies = append(p.NormLatencies, m)
 		return true
 	})
 	if totalPods == 0 {

@@ -45,6 +45,18 @@ jobs:
     jobIterations: {{ add .JOB_ITERATIONS 1 }}
     qps: {{ .QPS }}
     burst: {{ .BURST }}
+    watchers:
+    - kind: Deployment
+      apiVersion: apps/v1
+      labelSelector: {foo: bar}
+    - kind: Pod
+      apiVersion: v1
+      labelSelector: {foo: bar}
+      replicas: 2
+    - kind: MyClusterResource
+      apiVersion: example.com/v1
+      labelSelector: {foo: bar}
+      replicas: 1
     namespacedIterations: true
     preLoadImages: true
     preLoadPeriod: 2s
@@ -61,6 +73,7 @@ jobs:
     churnPercent: 20
     churnDuration: 1m
     churnDelay: 5s
+    gc: {{env "JOBGC" }}
     namespaceLabels:
       foo: bar
       complex.label/test: true

@@ -33,9 +33,9 @@ jobs:
           tags_to_keep=$(echo "$all_tags" | head -n 3)
           for tag in $all_tags; do
             if [[ $tags_to_keep != *"$tag"* ]]; then
-              if mike list | grep -q "$tag"; then
+              if mike list | grep -q "^$tag$"; then
                 echo "Deleting documentation for tag: $tag"
-                mike delete "$tag"
+                mike delete "$tag" || echo "Failed to delete documentation for tag: $tag"
               else
                 echo "Documentation for tag $tag not found. Skipping deletion."
               fi

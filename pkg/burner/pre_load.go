@@ -69,7 +69,7 @@ type NestedVM struct {
 	} `yaml:"spec"`
 }
 
-func preLoadImages(job Executor, clientSet kubernetes.Interface) error {
+func preLoadImages(job JobExecutor, clientSet kubernetes.Interface) error {
 	log.Info("Pre-load: images from job ", job.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
@@ -92,7 +92,7 @@ func preLoadImages(job Executor, clientSet kubernetes.Interface) error {
 	return nil
 }
 
-func getJobImages(job Executor) ([]string, error) {
+func getJobImages(job JobExecutor) ([]string, error) {
 	var imageList []string
 	var unstructuredObject unstructured.Unstructured
 	for _, object := range job.objects {

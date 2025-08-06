@@ -12,37 +12,62 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics
+package watchers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 )
 
 const informerTimeout = time.Minute
 
-type Watcher struct {
-	name        string
-	stopChannel chan struct{}
-	Informer    cache.SharedIndexInformer
-}
-
 // NewWatcher return a new ListWatcher of the specified resource and namespace
-func NewWatcher(restClient *rest.RESTClient, name string, resource string, namespace string, optionsModifier func(options *metav1.ListOptions), indexers cache.Indexers) *Watcher {
-	lw := cache.NewFilteredListWatchFromClient(
-		restClient,
-		resource,
-		namespace,
-		optionsModifier,
-	)
+func NewWatcher(
+	dynamicClient dynamic.Interface,
+	name string,
+	gvr schema.GroupVersionResource,
+	namespace string,
+	optionsModifier func(*metav1.ListOptions),
+	indexers cache.Indexers,
+) *Watcher {
+	resourceNamespaceable := dynamicClient.Resource(gvr)
+
+	var resourceInterface dynamic.ResourceInterface
+	if namespace == corev1.NamespaceAll {
+		resourceInterface = resourceNamespaceable
+	} else {
+		resourceInterface = resourceNamespaceable.Namespace(namespace)
+	}
+
+	lw := &cache.ListWatch{
+		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
+			if optionsModifier != nil {
+				optionsModifier(&opts)
+			}
+			return resourceInterface.List(context.TODO(), opts)
+		},
+		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+			if optionsModifier != nil {
+				optionsModifier(&opts)
+			}
+			return resourceInterface.Watch(context.TODO(), opts)
+		},
+	}
+
 	return &Watcher{
 		name:        name,
 		stopChannel: make(chan struct{}),
-		Informer:    cache.NewSharedIndexInformer(lw, nil, 0, indexers),
+		Informer:    cache.NewSharedIndexInformer(lw, &unstructured.Unstructured{}, 0, indexers),
 	}
 }
 
