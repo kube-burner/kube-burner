@@ -25,18 +25,18 @@ setup-kind() {
   echo "Deploying cluster"
   "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1
   echo "Deploying kubevirt operator"
-  KUBEVIRT_VERSION=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
+  KUBEVIRT_VERSION=$(gh release view --repo kubevirt/kubevirt --json tagName -q '.tagName')
   kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml
   kubectl create -f objectTemplates/kubevirt-cr.yaml
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt
   # Install CDI
-  CDI_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/kubevirt/containerized-data-importer/releases/latest)")
+  CDI_VERSION=$(gh release view --repo kubevirt/containerized-data-importer --json tagName -q '.tagName')
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml
   kubectl create -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml
   kubectl wait --for=condition=Available --timeout=600s cdi cdi
   # Install Snapshot CRDs and Controller
-  SNAPSHOTTER_VERSION=$(curl -s https://api.github.com/repos/kubernetes-csi/external-snapshotter/releases/latest | jq -r .tag_name)
+  SNAPSHOTTER_VERSION=$(gh release view --repo kubernetes-csi/external-snapshotter --json tagName -q '.tagName')
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${SNAPSHOTTER_VERSION}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
@@ -48,7 +48,7 @@ setup-kind() {
   ${CSI_DRIVER_HOST_PATH_DIR}/deploy/kubernetes-latest/deploy.sh
   kubectl apply -f ${CSI_DRIVER_HOST_PATH_DIR}/examples/csi-storageclass.yaml
   # Install Helm
-  HELM_VERSION=$(basename "$(curl -s -w '%{redirect_url}' https://github.com/helm/helm/releases/latest)")
+  HELM_VERSION=$(gh release view --repo helm/helm --json tagName -q '.tagName')
   curl -LsS https://get.helm.sh/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz -o ${KIND_FOLDER}/helm.tgz
   tar xzvf ${KIND_FOLDER}/helm.tgz -C ${KIND_FOLDER}
   HELM_EXEC=${KIND_FOLDER}/linux-${ARCH}/helm

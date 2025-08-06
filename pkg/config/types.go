@@ -100,6 +100,8 @@ type GlobalConfig struct {
 	Timeout time.Duration `yaml:"timeout"`
 	// Function templates to render at runtime
 	FunctionTemplates []string `yaml:"functionTemplates"`
+	// DeletionStrategy global deletion strategy for all created objects
+	DeletionStrategy string `yaml:"deletionStrategy" json:"deletionStrategy,omitempty"`
 }
 
 // Object defines an object that kube-burner will create
@@ -191,8 +193,6 @@ type Job struct {
 	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration,omitempty"`
 	// Churn delay between sets
 	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
-	// Churn deletion strategy
-	ChurnDeletionStrategy string `yaml:"churnDeletionStrategy" json:"churnDeletionStrategy,omitempty"`
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
@@ -224,6 +224,8 @@ type WaitOptions struct {
 type Watcher struct {
 	// Kind object kind to consider for watch
 	Kind string `yaml:"kind" json:"kind,omitempty"`
+	// APIVersion object apiVersion to consider for watch
+	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with these labels will be considered
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// Replicas number of replicas to create of the given object

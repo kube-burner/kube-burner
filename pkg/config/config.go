@@ -37,6 +37,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+const (
+	DefaultDeletionStrategy = "default"
+	GVRDeletionStrategy     = "gvr"
+)
+
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		GC:                false,
@@ -47,6 +52,7 @@ var configSpec = Spec{
 		WaitWhenFinished:  false,
 		Timeout:           4 * time.Hour,
 		FunctionTemplates: []string{},
+		DeletionStrategy:  DefaultDeletionStrategy,
 	},
 }
 
@@ -115,7 +121,6 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		ChurnPercent:           10,
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
-		ChurnDeletionStrategy:  "default",
 		MetricsClosing:         AfterJobPause,
 	}
 
