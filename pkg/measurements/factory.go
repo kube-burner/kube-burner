@@ -55,6 +55,7 @@ var measurementFactoryMap = map[string]NewMeasurementFactory{
 	"pvcLatency":            newPvcLatencyMeasurementFactory,
 	"nodeLatency":           newNodeLatencyMeasurementFactory,
 	"vmiLatency":            newVmiLatencyMeasurementFactory,
+	"vmimLatency":           newVmimLatencyMeasurementFactory,
 	"serviceLatency":        newServiceLatencyMeasurementFactory,
 	"pprof":                 newPprofLatencyMeasurementFactory,
 	"netpolLatency":         newNetpolLatencyMeasurementFactory,

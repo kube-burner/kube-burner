@@ -44,9 +44,13 @@ In this section is described global job configuration, it holds the following pa
 | `clusterHealth` | Checks if all the nodes are in "Ready" state                                             | Boolean        | false      |
 | `timeout` | Global benchmark timeout                                             | Duration        | 4hr      |
 | `functionTemplates` | Function template files to render at runtime                                             | List        | []      |
+| `deletionStrategy` | Global deletion strategy to apply, `default` or `gvr` (where `default` deletes entire namespaces and `gvr` deletes objects within namespaces)   | String   | default  |
 
 !!! note
     The precedence order to wait on resources is Global.waitWhenFinished > Job.waitWhenFinished > Job.podWait
+
+!!! warning
+     Global `waitWhenFinished` and job `gc` are mutually exclusive and cannot be enabled at the same time.
 
 kube-burner connects k8s clusters using the following methods in this order:
 
@@ -107,9 +111,11 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `jobIterationDelay`          | How long to wait between each job iteration. This is also the wait interval between each delete operation                             | Duration | 0s       |
 | `jobPause`                   | How long to pause after finishing the job                                                                                             | Duration | 0s       |
 | `beforeCleanup`              | Allows to run a bash script before the workload is deleted                                                                            | String   | ""       |
+| `gc`                         | Garbage collect job                                                                                                                   | Boolean  | false    |
 | `qps`                        | Limit object creation queries per second                                                                                              | Integer  | 0        |
 | `burst`                      | Maximum burst for throttle                                                                                                            | Integer  | 0        |
 | `objects`                    | List of objects the job will create. Detailed on the [objects section](#objects)                                                      | List     | []       |
+| `watchers`                   | List of watchers to be created for the job. Detailed on the [watchers section](#watchers)                                                      | List     | []       |
 | `verifyObjects`              | Verify object count after running each job                                                                                            | Boolean  | true     |
 | `errorOnVerify`              | Set RC to 1 when objects verification fails                                                                                           | Boolean  | true     |
 | `skipIndexing`               | Skip metric indexing on this job                                                                                                      | Boolean  | false    |
@@ -123,7 +129,6 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `churnPercent`               | Percentage of the jobIterations to churn each period                                                                                  | Integer  | 10       |
 | `churnDuration`              | Length of time that the job is churned for                                                                                            | Duration | 1h       |
 | `churnDelay`                 | Length of time to wait between each churn period                                                                                      | Duration | 5m       |
-| `churnDeletionStrategy`      | Churn deletion strategy to apply, `default` or `gvr` (where `default` churns namespaces and `gvr` churns objects within namespaces)   | String   | default  |
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
 | `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
@@ -143,6 +148,21 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
 Examples of valid configuration files can be found in the [examples folder](https://github.com/kube-burner/kube-burner/tree/master/examples).
+
+
+### Watchers
+
+We have watchers support during the benchmark workload. It is at a job level and will be usefull in scenarios where we want to monitor overhead created by watchers on a cluster.
+
+!!! note
+    This feature doesn't effect the overall QPS/Burst as it uses its own client instance.
+
+| Option            | Description                                             | Type    | Default |
+|-------------------|---------------------------------------------------------|---------|---------|
+| `kind`            | Object kind to consider for watch                       | String  |    ""   |
+| `apiVersion`      | Object apiVersion to consider for watch                 | String  |    ""   |
+| `labelSelector`   | Objects with these labels will be considered for watch  | Object  |    {}   |
+| `replicas`        | Number of watcher replicas to create                    | Integer |     0   |
 
 ### Objects
 
@@ -190,6 +210,7 @@ If you want to override the default waiter behaviors, you can specify wait optio
 
 | Option       | Description                                             | Type    | Default |
 |--------------|---------------------------------------------------------|---------|---------|
+| `apiVersion` | Object apiVersion to consider for wait | String | "" |
 | `kind` | Object kind to consider for wait | String | "" |
 | `labelSelector` | Objects with these labels will be considered for wait | Object | {} |
 | `customStatusPaths` | list of jq path/values to verify readiness of the object | Object  | [] |

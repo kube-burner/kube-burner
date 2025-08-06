@@ -19,11 +19,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
-
-	"maps"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
@@ -38,6 +37,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+const (
+	DefaultDeletionStrategy = "default"
+	GVRDeletionStrategy     = "gvr"
+)
+
 var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		GC:                false,
@@ -48,6 +52,7 @@ var configSpec = Spec{
 		WaitWhenFinished:  false,
 		Timeout:           4 * time.Hour,
 		FunctionTemplates: []string{},
+		DeletionStrategy:  DefaultDeletionStrategy,
 	},
 }
 
@@ -83,6 +88,19 @@ func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+// UnmarshalYAML implements Unmarshaller to customize watcher defaults
+func (w *Watcher) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type rawWatcher Watcher
+	watcher := rawWatcher{
+		Replicas: 1,
+	}
+	if err := unmarshal(&watcher); err != nil {
+		return err
+	}
+	*w = Watcher(watcher)
+	return nil
+}
+
 // UnmarshalYAML implements Unmarshaller to customize job defaults
 func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawJob Job
@@ -103,7 +121,6 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		ChurnPercent:           10,
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
-		ChurnDeletionStrategy:  "default",
 		MetricsClosing:         AfterJobPause,
 	}
 
@@ -174,6 +191,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		return configSpec, err
 	}
 	if err := validateDNS1123(); err != nil {
+		return configSpec, err
+	}
+	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
 	for i, job := range configSpec.Jobs {
@@ -261,7 +281,7 @@ func FetchConfigMap(configMap, namespace string) (string, string, error) {
 	for name, data := range configMapData.Data {
 		// We write the configMap data into the CWD
 		if err := os.WriteFile(name, []byte(data), 0644); err != nil {
-			return metricProfile, alertProfile, fmt.Errorf("Error writing configmap into disk: %v", err)
+			return metricProfile, alertProfile, fmt.Errorf("error writing configmap into disk: %v", err)
 		}
 		if name == "metrics.yml" {
 			metricProfile = "metrics.yml"
@@ -280,7 +300,7 @@ func validateDNS1123() error {
 		}
 		if job.JobType == CreationJob && len(job.Namespace) > 0 {
 			if errs := validation.IsDNS1123Subdomain(job.Namespace); job.JobType == CreationJob && len(errs) > 0 {
-				return fmt.Errorf("Namespace %s name validation error: %s", job.Namespace, errs)
+				return fmt.Errorf("namespace %s name validation error: %s", job.Namespace, errs)
 			}
 		}
 	}
@@ -293,6 +313,19 @@ func jobIsDuped() error {
 		jobCount[job.Name]++
 		if jobCount[job.Name] > 1 {
 			return fmt.Errorf("Job names must be unique")
+		}
+	}
+	return nil
+}
+
+// validateGC checks if GC and global waitWhenFinished are enabled at the same time
+func validateGC() error {
+	if !configSpec.GlobalConfig.WaitWhenFinished {
+		return nil
+	}
+	for _, job := range configSpec.Jobs {
+		if job.GC {
+			return fmt.Errorf("jobs GC and global waitWhenFinished cannot be enabled at the same time")
 		}
 	}
 	return nil

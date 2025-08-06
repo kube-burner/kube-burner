@@ -21,9 +21,11 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -87,10 +89,14 @@ func (plmf pvcLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 
 // creates pvc metric
 func (p *pvcLatency) handleCreatePVC(obj any) {
-	pvc := obj.(*corev1.PersistentVolumeClaim)
+	pvc, err := util.ConvertAnyToTyped[corev1.PersistentVolumeClaim](obj)
+	if err != nil {
+		log.Errorf("failed to convert to PersistentVolumeClaim: %v", err)
+		return
+	}
 	log.Tracef("handleCreatePVC: %s", pvc.Name)
 	pvcLabels := pvc.GetLabels()
-	p.metrics.LoadOrStore(string(pvc.UID), pvcMetric{
+	p.Metrics.LoadOrStore(string(pvc.UID), pvcMetric{
 		Timestamp:    time.Now().UTC(),
 		Namespace:    pvc.Namespace,
 		Name:         pvc.Name,
@@ -107,9 +113,13 @@ func (p *pvcLatency) handleCreatePVC(obj any) {
 
 // handles pvc update
 func (p *pvcLatency) handleUpdatePVC(obj any) {
-	pvc := obj.(*corev1.PersistentVolumeClaim)
+	pvc, err := util.ConvertAnyToTyped[corev1.PersistentVolumeClaim](obj)
+	if err != nil {
+		log.Errorf("failed to convert to PersistentVolumeClaim: %v", err)
+		return
+	}
 	log.Tracef("handleUpdatePVC: %s", pvc.Name)
-	if value, exists := p.metrics.Load(string(pvc.UID)); exists {
+	if value, exists := p.Metrics.Load(string(pvc.UID)); exists {
 		pm := value.(pvcMetric)
 		log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
 		if pm.bound == 0 || pm.lost == 0 {
@@ -132,7 +142,7 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 					pm.lost = time.Now().UTC().UnixMilli()
 				}
 			}
-			p.metrics.Store(string(pvc.UID), pm)
+			p.Metrics.Store(string(pvc.UID), pm)
 		} else {
 			log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
 		}
@@ -145,12 +155,16 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	if p.JobConfig.JobType == config.ReadJob || p.JobConfig.JobType == config.PatchJob || p.JobConfig.JobType == config.DeletionJob {
 		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
 	}
+	gvr, err := util.ResourceToGVR(p.RestConfig, "PersistentVolumeClaim", "v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "PersistentVolumeClaim", err)
+	}
 	p.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    p.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
 				name:          "pvcWatcher",
-				resource:      "persistentvolumeclaims",
+				resource:      gvr,
 				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePVC,
@@ -188,7 +202,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 	totalPVCs := 0
 	erroredPVCs := 0
 
-	p.metrics.Range(func(key, value any) bool {
+	p.Metrics.Range(func(key, value any) bool {
 		m := value.(pvcMetric)
 		// If a pvc does not reach the stable state, we skip that one
 		if m.bound == 0 && m.lost == 0 {
@@ -220,7 +234,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 
 		totalPVCs++
 		erroredPVCs += errorFlag
-		p.normLatencies = append(p.normLatencies, m)
+		p.NormLatencies = append(p.NormLatencies, m)
 		return true
 	})
 	if totalPVCs == 0 {

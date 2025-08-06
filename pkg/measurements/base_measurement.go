@@ -23,9 +23,12 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -40,32 +43,32 @@ type BaseMeasurement struct {
 	ClientSet                kubernetes.Interface
 	RestConfig               *rest.Config
 	Metadata                 map[string]any
-	watchers                 []*metrics.Watcher
-	metrics                  sync.Map
+	watchers                 []*watchers.Watcher
+	Metrics                  sync.Map
 	MeasurementName          string
-	latencyQuantiles         []any
+	LatencyQuantiles         []any
 	QuantilesMeasurementName string
-	normLatencies            []any
+	NormLatencies            []any
 }
 
 type MeasurementWatcher struct {
-	restClient    *rest.RESTClient
+	dynamicClient dynamic.Interface
 	name          string
-	resource      string
+	resource      schema.GroupVersionResource
 	labelSelector string
 	handlers      *cache.ResourceEventHandlerFuncs
 }
 
 func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWatcher) {
 	// Reset latency slices, required in multi-job benchmarks
-	bm.latencyQuantiles, bm.normLatencies = nil, nil
-	bm.metrics = sync.Map{}
+	bm.LatencyQuantiles, bm.NormLatencies = nil, nil
+	bm.Metrics = sync.Map{}
 
-	bm.watchers = make([]*metrics.Watcher, len(measurementWatchers))
+	bm.watchers = make([]*watchers.Watcher, len(measurementWatchers))
 	for i, measurementWatcher := range measurementWatchers {
 		log.Infof("Creating %v latency watcher for %s", measurementWatcher.resource, bm.JobConfig.Name)
-		bm.watchers[i] = metrics.NewWatcher(
-			measurementWatcher.restClient,
+		bm.watchers[i] = watchers.NewWatcher(
+			measurementWatcher.dynamicClient,
 			measurementWatcher.name,
 			measurementWatcher.resource,
 			corev1.NamespaceAll,
@@ -101,9 +104,9 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 	}
 	bm.calculateQuantiles(getLatency)
 	if len(bm.Config.LatencyThresholds) > 0 {
-		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.latencyQuantiles)
+		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.LatencyQuantiles)
 	}
-	for _, q := range bm.latencyQuantiles {
+	for _, q := range bm.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		log.Infof("%s: %v 99th: %v max: %v avg: %v", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
@@ -114,13 +117,13 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 }
 
 func (bm *BaseMeasurement) GetMetrics() *sync.Map {
-	return &bm.metrics
+	return &bm.Metrics
 }
 
 func (bm *BaseMeasurement) Index(jobName string, indexerList map[string]indexers.Indexer) {
 	metricMap := map[string][]any{
-		bm.MeasurementName:          bm.normLatencies,
-		bm.QuantilesMeasurementName: bm.latencyQuantiles,
+		bm.MeasurementName:          bm.NormLatencies,
+		bm.QuantilesMeasurementName: bm.LatencyQuantiles,
 	}
 	bm.indexLatencyMeasurement(jobName, metricMap, indexerList)
 }
@@ -161,7 +164,7 @@ func (bm *BaseMeasurement) indexLatencyMeasurement(jobName string, metricMap map
 // Receives a function to get the latencies for each condition
 func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]float64) {
 	quantileMap := map[string][]float64{}
-	for _, normLatency := range bm.normLatencies {
+	for _, normLatency := range bm.NormLatencies {
 		for condition, latency := range getLatency(normLatency) {
 			quantileMap[condition] = append(quantileMap[condition], latency)
 		}
@@ -175,8 +178,8 @@ func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]fl
 		return latencySummary
 	}
 
-	bm.latencyQuantiles = make([]any, 0, len(quantileMap))
+	bm.LatencyQuantiles = make([]any, 0, len(quantileMap))
 	for condition, latencies := range quantileMap {
-		bm.latencyQuantiles = append(bm.latencyQuantiles, calcSummary(condition, latencies))
+		bm.LatencyQuantiles = append(bm.LatencyQuantiles, calcSummary(condition, latencies))
 	}
 }

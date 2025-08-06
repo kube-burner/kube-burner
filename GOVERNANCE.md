@@ -61,14 +61,19 @@ To become a Maintainer you need to demonstrate the following:
 
   * commitment to the project:
     * participate in discussions, contributions, code and documentation reviews
-      for [TODO: Time Period] or more,
-    * perform reviews for [TODO:Number] non-trivial pull requests,
-    * contribute [TODO:Number] non-trivial pull requests and have them merged,
+      for *3* months or more,
+    * perform reviews for *10* non-trivial pull requests,
+    * contribute *5* non-trivial pull requests and have them merged,
   * ability to write quality code and/or documentation,
   * ability to collaborate with the team,
   * understanding of how the team works (policies, processes for testing and code review, etc),
   * understanding of the project's code base and coding and documentation style.
-  <!-- add any additional Maintainer requirements here -->
+
+#### What are non-trivial contributions?
+  * A feature enhancement
+  * A new feature
+  * A critical bug fix (a bug that affects kube-burner's core functionality)
+  * Adding new test scenarios
 
 A new Maintainer must be proposed by an existing maintainer by sending a message to the
 [maintainers mailing list](cncf-kube-burner-maintainers@lists.cncf.io). A simple majority vote of existing Maintainers

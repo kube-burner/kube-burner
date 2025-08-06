@@ -17,6 +17,7 @@ package burner
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (ex *Executor) setupDeleteJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupDeleteJob(mapper meta.RESTMapper) {
 	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
@@ -42,11 +43,11 @@ func (ex *Executor) setupDeleteJob(mapper meta.RESTMapper) {
 	ex.WaitWhenFinished = false
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1))
+		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1, ex.embedCfg))
 	}
 }
 
-func deleteHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func deleteHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 	ex.limiter.Wait(context.TODO())
 	var err error
@@ -60,9 +61,10 @@ func deleteHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 	if err != nil {
 		log.Errorf("Error found removing %s/%s: %s", item.GetKind(), item.GetName(), err)
 	}
+	atomic.AddInt32(&ex.objectOperations, 1)
 }
 
-func verifyDelete(ex *Executor, obj *object) {
+func verifyDelete(ex *JobExecutor, obj *object) {
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,

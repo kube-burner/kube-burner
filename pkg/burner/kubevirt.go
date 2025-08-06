@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubevirtV1 "kubevirt.io/api/core/v1"
 	"kubevirt.io/client-go/kubecli"
 
@@ -83,25 +85,17 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 			timeGreaterThan:      false,
 		},
 	},
-	config.KubeVirtOpMigrate: {
-		conditionCheckConfig: ConditionCheckConfig{
-			conditionType:        conditionTypeReady,
-			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
-			timeGreaterThan:      true,
-		},
-	},
+	config.KubeVirtOpMigrate:      nil,
 	config.KubeVirtOpAddVolume:    nil,
 	config.KubeVirtOpRemoveVolume: nil,
 }
 
-func (ex *Executor) setupKubeVirtJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupKubeVirtJob(mapper meta.RESTMapper) {
 	var err error
-
 	if len(ex.ExecutionMode) == 0 {
 		ex.ExecutionMode = config.ExecutionModeSequential
 	}
 	ex.itemHandler = kubeOpHandler
-
 	ex.kubeVirtClient, err = kubecli.GetKubevirtClientFromRESTConfig(ex.restConfig)
 	if err != nil {
 		log.Fatalf("Failed to get kubevirt client - %v", err)
@@ -119,17 +113,27 @@ func (ex *Executor) setupKubeVirtJob(mapper meta.RESTMapper) {
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		ex.objects = append(ex.objects, newObject(o, mapper, kubeVirtAPIVersionV1))
+		obj := newObject(o, mapper, kubeVirtAPIVersionV1, ex.embedCfg)
+
+		if o.KubeVirtOp == config.KubeVirtOpMigrate && obj.waitGVR == nil {
+			obj.waitGVR = &schema.GroupVersionResource{
+				Group:    "kubevirt.io",
+				Version:  "v1",
+				Resource: "virtualmachineinstances",
+			}
+		}
+		// If LabelSelector was not set at the wait block, use the same selector used for the operation
+		if len(obj.WaitOptions.LabelSelector) == 0 {
+			obj.WaitOptions.LabelSelector = obj.LabelSelector
+		}
+
+		ex.objects = append(ex.objects, obj)
 	}
 }
 
-func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
-
-	// If LabelSelector was not set at the wait block, use the same selector used for the operation
-	if len(obj.WaitOptions.LabelSelector) == 0 {
-		obj.WaitOptions.LabelSelector = obj.LabelSelector
-	}
+	ex.limiter.Wait(context.TODO())
 
 	operationConfig := supportedOps[obj.KubeVirtOp]
 	var err error
@@ -163,7 +167,33 @@ func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 	case config.KubeVirtOpUnpause:
 		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Unpause(context.Background(), item.GetName(), &kubevirtV1.UnpauseOptions{})
 	case config.KubeVirtOpMigrate:
-		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Migrate(context.Background(), item.GetName(), &kubevirtV1.MigrateOptions{})
+		if len(obj.WaitOptions.CustomStatusPaths) == 0 {
+			obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
+				{
+					Key:   ".migrationState.completed | tostring | ascii_downcase",
+					Value: "true",
+				},
+				{
+					Key:   fmt.Sprintf("(.migrationState.endTimestamp // \"1970-01-01T00:00:00Z\") | strptime(\"%%Y-%%m-%%dT%%H:%%M:%%SZ\") | mktime > %d | tostring", objectTimeUTC),
+					Value: "true",
+				},
+			}
+		}
+		vmim := &kubevirtV1.VirtualMachineInstanceMigration{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: fmt.Sprintf("%s-%s-%v-", item.GetName(), ex.Name, iteration),
+				Labels: map[string]string{
+					"kube-burner-uuid":                 ex.uuid,
+					"kube-burner-runid":                ex.runid,
+					"kube-burner-job":                  ex.Name,
+					config.KubeBurnerLabelJobIteration: fmt.Sprintf("%v", iteration),
+				},
+			},
+			Spec: kubevirtV1.VirtualMachineInstanceMigrationSpec{
+				VMIName: item.GetName(),
+			},
+		}
+		_, err = ex.kubeVirtClient.VirtualMachineInstanceMigration(item.GetNamespace()).Create(context.Background(), vmim, metav1.CreateOptions{})
 	case config.KubeVirtOpAddVolume:
 		err = addVolume(ex, item.GetName(), item.GetNamespace(), obj.InputVars)
 	case config.KubeVirtOpRemoveVolume:
@@ -175,6 +205,7 @@ func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 	} else {
 		log.Debugf("Successfully executed op [%s] on the VM [%s]", obj.KubeVirtOp, item.GetName())
 	}
+	atomic.AddInt32(&ex.objectOperations, 1)
 
 	// Use predefined status paths when not set by the user
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 && operationConfig != nil {
@@ -182,7 +213,7 @@ func kubeOpHandler(ex *Executor, obj *object, item unstructured.Unstructured, it
 	}
 }
 
-func getVolumeSourceFromVolume(ex *Executor, volumeName, namespace string) (*kubevirtV1.HotplugVolumeSource, error) {
+func getVolumeSourceFromVolume(ex *JobExecutor, volumeName, namespace string) (*kubevirtV1.HotplugVolumeSource, error) {
 	//Check if data volume exists.
 	_, err := ex.kubeVirtClient.CdiClient().CdiV1beta1().DataVolumes(namespace).Get(context.TODO(), volumeName, metav1.GetOptions{})
 	if err == nil {
@@ -209,7 +240,7 @@ func getVolumeSourceFromVolume(ex *Executor, volumeName, namespace string) (*kub
 	return nil, fmt.Errorf("volume %s is not a DataVolume or PersistentVolumeClaim", volumeName)
 }
 
-func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any) error {
+func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
@@ -245,11 +276,11 @@ func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any
 
 	switch diskType {
 	case "disk":
-		hotplugRequest.Disk.DiskDevice.Disk = &kubevirtV1.DiskTarget{
+		hotplugRequest.Disk.Disk = &kubevirtV1.DiskTarget{
 			Bus: "scsi",
 		}
 	case "lun":
-		hotplugRequest.Disk.DiskDevice.LUN = &kubevirtV1.LunTarget{
+		hotplugRequest.Disk.LUN = &kubevirtV1.LunTarget{
 			Bus: "scsi",
 		}
 	default:
@@ -294,7 +325,7 @@ func addVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any
 	return nil
 }
 
-func removeVolume(ex *Executor, vmiName, namespace string, extraArgs map[string]any) error {
+func removeVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
