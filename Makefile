@@ -8,7 +8,7 @@ BIN_DIR = bin
 BIN_PATH = $(BIN_DIR)/$(ARCH)/$(BIN_NAME)
 CGO = 0
 TEST_BINARY ?= $(CURDIR)/$(BIN_PATH)
-PARALLEL_TESTS ?= 4
+PARALLEL_TESTS ?= $(shell nproc)
 # Security hardening flags for static builds
 HARDENED_FLAGS = -buildmode=pie -tags=netgo,osusergo,static_build
 HARDENED_LDFLAGS = -extldflags '-static'
@@ -121,5 +121,5 @@ test: lint test-k8s
 
 test-k8s:
 	cd test && \
-	KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) --filter-tags '!serial' -j 4 -F pretty -T --print-output-on-failure test-k8s.bats && \
+	KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) --filter-tags '!serial' -j $(PARALLEL_TESTS) -F pretty -T --print-output-on-failure test-k8s.bats && \
 	KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) --filter-tags 'serial' -F pretty -T --print-output-on-failure test-k8s.bats
