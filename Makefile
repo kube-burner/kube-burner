@@ -121,5 +121,5 @@ test: lint test-k8s
 
 test-k8s:
 	cd test && \
-	KUBE_BURNER=$(TEST_BINARY) SKIP_TEARDOWN_FILE=true bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) --filter-tags '!serial' -j $(PARALLEL_TESTS) -F pretty -T --print-output-on-failure test-k8s.bats && \
-	KUBE_BURNER=$(TEST_BINARY) SKIP_SETUP_FILE=true bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) --filter-tags 'serial' -F pretty -T --print-output-on-failure test-k8s.bats
+	KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) --filter-tags '!serial' -j $(PARALLEL_TESTS) -F pretty -T --print-output-on-failure test-k8s.bats && \
+	KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) --filter-tags 'serial' -F pretty -T --print-output-on-failure test-k8s.bats
