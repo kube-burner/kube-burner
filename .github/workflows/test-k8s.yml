@@ -46,7 +46,6 @@ jobs:
     needs: fetch-latest-kind-node-tags
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         k8s-version: ${{ fromJson(needs.fetch-latest-kind-node-tags.outputs.tags) }}
     steps:
