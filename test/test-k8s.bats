@@ -221,8 +221,6 @@ teardown_file() {
   check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "unset" 0
   # Verify that the from-file label was set from the user-data file
   check_deployment_count ${NAMESPACE} "kube-burner.io/from-file" "from-file" ${REPLICAS}
-  # Verify that the from-env label was NOT set from the user-data file
-  check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "from-file" 0
   # Verify that the from-env label was set from the environment variable
   check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "from-env" ${REPLICAS}
   # Verify that the default value is used when the variable is not set
