@@ -138,6 +138,8 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (map[string]any, error) {
+	// Get environment variables
+	templateVars := util.EnvToMap()
 	// If a userDataFileReader was provided use it to override values
 	if userDataFileReader != nil {
 		userDataFileVars := make(map[string]any)
@@ -149,11 +151,12 @@ func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse file: %w", err)
 		}
-		maps.Copy(additionalVars, userDataFileVars)
+		// Copy values from userDataFileVars to templateVars
+		maps.Copy(templateVars, userDataFileVars)
 	}
-	// Combine additionalVars and environment variables
-	maps.Copy(util.EnvToMap(), additionalVars)
-	return additionalVars, nil
+	// Copy additionalVars to templateVars
+	maps.Copy(templateVars, additionalVars)
+	return templateVars, nil
 }
 
 func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec, error) {
