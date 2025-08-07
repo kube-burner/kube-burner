@@ -17,6 +17,7 @@ package workloads
 import (
 	"embed"
 	"fmt"
+	"io"
 	"path"
 
 	"github.com/kube-burner/kube-burner/pkg/burner"
@@ -25,6 +26,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/pkg/util/reader"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,6 +37,7 @@ var ConfigSpec config.Spec
 //
 // Parameters:
 //   - config: The configuration settings for the workload.
+//   - overlays: The overlay paths for the workload configuration.
 //   - embedFS: The embedded filesystem containing workload and metrics directories.
 //   - workloadDir: The directory path for workloads in the embedded filesystem.
 //   - metricsDir: The directory path for metrics in the embedded filesystem.
@@ -43,10 +46,11 @@ var ConfigSpec config.Spec
 //
 // Returns:
 //   - A WorkloadHelper instance configured with the provided settings.
-func NewWorkloadHelper(config Config, embedFS *embed.FS, workloadDir, metricsDir, alertsDir, scriptsDir string, kubeClientProvider *config.KubeClientProvider) WorkloadHelper {
+func NewWorkloadHelper(config Config, overlays []string, embedFS *embed.FS, workloadDir, metricsDir, alertsDir, scriptsDir string, kubeClientProvider *config.KubeClientProvider) WorkloadHelper {
 	embedCfg := fileutils.NewEmbedConfiguration(embedFS, workloadDir, metricsDir, alertsDir, scriptsDir)
 	wh := WorkloadHelper{
 		Config:             config,
+		OverlayPaths:       overlays,
 		kubeClientProvider: kubeClientProvider,
 		MetricsMetadata:    make(map[string]any),
 		SummaryMetadata:    make(map[string]any),
@@ -76,9 +80,11 @@ func (wh *WorkloadHelper) Run(configFile string) int {
 // Returns:
 //   - An integer representing the result of the workload execution.
 func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVars map[string]any, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) int {
-	f, err := fileutils.GetWorkloadReader(configFile, wh.embedCfg)
+	var f io.Reader
+	var err error
+	f, err = reader.NewReader(configFile, wh.OverlayPaths, wh.embedCfg, nil, false, additionalVars)
 	if err != nil {
-		log.Fatalf("Error reading configuration file: %v", err.Error())
+		log.Fatalf("Error creating reader for configuration file %s: %s", configFile, err)
 	}
 	ConfigSpec, err = config.ParseWithUserdata(wh.UUID, wh.Timeout, f, nil, false, additionalVars)
 	if err != nil {

@@ -1,0 +1,17 @@
+---
+global:
+  measurements:
+    - name: serviceLatency
+      svcTimeout: 5s
+
+metricsEndpoints:
+- indexer:
+    type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+
+jobs:
+  - name: overlay
+    namespace: overlay
+    objects:
+      - objectTemplate: objectTemplates/deployment.yml
+        replicas: 1
