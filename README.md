@@ -33,16 +33,39 @@ In case you want to start tinkering with Kube-burner now:
 - There's also a container image available at [quay](https://quay.io/repository/kube-burner/kube-burner?tab=tags).
 - Example configuration files can be found at the [examples directory](./examples).
 
+### Version Information
+
+You can check the version of your kube-burner installation using either of these commands:
+
+```bash
+# Using the version subcommand
+kube-burner version
+
+# Using the --version flag (quick version check)
+kube-burner --version
+kube-burner -v
+```
+
+Both commands display comprehensive version information including:
+
+- Version number
+- Git commit hash
+- Build date
+- Go version used for compilation
+- Operating system and architecture
+
 ## Building from Source
 
 Kube-burner provides multiple build options:
 
-- `make build`              - Standard build for development
-- `make build-release`      - Optimized release build  
-- `make build-hardened`     - Security-hardened static binary
+- `make build` - Standard build for development
+- `make build-release` - Optimized release build
+- `make build-hardened` - Security-hardened static binary
 - `make build-hardened-cgo` - Full security hardening with CGO (requires glibc)
 
 The default builds produce static binaries that work across all Linux distributions. The CGO-hardened build offers additional security features but requires glibc to be present on the target system.
+
+All build methods automatically embed proper version information, so `kube-burner --version` will display the correct build details.
 
 ## Contributing Guidelines, CI, and Code Style
 

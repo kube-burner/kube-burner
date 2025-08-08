@@ -30,17 +30,36 @@ import (
 // Bootstraps kube-burner cmd with some common flags
 func SetupCmd(cmd *cobra.Command) {
 	cmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
+
+	var showVersion bool
+	cmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Print version information and exit")
+
+	originalPreRun := cmd.PersistentPreRun
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if showVersion {
+			PrintVersionInfo()
+			os.Exit(0)
+		}
+		if originalPreRun != nil {
+			originalPreRun(cmd, args)
+		}
+	}
+
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version number of kube-burner",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("Version:", version.Version)
-			fmt.Println("Git Commit:", version.GitCommit)
-			fmt.Println("Build Date:", version.BuildDate)
-			fmt.Println("Go Version:", version.GoVersion)
-			fmt.Println("OS/Arch:", version.OsArch)
+			PrintVersionInfo()
 		},
 	})
+}
+
+func PrintVersionInfo() {
+	fmt.Println("Version:", version.Version)
+	fmt.Println("Git Commit:", version.GitCommit)
+	fmt.Println("Build Date:", version.BuildDate)
+	fmt.Println("Go Version:", version.GoVersion)
+	fmt.Println("OS/Arch:", version.OsArch)
 }
 
 // Configures kube-burner's file logging
