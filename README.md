@@ -33,6 +33,10 @@ In case you want to start tinkering with Kube-burner now:
 - There's also a container image available at [quay](https://quay.io/repository/kube-burner/kube-burner?tab=tags).
 - Example configuration files can be found at the [examples directory](./examples).
 
+## Local Development Setup
+
+For detailed instructions on setting up your local development environment, including Go installation, container runtime setup (Podman/Docker), Kind cluster configuration, and running your first tests, see our [Local Development Setup Guide](docs/contributing/local-setup.md).
+
 ## Building from Source
 
 Kube-burner provides multiple build options:
