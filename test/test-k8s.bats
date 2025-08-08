@@ -120,6 +120,16 @@ teardown_file() {
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
+@test "kube-burner init: high-precision pod latency metrics" {
+  export LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner-high-precision.yaml --uuid="${UUID}" --log-level=debug
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-test-high-precision.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-test-high-precision.json
+  # Verify that high-precision client-side metrics are present in the output
+  check_metric_value jobSummary podLatencyMeasurement podLatencyQuantilesMeasurement
+  check_destroyed_ns kube-burner-job=test-high-precision,kube-burner-uuid="${UUID}"
+  check_destroyed_pods test-high-precision kube-burner-job=test-high-precision,kube-burner-uuid="${UUID}"
+}
+
 @test "kube-burner index: local-indexing=true; tarball=true" {
   run_cmd ${KUBE_BURNER} index --uuid="${UUID}" -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz --start="$(date -d "-2 minutes" +%s)"
   check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/top2PrometheusCPU-start.json collected-metrics/prometheusRSS.json

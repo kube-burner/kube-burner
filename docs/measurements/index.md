@@ -9,9 +9,37 @@ Measurements are enabled in the `measurements` object of the configuration file.
 Collects latencies from the different pod startup phases, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: podLatency
 ```
+
+### High-Precision Pod Latency
+
+By default, pod latency measurements are limited to second-precision due to Kubernetes API timestamp constraints. For sub-second pod operations and more accurate measurements, you can enable high-precision mode:
+
+```yaml
+measurements:
+  - name: podLatency
+    highPrecisionMetrics: true
+```
+
+When enabled, this feature provides:
+
+- **Sub-millisecond accuracy**: Float64 values in milliseconds with decimal precision (e.g., 123.456ms)
+- **Client-side timestamps**: Captures exact moment events are observed by kube-burner, not API timestamps
+- **Dual measurement system**: Provides both standard (API-based) and high-precision (client-based) metrics
+- **Backward compatibility**: Existing measurements remain unchanged
+
+High-precision metrics are prefixed with "Client" and include:
+
+- `ClientPodScheduled`: Client-side scheduling latency
+- `ClientPodInitialized`: Client-side initialization latency
+- `ClientContainersReady`: Client-side containers ready latency
+- `ClientPodReady`: Client-side pod ready latency
+- `ClientPodReadyToStartContainers`: Client-side ready to start containers latency
+
+!!! note
+High-precision metrics are only available for real-time measurements during workload execution. They are not available when collecting metrics from existing pods using the `Collect` method, as client-side timestamps cannot be captured retroactively.
 
 ### Metrics
 
@@ -33,7 +61,7 @@ One document, such as the following, is indexed per each pod created by the work
   "nodeName": "worker-001",
   "jobName": "create-pods",
   "jobIteration": "2",
-  "replica": "3",
+  "replica": "3"
 }
 ```
 
@@ -75,10 +103,10 @@ Where `quantileName` matches with the pod conditions and can be:
 - `Ready`: The pod is able to service requests and should be added to the load balancing pools of all matching services.
 
 !!! note
-    We also log the errorRate of the latencies for user's understanding. It indicates the percentage of pods out of all pods in the workload that got errored during the latency calculations. Currently the threshold for the errorRate is 10% and we do not log latencies if the error is > 10% which indicates a problem with environment.(i.e system under test)
+We also log the errorRate of the latencies for user's understanding. It indicates the percentage of pods out of all pods in the workload that got errored during the latency calculations. Currently the threshold for the errorRate is 10% and we do not log latencies if the error is > 10% which indicates a problem with environment.(i.e system under test)
 
 !!! info
-    More information about the pod conditions can be found at the [kubernetes documentation site](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions).
+More information about the pod conditions can be found at the [kubernetes documentation site](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions).
 
 And the metrics are:
 
@@ -95,12 +123,12 @@ It is possible to establish pod latency thresholds to the different pod conditio
 Establishing a threshold of 2000ms in the P99 metric of the `Ready` condition.
 
 ```yaml
-  measurements:
+measurements:
   - name: podLatency
     thresholds:
-    - conditionType: Ready
-      metric: P99
-      threshold: 2000ms
+      - conditionType: Ready
+        metric: P99
+        threshold: 2000ms
 ```
 
 Latency thresholds are evaluated at the end of each job, showing an informative message like the following:
@@ -117,7 +145,7 @@ In case of not meeting any of the configured thresholds, like the example above,
 Collects latencies from the different job stages, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: jobLatency
 ```
 
@@ -128,22 +156,22 @@ The metrics collected are job latency timeseries (`jobLatencyMeasurement`) and t
 It generates a document like the following per each job:
 
 ```json
-  {
-    "timestamp": "2025-05-07T10:31:03Z",
-    "startTimeLatency": 0,
-    "completionLatency": 14000,
-    "metricName": "jobLatencyMeasurement",
-    "uuid": "62d3c7a1-4faa-44fb-99ff-cf2b79cdfd22",
-    "jobName": "small",
-    "jobIteration": 0,
-    "replica": 18,
-    "namespace": "kueue-scale-s",
-    "k8sJobName": "kueue-scale-small-18",
-    "metadata": {
-      "ocpMajorVersion": "4.18",
-      "ocpVersion": "4.18.5"
-    }
+{
+  "timestamp": "2025-05-07T10:31:03Z",
+  "startTimeLatency": 0,
+  "completionLatency": 14000,
+  "metricName": "jobLatencyMeasurement",
+  "uuid": "62d3c7a1-4faa-44fb-99ff-cf2b79cdfd22",
+  "jobName": "small",
+  "jobIteration": 0,
+  "replica": 18,
+  "namespace": "kueue-scale-s",
+  "k8sJobName": "kueue-scale-small-18",
+  "metadata": {
+    "ocpMajorVersion": "4.18",
+    "ocpVersion": "4.18.5"
   }
+}
 ```
 
 Where `completionLatency` and `starTimeLatency` indicate the job completion time and startup latency respectively since its creation timestamp.
@@ -194,7 +222,7 @@ Job latency quantile sample:
 Collects latencies from the different vm/vmi startup phases, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: vmiLatency
 ```
 
@@ -206,34 +234,34 @@ One document, such as the following, is indexed per each vm/vmi created by the w
 
 ```json
 {
-    "timestamp": "2024-11-26T12:57:50Z",
-    "podCreatedLatency": 116532,
-    "podScheduledLatency": 116574,
-    "podInitializedLatency": 132511,
-    "podContainersReadyLatency": 135541,
-    "podReadyLatency": 135541,
-    "vmiCreatedLatency": 7000,
-    "vmiPendingLatency": 116401,
-    "vmiSchedulingLatency": 117106,
-    "vmiScheduledLatency": 127926,
-    "vmiRunningLatency": 138166,
-    "vmReadyLatency": 138166,
-    "metricName": "vmiLatencyMeasurement",
-    "uuid": "f7c79fd5-58e7-4719-a710-7633ffb20491",
-    "namespace": "virt-density",
-    "podName": "virt-launcher-virt-density-27-zkfdt",
-    "vmName": "virt-density-27",
-    "vmiName": "virt-density-27",
-    "nodeName": "y37-h25-000-r740xd",
-    "jobName": "virt-density",
+  "timestamp": "2024-11-26T12:57:50Z",
+  "podCreatedLatency": 116532,
+  "podScheduledLatency": 116574,
+  "podInitializedLatency": 132511,
+  "podContainersReadyLatency": 135541,
+  "podReadyLatency": 135541,
+  "vmiCreatedLatency": 7000,
+  "vmiPendingLatency": 116401,
+  "vmiSchedulingLatency": 117106,
+  "vmiScheduledLatency": 127926,
+  "vmiRunningLatency": 138166,
+  "vmReadyLatency": 138166,
+  "metricName": "vmiLatencyMeasurement",
+  "uuid": "f7c79fd5-58e7-4719-a710-7633ffb20491",
+  "namespace": "virt-density",
+  "podName": "virt-launcher-virt-density-27-zkfdt",
+  "vmName": "virt-density-27",
+  "vmiName": "virt-density-27",
+  "nodeName": "y37-h25-000-r740xd",
+  "jobName": "virt-density"
 }
 ```
 
 !!! info
-    The fields `vmReadyLatency` and `vmName` are only set when the VMI has a parent VM object
+The fields `vmReadyLatency` and `vmName` are only set when the VMI has a parent VM object
 
 !!! info
-    The fields prefixed by `pod`, represent the latency of the different startup phases of the pod running the actual virtual machine.
+The fields prefixed by `pod`, represent the latency of the different startup phases of the pod running the actual virtual machine.
 
 ---
 
@@ -251,7 +279,7 @@ Pod latency quantile sample:
     "avg": 119509,
     "timestamp": "2024-11-26T13:00:30.713169517Z",
     "metricName": "vmiLatencyQuantilesMeasurement",
-    "jobName": "virt-density",
+    "jobName": "virt-density"
   },
   {
     "quantileName": "VMIScheduled",
@@ -263,7 +291,7 @@ Pod latency quantile sample:
     "avg": 138699,
     "timestamp": "2024-11-26T13:00:30.713173817Z",
     "metricName": "vmiLatencyQuantilesMeasurement",
-    "jobName": "virt-density",
+    "jobName": "virt-density"
   },
   {
     "quantileName": "PodContainersReady",
@@ -275,10 +303,9 @@ Pod latency quantile sample:
     "avg": 139361,
     "timestamp": "2024-11-26T13:00:30.713179584Z",
     "metricName": "vmiLatencyQuantilesMeasurement",
-    "jobName": "virt-density",
-  },
+    "jobName": "virt-density"
+  }
 ]
-
 ```
 
 ## Node latency
@@ -286,7 +313,7 @@ Pod latency quantile sample:
 Collects latencies from the different node conditions on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: nodeLatency
 ```
 
@@ -367,17 +394,18 @@ Where `quantileName` matches with the node conditions and can be:
 - `Ready`: Node is ready and able to accept pods.
 
 !!! info
-    More information about the node conditions can be found at the [kubernetes documentation site](https://kubernetes.io/docs/reference/node/node-status/#condition).
+More information about the node conditions can be found at the [kubernetes documentation site](https://kubernetes.io/docs/reference/node/node-status/#condition).
 
 And the metrics, error rates, and their thresholds work the same way as in the pod latency measurement.
 
 ## PVC latency
+
 Note: This measurement is not supported for patch, read and delete jobs. Because it requires all the events from creation to reaching a stable end state to happen during a job.
 
 Collects latencies from different pvc phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: pvcLatency
 ```
 
@@ -401,7 +429,7 @@ One document, such as the following, is indexed per each pvc created by the work
   "size": "1Gi",
   "storageClass": "gp3-csi",
   "jobIteration": 0,
-  "replica": 1,
+  "replica": 1
 }
 ```
 
@@ -422,7 +450,7 @@ PVC latency quantile sample:
     "avg": 4444,
     "timestamp": "2025-01-10T02:51:04.611059008Z",
     "metricName": "pvcLatencyQuantilesMeasurement",
-    "jobName": "pvc-move",
+    "jobName": "pvc-move"
   },
   {
     "quantileName": "Lost",
@@ -435,7 +463,7 @@ PVC latency quantile sample:
     "avg": 0,
     "timestamp": "2025-01-10T02:51:04.611061474Z",
     "metricName": "pvcLatencyQuantilesMeasurement",
-    "jobName": "pvc-move",
+    "jobName": "pvc-move"
   },
   {
     "quantileName": "Pending",
@@ -448,7 +476,7 @@ PVC latency quantile sample:
     "avg": 37,
     "timestamp": "2025-01-10T02:51:04.611062824Z",
     "metricName": "pvcLatencyQuantilesMeasurement",
-    "jobName": "pvc-move",
+    "jobName": "pvc-move"
   }
 ]
 ```
@@ -460,7 +488,7 @@ Where `quantileName` matches with the pvc phases and can be:
 - `Lost`: Indicates that the PVC has lost their underlying PersistentVolume.
 
 !!! info
-    More information about the PVC phases can be found at the [kubernetes api documentation](https://pkg.go.dev/k8s.io/api/core/v1#PersistentVolumeClaimPhase).
+More information about the PVC phases can be found at the [kubernetes api documentation](https://pkg.go.dev/k8s.io/api/core/v1#PersistentVolumeClaimPhase).
 
 And the metrics, error rates, and their thresholds work the same way as in the other latency measurements.
 
@@ -485,22 +513,14 @@ The connectivity check is done through a pod running in the `kube-burner-service
 This measure is enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: serviceLatency
     svcTimeout: 5s
 ```
 
 Where `svcTimeout`, by default `5s`, defines the maximum amount of time the measurement will wait for a service to be ready, when this timeout is met, the metric from that service is **discarded**.
 
-!!! warning "Considerations"
-    - Only TCP is supported.
-    - Supported services are `ClusterIP`, `NodePort` and `LoadBalancer`.
-    - kube-burner starts checking service connectivity when its endpoints object has at least one address.
-    - Make sure the endpoints of the service are correct and reachable from the pod running in the `kube-burner-service-latency`.
-    - When the service is `NodePort`, the connectivity check is done against the node where the connectivity check pods runs.
-    - By default all services created by the benchmark are tracked by this measurement, it's possible to discard service objects from tracking by annotating them with `kube-burner.io/service-latency=false`.
-    - Keep in mind that When service is `LoadBalancer` type, the provider needs to setup the load balancer, which adds some extra delay.
-    - Endpoints are pinged one after another, this can create some delay when the number of endpoints of the service is big.
+!!! warning "Considerations" - Only TCP is supported. - Supported services are `ClusterIP`, `NodePort` and `LoadBalancer`. - kube-burner starts checking service connectivity when its endpoints object has at least one address. - Make sure the endpoints of the service are correct and reachable from the pod running in the `kube-burner-service-latency`. - When the service is `NodePort`, the connectivity check is done against the node where the connectivity check pods runs. - By default all services created by the benchmark are tracked by this measurement, it's possible to discard service objects from tracking by annotating them with `kube-burner.io/service-latency=false`. - Keep in mind that When service is `LoadBalancer` type, the provider needs to setup the load balancer, which adds some extra delay. - Endpoints are pinged one after another, this can create some delay when the number of endpoints of the service is big.
 
 ### Metrics
 
@@ -519,7 +539,7 @@ The metrics collected are service latency timeseries (`svcLatencyMeasurement`) a
 ```
 
 !!! note
-    When type is `LoadBalancer`, it includes an extra field `ipAssigned`, that reports the IP assignation latency of the service.
+When type is `LoadBalancer`, it includes an extra field `ipAssigned`, that reports the IP assignation latency of the service.
 
 And the quantiles document has the structure:
 
@@ -555,7 +575,7 @@ When there're `LoadBalancer` services, an extra document with `quantileName` as 
 Collects latencies from different DataVolume phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: dataVolumeLatency
 ```
 
@@ -577,7 +597,7 @@ One document, such as the following, is indexed per each data volume created by 
   "dvName": "master-image",
   "jobName": "create-base-image-dv",
   "jobIteration": 0,
-  "replica": 1,
+  "replica": 1
 }
 ```
 
@@ -598,7 +618,7 @@ DataVolume latency quantile sample:
     "avg": 21900,
     "timestamp": "2025-01-14T14:40:15.3046Z",
     "metricName": "dvLatencyQuantilesMeasurement",
-    "jobName": "create-vms",
+    "jobName": "create-vms"
   },
   {
     "quantileName": "Running",
@@ -611,7 +631,7 @@ DataVolume latency quantile sample:
     "avg": 2000,
     "timestamp": "2025-01-14T14:40:15.304602Z",
     "metricName": "dvLatencyQuantilesMeasurement",
-    "jobName": "create-vms",
+    "jobName": "create-vms"
   },
   {
     "quantileName": "Ready",
@@ -624,7 +644,7 @@ DataVolume latency quantile sample:
     "avg": 22000,
     "timestamp": "2025-01-14T14:40:15.304604Z",
     "metricName": "dvLatencyQuantilesMeasurement",
-    "jobName": "create-vms",
+    "jobName": "create-vms"
   }
 ]
 ```
@@ -636,7 +656,7 @@ Where `quantileName` matches with the pvc phases and can be:
 - `Ready`: Indicates that the DV is ready for usage
 
 !!! info
-    More information about the DataVolume condition types can be found at the [kubevirt documentation](https://github.com/kubevirt/containerized-data-importer/blob/main/doc/datavolumes.md#conditions).
+More information about the DataVolume condition types can be found at the [kubevirt documentation](https://github.com/kubevirt/containerized-data-importer/blob/main/doc/datavolumes.md#conditions).
 
 And the metrics, error rates, and their thresholds work the same way as in the other latency measurements.
 
@@ -645,7 +665,7 @@ And the metrics, error rates, and their thresholds work the same way as in the o
 Collects latencies from different VolumeSnapshot phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: volumeSnapshotLatency
 ```
 
@@ -665,7 +685,7 @@ One document, such as the following, is indexed per each Volume Snapshot created
   "vsName": "master-image",
   "jobName": "create-base-image-snapshot",
   "jobIteration": 0,
-  "replica": 1,
+  "replica": 1
 }
 ```
 
@@ -686,7 +706,7 @@ VolumeSnapshot latency quantile sample:
     "avg": 22000,
     "timestamp": "2025-01-14T14:40:15.304604Z",
     "metricName": "volumeSnapshotLatencyQuantilesMeasurement",
-    "jobName": "create-snapshots",
+    "jobName": "create-snapshots"
   }
 ]
 ```
@@ -702,7 +722,7 @@ And the metrics, error rates, and their thresholds work the same way as in the o
 Collects latencies from different VirtualMachineInstanceMigration phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
 ```yaml
-  measurements:
+measurements:
   - name: vmimLatency
 ```
 
@@ -860,6 +880,7 @@ Calculates the time taken to apply the network policy rules by the SDN through c
 At a high level, Kube-burner utilizes a proxy pod, `network-policy-proxy`, to distribute connection information (such as remote IP addresses) to the client pods. These client pods then send the requests to the specified addresses and record a timestamp once a connection is successfully established. Kube-burner retrieves these timestamps from the client pods via the proxy pod and calculates the network policy latency by comparing the recorded timestamp with the timestamp when the network policy was created.
 
 During this testing, kube-burner creates two separate jobs:
+
 1. **Job 1**: Creates all necessary namespaces and pods.
 2. **Job 2**: Applies network policies to the pods defined on above namespaces and tests connections by sending HTTP requests.
 
@@ -908,21 +929,26 @@ On a summary, the advantages with this approach are -
 ### Steps in the Execution of Job 2:
 
 1. **Connection List Preparation**:
+
    - Kube-burner parses the network policy template to prepare a list of connection details for each client pod. Each connection is defined by a remote IP address, port, and the associated network policy name.
    - Currently, connection testing supports only the **Ingress** rule on port **8080**.
    - Although the template may specify identical configurations for multiple network policies within a namespace, Kube-burner optimizes this process by ensuring that only unique connections are sent to the client pods (avoiding duplicate remote IP addresses).
 
 2. **Sending Connection Information**:
+
    - Kube-burner passes the prepared connection information to the client pods via the `network-policy-proxy` pod and waits until the proxy pod confirms that all client pods have received the information.
 
 3. **Initial HTTP Requests**:
+
    - Once the client pods receive their connection details, they begin sending HTTP requests to the specified addresses. Initially, these requests will fail because the network policies have not yet been applied.
 
 4. **Network Policy Creation**:
+
    - As part of its regular workflow, Kube-burner parses the template and applies network policies for each namespace.
    - After the network policies are applied, the previously failing HTTP requests from the client pods become successful. At this point, each client pod records the timestamp when a successful connection is established.
 
 5. **Pause for Stabilization**:
+
    - After creating all network policies, Kube-burner pauses for **1 minute** (due to the `jobPause: 1m` configuration option in the template). This allows the connection tests to complete successfully within this time window.
 
 6. **Retrieving Timestamps and Calculating Latency**:
@@ -932,13 +958,14 @@ On a summary, the advantages with this approach are -
 This measure is enabled with:
 
 ```yaml
-  measurements:
-    - name: netpolLatency
+measurements:
+  - name: netpolLatency
 ```
 
 ### Metrics
 
 And the quantiles document has the structure:
+
 ```json
 [
   {
@@ -978,38 +1005,38 @@ As some components require authentication to get profiling information, `kube-bu
 
 - **Bearer token authentication**: This modality is configured by the variable `bearerToken`, which holds a valid Bearer token that will be used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components
 - **Certificate Authentication**: Usually valid for etcd, this method can be configured using a combination of cert/privKey files or directly using the cert/privkey content, it can be tweaked with the following variables:
-    - `cert`: Base64 encoded certificate.
-    - `key`: Base64 encoded private key.
-    - `certFile`: Path to a certificate file.
-    - `keyFile`: Path to a private key file.
+  - `cert`: Base64 encoded certificate.
+  - `key`: Base64 encoded private key.
+  - `certFile`: Path to a certificate file.
+  - `keyFile`: Path to a private key file.
 
 !!! note
-    The decoded content of the certificate and private key is written to the files /tmp/pprof.crt and /tmp/pprof.key of the remote pods respectively
+The decoded content of the certificate and private key is written to the files /tmp/pprof.crt and /tmp/pprof.key of the remote pods respectively
 
 An example of how to configure this measurement to collect pprof HEAP and CPU profiling data from kube-apiserver and etcd is shown below:
 
 ```yaml
-  measurements:
+measurements:
   - name: pprof
     pprofInterval: 30m
     pprofDirectory: pprof-data
     pprofTargets:
-    - name: kube-apiserver-heap
-      namespace: "openshift-kube-apiserver"
-      labelSelector: {app: openshift-kube-apiserver}
-      bearerToken: thisIsNotAValidToken
-      url: https://localhost:6443/debug/pprof/heap
+      - name: kube-apiserver-heap
+        namespace: "openshift-kube-apiserver"
+        labelSelector: { app: openshift-kube-apiserver }
+        bearerToken: thisIsNotAValidToken
+        url: https://localhost:6443/debug/pprof/heap
 
-    - name: etcd-heap
-      namespace: "openshift-etcd"
-      labelSelector: {app: etcd}
-      certFile: etcd-peer-pert.crt
-      keyFile: etcd-peer-pert.key
-      url: https://localhost:2379/debug/pprof/heap
+      - name: etcd-heap
+        namespace: "openshift-etcd"
+        labelSelector: { app: etcd }
+        certFile: etcd-peer-pert.crt
+        keyFile: etcd-peer-pert.key
+        url: https://localhost:2379/debug/pprof/heap
 ```
 
 !!! warning
-    As mentioned before, this measurement requires the `curl` command to be available in the target pods.
+As mentioned before, this measurement requires the `curl` command to be available in the target pods.
 
 ## Measure subcommand CLI example
 
@@ -1041,23 +1068,22 @@ For example
 
 ```yaml
 metricsEndpoints:
-- indexer:
-    type: local
-    alias: local-indexer
-- indexer:
-    type: opensearch
-    defaultIndex: kube-burner
-    esServers: ["https://opensearch.domain:9200"]
-    alias: os-indexer
+  - indexer:
+      type: local
+      alias: local-indexer
+  - indexer:
+      type: opensearch
+      defaultIndex: kube-burner
+      esServers: ["https://opensearch.domain:9200"]
+      alias: os-indexer
 global:
   measurements:
-  - name: podLatency
-    timeseriesIndexer: local-indexer
-    quantilesIndexer: os-indexer
+    - name: podLatency
+      timeseriesIndexer: local-indexer
+      quantilesIndexer: os-indexer
 ```
 
 With the configuration snippet above, the measurement `podLatency` would use the local indexer for timeseries metrics and opensearch for the quantile metrics.
-
 
 ## Additional Custom Measurements
 
