@@ -30,10 +30,7 @@ func EnhanceYAMLParseError(filename string, err error) error {
 
 	// Check if it's a yaml.TypeError which contains line/column info
 	if yamlErr, ok := err.(*yaml.TypeError); ok {
-		var errorDetails []string
-		for _, e := range yamlErr.Errors {
-			errorDetails = append(errorDetails, e)
-		}
+		errorDetails := append([]string(nil), yamlErr.Errors...)
 		return fmt.Errorf("failed to parse config file %s: %s", filename, strings.Join(errorDetails, "; "))
 	}
 
