@@ -233,7 +233,7 @@ func NewKubeClientProvider(config, context string) *KubeClientProvider {
 	var err error
 	if kubeConfigPath == "" {
 		if restConfig, err = rest.InClusterConfig(); err != nil {
-			log.Fatalf("error preparing kubernetes client: %s", err)
+			log.Fatalf("no running cluster found (no kubeconfig and no in-cluster config): %v", err) // If no kubeconfig is provided or no env vars are set
 		}
 	} else {
 		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -241,7 +241,15 @@ func NewKubeClientProvider(config, context string) *KubeClientProvider {
 			&clientcmd.ConfigOverrides{CurrentContext: context},
 		)
 		if restConfig, err = kubeConfig.ClientConfig(); err != nil {
-			log.Fatalf("error preparing kubernetes client: %s", err)
+			log.Fatalf("invalid kubeconfig or unreachable cluster: %v", err) // If kubeconfig is provided, but invalid or cluster is unreachable
+		}
+
+		clientset, err := kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			log.Fatalf("unable to create Kubernetes client: %v", err) // If kubeconfig is provided, but unable to create client
+		}
+		if _, err := clientset.Discovery().ServerVersion(); err != nil {
+			log.Fatalf("cluster config found but cannot reach API server: %v", err) // If kubeconfig is provided, but unable to reach API server
 		}
 	}
 	return &KubeClientProvider{restConfig: restConfig}
