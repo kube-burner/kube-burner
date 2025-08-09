@@ -13,6 +13,34 @@ Collects latencies from the different pod startup phases, these **latency metric
   - name: podLatency
 ```
 
+### High-Precision Pod Latency
+
+By default, pod latency measurements are limited to second-precision due to Kubernetes API timestamp constraints. For sub-second pod operations and more accurate measurements, you can enable high-precision mode:
+
+```yaml
+measurements:
+  - name: podLatency
+    highPrecisionMetrics: true
+```
+
+When enabled, this feature provides:
+
+- **Sub-millisecond accuracy**: Float64 values in milliseconds with decimal precision (e.g., 123.456ms)
+- **Client-side timestamps**: Captures exact moment events are observed by kube-burner, not API timestamps
+- **Dual measurement system**: Provides both standard (API-based) and high-precision (client-based) metrics
+- **Backward compatibility**: Existing measurements remain unchanged
+
+High-precision metrics are prefixed with "Client" and include:
+
+- `ClientPodScheduled`: Client-side scheduling latency
+- `ClientPodInitialized`: Client-side initialization latency
+- `ClientContainersReady`: Client-side containers ready latency
+- `ClientPodReady`: Client-side pod ready latency
+- `ClientPodReadyToStartContainers`: Client-side ready to start containers latency
+
+!!! note
+High-precision metrics are only available for real-time measurements during workload execution. They are not available when collecting metrics from existing pods using the `Collect` method, as client-side timestamps cannot be captured retroactively.
+
 ### Metrics
 
 The metrics collected are pod latency timeseries (`podLatencyMeasurement`) and four documents holding a summary with different pod latency quantiles of each pod condition (`podLatencyQuantilesMeasurement`).
