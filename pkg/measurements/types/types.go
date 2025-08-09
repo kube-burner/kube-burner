@@ -54,6 +54,8 @@ type Measurement struct {
 	QuantilesIndexer string `yaml:"quantilesIndexer"`
 	// Defines the indexer for timeseries
 	TimeseriesIndexer string `yaml:"timeseriesIndexer"`
+	// Enable high-precision timestamps for sub-millisecond accuracy
+	HighPrecisionMetrics bool `yaml:"highPrecisionMetrics"`
 }
 
 // LatencyThreshold holds the thresholds configuration
