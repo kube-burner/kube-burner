@@ -54,6 +54,13 @@ Tool aimed at stressing a kubernetes cluster by creating or deleting lots of obj
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		util.ConfigureLogging(cmd)
 	},
+	Run: func(cmd *cobra.Command, args []string) {
+		if showVersion, _ := cmd.Flags().GetBool("version"); showVersion {
+			util.PrintVersionInfo()
+			return
+		}
+		cmd.Help()
+	},
 }
 
 var completionCmd = &cobra.Command{
