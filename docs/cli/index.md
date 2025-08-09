@@ -27,6 +27,7 @@ Available Commands:
 Flags:
   -h, --help               help for kube-burner
       --log-level string   Allowed values: debug, info, warn, error, fatal (default "info")
+  -v, --version            Print version information and exit
 
 Use "kube-burner [command] --help" for more information about a command.
 ```
