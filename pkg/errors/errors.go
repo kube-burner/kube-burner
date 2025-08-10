@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package errors
 
 import (
 	"encoding/json"
@@ -22,7 +22,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// EnhanceYAMLParseError enhances YAML parsing errors with more context
 func EnhanceYAMLParseError(filename string, err error) error {
 	if err == nil {
 		return nil
@@ -44,7 +43,6 @@ func EnhanceYAMLParseError(filename string, err error) error {
 	return fmt.Errorf("failed to parse config file %s: %s. Please ensure the file contains valid YAML or JSON", filename, errStr)
 }
 
-// EnhanceJSONParseError enhances JSON parsing errors with more context
 func EnhanceJSONParseError(filename string, err error) error {
 	if err == nil {
 		return nil

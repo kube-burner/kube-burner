@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kube-burner/kube-burner/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -43,8 +44,5 @@ func ReadUserMetadata(inputFile string) (map[string]any, error) {
 
 	yamlDec := yaml.NewDecoder(f)
 	err = yamlDec.Decode(&userMetadata)
-	if err != nil {
-		return userMetadata, EnhanceYAMLParseError(inputFile, err)
-	}
-	return userMetadata, err
+	return userMetadata, errors.EnhanceYAMLParseError(inputFile, err)
 }

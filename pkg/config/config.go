@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
+	"github.com/kube-burner/kube-burner/pkg/errors"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -155,7 +156,7 @@ func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (
 
 		err = yaml.Unmarshal(userData, &userDataFileVars)
 		if err != nil {
-			return nil, util.EnhanceYAMLParseError("user data file", err)
+			return nil, errors.EnhanceYAMLParseError("user data file", err)
 		}
 		maps.Copy(inputData, userDataFileVars)
 	}
@@ -195,7 +196,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&configSpec); err != nil {
-		return configSpec, util.EnhanceYAMLParseError("configuration file", err)
+		return configSpec, errors.EnhanceYAMLParseError("configuration file", err)
 	}
 	if err := jobIsDuped(); err != nil {
 		return configSpec, err

@@ -88,24 +88,10 @@ func getReader(location string) (io.Reader, error) {
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
 		f, err = getBodyForURL(location, nil)
 	} else {
-		file, err := os.Open(location)
+		f, err = os.Open(location)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open config file %s: %w", location, err)
 		}
-
-		// Check if file is empty
-		stat, err := file.Stat()
-		if err != nil {
-			file.Close()
-			return nil, fmt.Errorf("failed to get file info for %s: %w", location, err)
-		}
-
-		if stat.Size() == 0 {
-			file.Close()
-			return nil, fmt.Errorf("config file %s is empty. Please provide a valid YAML or JSON configuration file", location)
-		}
-
-		f = file
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file %s: %w", location, err)
