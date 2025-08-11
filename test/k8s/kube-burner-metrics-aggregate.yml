@@ -3,6 +3,7 @@
 global:
   measurements:
   - name: vmiLatency
+    highPrecisionMetrics: true
 
 metricsEndpoints:
 - indexer:
