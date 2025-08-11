@@ -8,18 +8,18 @@ jobs:
     uses: ./.github/workflows/ci-tests.yml
     secrets: inherit
 
-  integration-tests:
+  ci-integration-tests:
     uses: ./.github/workflows/ci-integration-tests.yml
     needs: ci-tests
     secrets: inherit
 
   release-build:
     uses: ./.github/workflows/gorelease.yml
-    needs: [ci-tests, integration-tests]
+    needs: [ci-tests, ci-integration-tests]
 
   image-upload:
     uses: ./.github/workflows/image-upload.yml
-    needs: [ci-tests, integration-tests]
+    needs: [ci-tests, ci-integration-tests]
     secrets: inherit
 
   deploy-docs:
