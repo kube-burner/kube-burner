@@ -25,6 +25,7 @@ jobs:
         containerImage: quay.io/cloud-bulldozer/sampleapp:latest
         labelFromFile: {{ .deploymentLabelFromFile }}
         labelFromEnv: {{ .deploymentLabelFromEnv }}
+        labelFromFileOverride: {{ .deploymentLabelFromFileOverride }}
       waitOptions:
         customStatusPaths:
         - key: '(.conditions.[] | select(.type == "Available")).status'

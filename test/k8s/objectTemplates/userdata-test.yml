@@ -1,2 +1,2 @@
 deploymentLabelFromFile: from-file
-deploymentLabelFromEnv: from-file
+deploymentLabelFromFileOverride: from-file
