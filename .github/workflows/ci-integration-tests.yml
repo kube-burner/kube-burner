@@ -1,0 +1,25 @@
+name: CI Integration tests
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'examples/**'
+      - 'media/**'
+      - 'mkdocs.yml'
+      - '.gitignore'
+      - 'LICENSE'
+
+jobs:
+  build:
+    uses: ./.github/workflows/builders.yml
+
+  tests:
+    needs: build
+    uses: ./.github/workflows/test-k8s.yml
+    secrets: inherit

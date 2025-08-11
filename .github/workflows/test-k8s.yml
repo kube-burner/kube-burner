@@ -3,18 +3,6 @@ name: Execute tests on k8s and OCP
 on:
   workflow_dispatch:
   workflow_call:
-  pull_request:
-    branches:
-      - main
-      - master
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'examples/**'
-      - 'media/**'
-      - 'mkdocs.yml'
-      - '.gitignore'
-      - 'LICENSE'
 jobs:
   fetch-latest-kind-node-tags:
     runs-on: ubuntu-latest

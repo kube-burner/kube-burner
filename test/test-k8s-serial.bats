@@ -3,7 +3,10 @@
 # shellcheck disable=SC2086,SC2030,SC2031,SC2164
 
 load helpers.bash
-export BATS_NO_PARALLELIZE_WITHIN_FILE=true
+
+setup_file() {
+  export BATS_NO_PARALLELIZE_WITHIN_FILE=true
+}
 
 setup() {
   export UUID; UUID=$(uuidgen)
