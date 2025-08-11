@@ -74,10 +74,9 @@ func GetScriptsReader(location string, embedCfg *EmbedConfiguration) (io.Reader,
 
 func getEmbedReader(location string, embedFS *embed.FS, embedDir string) (io.Reader, error) {
 	log.Debugf("Looking for file %s in embed fs", location)
-	embedPath := filepath.Join(embedDir, location)
-	f, err := embedFS.Open(embedPath)
+	f, err := embedFS.Open(filepath.Join(embedDir, location))
 	if err != nil {
-		log.Infof("File %s not found in the embedded filesystem (tried: %s). Falling back to original path", location, embedPath)
+		log.Infof("File %s not found in the embedded filesystem. Falling back to original path", location)
 		return getReader(location)
 	}
 	return f, nil
@@ -88,82 +87,27 @@ func getReader(location string) (io.Reader, error) {
 	u, err := url.Parse(location)
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
 		f, err = getBodyForURL(location, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch config file from URL %s: %w", location, err)
-		}
 	} else {
-		// Handle local file
-		absPath, _ := filepath.Abs(location)
-
-		// Check if path exists and validate it's a file, not a directory
-		if stat, statErr := os.Stat(location); statErr == nil {
-			if stat.IsDir() {
-				return nil, fmt.Errorf("config file path is a directory, not a file: %s\n"+
-					"  Absolute path: %s\n"+
-					"  Please specify a file, not a directory", location, absPath)
-			}
-		}
-
 		f, err = os.Open(location)
-		if err != nil {
-			return nil, formatFileError(location, absPath, err)
-		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to open config file %s: %w", location, err)
 	}
 	return f, nil
 }
 
-func formatFileError(location, absPath string, err error) error {
-	if os.IsNotExist(err) {
-		return fmt.Errorf("config file not found: %s\n"+
-			"  Absolute path: %s\n"+
-			"  Please check:\n"+
-			"  - The file path is correct\n"+
-			"  - The file exists at the specified location\n"+
-			"  - You have the correct working directory", location, absPath)
-	}
-
-	if os.IsPermission(err) {
-		return fmt.Errorf("permission denied accessing config file: %s\n"+
-			"  Absolute path: %s\n"+
-			"  Please check:\n"+
-			"  - You have read permissions for the file\n"+
-			"  - The file is not locked by another process", location, absPath)
-	}
-
-	// Generic error with helpful context
-	return fmt.Errorf("failed to open config file: %s\n"+
-		"  Absolute path: %s\n"+
-		"  Error: %v\n"+
-		"  Please check the file path and permissions", location, absPath, err)
-}
-
 // getBodyForURL reads an URL and returns a reader
 func getBodyForURL(stringURL string, body io.Reader) (io.Reader, error) {
-	_, err := url.ParseRequestURI(stringURL)
+	u, err := url.ParseRequestURI(stringURL)
 	if err != nil {
-		return body, fmt.Errorf("invalid URL format: %s\n"+
-			"  Error: %v\n"+
-			"  Please check the URL syntax", stringURL, err)
+		return body, err
 	}
-
 	r, err := http.Get(stringURL)
 	if err != nil {
-		return body, fmt.Errorf("failed to fetch config from URL: %s\n"+
-			"  Error: %v\n"+
-			"  Please check:\n"+
-			"  - The URL is accessible\n"+
-			"  - Your network connection\n"+
-			"  - The server is responding", stringURL, err)
+		return body, err
 	}
-
 	if r.StatusCode != http.StatusOK {
-		return body, fmt.Errorf("HTTP error fetching config from URL: %s\n"+
-			"  Status: %d %s\n"+
-			"  Please check:\n"+
-			"  - The URL is correct\n"+
-			"  - The file exists at the URL\n"+
-			"  - You have access permissions", stringURL, r.StatusCode, http.StatusText(r.StatusCode))
+		return body, fmt.Errorf("error requesting %s: %d", u, r.StatusCode)
 	}
-
 	return r.Body, nil
 }
