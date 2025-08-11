@@ -272,7 +272,7 @@ check_deployment_count() {
 
   ACTUAL_COUNT=$(kubectl get deployment -n ${NAMESPACE} -l ${LABEL_KEY}=${LABEL_VALUE} -o json | jq '.items | length')
   if [[ "${ACTUAL_COUNT}" != "${EXPECTED_COUNT}" ]]; then
-    echo "Expected ${EXPECTED_COUNT} replicas to be patches with ${LABEL_KEY}=${LABEL_VALUE_END} but found only ${ACTUAL_COUNT}"
+    echo "Expected ${EXPECTED_COUNT} replicas to be patched with ${LABEL_KEY}=${LABEL_VALUE_END} but found ${ACTUAL_COUNT}"
     return 1
   fi
   echo "Found the expected ${EXPECTED_COUNT} deployments"

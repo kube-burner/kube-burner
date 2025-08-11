@@ -6,6 +6,7 @@ metadata:
   labels:
     kube-burner.io/from-file: {{ default "unset" .labelFromFile }}
     kube-burner.io/from-env: {{ default "unset" .labelFromEnv }}
+    kube-burner.io/from-file-override: {{ default "unset" .labelFromFileOverride }}
     kube-burner.io/unset: {{ default "unset" .labelUnset }}
 spec:
   replicas: 1

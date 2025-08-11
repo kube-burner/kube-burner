@@ -213,6 +213,7 @@ teardown_file() {
 @test "kube-burner init: user data file" {
   export NAMESPACE="userdata"
   export deploymentLabelFromEnv="from-env"
+  export deploymentLabelFromFileOverride="from-env"
   export REPLICAS=5
 
   run_cmd ${KUBE_BURNER} init -c kube-burner-userdata.yml --user-data=objectTemplates/userdata-test.yml --uuid="${UUID}" --log-level=debug
@@ -221,12 +222,12 @@ teardown_file() {
   check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "unset" 0
   # Verify that the from-file label was set from the user-data file
   check_deployment_count ${NAMESPACE} "kube-burner.io/from-file" "from-file" ${REPLICAS}
-  # Verify that the from-env label was NOT set from the user-data file
-  check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "from-file" 0
   # Verify that the from-env label was set from the environment variable
   check_deployment_count ${NAMESPACE} "kube-burner.io/from-env" "from-env" ${REPLICAS}
   # Verify that the default value is used when the variable is not set
   check_deployment_count ${NAMESPACE} "kube-burner.io/unset" "unset" ${REPLICAS}
+  # Verify that the from-file-override label was set from the input file
+  check_deployment_count ${NAMESPACE} "kube-burner.io/from-file-override" "from-file" ${REPLICAS}
   kubectl delete ns ${NAMESPACE}
 }
 
