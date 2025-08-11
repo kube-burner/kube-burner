@@ -40,6 +40,15 @@ const (
 	podLatencyQuantilesMeasurement = "podLatencyQuantilesMeasurement"
 )
 
+const (
+	// Client-side high-precision condition names
+	ClientContainersReady           = "ClientContainersReady"
+	ClientPodInitialized            = "ClientPodInitialized"
+	ClientPodReady                  = "ClientPodReady"
+	ClientPodScheduled              = "ClientPodScheduled"
+	ClientPodReadyToStartContainers = "ClientPodReadyToStartContainers"
+)
+
 var (
 	supportedPodConditions = map[string]struct{}{
 		string(corev1.ContainersReady): {},
@@ -47,11 +56,11 @@ var (
 		string(corev1.PodReady):        {},
 		string(corev1.PodScheduled):    {},
 		// Client-side high-precision conditions
-		"ClientContainersReady":           {},
-		"ClientPodInitialized":            {},
-		"ClientPodReady":                  {},
-		"ClientPodScheduled":              {},
-		"ClientPodReadyToStartContainers": {},
+		ClientContainersReady:           {},
+		ClientPodInitialized:            {},
+		ClientPodReady:                  {},
+		ClientPodScheduled:              {},
+		ClientPodReadyToStartContainers: {},
 	}
 )
 
@@ -160,40 +169,27 @@ func (p *podLatency) handleUpdatePod(obj any) {
 						if pm.scheduled.IsZero() {
 							pm.scheduled = c.LastTransitionTime.UTC()
 							pm.NodeName = pod.Spec.NodeName
-							// Always capture client-side timestamp regardless of highPrecisionMetrics flag
-							if pm.clientScheduled.IsZero() {
-								pm.clientScheduled = clientTimestamp
-								log.Debugf("Client-side: Pod %s scheduled at client time %v", pod.Name, clientTimestamp)
-							}
+							pm.clientScheduled = clientTimestamp
 						}
 					case corev1.PodReadyToStartContainers:
 						if pm.readyToStartContainers.IsZero() {
 							pm.readyToStartContainers = c.LastTransitionTime.UTC()
-							if pm.clientReadyToStartContainers.IsZero() {
-								pm.clientReadyToStartContainers = clientTimestamp
-							}
+							pm.clientReadyToStartContainers = clientTimestamp
 						}
 					case corev1.PodInitialized:
 						if pm.initialized.IsZero() {
 							pm.initialized = c.LastTransitionTime.UTC()
-							if pm.clientInitialized.IsZero() {
-								pm.clientInitialized = clientTimestamp
-							}
+							pm.clientInitialized = clientTimestamp
 						}
 					case corev1.ContainersReady:
 						if pm.containersReady.IsZero() {
 							pm.containersReady = c.LastTransitionTime.UTC()
-							if pm.clientContainersReady.IsZero() {
-								pm.clientContainersReady = clientTimestamp
-							}
+							pm.clientContainersReady = clientTimestamp
 						}
 					case corev1.PodReady:
 						log.Debugf("Pod %s is ready", pod.Name)
 						pm.podReady = c.LastTransitionTime.UTC()
-						if pm.clientPodReady.IsZero() {
-							pm.clientPodReady = clientTimestamp
-							log.Debugf("Client-side: Pod %s ready at client time %v", pod.Name, clientTimestamp)
-						}
+						pm.clientPodReady = clientTimestamp
 					}
 				}
 			}
@@ -262,14 +258,13 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 			}
 		}
 
-		// For collected metrics, use server-side timestamps as base
-		serverBaseTimestamp := pod.CreationTimestamp.UTC()
+		baseTimestamp := pod.CreationTimestamp.UTC()
 		if pod.Status.StartTime != nil {
-			serverBaseTimestamp = pod.Status.StartTime.UTC()
+			baseTimestamp = pod.Status.StartTime.UTC()
 		}
 
 		p.Metrics.Store(string(pod.UID), podMetric{
-			Timestamp:              serverBaseTimestamp, // Server-side base timestamp for collected metrics
+			Timestamp:              baseTimestamp,
 			Namespace:              pod.Namespace,
 			Name:                   pod.Name,
 			MetricName:             podLatencyMeasurement,
@@ -312,39 +307,36 @@ func (p *podLatency) normalizeMetrics() float64 {
 		// truth and will prevent us from those over 1s delays as well as <0 cases.
 		errorFlag := 0
 
-		// For server-side calculations, use the server-side base timestamp
-		serverBaseTimestamp := m.Timestamp
-
-		// Calculate standard API-based latencies (milliseconds) using server-side timestamps
-		m.ContainersReadyLatency = int(m.containersReady.Sub(serverBaseTimestamp).Milliseconds())
+		// Calculate standard API-based latencies (milliseconds)
+		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
 		if m.ContainersReadyLatency < 0 {
 			log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.ContainersReadyLatency = 0
 		}
 
-		m.SchedulingLatency = int(m.scheduled.Sub(serverBaseTimestamp).Milliseconds())
+		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
 		if m.SchedulingLatency < 0 {
 			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.SchedulingLatency = 0
 		}
 
-		m.InitializedLatency = int(m.initialized.Sub(serverBaseTimestamp).Milliseconds())
+		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
 		if m.InitializedLatency < 0 {
 			log.Tracef("InitializedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.InitializedLatency = 0
 		}
 
-		m.PodReadyLatency = int(m.podReady.Sub(serverBaseTimestamp).Milliseconds())
+		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
 		if m.PodReadyLatency < 0 {
 			log.Tracef("PodReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.PodReadyLatency = 0
 		}
 
-		m.ReadyToStartContainersLatency = int(m.readyToStartContainers.Sub(serverBaseTimestamp).Milliseconds())
+		m.ReadyToStartContainersLatency = int(m.readyToStartContainers.Sub(m.Timestamp).Milliseconds())
 		if m.ReadyToStartContainersLatency < 0 {
 			log.Tracef("ReadyToStartContainersLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
@@ -353,47 +345,40 @@ func (p *podLatency) normalizeMetrics() float64 {
 
 		// Calculate high-precision client-side latencies only when we have client-side timestamps
 		if !m.clientCreationTimestamp.IsZero() {
-			clientBaseTimestamp := m.clientCreationTimestamp // Client-side creation timestamp
-
 			if !m.clientScheduled.IsZero() {
-				m.ClientSchedulingLatency = float64(m.clientScheduled.Sub(clientBaseTimestamp).Nanoseconds()) / 1e6
+				m.ClientSchedulingLatency = float64(m.clientScheduled.Sub(m.clientCreationTimestamp).Nanoseconds()) / 1e6
 				if m.ClientSchedulingLatency < 0 {
 					m.ClientSchedulingLatency = 0
 				}
 			}
 
 			if !m.clientInitialized.IsZero() {
-				m.ClientInitializedLatency = float64(m.clientInitialized.Sub(clientBaseTimestamp).Nanoseconds()) / 1e6
+				m.ClientInitializedLatency = float64(m.clientInitialized.Sub(m.clientCreationTimestamp).Nanoseconds()) / 1e6
 				if m.ClientInitializedLatency < 0 {
 					m.ClientInitializedLatency = 0
 				}
 			}
 
 			if !m.clientContainersReady.IsZero() {
-				m.ClientContainersReadyLatency = float64(m.clientContainersReady.Sub(clientBaseTimestamp).Nanoseconds()) / 1e6
+				m.ClientContainersReadyLatency = float64(m.clientContainersReady.Sub(m.clientCreationTimestamp).Nanoseconds()) / 1e6
 				if m.ClientContainersReadyLatency < 0 {
 					m.ClientContainersReadyLatency = 0
 				}
 			}
 
 			if !m.clientPodReady.IsZero() {
-				m.ClientPodReadyLatency = float64(m.clientPodReady.Sub(clientBaseTimestamp).Nanoseconds()) / 1e6
+				m.ClientPodReadyLatency = float64(m.clientPodReady.Sub(m.clientCreationTimestamp).Nanoseconds()) / 1e6
 				if m.ClientPodReadyLatency < 0 {
 					m.ClientPodReadyLatency = 0
 				}
 			}
 
 			if !m.clientReadyToStartContainers.IsZero() {
-				m.ClientReadyToStartContainersLatency = float64(m.clientReadyToStartContainers.Sub(clientBaseTimestamp).Nanoseconds()) / 1e6
+				m.ClientReadyToStartContainersLatency = float64(m.clientReadyToStartContainers.Sub(m.clientCreationTimestamp).Nanoseconds()) / 1e6
 				if m.ClientReadyToStartContainersLatency < 0 {
 					m.ClientReadyToStartContainersLatency = 0
 				}
 			}
-		}
-
-		if p.highPrecisionMetrics {
-			log.Debugf("High-precision latencies for pod %s: Scheduling=%.3fms, Ready=%.3fms",
-				m.Name, m.ClientSchedulingLatency, m.ClientPodReadyLatency)
 		}
 
 		totalPods++
@@ -419,11 +404,11 @@ func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 
 	// Only report high-precision client-side latencies when highPrecisionMetrics flag is enabled
 	if p.highPrecisionMetrics {
-		latencies["ClientPodScheduled"] = podMetric.ClientSchedulingLatency
-		latencies["ClientContainersReady"] = podMetric.ClientContainersReadyLatency
-		latencies["ClientPodInitialized"] = podMetric.ClientInitializedLatency
-		latencies["ClientPodReady"] = podMetric.ClientPodReadyLatency
-		latencies["ClientPodReadyToStartContainers"] = podMetric.ClientReadyToStartContainersLatency
+		latencies[ClientPodScheduled] = podMetric.ClientSchedulingLatency
+		latencies[ClientContainersReady] = podMetric.ClientContainersReadyLatency
+		latencies[ClientPodInitialized] = podMetric.ClientInitializedLatency
+		latencies[ClientPodReady] = podMetric.ClientPodReadyLatency
+		latencies[ClientPodReadyToStartContainers] = podMetric.ClientReadyToStartContainersLatency
 	}
 
 	return latencies
