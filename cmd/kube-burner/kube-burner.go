@@ -57,18 +57,84 @@ Tool aimed at stressing a kubernetes cluster by creating or deleting lots of obj
 }
 
 var completionCmd = &cobra.Command{
-	Use:   "completion",
-	Short: "Generates completion scripts for bash shell",
-	Long: `To load completion in the current shell run
-. <(kube-burner completion)
+	Use:   "completion [bash|zsh|fish|powershell]",
+	Short: "Generate completion script",
+	Long: `Generate shell completion scripts for kube-burner commands.
 
-To configure your bash shell to load completions for each session execute:
+The completion script provides auto-completion for:
+  • Commands and subcommands
+  • Command-line flags and options  
+  • File paths for config files
+  • Valid argument values
 
-# kube-burner completion > /etc/bash_completion.d/kube-burner
-	`,
-	Args: cobra.NoArgs,
+BASH:
+  # Load completions in current session:
+  $ source <(kube-burner completion bash)
+
+  # Install completions permanently:
+  # Linux:
+  $ kube-burner completion bash | sudo tee /etc/bash_completion.d/kube-burner
+  # macOS (with Homebrew):
+  $ kube-burner completion bash > $(brew --prefix)/etc/bash_completion.d/kube-burner
+
+ZSH:
+  # Enable completion system (if not already enabled):
+  $ echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+  # Install completions permanently:
+  $ kube-burner completion zsh > "${fpath[1]}/_kube-burner"
+  
+  # Or for Oh My Zsh users:
+  $ kube-burner completion zsh > ~/.oh-my-zsh/completions/_kube-burner
+
+  # Restart your shell or run: exec zsh
+
+FISH:
+  # Load completions in current session:
+  $ kube-burner completion fish | source
+
+  # Install completions permanently:
+  $ kube-burner completion fish > ~/.config/fish/completions/kube-burner.fish
+
+POWERSHELL:
+  # Load completions in current session:
+  PS> kube-burner completion powershell | Out-String | Invoke-Expression
+
+  # Install completions permanently:
+  # 1. Generate the completion script:
+  PS> kube-burner completion powershell > kube-burner-completion.ps1
+  
+  # 2. Add to your PowerShell profile:
+  PS> Add-Content $PROFILE ". $(Get-Location)\kube-burner-completion.ps1"
+  
+  # 3. Restart PowerShell or reload profile:
+  PS> . $PROFILE
+
+  # Note: Ensure kube-burner is in your PATH or use the full path to the executable.
+  # On Windows, the executable should have a .exe extension for best compatibility.
+
+TROUBLESHOOTING:
+  • If completions don't work, ensure the shell completion system is installed
+  • For bash: install bash-completion package
+  • For zsh: ensure compinit is loaded  
+  • For PowerShell: ensure execution policy allows script execution
+  • Restart your shell after installation
+`,
+	DisableFlagsInUseLine: true,
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+	Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return rootCmd.GenBashCompletion(os.Stdout)
+		switch args[0] {
+		case "bash":
+			return rootCmd.GenBashCompletion(os.Stdout)
+		case "zsh":
+			return rootCmd.GenZshCompletion(os.Stdout)
+		case "fish":
+			return rootCmd.GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			return rootCmd.GenPowerShellCompletionWithDesc(os.Stdout)
+		}
+		return fmt.Errorf("unsupported shell type %q", args[0])
 	},
 }
 
