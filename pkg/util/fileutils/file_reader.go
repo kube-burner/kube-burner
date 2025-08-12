@@ -94,6 +94,9 @@ func getReader(location string) (io.Reader, error) {
 		f, err = getBodyForURL(location, nil)
 	} else {
 		f, err = os.Open(location)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open config file %s: %w", location, err)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file %s: %w", location, err)

@@ -15,8 +15,10 @@
 package util
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/kube-burner/kube-burner/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -28,7 +30,19 @@ func ReadUserMetadata(inputFile string) (map[string]any, error) {
 	if err != nil {
 		return userMetadata, err
 	}
+	defer f.Close()
+
+	// Check if file is empty
+	stat, err := f.Stat()
+	if err != nil {
+		return userMetadata, err
+	}
+
+	if stat.Size() == 0 {
+		return userMetadata, fmt.Errorf("user metadata file %s is empty. Please provide a valid YAML configuration file", inputFile)
+	}
+
 	yamlDec := yaml.NewDecoder(f)
 	err = yamlDec.Decode(&userMetadata)
-	return userMetadata, err
+	return userMetadata, errors.EnhanceYAMLParseError(inputFile, err)
 }

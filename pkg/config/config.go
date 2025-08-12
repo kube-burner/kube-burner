@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
+	"github.com/kube-burner/kube-burner/pkg/errors"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -147,9 +148,14 @@ func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (
 		if err != nil {
 			return nil, fmt.Errorf("error reading user data file: %w", err)
 		}
+
+		if len(userData) == 0 {
+			return nil, fmt.Errorf("user data file is empty. Please provide a valid YAML or JSON configuration file")
+		}
+
 		err = yaml.Unmarshal(userData, &userDataFileVars)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse file: %w", err)
+			return nil, errors.EnhanceYAMLParseError("user data file", err)
 		}
 		// Copy values from userDataFileVars to templateVars
 		maps.Copy(templateVars, userDataFileVars)
@@ -169,6 +175,11 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
 	}
+
+	if len(cfg) == 0 {
+		return configSpec, fmt.Errorf("configuration file is empty. Please provide a valid YAML or JSON configuration file")
+	}
+
 	inputData, err := getInputData(userDataFileReader, additionalVars)
 	if err != nil {
 		return configSpec, err
@@ -185,7 +196,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&configSpec); err != nil {
-		return configSpec, fmt.Errorf("error decoding configuration file: %s", err)
+		return configSpec, errors.EnhanceYAMLParseError("configuration file", err)
 	}
 	if err := jobIsDuped(); err != nil {
 		return configSpec, err
