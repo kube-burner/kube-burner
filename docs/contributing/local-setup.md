@@ -74,60 +74,130 @@ sudo usermod -aG docker $USER
 
 Install Kind to create local Kubernetes clusters:
 
+**Linux (x86_64):**
 ```bash
 # Install Kind
 curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
 chmod +x ./kind
-sudo mv ./kind /usr/local/bin/kind
+# Install to ~/.local/bin (no sudo required)
+mkdir -p ~/.local/bin
+mv ./kind ~/.local/bin/
+export PATH=$PATH:~/.local/bin
 
 # Verify installation
 kind version
 ```
 
+**macOS (Intel):**
+```bash
+# Install Kind for Intel Macs
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-darwin-amd64
+chmod +x ./kind
+mkdir -p ~/.local/bin
+mv ./kind ~/.local/bin/
+export PATH=$PATH:~/.local/bin
+```
+
+**macOS (Apple Silicon/ARM):**
+```bash
+# Install Kind for Apple Silicon Macs
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-darwin-arm64
+chmod +x ./kind
+mkdir -p ~/.local/bin
+mv ./kind ~/.local/bin/
+export PATH=$PATH:~/.local/bin
+```
+
+**Note for macOS users**: Virtualization tests (KubeVirt) will fail on macOS due to virtualization limitations. Consider using Linux for full test coverage.
+
 ### 4. Kubectl Installation
 
 Install kubectl to interact with Kubernetes clusters:
 
+**Linux (x86_64):**
 ```bash
-# Linux/macOS
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 chmod +x kubectl
-sudo mv kubectl /usr/local/bin/
+mkdir -p ~/.local/bin
+mv kubectl ~/.local/bin/
+export PATH=$PATH:~/.local/bin
+```
 
-# Verify installation
+**macOS (Intel):**
+```bash
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/amd64/kubectl"
+chmod +x kubectl
+mkdir -p ~/.local/bin
+mv kubectl ~/.local/bin/
+export PATH=$PATH:~/.local/bin
+```
+
+**macOS (Apple Silicon/ARM):**
+```bash
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl"
+chmod +x kubectl
+mkdir -p ~/.local/bin
+mv kubectl ~/.local/bin/
+export PATH=$PATH:~/.local/bin
+```
+
+**Verify installation:**
+```bash
 kubectl version --client
 ```
 
 ### 5. Additional Tools
 
-**Make (for build commands):**
+Install all additional tools in one go:
+
+**Fedora/RHEL/CentOS:**
 ```bash
-# Fedora/RHEL/CentOS
-sudo dnf install make
-
-# Ubuntu/Debian
-sudo apt-get install make
-
-# macOS
-brew install make
-
-# Windows (WSL2)
-sudo apt-get install make
+sudo dnf install make bats
 ```
 
-**Bats (for testing):**
+**Ubuntu/Debian:**
 ```bash
-# Fedora/RHEL/CentOS
-sudo dnf install bats
+sudo apt-get update && sudo apt-get install make bats
+```
 
-# Ubuntu/Debian
-sudo apt-get install bats
+**macOS:**
+```bash
+brew install make bats-core
+```
 
-# macOS
-brew install bats-core
+**Windows (WSL2):**
+```bash
+sudo apt-get update && sudo apt-get install make bats
+```
 
-# Windows (WSL2)
-sudo apt-get install bats
+### 6. Helm Installation (Optional)
+
+Helm is required for some optional components like Prometheus and OpenSearch:
+
+**Fedora/RHEL/CentOS:**
+```bash
+sudo dnf install helm
+```
+
+**Ubuntu/Debian:**
+```bash
+curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
+```
+
+**macOS:**
+```bash
+brew install helm
+```
+
+**Windows (WSL2):**
+```bash
+curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
 ```
 
 ## Setting Up a Local Kubernetes Cluster
@@ -143,7 +213,23 @@ kubectl cluster-info
 kubectl get nodes
 ```
 
-### 2. Install Prometheus (Optional, for metrics testing)
+### 2. Install KubeVirt (Required for Virtualization Tests)
+
+KubeVirt is required for running virtualization-related tests:
+
+```bash
+# Get the latest KubeVirt version
+KUBEVIRT_VERSION=$(gh release view --repo kubevirt/kubevirt --json tagName -q '.tagName')
+
+# Install KubeVirt
+kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/kubevirt-operator.yaml
+kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/kubevirt-cr.yaml
+
+# Wait for KubeVirt to be ready
+kubectl -n kubevirt wait kv kubevirt --for condition=Available --timeout=300s
+```
+
+### 3. Install Prometheus (Optional, for metrics testing)
 
 ```bash
 # Add Prometheus Helm repository
@@ -155,6 +241,21 @@ helm install prometheus prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
   --create-namespace \
   --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false
+```
+
+### 4. Install OpenSearch (Optional, for metrics indexing)
+
+```bash
+# Add OpenSearch Helm repository
+helm repo add opensearch https://opensearch-project.github.io/helm-charts/
+helm repo update
+
+# Install OpenSearch
+helm install opensearch opensearch/opensearch \
+  --namespace monitoring \
+  --create-namespace \
+  --set clusterName=opensearch-cluster \
+  --set globalNodeSelector."kubernetes\.io/os"=linux
 ```
 
 ## Building Kube-burner
@@ -195,8 +296,15 @@ go mod download
 ### 1. Basic Health Check
 
 ```bash
-# Check cluster health
+# Check cluster health (uses default kubeconfig)
+./bin/amd64/kube-burner health-check
+
+# Alternative: specify custom kubeconfig
 ./bin/amd64/kube-burner health-check --kubeconfig ~/.kube/config
+
+# Or set KUBECONFIG environment variable
+export KUBECONFIG=~/.kube/config
+./bin/amd64/kube-burner health-check
 ```
 
 ### 2. Run a Simple Workload
@@ -242,10 +350,12 @@ Run the test:
 
 ```bash
 # Run cluster density test
-./bin/amd64/kube-burner init --config examples/workloads/cluster-density/cluster-density.yml
+cd examples/workloads/cluster-density
+./bin/amd64/kube-burner init --config cluster-density.yml
 
 # Run kubelet density test
-./bin/amd64/kube-burner init --config examples/workloads/kubelet-density/kubelet-density.yml
+cd ../kubelet-density
+./bin/amd64/kube-burner init --config kubelet-density.yml
 ```
 
 ## Development Workflow
@@ -253,13 +363,13 @@ Run the test:
 ### 1. Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (includes lint and bats tests)
 make test
 
-# Run specific test
+# Run specific bats test
 make test-k8s TEST_FILTER="test-name"
 
-# Run linting
+# Run linting only
 make lint
 ```
 
@@ -269,7 +379,7 @@ make lint
 # Run pre-commit hooks
 pre-commit run --all-files
 
-# Run Go linting
+# Run Go linting (this is what make lint executes)
 golangci-lint run
 ```
 
@@ -324,6 +434,19 @@ kubectl cluster-info
 go clean -modcache
 go mod download
 go mod tidy
+```
+
+**5. KubeVirt Issues:**
+```bash
+# Check KubeVirt status
+kubectl get kubevirt -n kubevirt
+
+# Check KubeVirt operator
+kubectl get pods -n kubevirt
+
+# Reinstall if needed
+kubectl delete -f https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/kubevirt-cr.yaml
+kubectl delete -f https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/kubevirt-operator.yaml
 ```
 
 ### Getting Help
