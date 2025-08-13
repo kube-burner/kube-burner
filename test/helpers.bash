@@ -339,7 +339,8 @@ check_high_precision_metrics() {
   
   for metric in "${client_metrics[@]}"; do
     # Check if the metric exists and has a non-zero value in at least one record
-    local metric_found=$(jq --arg metric "$metric" '[.[] | select(has($metric) and (.[$metric] != null) and (.[$metric] > 0))] | length' "${metrics_file}")
+    local metric_found
+    metric_found=$(jq --arg metric "$metric" '[.[] | select(has($metric) and (.[$metric] != null) and (.[$metric] > 0))] | length' "${metrics_file}")
     if [[ ${metric_found} -eq 0 ]]; then
       echo "High-precision metric ${metric} not found or has zero values in ${metrics_file}"
       return 1
@@ -366,7 +367,8 @@ check_high_precision_quantiles() {
   
   for quantile in "${client_quantiles[@]}"; do
     # Check if the quantile exists in the quantiles file
-    local quantile_found=$(jq --arg quantile "$quantile" '[.[] | select(.quantileName == $quantile)] | length' "${quantiles_file}")
+    local quantile_found
+    quantile_found=$(jq --arg quantile "$quantile" '[.[] | select(.quantileName == $quantile)] | length' "${quantiles_file}")
     if [[ ${quantile_found} -eq 0 ]]; then
       echo "High-precision quantile ${quantile} not found in ${quantiles_file}"
       return 1
