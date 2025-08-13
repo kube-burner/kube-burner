@@ -6,6 +6,7 @@ global:
     - objectTemplates/envs.tpl
   measurements:
   - name: podLatency
+    highPrecisionMetrics: true
 {{ if .TIMESERIES_INDEXER }}
     timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}

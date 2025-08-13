@@ -323,3 +323,57 @@ check_metrics_not_created_for_job() {
     return 1
   fi
 }
+
+check_high_precision_metrics() {
+  local metrics_file=$1
+  echo "Checking for high-precision client-side metrics in ${metrics_file}"
+  
+  # Check if the file exists and has content
+  if [[ ! -f ${metrics_file} ]]; then
+    echo "Metrics file ${metrics_file} not found"
+    return 1
+  fi
+  
+  # Check for the presence of high-precision client-side latency fields in the measurement file
+  local client_metrics=("clientSchedulingLatency" "clientInitializedLatency" "clientContainersReadyLatency" "clientPodReadyLatency" "clientReadyToStartContainersLatency")
+  
+  for metric in "${client_metrics[@]}"; do
+    # Check if the metric exists and has a non-zero value in at least one record
+    local metric_found=$(jq --arg metric "$metric" '[.[] | select(has($metric) and (.[$metric] != null) and (.[$metric] > 0))] | length' "${metrics_file}")
+    if [[ ${metric_found} -eq 0 ]]; then
+      echo "High-precision metric ${metric} not found or has zero values in ${metrics_file}"
+      return 1
+    fi
+    echo "Found high-precision metric: ${metric}"
+  done
+  
+  echo "All high-precision client-side metrics found successfully"
+  return 0
+}
+
+check_high_precision_quantiles() {
+  local quantiles_file=$1
+  echo "Checking for high-precision client-side quantiles in ${quantiles_file}"
+  
+  # Check if the file exists and has content
+  if [[ ! -f ${quantiles_file} ]]; then
+    echo "Quantiles file ${quantiles_file} not found"
+    return 1
+  fi
+  
+  # Check for the presence of high-precision client-side quantile names
+  local client_quantiles=("ClientPodScheduled" "ClientPodInitialized" "ClientContainersReady" "ClientPodReady" "ClientPodReadyToStartContainers")
+  
+  for quantile in "${client_quantiles[@]}"; do
+    # Check if the quantile exists in the quantiles file
+    local quantile_found=$(jq --arg quantile "$quantile" '[.[] | select(.quantileName == $quantile)] | length' "${quantiles_file}")
+    if [[ ${quantile_found} -eq 0 ]]; then
+      echo "High-precision quantile ${quantile} not found in ${quantiles_file}"
+      return 1
+    fi
+    echo "Found high-precision quantile: ${quantile}"
+  done
+  
+  echo "All high-precision client-side quantiles found successfully"
+  return 0
+}
