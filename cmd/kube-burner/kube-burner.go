@@ -518,6 +518,61 @@ func alertCmd() *cobra.Command {
 	return cmd
 }
 
+func validateCmd() *cobra.Command {
+	var uuid string
+	var cfgFile string
+	var userDataFile string
+	var allowMissingKeys bool
+	var timeout time.Duration
+
+	cmd := &cobra.Command{
+		Use:   "validate",
+		Short: "Validate kube-burner configuration file",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if cfgFile == "" {
+				log.Fatalf("please provide a config file with -c")
+			}
+
+			configFileReader, err := fileutils.GetWorkloadReader(cfgFile, nil)
+			if err != nil {
+				log.Fatalf("error reading configuration file %s: %s", cfgFile, err)
+			}
+
+			var userDataFileReader io.Reader
+			if userDataFile != "" {
+				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
+				if err != nil {
+					log.Fatalf("error reading user data file %s: %s", userDataFile, err)
+				}
+			}
+
+			_, err = config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
+			if err != nil { // graceful error handling
+				errs := strings.Split(err.Error(), ";")
+				log.Error("config validation failed with following issues:")
+				for _, e := range errs {
+					log.Errorf("-%s", strings.TrimSpace(e))
+				}
+				os.Exit(1)
+			}
+
+			fmt.Println("Config file is valid!")
+			return nil
+		},
+	}
+	cmd.Flags().StringVarP(&cfgFile, "config", "c", "", "Config file path or URL")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
+	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
+	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
+	cmd.Flags().DurationVar(&timeout, "timeout", 4*time.Hour, "Validation timeout (same as benchmark timeout)")
+	return cmd
+}
+
 // executes rootCmd
 func main() {
 	util.SetupCmd(rootCmd)
@@ -529,6 +584,7 @@ func main() {
 		indexCmd(),
 		alertCmd(),
 		importCmd(),
+		validateCmd(),
 		completionCmd,
 	)
 	if err := rootCmd.Execute(); err != nil {
