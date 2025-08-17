@@ -123,6 +123,8 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
 		MetricsClosing:         AfterJobPause,
+		KubeConfig:             "",
+		KubeContext:            "",
 	}
 
 	if err := unmarshal(&raw); err != nil {
