@@ -22,14 +22,13 @@ import (
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (ex *JobExecutor) setupDeleteJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupDeleteJob() {
 	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
@@ -43,7 +42,7 @@ func (ex *JobExecutor) setupDeleteJob(mapper meta.RESTMapper) {
 	ex.WaitWhenFinished = false
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1, ex.embedCfg))
+		ex.objects = append(ex.objects, newObject(o, ex.mapper, APIVersionV1, ex.embedCfg))
 	}
 }
 
@@ -70,13 +69,17 @@ func verifyDelete(ex *JobExecutor, obj *object) {
 		LabelSelector: labelSelector,
 	}
 	wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		itemList, err := ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
-		if err != nil {
-			log.Error(err.Error())
-			return false, nil
+		totalItems := 0
+		for _, gvrToCheck := range obj.gvrList {
+			itemList, err := ex.dynamicClient.Resource(gvrToCheck).List(context.TODO(), listOptions)
+			if err != nil {
+				log.Error(err.Error())
+				return false, nil
+			}
+			totalItems += len(itemList.Items)
 		}
-		if len(itemList.Items) > 0 {
-			log.Debugf("Waiting for %d %s labeled with %s to be deleted", len(itemList.Items), obj.gvr.Resource, labelSelector)
+		if totalItems > 0 {
+			log.Debugf("Waiting for %d %s labeled with %s to be deleted", totalItems, obj.gvr.Resource, labelSelector)
 			return false, nil
 		}
 		return true, nil
