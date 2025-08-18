@@ -141,7 +141,6 @@ func (ex *JobExecutor) Verify() bool {
 		}
 		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
 			replicas = 0
-			// Check all relevant GVRs
 			for _, gvr := range obj.gvrList {
 				for {
 					objList, err = ex.dynamicClient.Resource(gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
