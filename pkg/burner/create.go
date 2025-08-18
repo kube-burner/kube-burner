@@ -28,6 +28,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"maps"
+	"slices"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
@@ -40,7 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupCreateJob() {
 	var f io.Reader
 	var err error
 	log.Debugf("Preparing create job: %s", ex.Name)
@@ -65,16 +66,20 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
 		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
-		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		if err != nil {
-			log.Fatal(err)
-		}
+		mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
 		obj := &object{
-			gvr:        mapping.Resource,
 			objectSpec: t,
 			Object:     o,
 			namespace:  uns.GetNamespace(),
-			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+			gvrList:    make([]schema.GroupVersionResource, 0),
+		}
+		if err == nil {
+			obj.gvr = mapping.Resource
+			obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+			obj.gvrList = append(obj.gvrList, obj.gvr)
+		} else {
+			obj.gvr = schema.GroupVersionResource{}
+			obj.gvk = gvk
 		}
 		obj.Kind = gvk.Kind
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
@@ -96,21 +101,16 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	}
 	var wg sync.WaitGroup
 	var ns string
-	var err error
+	var namespacesCreated = make(map[string]bool)
+	var namespacesWaited = make(map[string]bool)
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
-		ns = ex.Namespace
-		if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
-			log.Fatal(err.Error())
-		}
-		*waitListNamespaces = append(*waitListNamespaces, ns)
+		ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 	}
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
-	var namespacesCreated = make(map[string]bool)
-	var namespacesWaited = make(map[string]bool)
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
 			return
@@ -121,15 +121,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsRequired && ex.NamespacedIterations {
-			ns = ex.generateNamespace(i)
-			if !namespacesCreated[ns] {
-				if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
-					log.Error(err.Error())
-					continue
-				}
-				namespacesCreated[ns] = true
-				*waitListNamespaces = append(*waitListNamespaces, ns)
-			}
+			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 		}
 		for objectIndex, obj := range ex.objects {
 			labels := map[string]string{
@@ -144,10 +136,10 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 				if i == 0 {
 					// this executes only once during the first iteration of an object
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
-					ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
+					ex.replicaHandler(ctx, labels, obj, ns, i, &wg, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 				}
 			} else {
-				ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
+				ex.replicaHandler(ctx, labels, obj, ns, i, &wg, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
@@ -201,7 +193,7 @@ func (ex *JobExecutor) generateNamespace(iteration int) string {
 	return fmt.Sprintf("%s-%d", ex.Namespace, nsIndex)
 }
 
-func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]string, obj *object, ns string, iteration int, replicaWg *sync.WaitGroup) {
+func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]string, obj *object, ns string, iteration int, replicaWg *sync.WaitGroup, nsLabels, nsAnnotations map[string]string, waitListNamespaces *[]string, namespacesCreated map[string]bool) {
 	var wg sync.WaitGroup
 
 	for r := 1; r <= obj.Replicas; r++ {
@@ -220,7 +212,8 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			ex.limiter.Wait(context.TODO())
 			renderedObj := ex.renderTemplateForObject(obj, iteration, r, false)
 			// Re-decode rendered object
-			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
+			_, gvk := yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
+			obj.gvk = gvk
 
 			maps.Copy(copiedLabels, newObject.GetLabels())
 			newObject.SetLabels(copiedLabels)
@@ -235,6 +228,21 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			go func(n string) {
 				if !obj.namespaced {
 					n = ""
+				}
+				if obj.gvr == (schema.GroupVersionResource{}) {
+					// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
+					ex.resolveObjectMapping(obj)
+					if ex.nsRequired {
+						nsName := ex.Namespace
+						if ex.NamespacedIterations {
+							nsName = ex.generateNamespace(iteration)
+						}
+						ns = ex.createNamespace(nsName, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+					}
+					found := slices.Contains(obj.gvrList, obj.gvr)
+					if !found {
+						obj.gvrList = append(obj.gvrList, obj.gvr)
+					}
 				}
 				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
 				replicaWg.Done()
@@ -291,6 +299,18 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		}
 		return true, err
 	}, 1*time.Second, 3, 0, timeout)
+}
+
+func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[string]string, waitListNamespaces *[]string, namespacesCreated map[string]bool) string {
+	if namespacesCreated[ns] {
+		return ns
+	}
+	if err := util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
+		log.Error(err.Error())
+	}
+	namespacesCreated[ns] = true
+	*waitListNamespaces = append(*waitListNamespaces, ns)
+	return ns
 }
 
 // RunCreateJobWithChurn executes a churn creation job
