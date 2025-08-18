@@ -277,5 +277,7 @@ teardown_file() {
 
 @test "kube-burner init: create CRD and CR together" {
   run_cmd ${KUBE_BURNER} init -c kube-burner-cr-crd.yml --uuid="${UUID}"
-  check_running_custom_resources_in_ns testcr cr-crd 5
+  for cr in testcr0 testcr1; do
+    check_running_custom_resources_in_ns "${cr}" default 1
+  done
 }
