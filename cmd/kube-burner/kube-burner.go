@@ -83,6 +83,7 @@ func initCmd() *cobra.Command {
 	var userDataFile string
 	var allowMissingKeys bool
 	var rc int
+	var outputFormat, outputFile string
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -97,6 +98,11 @@ func initCmd() *cobra.Command {
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			// Validate output format if provided
+			if outputFormat != "" && !util.IsValidOutputFormat(outputFormat) {
+				log.Fatalf("Invalid output format: %s. Supported formats: json, yaml", outputFormat)
+			}
+
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
 				if err != nil {
@@ -135,7 +141,7 @@ func initCmd() *cobra.Command {
 				util.ClusterHealthCheck(clientSet)
 			}
 
-			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil, nil)
+			rc, err = burner.RunWithOutput(configSpec, kubeClientProvider, metricsScraper, nil, nil, outputFormat, outputFile)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(rc)
@@ -154,6 +160,8 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
+	cmd.Flags().StringVar(&outputFormat, "output", "", "Output format for summary: json, yaml (default: none)")
+	cmd.Flags().StringVar(&outputFile, "output-file", "", "Output file for summary (default: stdout)")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd
@@ -223,6 +231,7 @@ func measureCmd() *cobra.Command {
 	var jobName string
 	var userMetadata string
 	var kubeConfig, kubeContext string
+	var outputFormat, outputFile string
 	indexerList := make(map[string]indexers.Indexer)
 	metadata := make(map[string]any)
 	cmd := &cobra.Command{
@@ -233,6 +242,11 @@ func measureCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			// Validate output format if provided
+			if outputFormat != "" && !util.IsValidOutputFormat(outputFormat) {
+				log.Fatalf("Invalid output format: %s. Supported formats: json, yaml", outputFormat)
+			}
+
 			util.SetupFileLogging(uuid)
 			f, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
@@ -285,6 +299,11 @@ func measureCmd() *cobra.Command {
 				log.Error(err.Error())
 			}
 			measurementsInstance.Index(jobName, indexerList)
+
+			// Output measurements summary if requested
+			if outputFormat != "" {
+				outputMeasurementsSummary(measurementsInstance, uuid, jobName, outputFormat, outputFile, metadata)
+			}
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
@@ -295,6 +314,8 @@ func measureCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().StringVar(&outputFormat, "output", "", "Output format for measurements: json, yaml (default: none)")
+	cmd.Flags().StringVar(&outputFile, "output-file", "", "Output file for measurements (default: stdout)")
 	return cmd
 }
 
@@ -516,6 +537,40 @@ func alertCmd() *cobra.Command {
 	cmd.MarkFlagRequired("alert-profile")
 	cmd.Flags().SortFlags = false
 	return cmd
+}
+
+// outputMeasurementsSummary outputs measurements summary in the specified format
+func outputMeasurementsSummary(measurementsInstance *measurements.Measurements, uuid, jobName, outputFormat, outputFile string, metadata map[string]any) {
+	var measurementSummaries []burner.MeasurementSummary
+
+	for name := range measurementsInstance.MeasurementsMap {
+		summary := burner.MeasurementSummary{
+			Name:        name,
+			JobName:     jobName,
+			UUID:        uuid,
+			Timestamp:   time.Now(),
+			MetricCount: 0, // This would need to be populated from actual metrics
+			Metadata:    metadata,
+		}
+		measurementSummaries = append(measurementSummaries, summary)
+	}
+
+	format := util.OutputFormat(outputFormat)
+	var err error
+
+	if outputFile != "" {
+		err = burner.OutputMeasurementsToFile(measurementSummaries, outputFile, format)
+		if err != nil {
+			log.Errorf("Failed to write measurements to file %s: %v", outputFile, err)
+		} else {
+			log.Infof("Measurements written to %s", outputFile)
+		}
+	} else {
+		err = burner.OutputMeasurements(measurementSummaries, format)
+		if err != nil {
+			log.Errorf("Failed to output measurements: %v", err)
+		}
+	}
 }
 
 // executes rootCmd
