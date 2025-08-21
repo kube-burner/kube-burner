@@ -30,7 +30,9 @@ import (
 // Bootstraps kube-burner cmd with some common flags
 func SetupCmd(cmd *cobra.Command) {
 	cmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-	cmd.AddCommand(&cobra.Command{
+
+	var checkForUpdates bool
+	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the version number of kube-burner",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -39,8 +41,16 @@ func SetupCmd(cmd *cobra.Command) {
 			fmt.Println("Build Date:", version.BuildDate)
 			fmt.Println("Go Version:", version.GoVersion)
 			fmt.Println("OS/Arch:", version.OsArch)
+
+			if checkForUpdates {
+				if err := CheckLatestVersion(); err != nil {
+					log.Warnf("Failed to check for updates: %v", err)
+				}
+			}
 		},
-	})
+	}
+	versionCmd.Flags().BoolVar(&checkForUpdates, "check", false, "Check for newer releases")
+	cmd.AddCommand(versionCmd)
 }
 
 // Configures kube-burner's file logging

@@ -50,7 +50,7 @@ This is the main subcommand; it triggers a new kube-burner benchmark and it supp
 - `allow-missing`: Allow missing keys in the config file. Needed when using the [`default`](https://masterminds.github.io/sprig/defaults.html) template function
 
 !!! Note "Prometheus authentication"
-    Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.
+Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.
 
 With the above, running a kube-burner benchmark would be as simple as:
 
@@ -64,7 +64,7 @@ Kube-burner also supports remote configuration files served by a web server. To 
 kube-burner init -c http://web.domain.com:8080/cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
-To scrape metrics from multiple endpoints, the  `init` command can be triggered. For example:
+To scrape metrics from multiple endpoints, the `init` command can be triggered. For example:
 
 ```console
 kube-burner init -c cluster-density.yml -e metrics-endpoints.yaml
@@ -88,13 +88,13 @@ A metrics-endpoints.yaml file with valid keys for the `init` command would look 
 
 Kube-burner has defined a series of exit codes that can help to programmatically identify a benchmark execution error.
 
-| Exit code | Meaning |
-|--------|--------|
-| 0 | Benchmark execution finished normally |
-| 1 | Generic exit code, returned on a unrecoverable error (i.e: API Authorization error or config parsing error) |
-| 2 | Benchmark timeout, returned when kube-burner's execution time exceeds the value passed in the `--timeout` flag |
-| 3 | Alerting error, returned when a `error` or `critical` level alert is fired |
-| 4 | Measurement error, returned on some measurements error conditions, like `thresholds` |
+| Exit code | Meaning                                                                                                        |
+| --------- | -------------------------------------------------------------------------------------------------------------- |
+| 0         | Benchmark execution finished normally                                                                          |
+| 1         | Generic exit code, returned on a unrecoverable error (i.e: API Authorization error or config parsing error)    |
+| 2         | Benchmark timeout, returned when kube-burner's execution time exceeds the value passed in the `--timeout` flag |
+| 3         | Alerting error, returned when a `error` or `critical` level alert is fired                                     |
+| 4         | Measurement error, returned on some measurements error conditions, like `thresholds`                           |
 
 ## Index
 
@@ -112,7 +112,7 @@ We can specify a list of namespaces and selector labels as input.
 - `selector`: comma-separated list of selector labels in the format key1=value1,key2=value2. This is optional, by default no labels will be used for filtering.
 
 !!! Note
-    This subcommand should only be used to fetch measurements of a workload ran in the past. Also those resources should be active on the cluster. For present cases, please refer to the alternate options in this tool.
+This subcommand should only be used to fetch measurements of a workload ran in the past. Also those resources should be active on the cluster. For present cases, please refer to the alternate options in this tool.
 
 ## Check alerts
 
@@ -126,6 +126,52 @@ This subcommand requires the `uuid` flag to destroy all namespaces labeled with 
 
 The `health-check` subcommand assesses the status of nodes within the cluster. It provides information on the overall health of the cluster, indicating whether it is in a healthy state. In the event of an unhealthy cluster, the subcommand returns a list of nodes that are not in a "Ready" state, helping users identify and address specific issues affecting cluster stability.
 
+## Version
+
+The `version` subcommand displays version information about the kube-burner binary, including the version number, Git commit, build date, Go version, and OS/architecture.
+
+```console
+$ kube-burner version
+Version: v1.17.3
+Git Commit: abc123def456
+Build Date: 2024-01-15-10:30:00
+Go Version: go1.21.0
+OS/Arch: linux amd64
+```
+
+### Check for updates
+
+The version command supports a `--check` flag that queries the GitHub API to check if a newer release is available:
+
+```console
+$ kube-burner version --check
+Version: v1.17.2
+Git Commit: abc123def456
+Build Date: 2024-01-15-10:30:00
+Go Version: go1.21.0
+OS/Arch: linux amd64
+⚠️  A newer version is available!
+   Current version: v1.17.2
+   Latest version:  v1.17.3
+   Release URL:     https://github.com/kube-burner/kube-burner/releases/tag/v1.17.3
+   Consider upgrading to get the latest features and bug fixes.
+```
+
+If you're running the latest version, you'll see:
+
+```console
+$ kube-burner version --check
+Version: v1.17.3
+Git Commit: abc123def456
+Build Date: 2024-01-15-10:30:00
+Go Version: go1.21.0
+OS/Arch: linux amd64
+✅ You are running the latest version
+```
+
+!!! note
+The version check feature requires internet connectivity to query the GitHub API. Development versions (empty version string or "latest") will skip the version check.
+
 ## Completion
 
 Generates bash a completion script that can be imported with:
@@ -135,4 +181,4 @@ Or permanently imported with:
 `kube-burner completion > /etc/bash_completion.d/kube-burner`
 
 !!! note
-    the `bash-completion` utils must be installed for the kube-burner completion script to work.
+the `bash-completion` utils must be installed for the kube-burner completion script to work.
