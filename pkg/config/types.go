@@ -208,6 +208,8 @@ type Job struct {
 	MetricsClosing MetricsClosing `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
 	// Enables job's garbage collection
 	GC bool `yaml:"gc" json:"gc"`
+	// ExecutionGroup groups jobs that should run in parallel. Jobs in the same group must have the same jobType.
+	ExecutionGroup string `yaml:"executionGroup" json:"executionGroup,omitempty"`
 }
 
 type WaitOptions struct {
