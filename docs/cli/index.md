@@ -139,38 +139,20 @@ Go Version: go1.21.0
 OS/Arch: linux amd64
 ```
 
-### Check for updates
+### Automatic Update Notifications
 
-The version command supports a `--check` flag that queries the GitHub API to check if a newer release is available:
-
-```console
-$ kube-burner version --check
-Version: v1.17.2
-Git Commit: abc123def456
-Build Date: 2024-01-15-10:30:00
-Go Version: go1.21.0
-OS/Arch: linux amd64
-⚠️  A newer version is available!
-   Current version: v1.17.2
-   Latest version:  v1.17.3
-   Release URL:     https://github.com/kube-burner/kube-burner/releases/tag/v1.17.3
-   Consider upgrading to get the latest features and bug fixes.
-```
-
-If you're running the latest version, you'll see:
+Kube-burner automatically checks for newer releases when executing any command (except the version command itself). If a newer version is available, you'll see a warning message:
 
 ```console
-$ kube-burner version --check
-Version: v1.17.3
-Git Commit: abc123def456
-Build Date: 2024-01-15-10:30:00
-Go Version: go1.21.0
-OS/Arch: linux amd64
-✅ You are running the latest version
+$ kube-burner init -c config.yml
+⚠️  A newer kube-burner version (v1.17.4) is available! Current: v1.17.3
+   Download: https://github.com/kube-burner/kube-burner/releases/tag/v1.17.4
 ```
+
+This helps ensure you're aware of the latest features and bug fixes without needing to manually check for updates.
 
 !!! note
-The version check feature requires internet connectivity to query the GitHub API. Development versions (empty version string or "latest") will skip the version check.
+    The automatic version check requires internet connectivity to query the GitHub API. Development versions (empty version string or "latest") will skip the version check. The check runs in the background and won't interrupt normal operation if it fails.
 
 ## Completion
 
@@ -181,4 +163,4 @@ Or permanently imported with:
 `kube-burner completion > /etc/bash_completion.d/kube-burner`
 
 !!! note
-the `bash-completion` utils must be installed for the kube-burner completion script to work.
+    the `bash-completion` utils must be installed for the kube-burner completion script to work.

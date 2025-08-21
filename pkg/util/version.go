@@ -36,14 +36,12 @@ type GitHubRelease struct {
 func CheckLatestVersion() error {
 	currentVersion := version.Version
 	if currentVersion == "" || currentVersion == "latest" {
-		log.Info("Running development version, skipping version check")
+		// Skip version check for development versions
 		return nil
 	}
 
-	log.Info("Checking for newer releases...")
-
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 5 * time.Second, // Shorter timeout for automatic checks
 	}
 
 	resp, err := client.Get("https://api.github.com/repos/kube-burner/kube-burner/releases/latest")
@@ -65,14 +63,10 @@ func CheckLatestVersion() error {
 	currentVersionClean := strings.TrimPrefix(currentVersion, "v")
 
 	if latestVersion != currentVersionClean {
-		log.Warnf("⚠️  A newer version is available!")
-		log.Warnf("   Current version: %s", currentVersion)
-		log.Warnf("   Latest version:  %s", release.TagName)
-		log.Warnf("   Release URL:     %s", release.HTMLURL)
-		log.Warnf("   Consider upgrading to get the latest features and bug fixes.")
-	} else {
-		log.Info("✅ You are running the latest version")
+		log.Warnf("⚠️  A newer kube-burner version (%s) is available! Current: %s", release.TagName, currentVersion)
+		log.Warnf("   Download: %s", release.HTMLURL)
 	}
+	// Don't show "up to date" message for automatic checks to avoid noise
 
 	return nil
 }
