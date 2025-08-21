@@ -276,6 +276,7 @@ teardown_file() {
 }
 
 @test "kube-burner init: execute jobs in group" {
+  export GC=false
   run_cmd ${KUBE_BURNER} init -c kube-burner-execution-group.yml --uuid="${UUID}"
   for i in 0 1; do
     check_running_pods_in_ns "group-ns-${i}" 1
