@@ -49,3 +49,7 @@ The default builds produce static binaries that work across all Linux distributi
 Please read the [Contributing section](https://kube-burner.github.io/kube-burner/latest/contributing/) before contributing to this project. It provides information on how to contribute, guidelines for setting an environment a CI checks to be done before commiting code.
 
 This project utilizes a Continuous Integration (CI) pipeline to ensure code quality and maintain project standards. The CI process automatically builds, tests, and verifies the project on each commit and pull request.
+
+<br/>
+
+![Project analytics and stats](https://repobeats.axiom.co/api/embed/31b5825e757f9afbdde42ce52140c898a4fadd52.svg 'Repobeats analytics image')
