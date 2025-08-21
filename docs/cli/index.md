@@ -50,7 +50,7 @@ This is the main subcommand; it triggers a new kube-burner benchmark and it supp
 - `allow-missing`: Allow missing keys in the config file. Needed when using the [`default`](https://masterminds.github.io/sprig/defaults.html) template function
 
 !!! Note "Prometheus authentication"
-Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.
+    Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.
 
 With the above, running a kube-burner benchmark would be as simple as:
 
@@ -64,7 +64,7 @@ Kube-burner also supports remote configuration files served by a web server. To 
 kube-burner init -c http://web.domain.com:8080/cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
-To scrape metrics from multiple endpoints, the `init` command can be triggered. For example:
+To scrape metrics from multiple endpoints, the  `init` command can be triggered. For example:
 
 ```console
 kube-burner init -c cluster-density.yml -e metrics-endpoints.yaml
@@ -88,13 +88,13 @@ A metrics-endpoints.yaml file with valid keys for the `init` command would look 
 
 Kube-burner has defined a series of exit codes that can help to programmatically identify a benchmark execution error.
 
-| Exit code | Meaning                                                                                                        |
-| --------- | -------------------------------------------------------------------------------------------------------------- |
-| 0         | Benchmark execution finished normally                                                                          |
-| 1         | Generic exit code, returned on a unrecoverable error (i.e: API Authorization error or config parsing error)    |
-| 2         | Benchmark timeout, returned when kube-burner's execution time exceeds the value passed in the `--timeout` flag |
-| 3         | Alerting error, returned when a `error` or `critical` level alert is fired                                     |
-| 4         | Measurement error, returned on some measurements error conditions, like `thresholds`                           |
+| Exit code | Meaning |
+|--------|--------|
+| 0 | Benchmark execution finished normally |
+| 1 | Generic exit code, returned on a unrecoverable error (i.e: API Authorization error or config parsing error) |
+| 2 | Benchmark timeout, returned when kube-burner's execution time exceeds the value passed in the `--timeout` flag |
+| 3 | Alerting error, returned when a `error` or `critical` level alert is fired |
+| 4 | Measurement error, returned on some measurements error conditions, like `thresholds` |
 
 ## Index
 
@@ -112,7 +112,7 @@ We can specify a list of namespaces and selector labels as input.
 - `selector`: comma-separated list of selector labels in the format key1=value1,key2=value2. This is optional, by default no labels will be used for filtering.
 
 !!! Note
-This subcommand should only be used to fetch measurements of a workload ran in the past. Also those resources should be active on the cluster. For present cases, please refer to the alternate options in this tool.
+    This subcommand should only be used to fetch measurements of a workload ran in the past. Also those resources should be active on the cluster. For present cases, please refer to the alternate options in this tool.
 
 ## Check alerts
 
