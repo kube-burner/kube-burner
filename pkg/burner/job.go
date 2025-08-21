@@ -46,6 +46,15 @@ type returnPair struct {
 	executionErrors string
 }
 
+type groupMember struct {
+	ex             JobExecutor
+	watcher        *watchers.WatcherManager
+	measurements   *measurements.Measurements
+	jobName        string
+	waitNamespaces []string
+	rc             int
+}
+
 const (
 	jobName              = "JobName"
 	replica              = "Replica"
@@ -73,7 +82,6 @@ var (
 //
 //nolint:gocyclo
 func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory, embedCfg *fileutils.EmbedConfiguration) (int, error) {
-	var err error
 	var rc int
 	var executedJobs []prometheus.Job
 	var jobExecutors []JobExecutor
@@ -100,121 +108,33 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// Iterate job list
 		var measurementsInstance *measurements.Measurements
 		var measurementsJobName string
+		skip := make([]bool, len(jobExecutors))
 		for jobExecutorIdx, jobExecutor := range jobExecutors {
-			executedJobs = append(executedJobs, prometheus.Job{
-				Start:     time.Now().UTC(),
-				JobConfig: jobExecutor.Job,
-			})
-			watcherManager := watchers.NewWatcherManager(restConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
-			for idx, watcher := range jobExecutor.Watchers {
-				for replica := range watcher.Replicas {
-					watcherManager.Start(watcher.Kind, watcher.APIVersion, watcher.LabelSelector, idx+1, replica+1)
-				}
+			if skip[jobExecutorIdx] {
+				continue
 			}
-			watcherStartErrors := watcherManager.Wait()
-			slices.Concat(errs, watcherStartErrors)
-			var waitListNamespaces []string
-			if measurementsInstance == nil {
-				measurementsJobName = jobExecutor.Name
-				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg)
-				measurementsInstance.Start()
+			if jobExecutor.ExecutionGroup == "" {
+				runSingleJob(ctx, jobExecutorIdx, jobExecutor, restConfig, measurementsFactory, kubeClientProvider, embedCfg, metricsScraper, globalConfig, &measurementsInstance, &measurementsJobName, &executedJobs, globalWaitMap, executorMap, &msWg, &errs, &innerRC)
+				continue
 			}
-			log.Infof("Triggering job: %s", jobExecutor.Name)
-			if jobExecutor.JobType == config.CreationJob {
-				if jobExecutor.Cleanup {
-					// No timeout for initial job cleanup
-					jobExecutor.gc(context.TODO(), nil)
+			groupName := jobExecutor.ExecutionGroup
+			groupType := jobExecutor.JobType
+			groupMembers := []JobExecutor{jobExecutor}
+			for j := jobExecutorIdx + 1; j < len(jobExecutors); j++ {
+				if skip[j] {
+					continue
 				}
-				if jobExecutor.Churn {
-					log.Info("Churning enabled")
-					log.Infof("Churn cycles: %v", jobExecutor.ChurnCycles)
-					log.Infof("Churn duration: %v", jobExecutor.ChurnDuration)
-					log.Infof("Churn percent: %v", jobExecutor.ChurnPercent)
-					log.Infof("Churn delay: %v", jobExecutor.ChurnDelay)
-					log.Infof("Using deletion strategy: %v", jobExecutor.deletionStrategy)
-				}
-				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces)
-				if ctx.Err() != nil {
-					return
-				}
-				// If object verification is enabled
-				if jobExecutor.VerifyObjects && !jobExecutor.Verify() {
-					err := errors.New("object verification failed")
-					// If errorOnVerify is enabled. Set RC to 1 and append error
-					if jobExecutor.ErrorOnVerify {
-						innerRC = 1
-						errs = append(errs, err)
+				if jobExecutors[j].ExecutionGroup == groupName {
+					if jobExecutors[j].JobType != groupType {
+						log.Fatalf("all jobs in executionGroup %q must have the same jobType. Found %s and %s", groupName, groupType, jobExecutors[j].JobType)
 					}
-					log.Error(err.Error())
-				}
-				if jobExecutor.Churn {
-					churnStart := time.Now().UTC()
-					executedJobs[len(executedJobs)-1].ChurnStart = &churnStart
-					jobExecutor.RunCreateJobWithChurn(ctx)
-					churnEnd := time.Now().UTC()
-					executedJobs[len(executedJobs)-1].ChurnEnd = &churnEnd
-				}
-				globalWaitMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = waitListNamespaces
-				executorMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = jobExecutor
-			} else {
-				jobExecutor.Run(ctx)
-				if ctx.Err() != nil {
-					return
+					groupMembers = append(groupMembers, jobExecutors[j])
+					skip[j] = true
+				} else {
+					break
 				}
 			}
-			if jobExecutor.BeforeCleanup != "" {
-				log.Infof("Waiting for beforeCleanup command %s to finish", jobExecutor.BeforeCleanup)
-				stdOut, stdErr, err := util.RunShellCmd(jobExecutor.BeforeCleanup, jobExecutor.embedCfg)
-				if err != nil {
-					err = fmt.Errorf("BeforeCleanup failed: %v", err)
-					log.Error(err.Error())
-					errs = append(errs, err)
-					innerRC = 1
-				}
-				log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
-			}
-			jobEnd := time.Now().UTC()
-			if jobExecutor.MetricsClosing == config.AfterJob {
-				executedJobs[len(executedJobs)-1].End = jobEnd
-				executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
-			}
-			if jobExecutor.JobPause > 0 {
-				log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
-				time.Sleep(jobExecutor.JobPause)
-			}
-			if jobExecutor.MetricsClosing == config.AfterJobPause {
-				executedJobs[len(executedJobs)-1].End = time.Now().UTC()
-				executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
-			}
-			if !globalConfig.WaitWhenFinished {
-				elapsedTime := jobEnd.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
-				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
-			}
-			if !jobExecutor.MetricsAggregate {
-				// We stop and index measurements per job
-				if err = measurementsInstance.Stop(); err != nil {
-					errs = append(errs, err)
-					log.Error(err.Error())
-					innerRC = rcMeasurement
-				}
-				if jobExecutor.MetricsClosing == config.AfterMeasurements {
-					executedJobs[len(executedJobs)-1].End = time.Now().UTC()
-					executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
-				}
-				if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
-					msWg.Add(1)
-					go func(msi *measurements.Measurements, jobName string) {
-						defer msWg.Done()
-						msi.Index(jobName, metricsScraper.IndexerList)
-					}(measurementsInstance, measurementsJobName)
-				}
-				measurementsInstance = nil
-			}
-			watcherStopErrs := watcherManager.StopAll()
-			slices.Concat(errs, watcherStopErrs)
-			if jobExecutor.GC {
-				jobExecutor.gc(ctx, nil)
-			}
+			runExecutionGroup(ctx, groupName, groupMembers, restConfig, measurementsFactory, kubeClientProvider, embedCfg, metricsScraper, globalConfig, &executedJobs, globalWaitMap, executorMap, &msWg, &errs, &innerRC)
 		}
 		if globalConfig.WaitWhenFinished {
 			runWaitList(globalWaitMap, executorMap)
@@ -298,6 +218,269 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 	}
 	return rc, utilerrors.NewAggregate(errs)
+}
+
+// setupWatchers creates and starts watchers for a job
+func setupWatchers(jobExecutor JobExecutor, restConfig *rest.Config) (*watchers.WatcherManager, []error) {
+	watcherManager := watchers.NewWatcherManager(restConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
+	for idx, watcher := range jobExecutor.Watchers {
+		for replica := range watcher.Replicas {
+			watcherManager.Start(watcher.Kind, watcher.APIVersion, watcher.LabelSelector, idx+1, replica+1)
+		}
+	}
+	return watcherManager, watcherManager.Wait()
+}
+
+// executeJob runs the main work for a job
+func executeJob(ctx context.Context, jobExecutor JobExecutor, waitListNamespaces *[]string) (int, error) {
+	if jobExecutor.JobType == config.CreationJob {
+		if jobExecutor.Cleanup {
+			// No timeout for initial job cleanup
+			jobExecutor.gc(context.TODO(), nil)
+		}
+		if jobExecutor.Churn {
+			log.Info("Churning enabled")
+			log.Infof("Churn cycles: %v", jobExecutor.ChurnCycles)
+			log.Infof("Churn duration: %v", jobExecutor.ChurnDuration)
+			log.Infof("Churn percent: %v", jobExecutor.ChurnPercent)
+			log.Infof("Churn delay: %v", jobExecutor.ChurnDelay)
+			log.Infof("Using deletion strategy: %v", jobExecutor.deletionStrategy)
+		}
+		jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, waitListNamespaces)
+		if ctx.Err() != nil {
+			return 0, ctx.Err()
+		}
+		// If object verification is enabled
+		if jobExecutor.VerifyObjects && !jobExecutor.Verify() {
+			verr := errors.New("object verification failed")
+			// If errorOnVerify is enabled. Set RC to 1 and append error
+			if jobExecutor.ErrorOnVerify {
+				return 1, verr
+			}
+			log.Error(verr.Error())
+		}
+	} else {
+		jobExecutor.Run(ctx)
+		if ctx.Err() != nil {
+			return 0, ctx.Err()
+		}
+	}
+	return 0, nil
+}
+
+// runBeforeCleanup executes beforeCleanup command if configured
+func runBeforeCleanup(jobExecutor JobExecutor) (int, error) {
+	if jobExecutor.BeforeCleanup == "" {
+		return 0, nil
+	}
+	log.Infof("Waiting for beforeCleanup command %s to finish", jobExecutor.BeforeCleanup)
+	stdOut, stdErr, err := util.RunShellCmd(jobExecutor.BeforeCleanup, jobExecutor.embedCfg)
+	if err != nil {
+		err = fmt.Errorf("BeforeCleanup failed: %v", err)
+		log.Error(err.Error())
+		return 1, err
+	}
+	log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
+	return 0, nil
+}
+
+// runSingleJob executes a single job with sequential behavior
+func runSingleJob(ctx context.Context, jobExecutorIdx int, jobExecutor JobExecutor, restConfig *rest.Config, measurementsFactory *measurements.MeasurementsFactory, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration, metricsScraper metrics.Scraper, globalConfig config.GlobalConfig, measurementsInstance **measurements.Measurements, measurementsJobName *string, executedJobs *[]prometheus.Job, globalWaitMap map[string][]string, executorMap map[string]JobExecutor, msWg *sync.WaitGroup, errs *[]error, innerRC *int) {
+	*executedJobs = append(*executedJobs, prometheus.Job{
+		Start:     time.Now().UTC(),
+		JobConfig: jobExecutor.Job,
+	})
+	watcherManager, watcherStartErrors := setupWatchers(jobExecutor, restConfig)
+	*errs = slices.Concat(*errs, watcherStartErrors)
+	var waitListNamespaces []string
+	if *measurementsInstance == nil {
+		*measurementsJobName = jobExecutor.Name
+		*measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg)
+		(*measurementsInstance).Start()
+	}
+	log.Infof("Triggering job: %s", jobExecutor.Name)
+	rc, err := executeJob(ctx, jobExecutor, &waitListNamespaces)
+	if ctx.Err() != nil {
+		return
+	}
+	if rc > 0 {
+		*innerRC = rc
+		*errs = append(*errs, err)
+	}
+	if jobExecutor.JobType == config.CreationJob {
+		if jobExecutor.Churn {
+			churnStart := time.Now().UTC()
+			(*executedJobs)[len(*executedJobs)-1].ChurnStart = &churnStart
+			jobExecutor.RunCreateJobWithChurn(ctx)
+			churnEnd := time.Now().UTC()
+			(*executedJobs)[len(*executedJobs)-1].ChurnEnd = &churnEnd
+		}
+		globalWaitMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = waitListNamespaces
+		executorMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = jobExecutor
+	}
+	if cleanupRC, cleanupErr := runBeforeCleanup(jobExecutor); cleanupErr != nil {
+		*errs = append(*errs, cleanupErr)
+		*innerRC = cleanupRC
+	}
+	jobEnd := time.Now().UTC()
+	if jobExecutor.MetricsClosing == config.AfterJob {
+		(*executedJobs)[len(*executedJobs)-1].End = jobEnd
+		(*executedJobs)[len(*executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
+	}
+	if jobExecutor.JobPause > 0 {
+		log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
+		time.Sleep(jobExecutor.JobPause)
+	}
+	if jobExecutor.MetricsClosing == config.AfterJobPause {
+		(*executedJobs)[len(*executedJobs)-1].End = time.Now().UTC()
+		(*executedJobs)[len(*executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
+	}
+	if !globalConfig.WaitWhenFinished {
+		elapsedTime := jobEnd.Sub((*executedJobs)[len(*executedJobs)-1].Start).Round(time.Second)
+		log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
+	}
+	if !jobExecutor.MetricsAggregate {
+		// We stop and index measurements per job
+		if err := (*measurementsInstance).Stop(); err != nil {
+			*errs = append(*errs, err)
+			log.Error(err.Error())
+			*innerRC = rcMeasurement
+		}
+		if jobExecutor.MetricsClosing == config.AfterMeasurements {
+			(*executedJobs)[len(*executedJobs)-1].End = time.Now().UTC()
+			(*executedJobs)[len(*executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
+		}
+		if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
+			msWg.Add(1)
+			go func(msi *measurements.Measurements, jobName string) {
+				defer msWg.Done()
+				msi.Index(jobName, metricsScraper.IndexerList)
+			}(*measurementsInstance, *measurementsJobName)
+		}
+		*measurementsInstance = nil
+	}
+	watcherStopErrs := watcherManager.StopAll()
+	*errs = slices.Concat(*errs, watcherStopErrs)
+	if jobExecutor.GC {
+		jobExecutor.gc(ctx, nil)
+	}
+}
+
+// runExecutionGroup runs a contiguous group of jobs in parallel
+func runExecutionGroup(ctx context.Context, groupName string, groupMembers []JobExecutor, restConfig *rest.Config, measurementsFactory *measurements.MeasurementsFactory, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration, metricsScraper metrics.Scraper, globalConfig config.GlobalConfig, executedJobs *[]prometheus.Job, globalWaitMap map[string][]string, executorMap map[string]JobExecutor, msWg *sync.WaitGroup, errs *[]error, innerRC *int) {
+	groupJobName := fmt.Sprintf("group-%s", groupName)
+	*executedJobs = append(*executedJobs, prometheus.Job{
+		Start: time.Now().UTC(),
+		JobConfig: config.Job{
+			Name:           groupJobName,
+			MetricsClosing: config.AfterJob,
+			JobType:        groupMembers[0].JobType,
+		},
+	})
+	log.Infof("Triggering executionGroup %q with %d jobs in parallel", groupName, len(groupMembers))
+	members := make([]*groupMember, 0, len(groupMembers))
+	for _, member := range groupMembers {
+		watcherManager, watcherStartErrors := setupWatchers(member, restConfig)
+		*errs = slices.Concat(*errs, watcherStartErrors)
+		measurementsInstance := measurementsFactory.NewMeasurements(&member.Job, kubeClientProvider, embedCfg)
+		measurementsInstance.Start()
+		members = append(members, &groupMember{ex: member, watcher: watcherManager, measurements: measurementsInstance, jobName: member.Name})
+	}
+	var groupWg sync.WaitGroup
+	var mapsMu sync.Mutex
+	var errsMu sync.Mutex
+	var churnMu sync.Mutex
+	var groupChurnStart *time.Time
+	var groupChurnEnd *time.Time
+	for _, m := range members {
+		groupWg.Add(1)
+		go func(m *groupMember) {
+			defer groupWg.Done()
+			log.Infof("Triggering job (group %s): %s", groupName, m.ex.Name)
+			rc, err := executeJob(ctx, m.ex, &m.waitNamespaces)
+			if ctx.Err() != nil {
+				return
+			}
+			if rc > 0 {
+				m.rc = rc
+				errsMu.Lock()
+				*errs = append(*errs, err)
+				errsMu.Unlock()
+			}
+			if m.ex.JobType == config.CreationJob {
+				if m.ex.Churn {
+					start := time.Now().UTC()
+					churnMu.Lock()
+					if groupChurnStart == nil || start.Before(*groupChurnStart) {
+						groupChurnStart = &start
+					}
+					churnMu.Unlock()
+					m.ex.RunCreateJobWithChurn(ctx)
+					end := time.Now().UTC()
+					churnMu.Lock()
+					if groupChurnEnd == nil || end.After(*groupChurnEnd) {
+						groupChurnEnd = &end
+					}
+					churnMu.Unlock()
+				}
+				mapsMu.Lock()
+				globalWaitMap[m.ex.Name] = m.waitNamespaces
+				executorMap[m.ex.Name] = m.ex
+				mapsMu.Unlock()
+			}
+			if cleanupRC, cleanupErr := runBeforeCleanup(m.ex); cleanupErr != nil {
+				errsMu.Lock()
+				*errs = append(*errs, cleanupErr)
+				errsMu.Unlock()
+				m.rc = cleanupRC
+			}
+			if err := m.measurements.Stop(); err != nil {
+				errsMu.Lock()
+				*errs = append(*errs, err)
+				errsMu.Unlock()
+				log.Error(err.Error())
+				m.rc = rcMeasurement
+			}
+			if !m.ex.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
+				msWg.Add(1)
+				go func(msi *measurements.Measurements, jobName string) {
+					defer msWg.Done()
+					msi.Index(jobName, metricsScraper.IndexerList)
+				}(m.measurements, m.jobName)
+			}
+			watcherStopErrs := m.watcher.StopAll()
+			errsMu.Lock()
+			*errs = slices.Concat(*errs, watcherStopErrs)
+			errsMu.Unlock()
+			if m.ex.GC {
+				m.ex.gc(ctx, nil)
+			}
+		}(m)
+	}
+	groupWg.Wait()
+	maxMemberRC := 0
+	var totalObjectOperations int32
+	for _, m := range members {
+		if m.rc > maxMemberRC {
+			maxMemberRC = m.rc
+		}
+		totalObjectOperations += m.ex.objectOperations
+	}
+	if maxMemberRC > *innerRC {
+		*innerRC = maxMemberRC
+	}
+	(*executedJobs)[len(*executedJobs)-1].End = time.Now().UTC()
+	(*executedJobs)[len(*executedJobs)-1].ObjectOperations = totalObjectOperations
+	if groupChurnStart != nil {
+		(*executedJobs)[len(*executedJobs)-1].ChurnStart = groupChurnStart
+	}
+	if groupChurnEnd != nil {
+		(*executedJobs)[len(*executedJobs)-1].ChurnEnd = groupChurnEnd
+	}
+	if !globalConfig.WaitWhenFinished {
+		elapsedTime := (*executedJobs)[len(*executedJobs)-1].End.Sub((*executedJobs)[len(*executedJobs)-1].Start).Round(time.Second)
+		log.Infof("executionGroup %s took %v", groupName, elapsedTime)
+	}
 }
 
 // If requests, preload the images used in the test into the node
