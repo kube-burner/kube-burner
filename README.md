@@ -49,3 +49,26 @@ The default builds produce static binaries that work across all Linux distributi
 Please read the [Contributing section](https://kube-burner.github.io/kube-burner/latest/contributing/) before contributing to this project. It provides information on how to contribute, guidelines for setting an environment a CI checks to be done before commiting code.
 
 This project utilizes a Continuous Integration (CI) pipeline to ensure code quality and maintain project standards. The CI process automatically builds, tests, and verifies the project on each commit and pull request.
+
+---
+
+### Thanks to the contributors of Kube-burner ❤️
+
+<div align="center">
+<a href="https://github.com/kube-burner/kube-burner/graphs/contributors">
+<img src="https://contrib.rocks/image?repo=kube-burner/kube-burner" alt="Kube-burner Contributors"/>
+</a>
+</div>
+
+---
+
+**We are a [Cloud Native Computing Foundation](https://cncf.io/) Sandbox Project.**
+
+<img src="https://www.cncf.io/wp-content/uploads/2022/07/cncf-color-bg.svg" width=300 />
+
+## License
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkube-burner%2Fkube-burner.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkube-burner%2Fkube-burner?ref=badge_large)
+
+<br/>
+
