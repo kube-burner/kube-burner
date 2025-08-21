@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/version"
 	log "github.com/sirupsen/logrus"
@@ -30,7 +31,36 @@ import (
 // Bootstraps kube-burner cmd with some common flags
 func SetupCmd(cmd *cobra.Command) {
 	cmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-	cmd.AddCommand(&cobra.Command{
+
+	// Add version check to the root command's PersistentPreRun
+	originalPersistentPreRun := cmd.PersistentPreRun
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		// Run the original PersistentPreRun if it exists
+		if originalPersistentPreRun != nil {
+			originalPersistentPreRun(cmd, args)
+		}
+
+		// Check for updates
+		if cmd.Use != "version" {
+			// Run version check in background
+			done := make(chan bool, 1)
+			go func() {
+				defer func() { done <- true }()
+				// Silently ignore any errors from version check to avoid disrupting normal operation
+				_ = CheckLatestVersion()
+			}()
+
+			// Wait briefly for the version check to complete, but don't block indefinitely
+			select {
+			case <-done:
+				// Version check completed
+			case <-time.After(2 * time.Second):
+				// Continue without waiting longer
+			}
+		}
+	}
+
+	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the version number of kube-burner",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -40,7 +70,8 @@ func SetupCmd(cmd *cobra.Command) {
 			fmt.Println("Go Version:", version.GoVersion)
 			fmt.Println("OS/Arch:", version.OsArch)
 		},
-	})
+	}
+	cmd.AddCommand(versionCmd)
 }
 
 // Configures kube-burner's file logging
