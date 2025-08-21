@@ -50,6 +50,25 @@ Please read the [Contributing section](https://kube-burner.github.io/kube-burner
 
 This project utilizes a Continuous Integration (CI) pipeline to ensure code quality and maintain project standards. The CI process automatically builds, tests, and verifies the project on each commit and pull request.
 
+---
+
+### Thanks to the contributors of Kube-burner ❤️
+
+<div align="center">
+<a href="https://github.com/kube-burner/kube-burner/graphs/contributors">
+<img src="https://contrib.rocks/image?repo=kube-burner/kube-burner" alt="Kube-burner Contributors"/>
+</a>
+</div>
+
+---
+
+**We are a [Cloud Native Computing Foundation](https://cncf.io/) Sandbox Project.**
+
+<img src="https://www.cncf.io/wp-content/uploads/2022/07/cncf-color-bg.svg" width=300 />
+
+## License
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkube-burner%2Fkube-burner.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkube-burner%2Fkube-burner?ref=badge_large)
+
 <br/>
 
-![Project analytics and stats](https://repobeats.axiom.co/api/embed/31b5825e757f9afbdde42ce52140c898a4fadd52.svg 'Repobeats analytics image')
