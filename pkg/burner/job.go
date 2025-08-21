@@ -272,7 +272,7 @@ func RunWithOutput(configSpec config.Spec, kubeClientProvider *config.KubeClient
 
 		// Generate and output summary if requested
 		if outputFormat != "" {
-			generateAndOutputSummary(uuid, executedJobs, returnMap, metricsScraper, configSpec, outputFormat, outputFile, innerRC, "")
+			generateAndOutputSummary(uuid, executedJobs, returnMap, metricsScraper, outputFormat, outputFile, innerRC, "")
 		}
 
 		res <- innerRC
@@ -299,7 +299,7 @@ func RunWithOutput(configSpec config.Spec, kubeClientProvider *config.KubeClient
 
 		// Generate and output summary if requested (timeout case)
 		if outputFormat != "" {
-			generateAndOutputSummary(uuid, executedJobs, returnMap, metricsScraper, configSpec, outputFormat, outputFile, rc, utilerrors.NewAggregate(errs).Error())
+			generateAndOutputSummary(uuid, executedJobs, returnMap, metricsScraper, outputFormat, outputFile, rc, utilerrors.NewAggregate(errs).Error())
 		}
 	}
 	if globalConfig.GC {
@@ -471,7 +471,7 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 // generateAndOutputSummary creates and outputs a benchmark summary
-func generateAndOutputSummary(uuid string, executedJobs []prometheus.Job, returnMap map[string]returnPair, metricsScraper metrics.Scraper, configSpec config.Spec, outputFormat, outputFile string, returnCode int, executionErrors string) {
+func generateAndOutputSummary(uuid string, executedJobs []prometheus.Job, returnMap map[string]returnPair, metricsScraper metrics.Scraper, outputFormat, outputFile string, returnCode int, executionErrors string) {
 	if !util.IsValidOutputFormat(outputFormat) {
 		log.Errorf("Invalid output format: %s. Supported formats: json, yaml", outputFormat)
 		return
