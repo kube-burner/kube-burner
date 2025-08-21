@@ -1,7 +1,7 @@
-name: 🐞 Bug
-description: Create a report to help us improve
-title: "🐞 Bug: "
-labels: ["🐞 bug", "pending triage"]
+name: 🐞 Bug Report
+description: Create a report to help us improve kube-burner
+title: "[BUG] "
+labels: ["bug"]
 body:
   - type: checkboxes
     attributes:
@@ -10,6 +10,13 @@ body:
       options:
         - label: I have searched the existing issues
           required: true
+  - type: input
+    attributes:
+      label: kube-burner version
+      description: Output of `kube-burner version` command
+      placeholder: "v1.x.x"
+    validations:
+      required: true
   - type: textarea
     attributes:
       label: Describe the bug
@@ -21,52 +28,50 @@ body:
       label: Steps To Reproduce
       description: Steps to reproduce the behavior
       placeholder: |
-        1. Go to '...'
-        2. Click on '...'
-        3. Scroll down to '...'
-        4. See error
+        1. Run kube-burner with config '...'
+        2. Execute command '...'
+        3. Observe error '...'
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Expected Behavior
+      label: Expected behavior
       description: A clear and concise description of what you expected to happen
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Screenshots
+      label: kube-burner configuration
       description: |
-        If applicable, add screenshots to help explain your problem
+        Please provide your kube-burner configuration file or relevant sections
+        Tip: You can attach files by clicking this area to highlight it and then dragging files in
+      render: yaml
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Screenshots or output
+      description: |
+        If applicable, add screenshots or kube-burner output to help explain your problem
         Tip: You can attach images or log files by clicking this area to highlight it and then dragging files in
     validations:
       required: false
   - type: textarea
     attributes:
-      label: Device Information [optional]
+      label: Environment Information
       description: |
-        examples:
-        - **OS**: Ubuntu 20.04
-        - **Browser**: chrome
-        - **version**: 22
+        Please provide information about your environment
       value: |
-        - OS:
-        - Browser:
-        - version:
+        - **OS**: 
+        - **Kubernetes version**: 
+        - **kube-burner version**: 
+        - **Installation method**: (binary, container, go install, etc.)
       render: markdown
     validations:
-      required: false
-  - type: input
+      required: true
+  - type: textarea
     attributes:
       label: Additional context
-      description: Add any other context about the problem here
+      description: Add any other context about the problem here (logs, error messages, etc.)
     validations:
       required: false
-  - type: dropdown
-    attributes:
-      label: Are you working on this issue?
-      options:
-        - 'Yes'
-        - 'No'
-    validations:
-      required: true

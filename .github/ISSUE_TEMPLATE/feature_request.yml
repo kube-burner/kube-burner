@@ -1,12 +1,34 @@
-name: ⭐️ Feature request
-description: Suggest an idea for this project
-title: "Feature: "
-labels: ["🌟 feature", "pending triage"]
+name: ⭐️ Feature Request
+description: Suggest an idea for kube-burner
+title: "[RFE] "
+labels: ["enhancement"]
 body:
+  - type: checkboxes
+    attributes:
+      label: Is there an existing issue for this?
+      description: Please search to see if riptmilar feature request already exists
+      options:
+        - label: I have searched the existing issues
+          required: true
+  - type: dropdown
+    attributes:
+      label: Feature Category
+      description: What category does this feature request fall under?
+      options:
+        - Workload Generation
+        - Metrics Collection
+        - Configuration
+        - CLI/UX Improvements
+        - Performance
+        - Integrations
+        - Documentation
+        - Other
+    validations:
+      required: true
   - type: textarea
     attributes:
       label: Is your feature request related to a problem? Please describe
-      description: A clear and concise description of what the problem is
+      description: A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
     validations:
       required: true
   - type: textarea
@@ -21,17 +43,27 @@ body:
       description: A clear and concise description of any alternative solutions or features you've considered
     validations:
       required: false
-  - type: input
+  - type: textarea
+    attributes:
+      label: Use case
+      description: |
+        Describe your specific use case and how this feature would help with kube-burner workloads
+        Examples: load testing scenarios, metrics requirements, etc.
+    validations:
+      required: false
+  - type: textarea
     attributes:
       label: Additional context
-      description: Add any other context about the problem here
+      description: Add any other context, screenshots, or examples about the feature request here
     validations:
       required: false
   - type: dropdown
     attributes:
-      label: Are you working on this?
+      label: Are you willing to contribute to this feature?
       options:
-        - 'Yes'
-        - 'No'
+        - 'Yes, I can work on this'
+        - 'Yes, I can help with testing'
+        - 'Yes, I can help with documentation'
+        - 'No, but I would like to see it implemented'
     validations:
       required: true
