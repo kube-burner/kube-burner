@@ -79,7 +79,7 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
   check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 10
-  check_running_pods_in_ns default 5
+  check_running_pods_in_ns namespaced default 5
   ${KUBE_BURNER} destroy --uuid "${UUID}"
   kubectl delete pod -l kube-burner-uuid=${UUID} -n default
   check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}"
@@ -279,6 +279,6 @@ teardown_file() {
   export GC=false
   run_cmd ${KUBE_BURNER} init -c kube-burner-execution-group.yml --uuid="${UUID}"
   for i in 0 1; do
-    check_running_pods_in_ns "group-ns-${i}" 1
+    check_running_pods_in_ns member-${i} group-ns-${i} 1
   done
 }
