@@ -46,9 +46,8 @@ func SetupCmd(cmd *cobra.Command) {
 			done := make(chan bool, 1)
 			go func() {
 				defer func() { done <- true }()
-				if err := CheckLatestVersion(); err != nil {
-					// Silently ignore errors
-				}
+				// Silently ignore any errors from version check to avoid disrupting normal operation
+				_ = CheckLatestVersion()
 			}()
 
 			// Wait briefly for the version check to complete, but don't block indefinitely
