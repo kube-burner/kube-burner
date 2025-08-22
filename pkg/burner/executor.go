@@ -24,6 +24,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -54,6 +55,7 @@ type JobExecutor struct {
 	embedCfg          *fileutils.EmbedConfiguration
 	deletionStrategy  string
 	objectOperations  int32
+	templateNodes     map[string]corev1.NodeList
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
@@ -73,6 +75,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	ex.clientSet = clientSet
 	ex.restConfig = runtimeRestConfig
 	ex.dynamicClient = dynamic.NewForConfigOrDie(ex.restConfig)
+	ex.templateNodes = util.LoadNodesByRole(ex.clientSet)
 
 	_, setupRestConfig := kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
 	mapper := newRESTMapper(discovery.NewDiscoveryClientForConfigOrDie(setupRestConfig))
@@ -102,6 +105,7 @@ func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIn
 		jobUUID:      ex.uuid,
 		jobRunId:     ex.runid,
 		replica:      replicaIndex,
+		nodes:        ex.templateNodes,
 	}
 	maps.Copy(templateData, obj.InputVars)
 

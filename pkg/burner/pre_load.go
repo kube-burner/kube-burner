@@ -96,7 +96,12 @@ func getJobImages(job JobExecutor) ([]string, error) {
 	var imageList []string
 	var unstructuredObject unstructured.Unstructured
 	for _, object := range job.objects {
-		renderedObj, err := util.RenderTemplate(object.objectSpec, object.InputVars, util.MissingKeyZero, job.functionTemplates)
+		inputVars := map[string]any{}
+		maps.Copy(inputVars, object.InputVars)
+		if job.templateNodes != nil {
+			inputVars[nodes] = job.templateNodes
+		}
+		renderedObj, err := util.RenderTemplate(object.objectSpec, inputVars, util.MissingKeyZero, job.functionTemplates)
 		if err != nil {
 			return imageList, err
 		}
