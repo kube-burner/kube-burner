@@ -169,46 +169,8 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	// Wait for all replicas to be created
 	wg.Wait()
 	if ex.WaitWhenFinished {
-		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
-		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(ex.restConfig.QPS))
-		errChan := make(chan []error, 1)
-		for i := iterationStart; i < iterationEnd; i++ {
-			if ex.nsRequired && ex.NamespacedIterations {
-				ns = ex.generateNamespace(i)
-				if namespacesWaited[ns] {
-					continue
-				}
-				namespacesWaited[ns] = true
-			}
-			sem <- 1
-			wg.Add(1)
-			go func(ns string) {
-				defer func() {
-					<-sem
-					wg.Done()
-				}()
-				if err := ex.waitForObjects(ns); err != nil {
-					select {
-					case errChan <- err:
-					default:
-					}
-				}
-			}(ns)
-			// Wait for all namespaces to be ready
-			if !ex.NamespacedIterations {
-				break
-			}
-		}
-		wg.Wait()
-		close(errChan)
-
-		select {
-		case err := <-errChan:
-			if err != nil && waitErrors == nil {
-				waitErrors = append(waitErrors, err...)
-			}
-		default:
+		if errs := ex.waitForCompletion(iterationStart, iterationEnd, ns, namespacesWaited); len(errs) > 0 && waitErrors == nil {
+			waitErrors = append(waitErrors, errs...)
 		}
 	}
 	if len(waitErrors) > 0 {
@@ -266,6 +228,51 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		}(r)
 	}
 	wg.Wait()
+}
+
+// waitForCompletion waits for objects to be ready across the relevant namespaces
+func (ex *JobExecutor) waitForCompletion(iterationStart, iterationEnd int, ns string, namespacesWaited map[string]bool) []error {
+	log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
+	// This semaphore limits the maximum number of concurrent goroutines
+	sem := make(chan int, int(ex.restConfig.QPS))
+	errChan := make(chan []error, 1)
+	var wg sync.WaitGroup
+	for i := iterationStart; i < iterationEnd; i++ {
+		if ex.nsRequired && ex.NamespacedIterations {
+			ns = ex.generateNamespace(i)
+			if namespacesWaited[ns] {
+				continue
+			}
+			namespacesWaited[ns] = true
+		}
+		sem <- 1
+		wg.Add(1)
+		go func(namespace string) {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+			if err := ex.waitForObjects(namespace); err != nil {
+				select {
+				case errChan <- err:
+				default:
+				}
+			}
+		}(ns)
+		// Wait for all namespaces to be ready
+		if !ex.NamespacedIterations {
+			break
+		}
+	}
+	wg.Wait()
+	close(errChan)
+
+	select {
+	case err := <-errChan:
+		return err
+	default:
+		return nil
+	}
 }
 
 func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
