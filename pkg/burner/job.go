@@ -133,7 +133,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", jobExecutor.ChurnDelay)
 					log.Infof("Using deletion strategy: %v", jobExecutor.deletionStrategy)
 				}
-				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces)
+				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces); len(jobErrs) > 0 {
+					errs = append(errs, jobErrs...)
+					innerRC = 1
+				}
 				if ctx.Err() != nil {
 					return
 				}
@@ -150,14 +153,20 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				if jobExecutor.Churn {
 					churnStart := time.Now().UTC()
 					executedJobs[len(executedJobs)-1].ChurnStart = &churnStart
-					jobExecutor.RunCreateJobWithChurn(ctx)
+					if jobErrs := jobExecutor.RunCreateJobWithChurn(ctx); len(jobErrs) > 0 {
+						errs = append(errs, jobErrs...)
+						innerRC = 1
+					}
 					churnEnd := time.Now().UTC()
 					executedJobs[len(executedJobs)-1].ChurnEnd = &churnEnd
 				}
 				globalWaitMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = waitListNamespaces
 				executorMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = jobExecutor
 			} else {
-				jobExecutor.Run(ctx)
+				if jobErrs := jobExecutor.Run(ctx); len(jobErrs) > 0 {
+					errs = append(errs, jobErrs...)
+					innerRC = 1
+				}
 				if ctx.Err() != nil {
 					return
 				}
@@ -217,7 +226,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 		}
 		if globalConfig.WaitWhenFinished {
-			runWaitList(globalWaitMap, executorMap)
+			if waitErrs := runWaitList(globalWaitMap, executorMap); len(waitErrs) > 0 {
+				errs = append(errs, waitErrs...)
+				innerRC = 1
+			}
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
@@ -395,8 +407,9 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 }
 
 // Runs on wait list at the end of benchmark
-func runWaitList(globalWaitMap map[string][]string, executorMap map[string]JobExecutor) {
+func runWaitList(globalWaitMap map[string][]string, executorMap map[string]JobExecutor) []error {
 	var wg sync.WaitGroup
+	errChan := make(chan []error, len(globalWaitMap))
 	for executorUUID, namespaces := range globalWaitMap {
 		executor := executorMap[executorUUID]
 		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
@@ -406,13 +419,27 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]JobEx
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				executor.waitForObjects(ns)
-				<-sem
-				wg.Done()
+				defer func() {
+					<-sem
+					wg.Done()
+				}()
+				if err := executor.waitForObjects(ns); err != nil {
+					errChan <- err
+				}
 			}(ns)
 		}
 		wg.Wait()
 	}
+	close(errChan)
+
+	var errs []error
+	for err := range errChan {
+		errs = append(errs, err...)
+	}
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
 }
 
 func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {

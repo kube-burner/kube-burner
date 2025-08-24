@@ -87,7 +87,7 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 }
 
 // RunCreateJob executes a creation job
-func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) []error {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -97,6 +97,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	var wg sync.WaitGroup
 	var ns string
 	var err error
+	var waitErrors []error
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
@@ -113,7 +114,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	var namespacesWaited = make(map[string]bool)
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
-			return
+			return []error{ctx.Err()}
 		}
 		if i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
@@ -154,7 +155,9 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns)
+				if err := ex.waitForObjects(ns); len(err) > 0 {
+					waitErrors = append(waitErrors, err...)
+				}
 				namespacesWaited[ns] = true
 			}
 		}
@@ -169,6 +172,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(ex.restConfig.QPS))
+		errChan := make(chan []error, 1)
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.nsRequired && ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
@@ -180,9 +184,16 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
-				ex.waitForObjects(ns)
-				<-sem
-				wg.Done()
+				defer func() {
+					<-sem
+					wg.Done()
+				}()
+				if err := ex.waitForObjects(ns); err != nil {
+					select {
+					case errChan <- err:
+					default:
+					}
+				}
 			}(ns)
 			// Wait for all namespaces to be ready
 			if !ex.NamespacedIterations {
@@ -190,7 +201,20 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			}
 		}
 		wg.Wait()
+		close(errChan)
+
+		select {
+		case err := <-errChan:
+			if err != nil && waitErrors == nil {
+				waitErrors = append(waitErrors, err...)
+			}
+		default:
+		}
 	}
+	if len(waitErrors) > 0 {
+		return waitErrors
+	}
+	return nil
 }
 
 // Simple integer division on the iteration allows us to batch iterations into
@@ -294,15 +318,15 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 }
 
 // RunCreateJobWithChurn executes a churn creation job
-func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
+func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	if ctx.Err() != nil {
-		return
+		return []error{ctx.Err()}
 	}
 	if !ex.nsRequired {
 		log.Info("No namespaces were created in this job, skipping churning stage")
-		return
+		return nil
 	}
-	var err error
+	var errs []error
 	// Determine the number of job iterations to churn (min 1)
 	numToChurn := int(math.Max(float64(ex.ChurnPercent*ex.JobIterations/100), 1))
 	now := time.Now().UTC()
@@ -316,14 +340,14 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		select {
 		case <-timer:
 			log.Info("Churn job complete")
-			return
+			return errs
 		default:
 			log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
 		}
 		// Exit if churn cycles are completed
 		if ex.ChurnCycles > 0 && cyclesCount >= ex.ChurnCycles {
 			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnCycles)
-			return
+			return errs
 		}
 		// Max amount of churn is 100% of namespaces
 		randStart := 1
@@ -341,7 +365,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 				continue
 			}
 			// Label namespaces to be deleted
-			_, err = ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
+			_, err := ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
 			if err != nil {
 				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
 			}
@@ -363,7 +387,9 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		}
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})
+		if jobErrs := ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{}); len(jobErrs) > 0 {
+			errs = append(errs, jobErrs...)
+		}
 		log.Infof("Sleeping for %v", ex.ChurnDelay)
 		time.Sleep(ex.ChurnDelay)
 		cyclesCount++
