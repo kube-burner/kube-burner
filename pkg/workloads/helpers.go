@@ -16,7 +16,6 @@ package workloads
 
 import (
 	"embed"
-	"fmt"
 	"path"
 
 	"github.com/kube-burner/kube-burner/pkg/burner"
@@ -105,27 +104,26 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVar
 	return rc
 }
 
-// ExtractWorkload extracts the given workload and metrics profile to the current directory
-func ExtractWorkload(embedConfig embed.FS, embedFSDir string, workload string, rootCfg ...string) error {
-	dirContent, err := embedConfig.ReadDir(path.Join(embedFSDir, workload))
-	if err != nil {
-		return err
-	}
-	workloadContent, _ := embedConfig.ReadFile(embedFSDir)
-	if err = util.CreateFile(fmt.Sprintf("%v.yml", workload), workloadContent); err != nil {
-		return err
-	}
-	for _, f := range dirContent {
-		fileContent, _ := embedConfig.ReadFile(path.Join(embedFSDir, workload, f.Name()))
-		err := util.CreateFile(f.Name(), fileContent)
+// ExtractWorkload extracts the given workload and metrics profile from the embedded filesystem to the current directory.
+// Parameters:
+//   - embedConfig: The embedded filesystem containing workload and metrics directories.
+//   - embedFSDir: The root directory of the embedded filesystem.
+//   - folders: List of directories to be extracted.
+func ExtractWorkload(embedConfig embed.FS, embedFSDir string, folders []string) error {
+	var fileContent []byte
+	for _, folder := range folders {
+		dirContent, err := embedConfig.ReadDir(path.Join(embedFSDir, folder))
 		if err != nil {
 			return err
 		}
-	}
-	for _, f := range rootCfg {
-		fileContent, _ := embedConfig.ReadFile(path.Join(embedFSDir, f))
-		if err = util.CreateFile(f, fileContent); err != nil {
-			return err
+		for _, f := range dirContent {
+			fileContent, err = embedConfig.ReadFile(path.Join(embedFSDir, folder, f.Name()))
+			if err != nil {
+				return err
+			}
+			if util.CreateFile(f.Name(), fileContent) != nil {
+				return err
+			}
 		}
 	}
 	return nil
