@@ -16,6 +16,8 @@ package workloads
 
 import (
 	"embed"
+	"io/fs"
+	"os"
 	"path"
 
 	"github.com/kube-burner/kube-burner/pkg/burner"
@@ -110,20 +112,40 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVar
 //   - embedFSDir: The root directory of the embedded filesystem.
 //   - folders: List of directories to be extracted.
 func ExtractWorkload(embedConfig embed.FS, embedFSDir string, folders []string) error {
-	var fileContent []byte
 	for _, folder := range folders {
-		dirContent, err := embedConfig.ReadDir(path.Join(embedFSDir, folder))
+		subFS, err := fs.Sub(embedConfig, path.Join(embedFSDir, folder))
 		if err != nil {
 			return err
 		}
-		for _, f := range dirContent {
-			fileContent, err = embedConfig.ReadFile(path.Join(embedFSDir, folder, f.Name()))
+		if err := extractDirectory(subFS, "."); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Extracts a directory recursively
+func extractDirectory(subFS fs.FS, dirPath string) error {
+	dirContent, err := fs.ReadDir(subFS, dirPath)
+	if err != nil {
+		return err
+	}
+	for _, f := range dirContent {
+		if f.IsDir() {
+			err := os.MkdirAll(path.Join(dirPath, f.Name()), 0755)
 			if err != nil {
 				return err
 			}
-			if util.CreateFile(f.Name(), fileContent) != nil {
-				return err
-			}
+			extractDirectory(subFS, path.Join(dirPath, f.Name()))
+			continue
+		}
+		filePath := path.Join(dirPath, f.Name())
+		fileContent, err := fs.ReadFile(subFS, filePath)
+		if err != nil {
+			return err
+		}
+		if util.CreateFile(filePath, fileContent) != nil {
+			return err
 		}
 	}
 	return nil
