@@ -155,11 +155,11 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					}
 				}
 				if target.BearerToken != "" {
-					command = []string{"curl", "-sSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
+					command = []string{"curl", "-fsSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
 				} else if target.Cert != "" && target.Key != "" {
-					command = []string{"curl", "-sSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
+					command = []string{"curl", "-fsSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
 				} else {
-					command = []string{"curl", "-sSLk", target.URL}
+					command = []string{"curl", "-fsSLk", target.URL}
 				}
 				req := p.ClientSet.CoreV1().
 					RESTClient().
