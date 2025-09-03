@@ -126,6 +126,34 @@ This subcommand requires the `uuid` flag to destroy all namespaces labeled with 
 
 The `health-check` subcommand assesses the status of nodes within the cluster. It provides information on the overall health of the cluster, indicating whether it is in a healthy state. In the event of an unhealthy cluster, the subcommand returns a list of nodes that are not in a "Ready" state, helping users identify and address specific issues affecting cluster stability.
 
+## Version
+
+The `version` subcommand displays version information about the kube-burner binary, including the version number, Git commit, build date, Go version, and OS/architecture.
+
+```console
+$ kube-burner version
+Version: v1.17.3
+Git Commit: abc123def456
+Build Date: 2024-01-15-10:30:00
+Go Version: go1.21.0
+OS/Arch: linux amd64
+```
+
+### Automatic Update Notifications
+
+Kube-burner automatically checks for newer releases when executing any command (except the version command itself). If a newer version is available, you'll see a warning message:
+
+```console
+$ kube-burner init -c config.yml
+⚠️  A newer kube-burner version (v1.17.4) is available! Current: v1.17.3
+   Download: https://github.com/kube-burner/kube-burner/releases/tag/v1.17.4
+```
+
+This helps ensure you're aware of the latest features and bug fixes without needing to manually check for updates.
+
+!!! note
+    The automatic version check requires internet connectivity to query the GitHub API. Development versions (empty version string or "latest") will skip the version check. The check runs in the background and won't interrupt normal operation if it fails.
+
 ## Completion
 
 Generates bash a completion script that can be imported with:
