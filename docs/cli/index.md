@@ -50,7 +50,7 @@ This is the main subcommand; it triggers a new kube-burner benchmark and it supp
 - `allow-missing`: Allow missing keys in the config file. Needed when using the [`default`](https://masterminds.github.io/sprig/defaults.html) template function
 
 !!! Note "Prometheus authentication"
-    Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.
+Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.
 
 With the above, running a kube-burner benchmark would be as simple as:
 
@@ -64,7 +64,7 @@ Kube-burner also supports remote configuration files served by a web server. To 
 kube-burner init -c http://web.domain.com:8080/cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
 ```
 
-To scrape metrics from multiple endpoints, the  `init` command can be triggered. For example:
+To scrape metrics from multiple endpoints, the `init` command can be triggered. For example:
 
 ```console
 kube-burner init -c cluster-density.yml -e metrics-endpoints.yaml
@@ -88,13 +88,13 @@ A metrics-endpoints.yaml file with valid keys for the `init` command would look 
 
 Kube-burner has defined a series of exit codes that can help to programmatically identify a benchmark execution error.
 
-| Exit code | Meaning |
-|--------|--------|
-| 0 | Benchmark execution finished normally |
-| 1 | Generic exit code, returned on a unrecoverable error (i.e: API Authorization error or config parsing error) |
-| 2 | Benchmark timeout, returned when kube-burner's execution time exceeds the value passed in the `--timeout` flag |
-| 3 | Alerting error, returned when a `error` or `critical` level alert is fired |
-| 4 | Measurement error, returned on some measurements error conditions, like `thresholds` |
+| Exit code | Meaning                                                                                                        |
+| --------- | -------------------------------------------------------------------------------------------------------------- |
+| 0         | Benchmark execution finished normally                                                                          |
+| 1         | Generic exit code, returned on a unrecoverable error (i.e: API Authorization error or config parsing error)    |
+| 2         | Benchmark timeout, returned when kube-burner's execution time exceeds the value passed in the `--timeout` flag |
+| 3         | Alerting error, returned when a `error` or `critical` level alert is fired                                     |
+| 4         | Measurement error, returned on some measurements error conditions, like `thresholds`                           |
 
 ## Index
 
@@ -112,7 +112,7 @@ We can specify a list of namespaces and selector labels as input.
 - `selector`: comma-separated list of selector labels in the format key1=value1,key2=value2. This is optional, by default no labels will be used for filtering.
 
 !!! Note
-    This subcommand should only be used to fetch measurements of a workload ran in the past. Also those resources should be active on the cluster. For present cases, please refer to the alternate options in this tool.
+This subcommand should only be used to fetch measurements of a workload ran in the past. Also those resources should be active on the cluster. For present cases, please refer to the alternate options in this tool.
 
 ## Check alerts
 
@@ -128,11 +128,148 @@ The `health-check` subcommand assesses the status of nodes within the cluster. I
 
 ## Completion
 
-Generates bash a completion script that can be imported with:
-`. <(kube-burner completion)`
+Generates shell completion scripts for bash, zsh, fish, and PowerShell. The completion script provides auto-completion for commands, subcommands, flags, file paths, and valid argument values.
 
-Or permanently imported with:
-`kube-burner completion > /etc/bash_completion.d/kube-burner`
+### Usage
 
-!!! note
-    the `bash-completion` utils must be installed for the kube-burner completion script to work.
+```console
+kube-burner completion [bash|zsh|fish|powershell]
+```
+
+### What You Get
+
+Once installed, tab completion provides:
+
+- **Commands**: `kube-burner <Tab>` → shows `init`, `destroy`, `measure`, etc.
+- **Flags**: `kube-burner init --<Tab>` → shows `--config`, `--uuid`, `--timeout`, etc.
+- **Files**: `kube-burner init --config <Tab>` → shows available config files
+- **Values**: `kube-burner completion <Tab>` → shows `bash`, `zsh`, `fish`, `powershell`
+
+### Installation Instructions
+
+#### Bash
+
+**Temporary (current session only):**
+
+```console
+source <(kube-burner completion bash)
+```
+
+**Permanent installation:**
+
+```console
+# Linux (requires sudo):
+kube-burner completion bash | sudo tee /etc/bash_completion.d/kube-burner
+
+# macOS with Homebrew:
+kube-burner completion bash > $(brew --prefix)/etc/bash_completion.d/kube-burner
+
+# Manual installation:
+mkdir -p ~/.local/share/bash-completion/completions
+kube-burner completion bash > ~/.local/share/bash-completion/completions/kube-burner
+```
+
+#### Zsh
+
+**Setup completion system (if not already enabled):**
+
+```console
+echo "autoload -U compinit; compinit" >> ~/.zshrc
+```
+
+**Permanent installation:**
+
+```console
+# Standard installation:
+kube-burner completion zsh > "${fpath[1]}/_kube-burner"
+
+# Oh My Zsh users:
+kube-burner completion zsh > ~/.oh-my-zsh/completions/_kube-burner
+
+# Manual installation:
+mkdir -p ~/.zsh/completions
+kube-burner completion zsh > ~/.zsh/completions/_kube-burner
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+```
+
+**Restart your shell:**
+
+```console
+exec zsh
+```
+
+#### Fish
+
+**Temporary (current session only):**
+
+```console
+kube-burner completion fish | source
+```
+
+**Permanent installation:**
+
+```console
+kube-burner completion fish > ~/.config/fish/completions/kube-burner.fish
+```
+
+#### PowerShell
+
+**Temporary (current session only):**
+
+```powershell
+kube-burner completion powershell | Out-String | Invoke-Expression
+```
+
+**Permanent installation:**
+
+1. **Generate the completion script:**
+
+   ```powershell
+   kube-burner completion powershell > kube-burner-completion.ps1
+   ```
+
+2. **Add to your PowerShell profile:**
+
+   ```powershell
+   # Check if profile exists
+   Test-Path $PROFILE
+
+   # Create profile if it doesn't exist
+   if (!(Test-Path $PROFILE)) { New-Item -Path $PROFILE -Type File -Force }
+
+   # Add completion to profile
+   Add-Content $PROFILE ". $(Get-Location)\kube-burner-completion.ps1"
+   ```
+
+3. **Reload your profile:**
+   ```powershell
+   . $PROFILE
+   ```
+
+**Important PowerShell Notes:**
+
+- Ensure `kube-burner` is in your PATH or use the full path to the executable
+- On Windows, the executable should have a `.exe` extension for best compatibility
+- You may need to adjust PowerShell execution policy: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+
+### Troubleshooting
+
+| Issue                                  | Solution                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------- |
+| Completions not working                | Restart your shell after installation                                     |
+| "command not found" errors             | Ensure the shell completion system is installed (`bash-completion`, etc.) |
+| Zsh completions not loading            | Ensure `compinit` is loaded in your `.zshrc`                              |
+| PowerShell script errors               | Check execution policy with `Get-ExecutionPolicy`                         |
+| Completions show wrong executable name | Ensure consistent naming (with/without `.exe` extension)                  |
+
+### Verification
+
+Test that completion is working:
+
+```console
+# Type this and press Tab:
+kube-burner <Tab>
+
+# You should see available commands like:
+# init  destroy  measure  index  check-alerts  completion  help
+```
