@@ -103,6 +103,16 @@ teardown_file() {
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
 }
 
+@test "kube-burner init: local-indexing=true; high-precision-pod-latency=true" {
+  export LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
+  check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json
+  check_high_precision_metrics ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json
+  check_high_precision_quantiles ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json
+  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+}
+
 @test "kube-burner init: os-indexing=true; local-indexing=true; alerting=true"  {
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
