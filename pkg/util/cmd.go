@@ -30,6 +30,7 @@ import (
 // Bootstraps kube-burner cmd with some common flags
 func SetupCmd(cmd *cobra.Command) {
 	cmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
+	cmd.PersistentFlags().String("log-format", "text", "Log format: text, json")
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version number of kube-burner",
@@ -54,19 +55,36 @@ func SetupFileLogging(uuid string) {
 	log.SetOutput(mw)
 }
 
-// Configures kube-burner's logging level
+// Configures kube-burner's logging level and format
 func ConfigureLogging(cmd *cobra.Command) {
 	logLevel, _ := cmd.Flags().GetString("log-level")
+	logFormat, _ := cmd.Flags().GetString("log-format")
+
 	log.SetReportCaller(true)
-	formatter := &log.TextFormatter{
-		TimestampFormat: "2006-01-02 15:04:05",
-		FullTimestamp:   true,
-		DisableColors:   true,
-		CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
-			return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
-		},
+
+	switch logFormat {
+	case "json":
+		formatter := &log.JSONFormatter{
+			TimestampFormat: "2006-01-02T15:04:05.000Z07:00",
+			CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
+				return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+			},
+		}
+		log.SetFormatter(formatter)
+	case "text":
+		formatter := &log.TextFormatter{
+			TimestampFormat: "2006-01-02 15:04:05",
+			FullTimestamp:   true,
+			DisableColors:   true,
+			CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
+				return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+			},
+		}
+		log.SetFormatter(formatter)
+	default:
+		log.Fatalf("Unknown log format %s. Allowed values: text, json", logFormat)
 	}
-	log.SetFormatter(formatter)
+
 	lvl, err := log.ParseLevel(logLevel)
 	if err != nil {
 		log.Fatalf("Unknown log level %s", logLevel)
