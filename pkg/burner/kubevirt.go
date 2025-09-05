@@ -78,13 +78,7 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 			timeGreaterThan:      false,
 		},
 	},
-	config.KubeVirtOpUnpause: {
-		conditionCheckConfig: ConditionCheckConfig{
-			conditionType:        conditionTypeReady,
-			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
-			timeGreaterThan:      false,
-		},
-	},
+	config.KubeVirtOpUnpause:      nil,
 	config.KubeVirtOpMigrate:      nil,
 	config.KubeVirtOpAddVolume:    nil,
 	config.KubeVirtOpRemoveVolume: nil,
@@ -165,6 +159,14 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	case config.KubeVirtOpPause:
 		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Pause(context.Background(), item.GetName(), &kubevirtV1.PauseOptions{})
 	case config.KubeVirtOpUnpause:
+		if len(obj.WaitOptions.CustomStatusPaths) == 0 {
+			obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
+				{
+					Key:   "[((.conditions // []) | .[] | select(.type == \"Paused\"))] | length == 0 | tostring",
+					Value: "true",
+				},
+			}
+		}
 		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Unpause(context.Background(), item.GetName(), &kubevirtV1.UnpauseOptions{})
 	case config.KubeVirtOpMigrate:
 		if len(obj.WaitOptions.CustomStatusPaths) == 0 {
