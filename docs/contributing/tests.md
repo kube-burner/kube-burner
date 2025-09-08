@@ -65,3 +65,25 @@ The list of executed tests may be filtered by setting the environment variable `
 ```bash
 TEST_FILTER="datavolume" make test-k8s
 ```
+
+### Running local Kind to use as an External Cluster
+
+Starting Kind seperately from the test will reduce test setup and teardown time during development
+
+#### Prerequisites
+Follow the instuctions in [Running test with Podman](#running-test-with-podman)
+
+#### Create Kind
+
+Run:
+```
+hack/start_kind.sh
+```
+
+#### Customize
+
+Customize Kind and Kubernetes versions by setting `KIND_VERSION` and/or `K8S_VERSION`
+
+#### Run the tests
+Follow the instuctions in [Running test with an External Cluster](#running-test-with-an-external-cluster)
+using the `kubeconfig` file created by the Kind installation
