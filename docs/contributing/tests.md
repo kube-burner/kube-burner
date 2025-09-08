@@ -8,6 +8,7 @@ Tests can be executed locally with `make test`, some requirements are needed tho
 - bats
 - kubectl
 - podman or docker (required to run [kind](https://kind.sigs.k8s.io/))
+- [GitHub CLI](https://cli.github.com/). Make sure to login before running the tests
 
 ### Running test with Podman
 
