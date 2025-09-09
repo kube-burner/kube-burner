@@ -30,8 +30,8 @@ jobs:
       - name: Link Checker
         uses: lycheeverse/lychee-action@v2.6.1
         with:
-          args: --verbose --no-progress --exclude-mail --exclude-loopback './docs/**/*.md'
+          lycheeVersion: v0.20.1
+          args: --verbose --no-progress --exclude-loopback './docs/**/*.md'
           fail: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
