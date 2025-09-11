@@ -62,7 +62,8 @@ var (
 	}
 )
 
-func setLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
+// updates the labels in the object
+func udpateLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
 	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
 	if !found {
 		labelMap = make(map[string]any, len(labels))
@@ -83,20 +84,18 @@ func setLabelsInArray(obj *unstructured.Unstructured, labels map[string]string, 
 		innerObj := unstructured.Unstructured{}
 		innerObj.SetUnstructuredContent(a.(map[string]any))
 
-		setLabels(&innerObj, labels, templatePath)
+		udpateLabels(&innerObj, labels, templatePath)
 	}
 	unstructured.SetNestedSlice(obj.Object, array, arrayPath...)
 }
 
-// Helps to set metadata labels
-func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string) {
-	// Will be useful for the resources like Deployments and Replicasets. Because
-	// object.SetLabels(labels) doesn't actually set labels for the underlying
-	// objects (i.e Pods under deployment/replicastes). So this function should help
-	// us achieve that without breaking any of our labeling functionality.
+// updates the labels in the child resources
+// labeling these resources is required for some measurements to work properly
+// as they rely on those labels to watch the objects
+func updateChildLabels(obj *unstructured.Unstructured, labels map[string]string) {
 	paths := kindToLabelPaths[obj.GetKind()]
 	for _, path := range paths {
-		setLabels(obj, labels, path)
+		udpateLabels(obj, labels, path)
 	}
 
 	// Do the same for elements stored in array (e.g. dataVolumeTemplates in VirtualMachine)
