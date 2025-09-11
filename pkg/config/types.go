@@ -129,6 +129,8 @@ type Object struct {
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
 	// KubeVirt Operation
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
+	// Churn object
+	Churn bool `yaml:"churn" json:"churn,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -183,16 +185,8 @@ type Job struct {
 	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"-"`
 	// NamespaceAnnotations add custom annotations to namespaces created by kube-burner
 	NamespaceAnnotations map[string]string `yaml:"namespaceAnnotations" json:"-"`
-	// Churn workload
-	Churn bool `yaml:"churn" json:"churn,omitempty"`
-	// Churn cycles
-	ChurnCycles int `yaml:"churnCycles" json:"churnCycles,omitempty"`
-	// Churn percentage
-	ChurnPercent int `yaml:"churnPercent" json:"churnPercent,omitempty"`
-	// Churn duration
-	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration,omitempty"`
-	// Churn delay between sets
-	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
+	// Churn options
+	Churn Churn `yaml:"churn" json:"churn,omitempty"`
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
@@ -240,6 +234,20 @@ type StatusPath struct {
 	Value string `yaml:"value" json:"value"`
 }
 
+// Churn options
+type Churn struct {
+	// number of churn loop iterations
+	Cycles int `yaml:"cycles" json:"cycles,omitempty"`
+	// percentage of objects to churn
+	Percent int `yaml:"percent" json:"percent,omitempty"`
+	// duration of the churn stage
+	Duration time.Duration `yaml:"duration" json:"duration,omitempty"`
+	// Delay between sets
+	Delay time.Duration `yaml:"delay" json:"delay,omitempty"`
+	// Type
+	Type ChurnType `yaml:"type" json:"type,omitempty"`
+}
+
 type KubeClientProvider struct {
 	restConfig *rest.Config
 }
@@ -271,3 +279,10 @@ var metricsClosing = map[MetricsClosing]struct{}{
 	AfterMeasurements: {},
 	AfterJob:          {},
 }
+
+type ChurnType string
+
+const (
+	ChurnNamespaces ChurnType = "namespaces"
+	ChurnObjects    ChurnType = "objects"
+)

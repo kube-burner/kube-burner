@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -27,23 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-// Cleanup resources specific to kube-burner for a given iteration range
-func CleanupIterations(ctx context.Context, ex JobExecutor, iterationStart, iterationEnd int, namespace string) {
-	for i := iterationStart; i < iterationEnd; i++ {
-		labelSelector := fmt.Sprintf("kube-burner-job=%s,%s=%d", ex.Name, config.KubeBurnerLabelJobIteration, i)
-		for _, obj := range ex.objects {
-			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
-		}
-		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
-	}
-}
-
 // Cleanup resources specific to kube-burner with in a given list of namespaces
 func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
 	for _, namespace := range namespacesToDelete {
 		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
 		for _, obj := range ex.objects {
-			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
+			if obj.Churn {
+				CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
+			}
 		}
 		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
 	}
