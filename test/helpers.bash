@@ -7,9 +7,11 @@ K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
+KIND_YAML=${KIND_YAML:-kind.yml}
+KUBEVIRT_CR=${KUBEVIRT_CR:-objectTemplates/kubevirt-cr.yaml}
 
 setup-kind() {
-  KIND_FOLDER=$(mktemp -d)
+  KIND_FOLDER=${KIND_FOLDER:-$(mktemp -d)}
   echo "Downloading kind"
   # Kind is currently unavailable for ppc64le architecture, it is required that the binary is built for usage.
   if [[ "$ARCH" == "ppc64le" ]]
@@ -23,11 +25,11 @@ setup-kind() {
     IMAGE=kindest/node:"${K8S_VERSION}"
   fi
   echo "Deploying cluster"
-  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1
+  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config ${KIND_YAML} --image ${IMAGE} --name kind --wait 300s -v=1
   echo "Deploying kubevirt operator"
   KUBEVIRT_VERSION=$(gh release view --repo kubevirt/kubevirt --json tagName -q '.tagName')
   kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml
-  kubectl create -f objectTemplates/kubevirt-cr.yaml
+  kubectl create -f ${KUBEVIRT_CR}
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt
   # Install CDI
