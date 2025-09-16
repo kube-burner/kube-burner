@@ -124,7 +124,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `preloadNodeLabels`          | Add node selector labels for the resources created in preload stage                                                                   | Object   | {}       |
 | `namespaceLabels`            | Add custom labels to the namespaces created by kube-burner                                                                            | Object   | {}       |
 | `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}       |
-| `churn`                      | Configures job churning, only supported for create jobs, see [churning jobs section](#churning-jobs)                                  | Object   | {}       |
+| `churnConfig`                | Configures job churning, only supported for create jobs, see [churning jobs section](#churning-jobs)                                  | Object   | {}       |
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
 | `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
@@ -492,7 +492,7 @@ jobs:
   jobIterations: 100
   namespacedIterations: true
   namespace: churning
-  churn:
+  churnConfig:
     percent: 20
     duration: 2h
   objects:
@@ -514,7 +514,7 @@ Churn supports the following options:
 - `type`: Churn type, either `namespaces`, to churn entire namespaces or `objects`, to churn individual objects of the job's namespaces.
 
 !!! note
-    In order to enable churning for a job, either `duration` or `cycles` must be set. It's possibel to use both at the same time.
+    In order to enable churning for a job, either `duration` or `cycles` must be set. It's possible to use both at the same time.
 
 ### Disable churning on individual objects
 
@@ -526,7 +526,7 @@ jobs:
   jobIterations: 100
   namespacedIterations: true
   namespace: churning
-  churn:
+  churnConfig:
     percent: 20
     cycles: 10
   objects:
