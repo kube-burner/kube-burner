@@ -31,7 +31,7 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 	for _, namespace := range namespacesToDelete {
 		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
 		for _, obj := range ex.objects {
-			if obj.Churn {
+			if obj.ChurnConfig {
 				CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 			}
 		}

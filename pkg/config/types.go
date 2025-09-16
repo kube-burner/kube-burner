@@ -129,8 +129,8 @@ type Object struct {
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
 	// KubeVirt Operation
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
-	// Churn object
-	Churn bool `yaml:"churn" json:"churn,omitempty"`
+	// ChurnConfig object
+	ChurnConfig bool `yaml:"churnConfig" json:"churnConfig,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -186,7 +186,7 @@ type Job struct {
 	// NamespaceAnnotations add custom annotations to namespaces created by kube-burner
 	NamespaceAnnotations map[string]string `yaml:"namespaceAnnotations" json:"-"`
 	// Churn options
-	Churn Churn `yaml:"churn" json:"churn,omitempty"`
+	Churn ChurnConfig `yaml:"churn" json:"churn,omitempty"`
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
@@ -233,7 +233,7 @@ type StatusPath struct {
 }
 
 // Churn options
-type Churn struct {
+type ChurnConfig struct {
 	// number of churn loop iterations
 	Cycles int `yaml:"cycles" json:"cycles,omitempty"`
 	// percentage of objects to churn
