@@ -124,11 +124,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `preloadNodeLabels`          | Add node selector labels for the resources created in preload stage                                                                   | Object   | {}       |
 | `namespaceLabels`            | Add custom labels to the namespaces created by kube-burner                                                                            | Object   | {}       |
 | `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}       |
-| `churn`                      | Churn the workload. Only supports namespace based workloads                                                                           | Boolean  | false    |
-| `churnCycles`                | Number of churn cycles to execute                                                                                                     | Integer  | 100      |
-| `churnPercent`               | Percentage of the jobIterations to churn each period                                                                                  | Integer  | 10       |
-| `churnDuration`              | Length of time that the job is churned for                                                                                            | Duration | 1h       |
-| `churnDelay`                 | Length of time to wait between each churn period                                                                                      | Duration | 5m       |
+| `churn`                      | Configures job churning, only supported for create jobs, see [churning jobs section](#churning-jobs)                                  | Object   | {}       |
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
 | `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
@@ -483,26 +479,60 @@ Patch jobs support different execution modes
 
 ## Churning Jobs
 
-Churn is the deletion and re-creation of objects, and is supported for namespace-based jobs only. This occurs after the job has completed
-but prior to uploading metrics, if applicable. It deletes a percentage of contiguous namespaces randomly chosen and re-creates them
+Only supported in create jobs, churn is the deletion and re-creation of objects, and is supported for namespace-based jobs only. This occurs after the job has completed
+but prior to uploading metrics, if applicable. It deletes a percentage of contiguous randomly chosen namespaces or objects within those namespaces and re-creates them
 with all of the appropriate objects. It will then wait for a specified delay (or none if set to `0`) before deleting and recreating the
-next randomly chosen set. This cycle continues until the churn duration has passed.
+next randomly chosen set. This cycle continues until the churn duration/cycles has passed.
 
 An example implementation that would churn 20% of the 100 job iterations for 2 hours with no delay between sets:
 
 ```yaml
 jobs:
-- name: cluster-density
+- name: churning-job
   jobIterations: 100
   namespacedIterations: true
   namespace: churning
-  churn: true
-  churnPercent: 20
-  churnDuration: 2h
-  churnDelay: 0s
+  churn:
+    percent: 20
+    duration: 2h
   objects:
   - objectTemplate: deployment.yml
     replicas: 10
+
+  - objectTemplate: service.yml
+    replicas: 10
+```
+
+### Supported options
+
+Churn supports the following options:
+
+- `cycles`: Number of churn cycles to execute
+- `percent`: Percentage of the jobIterations to churn each period
+- `duration`: Length of time that the job is churned for
+- `delay`: Length of time to wait between each churn period
+- `type`: Churn type, either `namespaces`, to churn entire namespaces or `objects`, to churn individual objects of the job's namespaces.
+
+!!! note
+    In order to enable churning for a job, either `duration` or `cycles` must be set. It's possibel to use both at the same time.
+
+### Disable churning on individual objects
+
+By default, when churning type is configured to `object`, all namespaced objects in the job's namespace are churned. But it's possible to skip individual objects by using the flag `churn: false` in the object definition.
+
+```yaml
+jobs:
+- name: churning-job
+  jobIterations: 100
+  namespacedIterations: true
+  namespace: churning
+  churn:
+    percent: 20
+    cycles: 10
+  objects:
+  - objectTemplate: deployment.yml
+    replicas: 10
+    churn: false
 
   - objectTemplate: service.yml
     replicas: 10
