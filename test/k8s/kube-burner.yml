@@ -68,7 +68,7 @@ jobs:
     errorOnVerify: true
     jobIterationDelay: 1s
     maxWaitTimeout: 2m
-    churn:
+    churnConfig:
       cycles: {{ .CHURN_CYCLES }}
       percent: 20
       delay: 5s
