@@ -11,13 +11,13 @@ setup_file() {
   export QPS=3
   export BURST=3
   export GC=true
-  export CHURN=false
-  export CHURN_CYCLES=100
+  export CHURN_TYPE=namespaces
   export TEST_KUBECONFIG; TEST_KUBECONFIG=$(mktemp -d)/kubeconfig
   export TEST_KUBECONTEXT=test-context
   export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
   export ES_INDEX="kube-burner"
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
+  export PRELOAD_IMAGES=false
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
     setup-kind
   fi
@@ -64,7 +64,6 @@ teardown_file() {
 }
 
 @test "kube-burner init: churn=true; absolute-path=true; job-gc=true" {
-  export CHURN=true
   export CHURN_CYCLES=2
   export GC=false
   export JOBGC=true
@@ -72,10 +71,12 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
   check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  export CHURN_TYPE=resource CHURN_DURATION=1
+  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid="${UUID}" --log-level=debug
 }
 
-@test "kube-burner init: gc=false" {
-  export GC=false
+@test "kube-burner init: gc=false; preload=true" {
+  export GC=false PRELOAD_IMAGES=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
   check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 10
