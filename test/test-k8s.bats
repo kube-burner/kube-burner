@@ -18,6 +18,7 @@ setup_file() {
   export ES_INDEX="kube-burner"
   export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
   export PRELOAD_IMAGES=false
+  export CHURN_CYCLES=0
   if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
     setup-kind
   fi
