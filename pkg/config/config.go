@@ -77,15 +77,15 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 // UnmarshalYAML implements Unmarshaller to customize churn defaults
-func (c *Churn) UnmarshalYAML(unmarshal func(any) error) error {
-	type rawChurn Churn
+func (c *ChurnConfig) UnmarshalYAML(unmarshal func(any) error) error {
+	type rawChurn ChurnConfig
 	churn := rawChurn{
 		Type: ChurnNamespaces,
 	}
 	if err := unmarshal(&churn); err != nil {
 		return err
 	}
-	*c = Churn(churn)
+	*c = ChurnConfig(churn)
 	return nil
 }
 
