@@ -66,7 +66,7 @@ jobs:
     waitWhenFinished: true
     verifyObjects: true
     errorOnVerify: true
-    jobIterationDelay: 5s
+    jobIterationDelay: 1s
     maxWaitTimeout: 2m
     churn:
       cycles: {{ .CHURN_CYCLES }}
