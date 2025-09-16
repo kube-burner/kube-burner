@@ -133,24 +133,26 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			}
 		}
 		for objectIndex, obj := range ex.objects {
-			if churning && obj.Churn {
-				customLabels := map[string]string{
-					"kube-burner-uuid":                 ex.uuid,
-					"kube-burner-job":                  ex.Name,
-					"kube-burner-index":                strconv.Itoa(objectIndex),
-					"kube-burner-runid":                ex.runid,
-					config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
-				}
-				ex.objects[objectIndex].LabelSelector = customLabels
-				if obj.RunOnce {
-					if i == 0 {
-						// this executes only once during the first iteration of an object
-						log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
-						ex.replicaHandler(ctx, customLabels, obj, ns, i, &wg)
-					}
-				} else {
+			// If churning is ongoing, skip objects that are not marked for churning
+			if churning && !obj.Churn {
+				continue
+			}
+			customLabels := map[string]string{
+				"kube-burner-uuid":                 ex.uuid,
+				"kube-burner-job":                  ex.Name,
+				"kube-burner-index":                strconv.Itoa(objectIndex),
+				"kube-burner-runid":                ex.runid,
+				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
+			}
+			ex.objects[objectIndex].LabelSelector = customLabels
+			if obj.RunOnce {
+				if i == 0 {
+					// this executes only once during the first iteration of an object
+					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
 					ex.replicaHandler(ctx, customLabels, obj, ns, i, &wg)
 				}
+			} else {
+				ex.replicaHandler(ctx, customLabels, obj, ns, i, &wg)
 			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
