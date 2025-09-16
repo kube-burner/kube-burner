@@ -69,9 +69,9 @@ jobs:
     jobIterationDelay: 5s
     maxWaitTimeout: 2m
     churn:
-      churnCycles: {{ .CHURN_CYCLES }}
-      churnPercent: 20
-      churnDelay: 5s
+      cycles: {{ .CHURN_CYCLES }}
+      percent: 20
+      delay: 5s
       type: {{ .CHURN_TYPE }}
     gc: {{env "JOBGC" }}
     namespaceLabels:
