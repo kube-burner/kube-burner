@@ -361,5 +361,5 @@ func validateGC() error {
 
 // checks if Churn is enabled
 func IsChurnEnabled(job Job) bool {
-	return job.Churn.Delay > 0 || job.Churn.Cycles > 0
+	return job.ChurnConfig.Duration > 0 || job.ChurnConfig.Cycles > 0
 }
