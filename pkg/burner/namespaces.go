@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 )
 
 // Cleanup resources specific to kube-burner with in a given list of namespaces
@@ -49,7 +50,7 @@ func CleanupNamespaceResourcesUsingGVR(ctx context.Context, ex JobExecutor, obj 
 		return
 	}
 	for _, item := range resources.Items {
-		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{}); err != nil {
+		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
 			if !errors.IsNotFound(err) {
 				log.Errorf("Error deleting %v/%v in %v: %v", item.GetKind(), item.GetName(), namespace, err)
 			}
