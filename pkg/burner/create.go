@@ -333,12 +333,12 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		log.Fatalf("Unable to list namespaces: %v", err)
 		return
 	}
-	numToChurn := int(math.Max(float64(ex.Churn.Percent*len(jobNamespaces.Items)/100), 1))
+	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 	now := time.Now().UTC()
 	cyclesCount := 0
 	rand.NewSource(now.UnixNano())
 	// Create timer for the churn duration
-	timer := time.After(ex.Churn.Duration)
+	timer := time.After(ex.ChurnConfig.Duration)
 	// Patch to label namespaces for deletion
 	delPatch := []byte(`[{"op":"add","path":"/metadata/labels/churndelete","value": "delete"}]`)
 	for {
@@ -352,8 +352,8 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 			log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
 		}
 		// Exit if churn cycles are completed
-		if ex.Churn.Cycles > 0 && cyclesCount >= ex.Churn.Cycles {
-			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.Churn.Cycles)
+		if ex.ChurnConfig.Cycles > 0 && cyclesCount >= ex.ChurnConfig.Cycles {
+			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnConfig.Cycles)
 			return
 		}
 		// Max amount of churn is 100% of namespaces
@@ -374,7 +374,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
 		// Cleanup namespaces based on the labels we added to the objects
-		if ex.Churn.Type == config.ChurnObjects {
+		if ex.ChurnConfig.Type == config.ChurnObjects {
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		} else {
 			util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
@@ -382,8 +382,8 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{}, true)
-		log.Infof("Sleeping for %v", ex.Churn.Delay)
-		time.Sleep(ex.Churn.Delay)
+		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
+		time.Sleep(ex.ChurnConfig.Delay)
 		cyclesCount++
 	}
 }

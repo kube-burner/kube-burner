@@ -185,8 +185,8 @@ type Job struct {
 	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"-"`
 	// NamespaceAnnotations add custom annotations to namespaces created by kube-burner
 	NamespaceAnnotations map[string]string `yaml:"namespaceAnnotations" json:"-"`
-	// Churn options
-	Churn ChurnConfig `yaml:"churnConfig" json:"churnConfig,omitempty"`
+	// ChurnConfig options
+	ChurnConfig ChurnConfig `yaml:"churnConfig" json:"churnConfig,omitempty"`
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
