@@ -99,6 +99,7 @@ jobs:
 
     - objectTemplate: objectTemplates/service.yml
       replicas: 1
+      churn: false
 
     - objectTemplate: objectTemplates/secret.yml
       replicas: 1
