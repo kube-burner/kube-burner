@@ -80,7 +80,7 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 func (c *ChurnConfig) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawChurn ChurnConfig
 	churn := rawChurn{
-		Type: ChurnNamespaces,
+		Mode: ChurnNamespaces,
 	}
 	if err := unmarshal(&churn); err != nil {
 		return err

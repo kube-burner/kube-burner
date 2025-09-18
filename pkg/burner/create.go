@@ -379,7 +379,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
 		// Cleanup namespaces based on the labels we added to the objects
-		if ex.ChurnConfig.Type == config.ChurnObjects {
+		if ex.ChurnConfig.Mode == config.ChurnObjects {
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		} else {
 			util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")

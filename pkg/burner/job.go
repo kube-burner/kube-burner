@@ -130,7 +130,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn duration: %v", jobExecutor.ChurnConfig.Duration)
 					log.Infof("Churn percent: %v", jobExecutor.ChurnConfig.Percent)
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
-					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Type)
+					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
 				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces, false)
 				if ctx.Err() != nil {
