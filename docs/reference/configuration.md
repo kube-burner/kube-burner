@@ -511,7 +511,7 @@ Churn supports the following options:
 - `percent`: Percentage of the jobIterations to churn each period
 - `duration`: Length of time that the job is churned for
 - `delay`: Length of time to wait between each churn period
-- `type`: Churn type, either `namespaces`, to churn entire namespaces or `objects`, to churn individual objects of the job's namespaces.
+- `mode`: Churning mode, either `namespaces`, to churn entire namespaces or `objects`, to churn individual objects of the job's namespaces. Defaults to `namespaces`.
 
 !!! note
     In order to enable churning for a job, either `duration` or `cycles` must be set. It's possible to use both at the same time.

@@ -242,8 +242,8 @@ type ChurnConfig struct {
 	Duration time.Duration `yaml:"duration" json:"duration,omitempty"`
 	// Delay between sets
 	Delay time.Duration `yaml:"delay" json:"delay,omitempty"`
-	// Type
-	Type ChurnType `yaml:"type" json:"type,omitempty"`
+	// Churning mode
+	Mode ChurnMode `yaml:"type" json:"type,omitempty"`
 }
 
 type KubeClientProvider struct {
@@ -278,9 +278,9 @@ var metricsClosing = map[MetricsClosing]struct{}{
 	AfterJob:          {},
 }
 
-type ChurnType string
+type ChurnMode string
 
 const (
-	ChurnNamespaces ChurnType = "namespaces"
-	ChurnObjects    ChurnType = "objects"
+	ChurnNamespaces ChurnMode = "namespaces"
+	ChurnObjects    ChurnMode = "objects"
 )
