@@ -126,11 +126,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					log.Info("Churning enabled")
-					log.Infof("Churn cycles: %v", jobExecutor.Churn.Cycles)
-					log.Infof("Churn duration: %v", jobExecutor.Churn.Duration)
-					log.Infof("Churn percent: %v", jobExecutor.Churn.Percent)
-					log.Infof("Churn delay: %v", jobExecutor.Churn.Delay)
-					log.Infof("Churn type: %v", jobExecutor.Churn.Type)
+					log.Infof("Churn cycles: %v", jobExecutor.ChurnConfig.Cycles)
+					log.Infof("Churn duration: %v", jobExecutor.ChurnConfig.Duration)
+					log.Infof("Churn percent: %v", jobExecutor.ChurnConfig.Percent)
+					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
+					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Type)
 				}
 				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces, false)
 				if ctx.Err() != nil {
