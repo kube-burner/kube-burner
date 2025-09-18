@@ -73,6 +73,10 @@ func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, names
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		allDeleted := true
 		for _, obj := range objects {
+			// If churning is enabled and object doesn't have churning enabled we skip that object from deletion wait
+			if config.IsChurnEnabled(ex.Job) && !obj.Churn {
+				continue
+			}
 			if obj.namespaced {
 				resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 				objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
