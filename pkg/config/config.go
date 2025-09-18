@@ -93,8 +93,8 @@ func (c *ChurnConfig) UnmarshalYAML(unmarshal func(any) error) error {
 func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
-		Wait:        true,
-		ChurnConfig: true,
+		Wait:  true,
+		Churn: true,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err

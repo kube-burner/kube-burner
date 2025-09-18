@@ -129,8 +129,8 @@ type Object struct {
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
 	// KubeVirt Operation
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
-	// ChurnConfig object
-	ChurnConfig bool `yaml:"churnConfig" json:"churnConfig,omitempty"`
+	// Churn object
+	Churn bool `yaml:"churn" json:"churn,omitempty"`
 }
 
 // Job defines a kube-burner job

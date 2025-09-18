@@ -134,7 +134,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		for objectIndex, obj := range ex.objects {
 			// If churning is ongoing, skip objects that are not marked for churning
-			if churning && !obj.ChurnConfig {
+			if churning && !obj.Churn {
 				continue
 			}
 			customLabels := map[string]string{
