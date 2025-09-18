@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +32,7 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 	for _, namespace := range namespacesToDelete {
 		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
 		for _, obj := range ex.objects {
-			if obj.Churn {
+			if config.IsChurnEnabled(ex.Job) && obj.Churn {
 				CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 			}
 		}

@@ -122,6 +122,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 		}
 		for objectIndex, obj := range ex.objects {
+<<<<<<< HEAD
 			if obj.gvr == (schema.GroupVersionResource{}) {
 				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
 				ex.resolveObjectMapping(obj)
@@ -132,6 +133,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 					}
 					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 				}
+=======
+			// If churning is ongoing, skip objects that are not marked for churning
+			if churning && !obj.Churn {
+				continue
+>>>>>>> de84917d (Fix typo in churn field name in objects)
 			}
 			kbLabels := map[string]string{
 				"kube-burner-uuid":                 ex.uuid,
