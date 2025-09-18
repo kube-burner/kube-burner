@@ -26,6 +26,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 
 	"maps"
 
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -87,7 +89,7 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 }
 
 // RunCreateJob executes a creation job
-func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string, churning bool) {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -132,22 +134,26 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			}
 		}
 		for objectIndex, obj := range ex.objects {
-			labels := map[string]string{
+			// If churning is ongoing, skip objects that are not marked for churning
+			if churning && !obj.Churn {
+				continue
+			}
+			customLabels := map[string]string{
 				"kube-burner-uuid":                 ex.uuid,
 				"kube-burner-job":                  ex.Name,
 				"kube-burner-index":                strconv.Itoa(objectIndex),
 				"kube-burner-runid":                ex.runid,
 				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 			}
-			ex.objects[objectIndex].LabelSelector = labels
+			ex.objects[objectIndex].LabelSelector = customLabels
 			if obj.RunOnce {
 				if i == 0 {
 					// this executes only once during the first iteration of an object
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
-					ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
+					ex.replicaHandler(ctx, customLabels, obj, ns, i, &wg)
 				}
 			} else {
-				ex.replicaHandler(ctx, labels, obj, ns, i, &wg)
+				ex.replicaHandler(ctx, customLabels, obj, ns, i, &wg)
 			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
@@ -224,7 +230,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 
 			maps.Copy(copiedLabels, newObject.GetLabels())
 			newObject.SetLabels(copiedLabels)
-			setMetadataLabels(newObject, copiedLabels)
+			updateChildLabels(newObject, map[string]string{"kube-burner-runid": ex.runid})
 
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
@@ -247,6 +253,10 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
+	if log.GetLevel() == log.TraceLevel {
+		out, _ := yaml.Marshal(obj)
+		log.Trace(string(out))
+	}
 	util.RetryWithExponentialBackOff(func() (bool, error) {
 		if ctx.Err() != nil {
 			return true, err
@@ -295,6 +305,11 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 
 // RunCreateJobWithChurn executes a churn creation job
 func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
+	nsLabels := labels.Set{
+		"kube-burner-job":   ex.Name,
+		"kube-burner-uuid":  ex.uuid,
+		"kube-burner-runid": ex.runid,
+	}
 	if ctx.Err() != nil {
 		return
 	}
@@ -302,70 +317,64 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		log.Info("No namespaces were created in this job, skipping churning stage")
 		return
 	}
-	var err error
-	// Determine the number of job iterations to churn (min 1)
-	numToChurn := int(math.Max(float64(ex.ChurnPercent*ex.JobIterations/100), 1))
+	// List namespaces to churn
+	jobNamespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(nsLabels).String()})
+	if err != nil {
+		log.Fatalf("Unable to list namespaces: %v", err)
+	}
+	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 	now := time.Now().UTC()
 	cyclesCount := 0
 	rand.NewSource(now.UnixNano())
 	// Create timer for the churn duration
-	timer := time.After(ex.ChurnDuration)
+	timer := time.After(ex.ChurnConfig.Duration)
 	// Patch to label namespaces for deletion
 	delPatch := []byte(`[{"op":"add","path":"/metadata/labels/churndelete","value": "delete"}]`)
 	for {
-		select {
-		case <-timer:
-			log.Info("Churn job complete")
-			return
-		default:
-			log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
+		var randStart int
+		var namespacesToDelete []string
+		if ex.ChurnConfig.Duration > 0 {
+			select {
+			case <-timer:
+				log.Info("Churn job complete")
+				return
+			default:
+				log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
+			}
 		}
 		// Exit if churn cycles are completed
-		if ex.ChurnCycles > 0 && cyclesCount >= ex.ChurnCycles {
-			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnCycles)
+		if ex.ChurnConfig.Cycles > 0 && cyclesCount >= ex.ChurnConfig.Cycles {
+			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnConfig.Cycles)
 			return
 		}
 		// Max amount of churn is 100% of namespaces
-		randStart := 1
-		if ex.JobIterations-numToChurn+1 > 0 {
-			randStart = rand.Intn(ex.JobIterations - numToChurn + 1)
-		} else {
-			numToChurn = ex.JobIterations
+		if len(jobNamespaces.Items)-numToChurn+1 > 0 {
+			randStart = rand.Intn(len(jobNamespaces.Items) - numToChurn + 1)
 		}
-		var namespacesPatched = make(map[string]bool)
-		var namespacesToDelete []string
 		// delete numToChurn namespaces starting at randStart
 		for i := randStart; i < numToChurn+randStart; i++ {
-			ns := ex.generateNamespace(i)
-			if namespacesPatched[ns] {
-				continue
-			}
+			ns := jobNamespaces.Items[i].Name
 			// Label namespaces to be deleted
 			_, err = ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
 			if err != nil {
-				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
+				log.Errorf("Error patching namespace %s: %v", ns, err)
 			}
-			namespacesPatched[ns] = true
 			namespacesToDelete = append(namespacesToDelete, ns)
 		}
 		// 1 hour timeout to delete namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
-		// Cleanup namespaces based on the labels we added
-		if ex.JobIterations < ex.IterationsPerNamespace && len(namespacesToDelete) == 1 {
-			log.Infof("Churning through iterations: %d to %d in namespace: %s", randStart, numToChurn+randStart, namespacesToDelete[0])
-			CleanupIterations(ctx, *ex, randStart, numToChurn+randStart, namespacesToDelete[0])
+		// Cleanup namespaces based on the labels we added to the objects
+		if ex.ChurnConfig.Mode == config.ChurnObjects {
+			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 		} else {
-			if ex.deletionStrategy == config.GVRDeletionStrategy {
-				CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
-			}
 			util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
 		}
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})
-		log.Infof("Sleeping for %v", ex.ChurnDelay)
-		time.Sleep(ex.ChurnDelay)
+		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{}, true)
+		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
+		time.Sleep(ex.ChurnConfig.Delay)
 		cyclesCount++
 	}
 }

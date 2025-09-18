@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -112,7 +111,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 			}
 			watcherStartErrors := watcherManager.Wait()
-			slices.Concat(errs, watcherStartErrors)
+			errs = append(errs, watcherStartErrors...)
 			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
@@ -125,15 +124,15 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					// No timeout for initial job cleanup
 					jobExecutor.gc(context.TODO(), nil)
 				}
-				if jobExecutor.Churn {
+				if config.IsChurnEnabled(jobExecutor.Job) {
 					log.Info("Churning enabled")
-					log.Infof("Churn cycles: %v", jobExecutor.ChurnCycles)
-					log.Infof("Churn duration: %v", jobExecutor.ChurnDuration)
-					log.Infof("Churn percent: %v", jobExecutor.ChurnPercent)
-					log.Infof("Churn delay: %v", jobExecutor.ChurnDelay)
-					log.Infof("Using deletion strategy: %v", jobExecutor.deletionStrategy)
+					log.Infof("Churn cycles: %v", jobExecutor.ChurnConfig.Cycles)
+					log.Infof("Churn duration: %v", jobExecutor.ChurnConfig.Duration)
+					log.Infof("Churn percent: %v", jobExecutor.ChurnConfig.Percent)
+					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
+					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces)
+				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces, false)
 				if ctx.Err() != nil {
 					return
 				}
@@ -147,7 +146,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 					log.Error(err.Error())
 				}
-				if jobExecutor.Churn {
+				if config.IsChurnEnabled(jobExecutor.Job) {
 					churnStart := time.Now().UTC()
 					executedJobs[len(executedJobs)-1].ChurnStart = &churnStart
 					jobExecutor.RunCreateJobWithChurn(ctx)
@@ -211,7 +210,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance = nil
 			}
 			watcherStopErrs := watcherManager.StopAll()
-			slices.Concat(errs, watcherStopErrs)
+			errs = append(errs, watcherStopErrs...)
 			if jobExecutor.GC {
 				jobExecutor.gc(ctx, nil)
 			}
