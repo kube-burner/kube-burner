@@ -26,6 +26,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 
 	"maps"
 
@@ -254,6 +255,10 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
+	if log.GetLevel() == log.TraceLevel {
+		out, _ := yaml.Marshal(obj)
+		log.Trace(string(out))
+	}
 	util.RetryWithExponentialBackOff(func() (bool, error) {
 		if ctx.Err() != nil {
 			return true, err
@@ -326,12 +331,10 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		log.Info("No namespaces were created in this job, skipping churning stage")
 		return
 	}
-	var err error
 	// List namespaces to churn
 	jobNamespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(nsLabels).String()})
 	if err != nil {
 		log.Fatalf("Unable to list namespaces: %v", err)
-		return
 	}
 	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 	now := time.Now().UTC()
@@ -344,12 +347,14 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 	for {
 		var randStart int
 		var namespacesToDelete []string
-		select {
-		case <-timer:
-			log.Info("Churn job complete")
-			return
-		default:
-			log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
+		if ex.ChurnConfig.Duration > 0 {
+			select {
+			case <-timer:
+				log.Info("Churn job complete")
+				return
+			default:
+				log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
+			}
 		}
 		// Exit if churn cycles are completed
 		if ex.ChurnConfig.Cycles > 0 && cyclesCount >= ex.ChurnConfig.Cycles {
