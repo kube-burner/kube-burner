@@ -245,7 +245,7 @@ type ChurnConfig struct {
 	// Delay between sets
 	Delay time.Duration `yaml:"delay" json:"delay,omitempty"`
 	// Churning mode
-	Mode ChurnMode `yaml:"type" json:"type,omitempty"`
+	Mode ChurnMode `yaml:"mode" json:"mode,omitempty"`
 }
 
 type KubeClientProvider struct {
