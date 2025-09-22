@@ -15,3 +15,6 @@ test/k8s/collected-metrics/
 test/k8s/*/alert.json
 .vscode/
 *.log
+
+# macOS Finder artifacts
+.DS_Store
