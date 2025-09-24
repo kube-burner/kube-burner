@@ -188,7 +188,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := jobEnd.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
-				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
+				log.Debugf("Job %s took %v", jobExecutor.Name, elapsedTime)
 			}
 			if !jobExecutor.MetricsAggregate {
 				// We stop and index measurements per job
@@ -358,24 +358,23 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 
 func verifyJobTimeout(job *config.Job, defaultTimeout time.Duration) {
 	if job.MaxWaitTimeout == 0 {
-		log.Debugf("job.MaxWaitTimeout is zero in %s, override by timeout: %s", job.Name, defaultTimeout)
+		log.Debugf("%s: job.MaxWaitTimeout is zero, override by timeout: %s", job.Name, defaultTimeout)
 		job.MaxWaitTimeout = defaultTimeout
 	}
 }
 
 func verifyQPSBurst(job *config.Job) {
 	if job.QPS <= 0 {
-		log.Warnf("Invalid QPS (%v); using default: %v", job.QPS, rest.DefaultQPS)
+		log.Warnf("%s: Invalid QPS (%v); using default: %v", job.Name, job.QPS, rest.DefaultQPS)
 		job.QPS = rest.DefaultQPS
 	} else {
-		log.Infof("QPS: %v", job.QPS)
+		log.Debugf("%s: QPS: %v", job.Name, job.QPS)
 	}
-
 	if job.Burst <= 0 {
-		log.Warnf("Invalid Burst (%v); using default: %v", job.Burst, rest.DefaultBurst)
+		log.Warnf("%s: Invalid Burst (%v); using default: %v", job.Name, job.Burst, rest.DefaultBurst)
 		job.Burst = rest.DefaultBurst
 	} else {
-		log.Infof("Burst: %v", job.Burst)
+		log.Debugf("%s: Burst: %v", job.Name, job.Burst)
 	}
 }
 
