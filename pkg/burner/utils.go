@@ -116,7 +116,7 @@ func (ex *JobExecutor) Verify() bool {
 	var objList *unstructured.UnstructuredList
 	var replicas int
 	success := true
-	log.Debug("Verifying created objects")
+	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
 		listOptions := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-runid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.runid, ex.Name, objectIndex),

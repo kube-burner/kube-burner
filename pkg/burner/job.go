@@ -368,13 +368,13 @@ func verifyQPSBurst(job *config.Job) {
 		log.Warnf("%s: Invalid QPS (%v); using default: %v", job.Name, job.QPS, rest.DefaultQPS)
 		job.QPS = rest.DefaultQPS
 	} else {
-		log.Infof("%s: QPS: %v", job.Name, job.QPS)
+		log.Debugf("%s: QPS: %v", job.Name, job.QPS)
 	}
 	if job.Burst <= 0 {
 		log.Warnf("%s: Invalid Burst (%v); using default: %v", job.Name, job.Burst, rest.DefaultBurst)
 		job.Burst = rest.DefaultBurst
 	} else {
-		log.Infof("%s: Burst: %v", job.Name, job.Burst)
+		log.Debugf("%s: Burst: %v", job.Name, job.Burst)
 	}
 }
 

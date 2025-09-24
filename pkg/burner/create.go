@@ -115,8 +115,8 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		if ctx.Err() != nil {
 			return
 		}
-		if i == iterationStart+iterationProgress*percent {
-			log.Debugf("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
+		if ex.JobIterations > 1 && i == iterationStart+iterationProgress*percent {
+			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
