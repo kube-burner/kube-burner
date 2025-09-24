@@ -100,7 +100,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 |------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|----------|----------|
 | `name`                       | Job name                                                                                                                              | String   | ""       |
 | `jobType`                    | Type of job to execute. More details at [job types](#job-types)                                                                       | String   | create   |
-| `jobIterations`              | How many times to execute the job                                                                                                     | Integer  | 0        |
+| `jobIterations`              | How many times to execute the job                                                                                                     | Integer  | 1        |
 | `namespace`                  | Namespace base name to use                                                                                                            | String   | ""       |
 | `namespacedIterations`       | Whether to create a namespace per job iteration                                                                                       | Boolean  | true     |
 | `iterationsPerNamespace`     | The maximum number of `jobIterations` to create in a single namespace. Important for node-density workloads that create Services.     | Integer  | 1        |
@@ -162,7 +162,7 @@ We have watchers support during the benchmark workload. It is at a job level and
 | `kind`            | Object kind to consider for watch                       | String  |    ""   |
 | `apiVersion`      | Object apiVersion to consider for watch                 | String  |    ""   |
 | `labelSelector`   | Objects with these labels will be considered for watch  | Object  |    {}   |
-| `replicas`        | Number of watcher replicas to create                    | Integer |     0   |
+| `replicas`        | Number of watcher replicas to create                    | Integer |    1    |
 
 ### Objects
 

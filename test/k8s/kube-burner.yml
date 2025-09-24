@@ -93,7 +93,6 @@ jobs:
       {{- end }}
 
     - objectTemplate: objectTemplates/pod.yml
-      replicas: 1
 
     - objectTemplate: objectTemplates/job.yml
       replicas: 1
