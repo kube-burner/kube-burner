@@ -81,7 +81,7 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 		if obj.namespaced && obj.namespace == "" {
 			ex.nsRequired = true
 		}
-		log.Infof("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
+		log.Debugf("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
 }
@@ -116,7 +116,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			return
 		}
 		if i == iterationStart+iterationProgress*percent {
-			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
+			log.Debugf("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
