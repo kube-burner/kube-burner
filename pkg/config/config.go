@@ -80,7 +80,8 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
-		Wait: true,
+		Wait:     true,
+		Replicas: 1,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err
@@ -109,6 +110,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		Cleanup:                true,
 		NamespacedIterations:   true,
 		IterationsPerNamespace: 1,
+		JobIterations:          1,
 		PodWait:                false,
 		WaitWhenFinished:       true,
 		VerifyObjects:          true,
