@@ -1,0 +1,9 @@
+---
+apiVersion: testcrd.example.com/v1
+kind: TestCR{{.Iteration}}
+metadata:
+  name: test{{.Replica}}
+  namespace: default
+spec:
+  workload: {{randAlpha 5}}
+  iterations: {{.Iteration}}

@@ -274,3 +274,10 @@ teardown_file() {
     check_metrics_not_created_for_job ${job} ${metric}
   done
 }
+
+@test "kube-burner init: create CRD and CR together" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-cr-crd.yml --uuid="${UUID}"
+  for cr in testcr0 testcr1; do
+    check_running_custom_resources_in_ns "${cr}" default 1
+  done
+}
