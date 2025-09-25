@@ -181,13 +181,15 @@ func newRESTMapper(discoveryClient *discovery.DiscoveryClient) meta.RESTMapper {
 	return restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
 }
 
-func (ex *JobExecutor) Run(ctx context.Context) {
+func (ex *JobExecutor) Run(ctx context.Context) []error {
+	var errs []error
 	switch ex.ExecutionMode {
 	case config.ExecutionModeParallel:
-		ex.runParallel(ctx)
+		errs = ex.runParallel(ctx)
 	case config.ExecutionModeSequential:
-		ex.runSequential(ctx)
+		errs = ex.runSequential(ctx)
 	}
+	return errs
 }
 
 func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
@@ -213,11 +215,12 @@ func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.Unstruct
 	return itemList, nil
 }
 
-func (ex *JobExecutor) runSequential(ctx context.Context) {
+func (ex *JobExecutor) runSequential(ctx context.Context) []error {
+	var errs []error
 	for i := range ex.JobIterations {
 		for _, obj := range ex.objects {
 			if ctx.Err() != nil {
-				return
+				return []error{ctx.Err()}
 			}
 			itemList, err := ex.getItemListForObject(obj)
 			if err != nil {
@@ -234,7 +237,11 @@ func (ex *JobExecutor) runSequential(ctx context.Context) {
 
 			// If requested, wait for the completion of the specific object
 			if ex.ObjectWait {
-				ex.waitForObject("", obj)
+				if err := ex.waitForObject("", obj); err != nil {
+					if errs == nil {
+						errs = append(errs, err)
+					}
+				}
 			}
 
 			if ex.objectFinalizer != nil {
@@ -247,7 +254,9 @@ func (ex *JobExecutor) runSequential(ctx context.Context) {
 			}
 		}
 		if ex.WaitWhenFinished {
-			ex.waitForObjects("")
+			if err := ex.waitForObjects(""); len(err) > 0 {
+				errs = append(errs, err...)
+			}
 		}
 		// Wait between job iterations
 		if ex.JobIterationDelay > 0 {
@@ -262,14 +271,15 @@ func (ex *JobExecutor) runSequential(ctx context.Context) {
 			}
 		}
 	}
+	return errs
 }
 
 // runParallel executes all objects for all jobs in parallel
-func (ex *JobExecutor) runParallel(ctx context.Context) {
+func (ex *JobExecutor) runParallel(ctx context.Context) []error {
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
 		if ctx.Err() != nil {
-			return
+			return []error{ctx.Err()}
 		}
 		itemList, err := ex.getItemListForObject(obj)
 		if err != nil {
@@ -284,5 +294,5 @@ func (ex *JobExecutor) runParallel(ctx context.Context) {
 		}
 	}
 	wg.Wait()
-	ex.waitForObjects("")
+	return ex.waitForObjects("")
 }
