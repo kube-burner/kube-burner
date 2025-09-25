@@ -206,6 +206,8 @@ type Job struct {
 	MetricsAggregate bool `yaml:"metricsAggregate" json:"metricsAggregate,omitempty"`
 	// MetricsClosing defines when to stop metrics collection
 	MetricsClosing MetricsClosing `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
+	// Measurements job-specific measurements to enable
+	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
 	// Enables job's garbage collection
 	GC bool `yaml:"gc" json:"gc"`
 }
