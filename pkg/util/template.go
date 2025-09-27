@@ -41,8 +41,21 @@ var funcMap = sprig.GenericFuncMap()
 func init() {
 	AddRenderingFunction("Binomial", combin.Binomial)
 	AddRenderingFunction("IndexToCombination", combin.IndexToCombination)
-	funcMap["GetSubnet24"] = func(subnetIdx int) string { // TODO Document this function
-		return netip.AddrFrom4([4]byte{byte(subnetIdx>>16 + 1), byte(subnetIdx >> 8), byte(subnetIdx), 0}).String() + "/24"
+	funcMap["GetSubnet24"] = func(subnetIdx int) string {
+	    return netip.AddrFrom4([4]byte{byte(subnetIdx>>16 + 1), byte(subnetIdx >> 8), byte(subnetIdx), 0}).String() + "/24"
+	}
+	// Parent /16 subnet
+	funcMap["GetSubnet16"] = func(subnetIdx int) string {
+	    first := byte((subnetIdx >> 8) + 1)
+	    second := byte(subnetIdx & 0xFF)
+	    return netip.AddrFrom4([4]byte{first, second, 0, 0}).String() + "/16"
+	}
+	// Child /24s that stay inside the parent /16
+	funcMap["GetSubnet24In16"] = func(subnetIdx, offset int) string {
+	    first := byte((subnetIdx >> 8) + 1)
+	    second := byte(subnetIdx & 0xFF)
+	    third := byte(offset) // carve /24s by varying the 3rd octet
+	    return netip.AddrFrom4([4]byte{first, second, third, 0}).String() + "/24"
 	}
 	// This function returns number of addresses requested per iteration from the list of total provided addresses
 	funcMap["GetIPAddress"] = func(Addresses string, iteration int, addressesPerIteration int) string { // TODO Move this function to kube-burner-ocp

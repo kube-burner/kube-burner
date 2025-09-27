@@ -573,7 +573,9 @@ On top of the default [golang template semantics](https://golang.org/pkg/text/te
 
 - `Binomial` - returns the binomial coefficient of (n,k)
 - `IndexToCombination` - returns the combination corresponding to the given index
-- `GetSubnet24`
+- `GetSubnet16` – returns a /16 CIDR block derived from the given subnet index (acts as the parent network).
+- `GetSubnet24` – returns a /24 CIDR block derived from the given subnet index (acts as the parent network).
+- `GetSubnet24In16` – returns a /24 CIDR block inside the /16 derived from the given subnet index and offset (acts as a child network carved from the parent).
 - `GetIPAddress` - returns number of addresses requested per iteration from the list of total provided addresses
 - `ReadFile` - returns the content of the file in the provided path
 
