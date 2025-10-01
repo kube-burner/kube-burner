@@ -21,7 +21,6 @@ import (
 	"runtime"
 
 	"github.com/cloud-bulldozer/go-commons/v2/version"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
@@ -29,20 +28,20 @@ import (
 
 type Hook struct {
 	Writer       *os.File
-	Formatter    logrus.Formatter
-	LogLevels    []logrus.Level
+	Formatter    log.Formatter
+	LogLevels    []log.Level
 	OutputToFile bool
 }
 
 // Fire is executed by the hook when a log entry is sent
-func (h *Hook) Fire(entry *logrus.Entry) error {
+func (h *Hook) Fire(entry *log.Entry) error {
 	message, _ := h.Formatter.Format(entry)
 	h.Writer.Write(message)
 	return nil
 }
 
-func (h *Hook) Levels() []logrus.Level {
-	return logrus.AllLevels
+func (h *Hook) Levels() []log.Level {
+	return log.AllLevels
 }
 
 // Bootstraps kube-burner cmd with some common flags
