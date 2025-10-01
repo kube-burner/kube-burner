@@ -73,13 +73,18 @@ func GetScriptsReader(location string, embedCfg *EmbedConfiguration) (io.Reader,
 }
 
 func getEmbedReader(location string, embedFS *embed.FS, embedDir string) (io.Reader, error) {
-	log.Debugf("Looking for file %s in embed fs", location)
-	f, err := embedFS.Open(filepath.Join(embedDir, location))
-	if err != nil {
-		log.Infof("File %s not found in the embedded filesystem. Falling back to original path", location)
+	if _, err := os.Stat(location); err == nil {
+		log.Infof("Config file %v available in the current directory, using it", location)
 		return getReader(location)
+	} else {
+		log.Debugf("Looking for file %s in embed fs", location)
+		f, err := embedFS.Open(filepath.Join(embedDir, location))
+		if err != nil {
+			log.Infof("File %s not found in the embedded filesystem. Falling back to original path", location)
+			return getReader(location)
+		}
+		return f, nil
 	}
-	return f, nil
 }
 
 func getReader(location string) (io.Reader, error) {
@@ -89,6 +94,9 @@ func getReader(location string) (io.Reader, error) {
 		f, err = getBodyForURL(location, nil)
 	} else {
 		f, err = os.Open(location)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open config file %s: %w", location, err)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file %s: %w", location, err)

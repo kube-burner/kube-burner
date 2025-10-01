@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/watchers"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/rest"
 )
@@ -91,7 +93,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	defer cancel()
 	go func() {
 		var innerRC int
-		clientSet, _ := kubeClientProvider.DefaultClientSet()
+		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		handlePreloadImages(jobExecutors, kubeClientProvider)
@@ -103,10 +105,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
 			})
-			watcherManager := watchers.NewWatcherManager(clientSet, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
+			watcherManager := watchers.NewWatcherManager(restConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
 			for idx, watcher := range jobExecutor.Watchers {
 				for replica := range watcher.Replicas {
-					watcherManager.Start(watcher.Kind, watcher.LabelSelector, idx+1, replica+1)
+					watcherManager.Start(watcher.Kind, watcher.APIVersion, watcher.LabelSelector, idx+1, replica+1)
 				}
 			}
 			watcherStartErrors := watcherManager.Wait()
@@ -129,7 +131,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn duration: %v", jobExecutor.ChurnDuration)
 					log.Infof("Churn percent: %v", jobExecutor.ChurnPercent)
 					log.Infof("Churn delay: %v", jobExecutor.ChurnDelay)
-					log.Infof("Churn deletion strategy: %v", jobExecutor.ChurnDeletionStrategy)
+					log.Infof("Using deletion strategy: %v", jobExecutor.deletionStrategy)
 				}
 				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces)
 				if ctx.Err() != nil {
@@ -174,6 +176,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
 				executedJobs[len(executedJobs)-1].End = jobEnd
+				executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
 			}
 			if jobExecutor.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
@@ -181,10 +184,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if jobExecutor.MetricsClosing == config.AfterJobPause {
 				executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+				executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
 			}
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := jobEnd.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
-				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
+				log.Debugf("Job %s took %v", jobExecutor.Name, elapsedTime)
 			}
 			if !jobExecutor.MetricsAggregate {
 				// We stop and index measurements per job
@@ -195,6 +199,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if jobExecutor.MetricsClosing == config.AfterMeasurements {
 					executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+					executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
 				}
 				if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
 					msWg.Add(1)
@@ -316,11 +321,17 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
 			}
+			var achievedQps float64
+			elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
+			if elapsedTime > 0 {
+				achievedQps = math.Round((float64(job.ObjectOperations)/elapsedTime)*1000) / 1000
+			}
 			jobSummaries = append(jobSummaries, JobSummary{
 				UUID:                uuid,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,
-				ElapsedTime:         job.End.Sub(job.Start).Round(time.Second).Seconds(),
+				ElapsedTime:         elapsedTime,
+				AchievedQps:         achievedQps,
 				ChurnStartTimestamp: job.ChurnStart,
 				ChurnEndTimestamp:   job.ChurnEnd,
 				JobConfig:           job.JobConfig,
@@ -347,24 +358,23 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 
 func verifyJobTimeout(job *config.Job, defaultTimeout time.Duration) {
 	if job.MaxWaitTimeout == 0 {
-		log.Debugf("job.MaxWaitTimeout is zero in %s, override by timeout: %s", job.Name, defaultTimeout)
+		log.Debugf("%s: job.MaxWaitTimeout is zero, override by timeout: %s", job.Name, defaultTimeout)
 		job.MaxWaitTimeout = defaultTimeout
 	}
 }
 
 func verifyQPSBurst(job *config.Job) {
 	if job.QPS <= 0 {
-		log.Warnf("Invalid QPS (%v); using default: %v", job.QPS, rest.DefaultQPS)
+		log.Warnf("%s: Invalid QPS (%v); using default: %v", job.Name, job.QPS, rest.DefaultQPS)
 		job.QPS = rest.DefaultQPS
 	} else {
-		log.Infof("QPS: %v", job.QPS)
+		log.Debugf("%s: QPS: %v", job.Name, job.QPS)
 	}
-
 	if job.Burst <= 0 {
-		log.Warnf("Invalid Burst (%v); using default: %v", job.Burst, rest.DefaultBurst)
+		log.Warnf("%s: Invalid Burst (%v); using default: %v", job.Name, job.Burst, rest.DefaultBurst)
 		job.Burst = rest.DefaultBurst
 	} else {
-		log.Infof("Burst: %v", job.Burst)
+		log.Debugf("%s: Burst: %v", job.Name, job.Burst)
 	}
 }
 
@@ -409,10 +419,27 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
-	err := util.CleanupNamespaces(ctx, ex.clientSet, labelSelector)
-	// Just report error and continue
-	if err != nil {
-		log.Error(err.Error())
+	if ex.deletionStrategy == config.GVRDeletionStrategy {
+		namespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			log.Error(err.Error())
+		} else {
+			namespacesToDelete := make([]string, 0, len(namespaces.Items))
+			for _, ns := range namespaces.Items {
+				namespacesToDelete = append(namespacesToDelete, ns.Name)
+			}
+			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
+			err := util.CleanupNamespaces(ctx, ex.clientSet, labelSelector)
+			if err != nil {
+				log.Error(err.Error())
+			}
+		}
+	} else {
+		err := util.CleanupNamespaces(ctx, ex.clientSet, labelSelector)
+		// Just report error and continue
+		if err != nil {
+			log.Error(err.Error())
+		}
 	}
 	for _, obj := range ex.objects {
 		ex.limiter.Wait(ctx)

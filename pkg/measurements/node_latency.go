@@ -16,15 +16,18 @@ package measurements
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -86,9 +89,13 @@ func (nlmf nodeLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, 
 }
 
 func (n *nodeLatency) handleCreateNode(obj any) {
-	node := obj.(*corev1.Node)
+	node, err := util.ConvertAnyToTyped[corev1.Node](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Node: %v", err)
+		return
+	}
 	labels := node.Labels
-	n.metrics.LoadOrStore(string(node.UID), NodeMetric{
+	n.Metrics.LoadOrStore(string(node.UID), NodeMetric{
 		Timestamp:  node.CreationTimestamp.UTC(),
 		Name:       node.Name,
 		MetricName: nodeLatencyMeasurement,
@@ -100,8 +107,12 @@ func (n *nodeLatency) handleCreateNode(obj any) {
 }
 
 func (n *nodeLatency) handleUpdateNode(obj any) {
-	node := obj.(*corev1.Node)
-	if value, exists := n.metrics.Load(string(node.UID)); exists {
+	node, err := util.ConvertAnyToTyped[corev1.Node](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Node: %v", err)
+		return
+	}
+	if value, exists := n.Metrics.Load(string(node.UID)); exists {
 		nm := value.(NodeMetric)
 		for _, c := range node.Status.Conditions {
 			switch c.Type {
@@ -124,23 +135,27 @@ func (n *nodeLatency) handleUpdateNode(obj any) {
 				}
 			}
 		}
-		n.metrics.Store(string(node.UID), nm)
+		n.Metrics.Store(string(node.UID), nm)
 	}
 }
 
 func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
-	n.latencyQuantiles, n.normLatencies = nil, nil
+	n.LatencyQuantiles, n.NormLatencies = nil, nil
 	defer measurementWg.Done()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	n.Collect(&wg)
 	wg.Wait()
+	gvr, err := util.ResourceToGVR(n.RestConfig, "Node", "v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "Node", err)
+	}
 	n.startMeasurement(
 		[]MeasurementWatcher{
 			{
-				restClient:    n.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
+				dynamicClient: dynamic.NewForConfigOrDie(n.RestConfig),
 				name:          "nodeWatcher",
-				resource:      "nodes",
+				resource:      gvr,
 				labelSelector: "",
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNode,
@@ -163,7 +178,7 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 	}
 	nodes = append(nodes, nodeList.Items...)
 
-	n.metrics = sync.Map{}
+	n.Metrics = sync.Map{}
 	for _, node := range nodes {
 		var nodeMemoryPressure, nodeDiskPressure, nodePIDPressure, nodeReady time.Time
 		for _, c := range node.Status.Conditions {
@@ -178,7 +193,7 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 				nodeReady = c.LastTransitionTime.UTC()
 			}
 		}
-		n.metrics.Store(string(node.UID), NodeMetric{
+		n.Metrics.Store(string(node.UID), NodeMetric{
 			Timestamp:          node.CreationTimestamp.UTC(),
 			Name:               node.Name,
 			MetricName:         nodeLatencyMeasurement,
@@ -198,7 +213,7 @@ func (n *nodeLatency) Stop() error {
 }
 
 func (n *nodeLatency) normalizeLatencies() float64 {
-	n.metrics.Range(func(key, value any) bool {
+	n.Metrics.Range(func(key, value any) bool {
 		m := value.(NodeMetric)
 		// If a node does not reach the Ready state, we skip that node
 		if m.NodeReady.IsZero() {
@@ -219,7 +234,7 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 		m.NodeDiskPressureLatency = int(m.NodeDiskPressure.Sub(earliest).Milliseconds())
 		m.NodePIDPressureLatency = int(m.NodePIDPressure.Sub(earliest).Milliseconds())
 		m.NodeReadyLatency = int(m.NodeReady.Sub(earliest).Milliseconds())
-		n.normLatencies = append(n.normLatencies, m)
+		n.NormLatencies = append(n.NormLatencies, m)
 		return true
 	})
 	return 0

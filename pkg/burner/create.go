@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -80,7 +81,7 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 		if obj.namespaced && obj.namespace == "" {
 			ex.nsRequired = true
 		}
-		log.Infof("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
+		log.Debugf("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
 }
@@ -114,7 +115,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		if ctx.Err() != nil {
 			return
 		}
-		if i == iterationStart+iterationProgress*percent {
+		if ex.JobIterations > 1 && i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
 		}
@@ -282,6 +283,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 			log.Error("Retrying object creation")
 			return false, nil
 		}
+		atomic.AddInt32(&ex.objectOperations, 1)
 		if ns != "" {
 			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		} else {
@@ -354,7 +356,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 			log.Infof("Churning through iterations: %d to %d in namespace: %s", randStart, numToChurn+randStart, namespacesToDelete[0])
 			CleanupIterations(ctx, *ex, randStart, numToChurn+randStart, namespacesToDelete[0])
 		} else {
-			if ex.ChurnDeletionStrategy == "gvr" {
+			if ex.deletionStrategy == config.GVRDeletionStrategy {
 				CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 			}
 			util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")

@@ -23,12 +23,14 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/measurements/util"
+	mutil "github.com/kube-burner/kube-burner/pkg/measurements/util"
 	kutil "github.com/kube-burner/kube-burner/pkg/util"
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	lcorev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
@@ -82,7 +84,11 @@ func (slmf serviceLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Jo
 
 func (s *serviceLatency) handleCreateSvc(obj any) {
 	// TODO Magic annotation to skip service
-	svc := obj.(*corev1.Service)
+	svc, err := kutil.ConvertAnyToTyped[corev1.Service](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Service: %v", err)
+		return
+	}
 	if annotation, ok := svc.Annotations["kube-burner.io/service-latency"]; ok {
 		if annotation == "false" {
 			log.Debugf("Annotation found, discarding service %v/%v", svc.Namespace, svc.Name)
@@ -106,7 +112,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		}
 		endpointsReadyTs := time.Now().UTC()
 		log.Debugf("Endpoints %v/%v ready", svc.Namespace, svc.Name)
-		svcLatencyChecker, err := util.NewSvcLatencyChecker(s.ClientSet, *s.RestConfig)
+		svcLatencyChecker, err := mutil.NewSvcLatencyChecker(s.ClientSet, *s.RestConfig)
 		if err != nil {
 			log.Error(err)
 		}
@@ -143,7 +149,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		}
 		svcLatency := time.Since(endpointsReadyTs)
 		log.Debugf("Service %v/%v latency was: %vms", svc.Namespace, svc.Name, svcLatency.Milliseconds())
-		s.metrics.Store(string(svc.UID), svcMetric{
+		s.Metrics.Store(string(svc.UID), svcMetric{
 			Name:              svc.Name,
 			Namespace:         svc.Namespace,
 			Timestamp:         svc.CreationTimestamp.UTC(),
@@ -160,35 +166,54 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 
 // start service latency measurement
 func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
-	// Reset latency slices, required in multi-job benchmarks
-	s.latencyQuantiles, s.normLatencies = nil, nil
 	defer measurementWg.Done()
-	err := deployPodInNamespace(s.ClientSet, types.SvcLatencyNs, types.SvcLatencyCheckerName, "quay.io/cloud-bulldozer/fedora-nc:latest", []string{"sleep", "inf"})
-	if err != nil {
+
+	s.LatencyQuantiles, s.NormLatencies = nil, nil
+	if err := deployPodInNamespace(
+		s.ClientSet,
+		types.SvcLatencyNs,
+		types.SvcLatencyCheckerName,
+		"quay.io/cloud-bulldozer/fedora-nc:latest",
+		[]string{"sleep", "inf"},
+	); err != nil {
 		return err
 	}
-	s.startMeasurement(
-		[]MeasurementWatcher{
-			{
-				restClient:    s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-				name:          "svcWatcher",
-				resource:      "services",
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", s.Runid),
-				handlers: &cache.ResourceEventHandlerFuncs{
-					AddFunc: s.handleCreateSvc,
-				},
-			},
-			{
-				restClient:    s.ClientSet.CoreV1().RESTClient().(*rest.RESTClient),
-				name:          "epWatcher",
-				resource:      "endpoints",
-				labelSelector: "",
-				handlers:      nil,
+
+	sgvr, err := kutil.ResourceToGVR(s.RestConfig, "Service", "v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "Service", err)
+	}
+
+	s.startMeasurement([]MeasurementWatcher{
+		{
+			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
+			name:          "svcWatcher",
+			resource:      sgvr,
+			labelSelector: fmt.Sprintf("kube-burner-runid=%v", s.Runid),
+			handlers: &cache.ResourceEventHandlerFuncs{
+				AddFunc: s.handleCreateSvc,
 			},
 		},
-	)
+	})
+
+	// Create shared informer factory for typed clients
+	clientset := kubernetes.NewForConfigOrDie(s.RestConfig)
+	factory := informers.NewSharedInformerFactory(clientset, 0)
+
+	// Endpoint lister & informer from typed client
+	s.epLister = factory.Core().V1().Endpoints().Lister()
+	epInformer := factory.Core().V1().Endpoints().Informer()
+
+	// Start the informer
+	stopCh := make(chan struct{})
+	go epInformer.Run(stopCh)
+
+	// Wait for the endpoint informer cache to sync
+	if !cache.WaitForCacheSync(stopCh, epInformer.HasSynced) {
+		return fmt.Errorf("failed to sync endpoint informer cache")
+	}
+
 	s.svcLister = lcorev1.NewServiceLister(s.watchers[0].Informer.GetIndexer())
-	s.epLister = lcorev1.NewEndpointsLister(s.watchers[1].Informer.GetIndexer())
 	return nil
 }
 
@@ -201,7 +226,7 @@ func (s *serviceLatency) Stop() error {
 	}()
 	kutil.CleanupNamespaces(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
-	for _, q := range s.latencyQuantiles {
+	for _, q := range s.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
 		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", s.JobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
@@ -213,11 +238,11 @@ func (s *serviceLatency) normalizeMetrics() {
 	var latencies []float64
 	var ipAssignedLatencies []float64
 	sLen := 0
-	s.metrics.Range(func(key, value any) bool {
+	s.Metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(svcMetric)
 		latencies = append(latencies, float64(metric.ReadyLatency))
-		s.normLatencies = append(s.normLatencies, metric)
+		s.NormLatencies = append(s.NormLatencies, metric)
 		if metric.IPAssignedLatency != 0 {
 			ipAssignedLatencies = append(ipAssignedLatencies, float64(metric.IPAssignedLatency))
 		}
@@ -233,10 +258,10 @@ func (s *serviceLatency) normalizeMetrics() {
 		return latencySummary
 	}
 	if sLen > 0 {
-		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("Ready", latencies))
+		s.LatencyQuantiles = append(s.LatencyQuantiles, calcSummary("Ready", latencies))
 	}
 	if len(ipAssignedLatencies) > 0 {
-		s.latencyQuantiles = append(s.latencyQuantiles, calcSummary("IPAssigned", ipAssignedLatencies))
+		s.LatencyQuantiles = append(s.LatencyQuantiles, calcSummary("IPAssigned", ipAssignedLatencies))
 	}
 }
 

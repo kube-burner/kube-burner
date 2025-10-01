@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
+	"github.com/kube-burner/kube-burner/pkg/errors"
 	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -35,6 +36,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+)
+
+const (
+	DefaultDeletionStrategy = "default"
+	GVRDeletionStrategy     = "gvr"
 )
 
 var configSpec = Spec{
@@ -47,6 +53,7 @@ var configSpec = Spec{
 		WaitWhenFinished:  false,
 		Timeout:           4 * time.Hour,
 		FunctionTemplates: []string{},
+		DeletionStrategy:  DefaultDeletionStrategy,
 	},
 }
 
@@ -73,7 +80,8 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
-		Wait: true,
+		Wait:     true,
+		Replicas: 1,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err
@@ -102,6 +110,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		Cleanup:                true,
 		NamespacedIterations:   true,
 		IterationsPerNamespace: 1,
+		JobIterations:          1,
 		PodWait:                false,
 		WaitWhenFinished:       true,
 		VerifyObjects:          true,
@@ -115,7 +124,6 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		ChurnPercent:           10,
 		ChurnDuration:          1 * time.Hour,
 		ChurnDelay:             5 * time.Minute,
-		ChurnDeletionStrategy:  "default",
 		MetricsClosing:         AfterJobPause,
 	}
 
@@ -133,9 +141,8 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (map[string]any, error) {
-	inputData := make(map[string]any)
-	// First copy from additionalVars
-	maps.Copy(inputData, additionalVars)
+	// Get environment variables
+	templateVars := util.EnvToMap()
 	// If a userDataFileReader was provided use it to override values
 	if userDataFileReader != nil {
 		userDataFileVars := make(map[string]any)
@@ -143,15 +150,21 @@ func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (
 		if err != nil {
 			return nil, fmt.Errorf("error reading user data file: %w", err)
 		}
+
+		if len(userData) == 0 {
+			return nil, fmt.Errorf("user data file is empty. Please provide a valid YAML or JSON configuration file")
+		}
+
 		err = yaml.Unmarshal(userData, &userDataFileVars)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse file: %w", err)
+			return nil, errors.EnhanceYAMLParseError("user data file", err)
 		}
-		maps.Copy(inputData, userDataFileVars)
+		// Copy values from userDataFileVars to templateVars
+		maps.Copy(templateVars, userDataFileVars)
 	}
-	// Add all entries from environment variables, overriding duplicates
-	maps.Copy(inputData, util.EnvToMap())
-	return inputData, nil
+	// Copy additionalVars to templateVars
+	maps.Copy(templateVars, additionalVars)
+	return templateVars, nil
 }
 
 func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec, error) {
@@ -164,6 +177,11 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
 	}
+
+	if len(cfg) == 0 {
+		return configSpec, fmt.Errorf("configuration file is empty. Please provide a valid YAML or JSON configuration file")
+	}
+
 	inputData, err := getInputData(userDataFileReader, additionalVars)
 	if err != nil {
 		return configSpec, err
@@ -180,7 +198,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
 	if err = yamlDec.Decode(&configSpec); err != nil {
-		return configSpec, fmt.Errorf("error decoding configuration file: %s", err)
+		return configSpec, errors.EnhanceYAMLParseError("configuration file", err)
 	}
 	if err := jobIsDuped(); err != nil {
 		return configSpec, err
@@ -228,7 +246,7 @@ func NewKubeClientProvider(config, context string) *KubeClientProvider {
 	var err error
 	if kubeConfigPath == "" {
 		if restConfig, err = rest.InClusterConfig(); err != nil {
-			log.Fatalf("error preparing kubernetes client: %s", err)
+			log.Fatalf("no running cluster found (no kubeconfig and no in-cluster config): %v", err) // If no kubeconfig is provided or no env vars are set
 		}
 	} else {
 		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -236,7 +254,15 @@ func NewKubeClientProvider(config, context string) *KubeClientProvider {
 			&clientcmd.ConfigOverrides{CurrentContext: context},
 		)
 		if restConfig, err = kubeConfig.ClientConfig(); err != nil {
-			log.Fatalf("error preparing kubernetes client: %s", err)
+			log.Fatalf("invalid kubeconfig or unreachable cluster: %v", err) // If kubeconfig is provided, but invalid or cluster is unreachable
+		}
+
+		clientset, err := kubernetes.NewForConfig(restConfig)
+		if err != nil {
+			log.Fatalf("unable to create Kubernetes client: %v", err) // If kubeconfig is provided, but unable to create client
+		}
+		if _, err := clientset.Discovery().ServerVersion(); err != nil {
+			log.Fatalf("cluster config found but cannot reach API server: %v", err) // If kubeconfig is provided, but unable to reach API server
 		}
 	}
 	return &KubeClientProvider{restConfig: restConfig}
