@@ -97,7 +97,6 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 	clientSet, restConfig := kubeClientProvider.ClientSet(jobConfig.QPS, jobConfig.Burst)
 	log.Infof("Initializing measurements for job: %s", jobConfig.Name)
 	mergedMeasurements := make(map[string]types.Measurement)
-	mergo.Merge(&mergedMeasurements, msf.ConfigSpec.GlobalConfig.Measurements, mergo.WithOverride)
 	for _, measurement := range msf.ConfigSpec.GlobalConfig.Measurements {
 		mergedMeasurements[measurement.Name] = measurement
 	}
@@ -123,8 +122,7 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 		}
 		mf, err := newMeasurementFactoryFunc(msf.ConfigSpec, measurement, msf.Metadata)
 		if err != nil {
-			log.Errorf("Failed to create measurement [%s]: %v", name, err)
-			continue
+			log.Fatalf("Failed to create measurement [%s]: %v", name, err)
 		}
 		ms.MeasurementsMap[name] = mf.NewMeasurement(jobConfig, clientSet, restConfig, embedCfg)
 		log.Infof("Registered measurement: %s", name)
