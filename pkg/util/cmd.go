@@ -16,16 +16,34 @@ package util
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"runtime"
 
 	"github.com/cloud-bulldozer/go-commons/v2/version"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
 )
+
+type Hook struct {
+	Writer       *os.File
+	Formatter    logrus.Formatter
+	LogLevels    []logrus.Level
+	OutputToFile bool
+}
+
+// Fire is executed by the hook when a log entry is sent
+func (h *Hook) Fire(entry *logrus.Entry) error {
+	message, _ := h.Formatter.Format(entry)
+	h.Writer.Write(message)
+	return nil
+}
+
+func (h *Hook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
 
 // Bootstraps kube-burner cmd with some common flags
 func SetupCmd(cmd *cobra.Command) {
@@ -43,30 +61,33 @@ func SetupCmd(cmd *cobra.Command) {
 	})
 }
 
-// Configures kube-burner's file logging
-func SetupFileLogging(uuid string) {
-	logFileName := fmt.Sprintf("kube-burner-%s.log", uuid)
-	file, err := os.Create(logFileName)
-	if err != nil {
-		log.Fatalf("Failed to create log file: %v", err)
-	}
-	mw := io.MultiWriter(os.Stdout, file)
-	log.SetOutput(mw)
-}
-
 // Configures kube-burner's logging level
-func ConfigureLogging(cmd *cobra.Command) {
-	logLevel, _ := cmd.Flags().GetString("log-level")
+func ConfigureLogging(logLevel, uuid string) {
 	log.SetReportCaller(true)
-	formatter := &log.TextFormatter{
-		TimestampFormat: "2006-01-02 15:04:05",
-		FullTimestamp:   true,
-		DisableColors:   true,
+	log.SetFormatter(&log.TextFormatter{
 		CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
 			return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
 		},
+	})
+	if uuid != "" {
+		logFileName := fmt.Sprintf("kube-burner-%s.log", uuid)
+		file, err := os.Create(logFileName)
+		if err != nil {
+			log.Fatalf("Failed to create log file: %v", err)
+		}
+		log.AddHook(&Hook{
+			Writer: file,
+			Formatter: &log.TextFormatter{
+				TimestampFormat: "2006-01-02 15:04:05",
+				FullTimestamp:   true,
+				DisableColors:   true,
+				CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
+					return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+				},
+			},
+		})
+
 	}
-	log.SetFormatter(formatter)
 	lvl, err := log.ParseLevel(logLevel)
 	if err != nil {
 		log.Fatalf("Unknown log level %s", logLevel)
