@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupCreateJob() {
 	var f io.Reader
 	var err error
 	log.Debugf("Preparing create job: %s", ex.Name)
@@ -65,16 +65,18 @@ func (ex *JobExecutor) setupCreateJob(mapper meta.RESTMapper) {
 			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
 		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
-		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		if err != nil {
-			log.Fatal(err)
-		}
+		mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
 		obj := &object{
-			gvr:        mapping.Resource,
 			objectSpec: t,
 			Object:     o,
 			namespace:  uns.GetNamespace(),
-			namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		}
+		if err == nil {
+			obj.gvr = mapping.Resource
+			obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+		} else {
+			obj.gvr = schema.GroupVersionResource{}
+			obj.gvk = gvk
 		}
 		obj.Kind = gvk.Kind
 		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
@@ -96,21 +98,16 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	}
 	var wg sync.WaitGroup
 	var ns string
-	var err error
+	var namespacesCreated = make(map[string]bool)
+	var namespacesWaited = make(map[string]bool)
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
-		ns = ex.Namespace
-		if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
-			log.Fatal(err.Error())
-		}
-		*waitListNamespaces = append(*waitListNamespaces, ns)
+		ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 	}
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
-	var namespacesCreated = make(map[string]bool)
-	var namespacesWaited = make(map[string]bool)
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
 			return
@@ -121,17 +118,20 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsRequired && ex.NamespacedIterations {
-			ns = ex.generateNamespace(i)
-			if !namespacesCreated[ns] {
-				if err = util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
-					log.Error(err.Error())
-					continue
-				}
-				namespacesCreated[ns] = true
-				*waitListNamespaces = append(*waitListNamespaces, ns)
-			}
+			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
 		}
 		for objectIndex, obj := range ex.objects {
+			if obj.gvr == (schema.GroupVersionResource{}) {
+				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
+				ex.resolveObjectMapping(obj)
+				if ex.nsRequired {
+					nsName := ex.Namespace
+					if ex.NamespacedIterations {
+						nsName = ex.generateNamespace(i)
+					}
+					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+				}
+			}
 			labels := map[string]string{
 				"kube-burner-uuid":                 ex.uuid,
 				"kube-burner-job":                  ex.Name,
@@ -291,6 +291,18 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		}
 		return true, err
 	}, 1*time.Second, 3, 0, timeout)
+}
+
+func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[string]string, waitListNamespaces *[]string, namespacesCreated map[string]bool) string {
+	if namespacesCreated[ns] {
+		return ns
+	}
+	if err := util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
+		log.Error(err.Error())
+	}
+	namespacesCreated[ns] = true
+	*waitListNamespaces = append(*waitListNamespaces, ns)
+	return ns
 }
 
 // RunCreateJobWithChurn executes a churn creation job
