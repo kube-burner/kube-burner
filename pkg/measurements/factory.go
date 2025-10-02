@@ -17,6 +17,7 @@ package measurements
 import (
 	"sync"
 
+	"dario.cat/mergo"
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/pkg/config"
 	"github.com/kube-burner/kube-burner/pkg/measurements/types"
@@ -28,8 +29,8 @@ import (
 )
 
 type MeasurementsFactory struct {
-	Metadata  map[string]any
-	Factories map[string]MeasurementFactory
+	Metadata   map[string]any
+	ConfigSpec config.Spec
 }
 
 type Measurements struct {
@@ -83,41 +84,48 @@ func NewMeasurementsFactory(configSpec config.Spec, metadata map[string]any, add
 			measurementFactoryMap[k] = v
 		}
 	}
-
-	measurementsFactory := MeasurementsFactory{
-		Metadata:  metadata,
-		Factories: make(map[string]MeasurementFactory, len(configSpec.GlobalConfig.Measurements)),
+	return &MeasurementsFactory{
+		Metadata:   metadata,
+		ConfigSpec: configSpec,
 	}
-	for _, measurement := range configSpec.GlobalConfig.Measurements {
-		if !isIndexerOk(configSpec, measurement) {
-			log.Fatalf("One of the indexers for measurement %s has not been found", measurement.Name)
-		}
-		if _, alreadyRegistered := measurementsFactory.Factories[measurement.Name]; alreadyRegistered {
-			log.Warnf("Measurement [%s] is registered more than once", measurement.Name)
-			continue
-		}
-		newMeasurementFactoryFunc, exists := measurementFactoryMap[measurement.Name]
-		if !exists {
-			log.Warnf("Measurement [%s] is not supported", measurement.Name)
-			continue
-		}
-		mf, err := newMeasurementFactoryFunc(configSpec, measurement, metadata)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		measurementsFactory.Factories[measurement.Name] = mf
-		log.Infof("📈 Registered measurement: %s", measurement.Name)
-	}
-	return &measurementsFactory
 }
 
 func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration) *Measurements {
 	ms := Measurements{
-		MeasurementsMap: make(map[string]Measurement, len(msf.Factories)),
+		MeasurementsMap: make(map[string]Measurement),
 	}
 	clientSet, restConfig := kubeClientProvider.ClientSet(jobConfig.QPS, jobConfig.Burst)
-	for name, factory := range msf.Factories {
-		ms.MeasurementsMap[name] = factory.NewMeasurement(jobConfig, clientSet, restConfig, embedCfg)
+	log.Infof("Initializing measurements for job: %s", jobConfig.Name)
+	mergedMeasurements := make(map[string]types.Measurement)
+	for _, measurement := range msf.ConfigSpec.GlobalConfig.Measurements {
+		mergedMeasurements[measurement.Name] = measurement
+	}
+	for _, measurement := range jobConfig.Measurements {
+		if globalMeasurement, exists := mergedMeasurements[measurement.Name]; exists {
+			if err := mergo.Merge(&globalMeasurement, measurement, mergo.WithOverride); err != nil {
+				log.Errorf("Failed to merge measurement [%s]: %v", measurement.Name, err)
+				continue
+			}
+			mergedMeasurements[measurement.Name] = globalMeasurement
+		} else {
+			mergedMeasurements[measurement.Name] = measurement
+		}
+	}
+	for name, measurement := range mergedMeasurements {
+		if !isIndexerOk(msf.ConfigSpec, measurement) {
+			log.Fatalf("One of the indexers for measurement %s has not been found", measurement.Name)
+		}
+		newMeasurementFactoryFunc, exists := measurementFactoryMap[name]
+		if !exists {
+			log.Warnf("Measurement [%s] is not supported", name)
+			continue
+		}
+		mf, err := newMeasurementFactoryFunc(msf.ConfigSpec, measurement, msf.Metadata)
+		if err != nil {
+			log.Fatalf("Failed to create measurement [%s]: %v", name, err)
+		}
+		ms.MeasurementsMap[name] = mf.NewMeasurement(jobConfig, clientSet, restConfig, embedCfg)
+		log.Infof("Registered measurement: %s", name)
 	}
 
 	return &ms

@@ -208,6 +208,8 @@ type Job struct {
 	MetricsClosing MetricsClosing `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
 	// Enables job's garbage collection
 	GC bool `yaml:"gc" json:"gc"`
+	// Measurements job-specific measurements to enable
+	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
 }
 
 type WaitOptions struct {
