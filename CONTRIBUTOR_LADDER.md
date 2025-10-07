@@ -132,4 +132,4 @@ Contact the Maintainers about changing to Emeritus status, or reducing your cont
 
 ## Contact
 * For inquiries, please reach out to:
-    *  [maintainers mailing list](cncf-kube-burner-maintainers@lists.cncf.io)
+    *  [maintainers mailing list](mailto:cncf-kube-burner-maintainers@lists.cncf.io)
