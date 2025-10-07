@@ -2,6 +2,35 @@
 
 Kube-burner allows you to get further metrics using other mechanisms or data sources, such as the Kubernetes API. These mechanisms are called measurements.
 
+Measurements can be configured at two levels:
+
+1. Global measurements: Defined in the global configuration section, these measurements will run for all jobs in the benchmark.
+2. Job-specific measurements: Defined within each job's configuration, these measurements only run for that specific job.
+
+If a measurement is defined both globally and in a job-specific configuration, the job-specific one takes precedence
+
+Example of global measurements:
+```yaml
+global:
+  measurements:
+    - name: podLatency
+    - name: serviceLatency
+
+jobs:
+  - name: job1
+```
+
+Example of job-specific measurements:
+```yaml
+jobs:
+  - name: job1
+    measurements:
+      - name: podLatency
+  - name: job2
+    measurements:
+      - name: serviceLatency
+```
+
 Measurements are enabled in the `measurements` object of the configuration file. This object contains a list of measurements with their options.
 
 ## Pod latency
