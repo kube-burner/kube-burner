@@ -24,7 +24,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -84,7 +83,7 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 	config.KubeVirtOpRemoveVolume: nil,
 }
 
-func (ex *JobExecutor) setupKubeVirtJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupKubeVirtJob() {
 	var err error
 	if len(ex.ExecutionMode) == 0 {
 		ex.ExecutionMode = config.ExecutionModeSequential
@@ -107,7 +106,7 @@ func (ex *JobExecutor) setupKubeVirtJob(mapper meta.RESTMapper) {
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		obj := newObject(o, mapper, kubeVirtAPIVersionV1, ex.embedCfg)
+		obj := newObject(o, ex.mapper, kubeVirtAPIVersionV1, ex.embedCfg)
 
 		if o.KubeVirtOp == config.KubeVirtOpMigrate && obj.waitGVR == nil {
 			obj.waitGVR = &schema.GroupVersionResource{

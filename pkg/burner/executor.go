@@ -25,10 +25,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"kubevirt.io/client-go/kubecli"
 )
 
@@ -52,6 +52,7 @@ type JobExecutor struct {
 	kubeVirtClient    kubecli.KubevirtClient
 	functionTemplates []string
 	embedCfg          *fileutils.EmbedConfiguration
+	mapper            *restmapper.DeferredDiscoveryRESTMapper
 	deletionStrategy  string
 	objectOperations  int32
 }
@@ -75,19 +76,19 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	ex.dynamicClient = dynamic.NewForConfigOrDie(ex.restConfig)
 
 	_, setupRestConfig := kubeClientProvider.ClientSet(100, 100) // Hardcoded QPS/Burst
-	mapper := newRESTMapper(discovery.NewDiscoveryClientForConfigOrDie(setupRestConfig))
+	ex.mapper = newRESTMapper(setupRestConfig)
 
 	switch job.JobType {
 	case config.CreationJob:
-		ex.setupCreateJob(mapper)
+		ex.setupCreateJob()
 	case config.DeletionJob:
-		ex.setupDeleteJob(mapper)
+		ex.setupDeleteJob()
 	case config.PatchJob:
-		ex.setupPatchJob(mapper)
+		ex.setupPatchJob()
 	case config.ReadJob:
-		ex.setupReadJob(mapper)
+		ex.setupReadJob()
 	case config.KubeVirtJob:
-		ex.setupKubeVirtJob(mapper)
+		ex.setupKubeVirtJob()
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}
