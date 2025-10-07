@@ -52,6 +52,7 @@ const (
 	jobIteration         = "Iteration"
 	jobUUID              = "UUID"
 	jobRunId             = "RunID"
+	nodes                = "Nodes"
 	rcTimeout            = 2
 	rcAlert              = 3
 	rcMeasurement        = 4
