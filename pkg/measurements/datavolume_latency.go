@@ -266,9 +266,10 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 
 		m.DVRunningLatency = int(m.dvRunning.Sub(m.Timestamp).Milliseconds())
 		if m.DVRunningLatency < 0 {
+			// Running condition may be missed when creating empty volumes.
+			// Since we validated that the volume is Ready, assume the Running latency is 0 and don't report an error
 			log.Tracef("DVRunningLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.DVBoundLatency = 0
+			m.DVRunningLatency = 0
 		}
 
 		m.DVReadyLatency = int(m.dvReady.Sub(m.Timestamp).Milliseconds())
