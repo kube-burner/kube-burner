@@ -12,9 +12,9 @@ import (
 func ClusterHealthCheck(clientSet kubernetes.Interface) {
 	log.Infof("🏥 Checking for Cluster Health")
 	if ClusterHealthyVanillaK8s(clientSet) {
-		log.Infof("Cluster is healthy.")
+		log.Infof("Cluster is healthy")
 	} else {
-		log.Fatalf("Cluster is not healthy.")
+		log.Fatalf("Cluster is not healthy")
 	}
 }
 

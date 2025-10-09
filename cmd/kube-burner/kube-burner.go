@@ -51,9 +51,6 @@ var rootCmd = &cobra.Command{
 	Long: `Kube-burner 🔥
 
 Tool aimed at stressing a kubernetes cluster by creating or deleting lots of objects.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		util.ConfigureLogging(cmd)
-	},
 }
 
 var completionCmd = &cobra.Command{
@@ -105,7 +102,8 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			util.SetupFileLogging(uuid)
+			logLevel, _ := cmd.Flags().GetString("log-level")
+			util.ConfigureLogging(logLevel, uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
@@ -166,13 +164,13 @@ func healthCheck() *cobra.Command {
 		Use:   "health-check",
 		Short: "Check for Health Status of the cluster",
 		PostRun: func(cmd *cobra.Command, args []string) {
-			log.Info("👋 Exiting kube-burner ")
+			log.Info("👋 Exiting kube-burner")
 			os.Exit(rc)
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			var uuid = uid.NewString()
-			util.SetupFileLogging(uuid)
+			logLevel, _ := cmd.Flags().GetString("log-level")
+			util.ConfigureLogging(logLevel, "")
 			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
 		},
@@ -196,7 +194,8 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupFileLogging(uuid)
+			logLevel, _ := cmd.Flags().GetString("log-level")
+			util.ConfigureLogging(logLevel, uuid)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
 			dynamicClient := dynamic.NewForConfigOrDie(restConfig)
@@ -233,7 +232,8 @@ func measureCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupFileLogging(uuid)
+			logLevel, _ := cmd.Flags().GetString("log-level")
+			util.ConfigureLogging(logLevel, uuid)
 			f, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
@@ -322,7 +322,8 @@ func indexCmd() *cobra.Command {
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupFileLogging(uuid)
+			logLevel, _ := cmd.Flags().GetString("log-level")
+			util.ConfigureLogging(logLevel, uuid)
 			configSpec.GlobalConfig.UUID = uuid
 			metricsProfiles := strings.FieldsFunc(metricsProfile, func(r rune) bool {
 				return r == ',' || r == ' '
