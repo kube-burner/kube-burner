@@ -161,7 +161,7 @@ type Job struct {
 	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout" json:"maxWaitTimeout,omitempty"`
 	// WaitForDeletion wait for objects to be definitively deleted
 	WaitForDeletion bool `yaml:"waitForDeletion" json:"waitForDeletion,omitempty"`
-	// PodWait wait for all pods to be running before moving forward to the next iteration
+	//  wait for all pods to be running before moving forward to the next iteration
 	PodWait bool `yaml:"podWait" json:"podWait,omitempty"`
 	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`

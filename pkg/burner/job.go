@@ -428,13 +428,13 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 				namespacesToDelete = append(namespacesToDelete, ns.Name)
 			}
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
-			err := util.CleanupNamespaces(ctx, ex.clientSet, labelSelector)
+			err := util.CleanupNamespacesWithLabel(ctx, ex.clientSet, labelSelector)
 			if err != nil {
 				log.Error(err.Error())
 			}
 		}
 	} else {
-		err := util.CleanupNamespaces(ctx, ex.clientSet, labelSelector)
+		err := util.CleanupNamespacesWithLabel(ctx, ex.clientSet, labelSelector)
 		// Just report error and continue
 		if err != nil {
 			log.Error(err.Error())
