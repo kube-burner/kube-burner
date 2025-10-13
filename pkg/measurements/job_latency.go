@@ -46,6 +46,10 @@ var (
 	supportedJobConditions = map[string]struct{}{
 		string(batchv1.JobComplete): {},
 	}
+	supportedJobLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.PatchJob:    {},
+	}
 )
 
 type jobMetric struct {
@@ -230,4 +234,11 @@ func (j *jobLatency) getLatency(normLatency any) map[string]float64 {
 		jobStartTimeMeasurement:     float64(jobMetric.StartTimeLatency),
 		string(batchv1.JobComplete): float64(jobMetric.CompletionLatency),
 	}
+}
+
+func (j *jobLatency) IsCompatible() bool {
+	if _, exists := supportedJobLatencyJobTypes[j.JobConfig.JobType]; exists {
+		return true
+	}
+	return false
 }

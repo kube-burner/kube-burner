@@ -47,6 +47,11 @@ var (
 	supportedVolumeSnapshotConditions = map[string]struct{}{
 		"Ready": {},
 	}
+	supportedVolumeSnapshotLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.PatchJob:    {},
+		config.KubeVirtJob: {},
+	}
 )
 
 // volumeSnapshotMetric holds data about VolumeSnapshot creation process
@@ -231,4 +236,11 @@ func (vsl *volumeSnapshotLatency) getLatency(normLatency any) map[string]float64
 	return map[string]float64{
 		"Ready": float64(volumeSnapshotMetric.VSReadyLatency),
 	}
+}
+
+func (vsl *volumeSnapshotLatency) IsCompatible() bool {
+	if _, exists := supportedVolumeSnapshotLatencyJobTypes[vsl.JobConfig.JobType]; exists {
+		return true
+	}
+	return false
 }

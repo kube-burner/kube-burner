@@ -51,6 +51,12 @@ var (
 	}
 )
 
+var supportedDvLatencyJobTypes = map[config.JobType]struct{}{
+	config.CreationJob: {},
+	config.PatchJob:    {},
+	config.KubeVirtJob: {},
+}
+
 // dvMetric holds data about DataVolume creation process
 type dvMetric struct {
 	// Timestamp filed is very important the the elasticsearch indexing and represents the first creation time that we track (i.e., vm or vmi)
@@ -296,4 +302,11 @@ func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
 		string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
 		string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
 	}
+}
+
+func (dv *dvLatency) IsCompatible() bool {
+	if _, exists := supportedDvLatencyJobTypes[dv.JobConfig.JobType]; exists {
+		return true
+	}
+	return false
 }

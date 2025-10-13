@@ -249,3 +249,7 @@ func (n *nodeLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
 	}
 }
+
+func (n *nodeLatency) IsCompatible() bool {
+	return true
+}

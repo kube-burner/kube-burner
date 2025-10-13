@@ -57,6 +57,12 @@ const (
 	netpolLatencyQuantilesMeasurement = "netpolLatencyQuantilesMeasurement"
 )
 
+var supportedNetpolLatencyJobTypes = map[kconfig.JobType]struct{}{
+	kconfig.CreationJob: {},
+	kconfig.PatchJob:    {},
+	kconfig.DeletionJob: {},
+}
+
 var proxyPortForwarder *mutil.PodPortForwarder
 var nsPodAddresses = make(map[string]map[string][]string)
 var proxyEndpoint string
@@ -570,4 +576,11 @@ func (n *netpolLatency) normalizeMetrics() {
 
 func (n *netpolLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
+}
+
+func (n *netpolLatency) IsCompatible() bool {
+	if _, exists := supportedNetpolLatencyJobTypes[n.JobConfig.JobType]; exists {
+		return true
+	}
+	return false
 }

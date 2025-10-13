@@ -42,6 +42,11 @@ var (
 		string(corev1.ClaimBound):   {},
 		string(corev1.ClaimLost):    {},
 	}
+	supportedPvcLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.PatchJob:    {},
+		config.DeletionJob: {},
+	}
 )
 
 type pvcMetric struct {
@@ -250,4 +255,11 @@ func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.ClaimBound):   float64(pvcMetric.BindingLatency),
 		string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
 	}
+}
+
+func (p *pvcLatency) IsCompatible() bool {
+	if _, exists := supportedPvcLatencyJobTypes[p.JobConfig.JobType]; exists {
+		return true
+	}
+	return false
 }

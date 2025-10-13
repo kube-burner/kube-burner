@@ -42,6 +42,11 @@ const (
 	svcLatencyQuantilesMeasurement = "svcLatencyQuantilesMeasurement"
 )
 
+var supportedServiceLatencyJobTypes = map[config.JobType]struct{}{
+	config.CreationJob: {},
+	config.PatchJob:    {},
+}
+
 type serviceLatency struct {
 	BaseMeasurement
 
@@ -297,4 +302,11 @@ func (s *serviceLatency) waitForIngress(svc *corev1.Service) error {
 
 func (s *serviceLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
+}
+
+func (s *serviceLatency) IsCompatible() bool {
+	if _, exists := supportedServiceLatencyJobTypes[s.JobConfig.JobType]; exists {
+		return true
+	}
+	return false
 }

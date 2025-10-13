@@ -45,6 +45,11 @@ var (
 		"VMI" + string(kvv1.Scheduled):  {},
 		"VMI" + string(kvv1.Running):    {},
 	}
+	supportedVMILatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.KubeVirtJob: {},
+		config.DeletionJob: {},
+	}
 )
 
 // vmiMetric holds both pod and vmi metrics
@@ -420,4 +425,11 @@ func getParentVMIName(podObj *corev1.Pod) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no parent VMI found for pod %s", podObj.Name)
+}
+
+func (vmi *vmiLatency) IsCompatible() bool {
+	if _, exists := supportedVMILatencyJobTypes[vmi.JobConfig.JobType]; exists {
+		return true
+	}
+	return false
 }
