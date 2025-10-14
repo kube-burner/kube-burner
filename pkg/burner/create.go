@@ -397,6 +397,8 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 	cyclesCount := 0
 	timer := time.After(ex.ChurnConfig.Duration)
 	now := time.Now().UTC()
+	var objectList *unstructured.UnstructuredList
+	var err error
 	for {
 		deletedObjects := []deletedObject{}
 		if ex.ChurnConfig.Duration > 0 {
@@ -415,23 +417,25 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 		}
 		for _, obj := range ex.objects {
 			if obj.Churn {
-				objectList, err := ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
+				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 					LabelSelector: labels.FormatLabels(obj.LabelSelector),
 				})
 				if err != nil {
 					log.Errorf("Error listing objects: %v", err)
+					continue
 				}
 				numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
 				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
 				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
 				for _, objToDelete := range objectsToDelete {
-					// TODO: Handle not namespaced objects
-					fmt.Println(numToChurn, randStart)
-					fmt.Println(objToDelete.GetNamespace())
-					err := ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{})
+					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{})
 					if err != nil {
 						log.Errorf("Error deleting object %s/%s: %v", objToDelete.GetKind(), objToDelete.GetName(), err)
 					}
+					// We need to reset these fields as we're reusing the original object
+					objToDelete.SetResourceVersion("")
+					objToDelete.SetUID("")
+					objToDelete.SetSelfLink("")
 					// Store the deleted objects to re-create them later
 					deletedObjects = append(deletedObjects, deletedObject{
 						object: &objToDelete,
@@ -439,38 +443,39 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 					})
 				}
 			}
+			ex.verifyDelete(deletedObjects)
 			ex.reCreateDeletedObjects(ctx, deletedObjects)
+			log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 			time.Sleep(ex.ChurnConfig.Delay)
 			cyclesCount++
 		}
 	}
 }
 
+// reCreateDeletedObjects re-creates the deleted objects
 func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObjects []deletedObject) {
 	log.Infof("Re-creating %d deleted objects", len(deletedObjects))
+	var wg sync.WaitGroup
 	for _, objectToCreate := range deletedObjects {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout)
 			ex.limiter.Wait(context.TODO())
 		}()
 	}
+	wg.Wait()
 }
 
-func (ex *JobExecutor) verifyDelete(obj *object) {
-	labelSelector := labels.Set(obj.LabelSelector).String()
-	listOptions := metav1.ListOptions{
-		LabelSelector: labelSelector,
+// verifyDelete verifies if the object has been deleted
+func (ex *JobExecutor) verifyDelete(deletedObjects []deletedObject) {
+	for _, obj := range deletedObjects {
+		wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			_, err = ex.dynamicClient.Resource(obj.gvr).Get(context.TODO(), obj.object.GetName(), metav1.GetOptions{})
+			if kerrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		})
 	}
-	wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		itemList, err := ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
-		if err != nil {
-			log.Error(err.Error())
-			return false, nil
-		}
-		if len(itemList.Items) > 0 {
-			log.Debugf("Waiting for %d %s labeled with %s to be deleted", len(itemList.Items), obj.gvr.Resource, labelSelector)
-			return false, nil
-		}
-		return true, nil
-	})
 }
