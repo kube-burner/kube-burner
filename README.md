@@ -30,12 +30,20 @@ Install latest stable version with:
 curl -Ls https://raw.githubusercontent.com/kube-burner/kube-burner/hack/install.sh | sh
 ```
 
-Example configuration files can be found at the [examples directory](./examples).
+> [!NOTE]
+> Default installation path is `${HOME}/.local/bin/`, you can change it by setting `INSTALL_DIR` environment variable
+> before running the script
 
-### Container image
+## Downloading Kube-burner
 
-There's also a container image available at [quay](https://quay.io/repository/kube-burner/kube-burner?tab=tags).
+In case you want to start tinkering with Kube-burner now:
 
+- You can find the binaries in the [releases section of the repository](https://github.com/kube-burner/kube-burner/releases).
+- There's also a container image available at [quay](https://quay.io/repository/kube-burner/kube-burner?tab=tags).
+
+### Example configs
+
+Example configuration files can be found at the [examples directory](./examples/workloads).
 
 ## Building from Source
 

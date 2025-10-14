@@ -31,34 +31,6 @@ detect_os() {
   esac
 }
 
-# Detect architecture
-detect_arch() {
-  local arch
-  arch=$(uname -m)
-  
-  case "${arch}" in
-    x86_64 | amd64)
-      echo "x86_64"
-      ;;
-    aarch64 | arm64)
-      echo "arm64"
-      ;;
-    armv7l)
-      echo "armv7"
-      ;;
-    s390x)
-      echo "s390x"
-      ;;
-    ppc64le)
-      echo "ppc64le"
-      ;;
-    *)
-      echo "Unsupported architecture: ${arch}"
-      exit 1
-      ;;
-  esac
-}
-
 # Get latest release version from GitHub
 get_latest_version() {
   local version
@@ -111,7 +83,7 @@ main() {
   local os
   local arch
   os=$(detect_os)
-  arch=$(detect_arch)
+  arch=$(uname -m | sed s/aarch64/arm64/)
   
   echo "Detected system: ${os}/${arch}"
   
