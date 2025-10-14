@@ -47,6 +47,11 @@ var (
 		string(corev1.PodReady):        {},
 		string(corev1.PodScheduled):    {},
 	}
+	supportedPodLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.PatchJob:    {},
+		config.DeletionJob: {},
+	}
 )
 
 type podMetric struct {
@@ -300,4 +305,9 @@ func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
 		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
 	}
+}
+
+func (p *podLatency) IsCompatible() bool {
+	_, exists := supportedPodLatencyJobTypes[p.JobConfig.JobType]
+	return exists
 }

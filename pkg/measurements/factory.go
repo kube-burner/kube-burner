@@ -46,6 +46,7 @@ type Measurement interface {
 	Start(*sync.WaitGroup) error
 	Stop() error
 	Collect(*sync.WaitGroup)
+	IsCompatible() bool
 	Index(string, map[string]indexers.Indexer)
 	GetMetrics() *sync.Map
 }
@@ -124,10 +125,14 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 		if err != nil {
 			log.Fatalf("Failed to create measurement [%s]: %v", name, err)
 		}
-		ms.MeasurementsMap[name] = mf.NewMeasurement(jobConfig, clientSet, restConfig, embedCfg)
+		msInstance := mf.NewMeasurement(jobConfig, clientSet, restConfig, embedCfg)
+		if !jobConfig.MetricsAggregate && !msInstance.IsCompatible() {
+			log.Warnf("Skipped measurement [%s] not compatible with job type %s", name, jobConfig.JobType)
+			continue
+		}
+		ms.MeasurementsMap[name] = msInstance
 		log.Infof("Registered measurement: %s", name)
 	}
-
 	return &ms
 }
 
