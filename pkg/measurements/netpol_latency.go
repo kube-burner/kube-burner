@@ -579,8 +579,6 @@ func (n *netpolLatency) Collect(measurementWg *sync.WaitGroup) {
 }
 
 func (n *netpolLatency) IsCompatible() bool {
-	if _, exists := supportedNetpolLatencyJobTypes[n.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedNetpolLatencyJobTypes[n.JobConfig.JobType]
+	return exists
 }

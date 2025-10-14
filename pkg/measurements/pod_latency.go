@@ -308,8 +308,6 @@ func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 }
 
 func (p *podLatency) IsCompatible() bool {
-	if _, exists := supportedPodLatencyJobTypes[p.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedPodLatencyJobTypes[p.JobConfig.JobType]
+	return exists
 }

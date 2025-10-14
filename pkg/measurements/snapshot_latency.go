@@ -239,8 +239,6 @@ func (vsl *volumeSnapshotLatency) getLatency(normLatency any) map[string]float64
 }
 
 func (vsl *volumeSnapshotLatency) IsCompatible() bool {
-	if _, exists := supportedVolumeSnapshotLatencyJobTypes[vsl.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedVolumeSnapshotLatencyJobTypes[vsl.JobConfig.JobType]
+	return exists
 }

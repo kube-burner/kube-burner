@@ -237,8 +237,6 @@ func (j *jobLatency) getLatency(normLatency any) map[string]float64 {
 }
 
 func (j *jobLatency) IsCompatible() bool {
-	if _, exists := supportedJobLatencyJobTypes[j.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedJobLatencyJobTypes[j.JobConfig.JobType]
+	return exists
 }

@@ -126,7 +126,7 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 			log.Fatalf("Failed to create measurement [%s]: %v", name, err)
 		}
 		msInstance := mf.NewMeasurement(jobConfig, clientSet, restConfig, embedCfg)
-		if !msInstance.IsCompatible() {
+		if !jobConfig.MetricsAggregate && !msInstance.IsCompatible() {
 			log.Warnf("Skipped measurement [%s] not compatible with job type %s", name, jobConfig.JobType)
 			continue
 		}

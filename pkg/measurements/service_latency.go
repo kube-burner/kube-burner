@@ -305,8 +305,6 @@ func (s *serviceLatency) Collect(measurementWg *sync.WaitGroup) {
 }
 
 func (s *serviceLatency) IsCompatible() bool {
-	if _, exists := supportedServiceLatencyJobTypes[s.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedServiceLatencyJobTypes[s.JobConfig.JobType]
+	return exists
 }

@@ -305,8 +305,6 @@ func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
 }
 
 func (dv *dvLatency) IsCompatible() bool {
-	if _, exists := supportedDvLatencyJobTypes[dv.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedDvLatencyJobTypes[dv.JobConfig.JobType]
+	return exists
 }

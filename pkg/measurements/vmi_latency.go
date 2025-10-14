@@ -428,8 +428,6 @@ func getParentVMIName(podObj *corev1.Pod) (string, error) {
 }
 
 func (vmi *vmiLatency) IsCompatible() bool {
-	if _, exists := supportedVMILatencyJobTypes[vmi.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedVMILatencyJobTypes[vmi.JobConfig.JobType]
+	return exists
 }

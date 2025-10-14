@@ -360,8 +360,6 @@ func (vmiml *vmimLatency) getLatency(normLatency any) map[string]float64 {
 }
 
 func (vmiml *vmimLatency) IsCompatible() bool {
-	if _, exists := supportedVMIMLatencyJobTypes[vmiml.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedVMIMLatencyJobTypes[vmiml.JobConfig.JobType]
+	return exists
 }

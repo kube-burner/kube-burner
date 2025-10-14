@@ -258,8 +258,6 @@ func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
 }
 
 func (p *pvcLatency) IsCompatible() bool {
-	if _, exists := supportedPvcLatencyJobTypes[p.JobConfig.JobType]; exists {
-		return true
-	}
-	return false
+	_, exists := supportedPvcLatencyJobTypes[p.JobConfig.JobType]
+	return exists
 }
