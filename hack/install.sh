@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2086 
 # Quick install script for kube-burner
 # Downloads the latest release version based on system architecture and OS
 
@@ -7,7 +8,6 @@ set -euo pipefail
 # Configuration
 REPO="kube-burner/kube-burner"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin/}"
-TEMP_DIR=$(mktemp -d)
 
 # Detect OS
 detect_os() {
@@ -67,7 +67,6 @@ download_and_extract() {
 # Verify installation
 verify_installation() {
   if command -v kube-burner &> /dev/null; then
-    local installed_version
     echo "kube-burner is now available in your PATH, installed at ${INSTALL_DIR}"
   else
     echo "kube-burner installed to ${INSTALL_DIR}, but not found in PATH"
