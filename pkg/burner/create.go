@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 )
 
 type deletedObject struct {
@@ -417,8 +418,11 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 		}
 		for _, obj := range ex.objects {
 			if obj.Churn {
+				labelSelector := obj.LabelSelector
+				delete(labelSelector, "kube-burner.io/job-iteration")
+				delete(labelSelector, "kube-burner.io/replica")
 				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
-					LabelSelector: labels.FormatLabels(obj.LabelSelector),
+					LabelSelector: labels.FormatLabels(labelSelector),
 				})
 				if err != nil {
 					log.Errorf("Error listing objects: %v", err)
@@ -428,14 +432,14 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
 				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
 				for _, objToDelete := range objectsToDelete {
-					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{})
+					log.Debugf("Deleting %s/%s", objToDelete.GetKind(), objToDelete.GetName())
+					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
+						PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+					})
 					if err != nil {
 						log.Errorf("Error deleting object %s/%s: %v", objToDelete.GetKind(), objToDelete.GetName(), err)
 					}
-					// We need to reset these fields as we're reusing the original object
-					objToDelete.SetResourceVersion("")
-					objToDelete.SetUID("")
-					objToDelete.SetSelfLink("")
+					trimObject(&objToDelete)
 					// Store the deleted objects to re-create them later
 					deletedObjects = append(deletedObjects, deletedObject{
 						object: &objToDelete,
@@ -443,12 +447,12 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 					})
 				}
 			}
-			ex.verifyDelete(deletedObjects)
-			ex.reCreateDeletedObjects(ctx, deletedObjects)
-			log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
-			time.Sleep(ex.ChurnConfig.Delay)
-			cyclesCount++
 		}
+		ex.verifyDelete(deletedObjects)
+		ex.reCreateDeletedObjects(ctx, deletedObjects)
+		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
+		time.Sleep(ex.ChurnConfig.Delay)
+		cyclesCount++
 	}
 }
 
@@ -460,8 +464,8 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout)
 			ex.limiter.Wait(context.TODO())
+			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout)
 		}()
 	}
 	wg.Wait()
@@ -478,4 +482,21 @@ func (ex *JobExecutor) verifyDelete(deletedObjects []deletedObject) {
 			return false, nil
 		})
 	}
+}
+
+// trimObject trims the object to remove the fields that conflict with the object recreation
+func trimObject(obj *unstructured.Unstructured) {
+	obj.SetResourceVersion("")
+	obj.SetUID("")
+	obj.SetSelfLink("")
+	obj.SetGeneration(0)
+	obj.SetDeletionTimestamp(nil)
+	obj.SetDeletionGracePeriodSeconds(nil)
+	obj.SetFinalizers(nil)
+	obj.SetOwnerReferences(nil)
+	obj.SetManagedFields(nil)
+	unstructured.RemoveNestedField(obj.Object, "spec", "template", "template", "labels", "controller-uid")
+	unstructured.RemoveNestedField(obj.Object, "spec", "selector", "matchLabels", "batch.kubernetes.io/controller-uid")
+	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "batch.kubernetes.io/controller-uid")
+	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "controller-uid")
 }
