@@ -27,7 +27,7 @@ Documentation is [available here](https://kube-burner.github.io/kube-burner/)
 Install latest stable version with:
 
 ```shell
-curl -Ls https://raw.githubusercontent.com/kube-burner/kube-burner/hack/install.sh | sh
+curl -Ls https://raw.githubusercontent.com/kube-burner/kube-burner/refs/heads/main/hack/install.sh | sh
 ```
 
 > [!NOTE]
