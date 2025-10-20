@@ -188,7 +188,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := jobEnd.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
-				log.Debugf("Job %s took %v", jobExecutor.Name, elapsedTime)
+				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
 			}
 			if !jobExecutor.MetricsAggregate {
 				// We stop and index measurements per job
