@@ -269,3 +269,7 @@ func (p *pprof) copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 	log.Infof("Certificate and private key copied into %s %s", pod.Name, pod.Spec.Containers[0].Name)
 	return nil
 }
+
+func (p *pprof) IsCompatible() bool {
+	return true
+}

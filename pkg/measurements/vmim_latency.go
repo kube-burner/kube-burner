@@ -51,6 +51,11 @@ var (
 		"VirtualMachineInstanceMigration" + string(kvv1.MigrationRunning):         {},
 		"VirtualMachineInstanceMigration" + string(kvv1.MigrationSucceeded):       {},
 	}
+	supportedVMIMLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.KubeVirtJob: {},
+		config.DeletionJob: {},
+	}
 )
 
 // vmimMetric holds VirtualMachineInstanceMigration metrics
@@ -352,4 +357,9 @@ func (vmiml *vmimLatency) getLatency(normLatency any) map[string]float64 {
 		string(kvv1.MigrationRunning):         float64(vmimMetric.RunningLatency),
 		string(kvv1.MigrationSucceeded):       float64(vmimMetric.SucceededLatency),
 	}
+}
+
+func (vmiml *vmimLatency) IsCompatible() bool {
+	_, exists := supportedVMIMLatencyJobTypes[vmiml.JobConfig.JobType]
+	return exists
 }
