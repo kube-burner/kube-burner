@@ -436,7 +436,7 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				for _, objToDelete := range objectsToDelete {
 					log.Debugf("Deleting %s/%s", objToDelete.GetKind(), objToDelete.GetName())
 					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
-						PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+						PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 					})
 					if err != nil {
 						log.Errorf("Error deleting object %s/%s: %v", objToDelete.GetKind(), objToDelete.GetName(), err)
