@@ -417,8 +417,10 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 			return
 		}
 		for _, obj := range ex.objects {
+			// if churning is enabled in the object
 			if obj.Churn {
 				labelSelector := obj.LabelSelector
+				// Remove these labels to list all objects
 				delete(labelSelector, "kube-burner.io/job-iteration")
 				delete(labelSelector, "kube-burner.io/replica")
 				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
@@ -458,9 +460,13 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 
 // reCreateDeletedObjects re-creates the deleted objects
 func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObjects []deletedObject) {
+	var affectedNamespaces = make(map[string]bool)
 	log.Infof("Re-creating %d deleted objects", len(deletedObjects))
 	var wg sync.WaitGroup
 	for _, objectToCreate := range deletedObjects {
+		if objectToCreate.object.GetNamespace() != "" {
+			affectedNamespaces[objectToCreate.object.GetNamespace()] = true
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -469,6 +475,9 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 		}()
 	}
 	wg.Wait()
+	for namespace := range affectedNamespaces {
+		ex.waitForObjects(namespace)
+	}
 }
 
 // verifyDelete verifies if the object has been deleted
