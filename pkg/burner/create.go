@@ -416,6 +416,7 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnConfig.Cycles)
 			return
 		}
+		log.Infof("Deleting objects")
 		for _, obj := range ex.objects {
 			// if churning is enabled in the object
 			if obj.Churn {
@@ -433,7 +434,6 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
 				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
 				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
-				log.Infof("Deleting %d objects", len(objectsToDelete))
 				for _, objToDelete := range objectsToDelete {
 					log.Debugf("Deleting %s/%s", objToDelete.GetKind(), objToDelete.GetName())
 					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
