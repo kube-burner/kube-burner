@@ -384,7 +384,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		defer cancel()
 		// Cleanup namespaces based on the labels we added to the objects
-		util.CleanupNamespacesWithLabel(ctx, ex.clientSet, "churndelete=delete")
+		util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
 		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{}, true)
