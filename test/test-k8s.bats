@@ -76,8 +76,9 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid="${UUID}" --log-level=debug
 }
 
-@test "kube-burner init: gc=false; preload=true" {
+@test "kube-burner init: gc=false; preload=true; churn-mode=objects" {
   export GC=false PRELOAD_IMAGES=true
+  export CHURN_CYCLES=2 CHURN_MODE=objects
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
   check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
