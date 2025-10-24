@@ -229,7 +229,7 @@ func (s *serviceLatency) Stop() error {
 		cancel()
 		s.stopWatchers()
 	}()
-	kutil.CleanupNamespacesWithLabel(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
+	kutil.CleanupNamespaces(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
 	for _, q := range s.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
