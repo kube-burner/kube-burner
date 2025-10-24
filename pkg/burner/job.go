@@ -132,7 +132,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces, false)
+				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces)
 				if ctx.Err() != nil {
 					return
 				}
