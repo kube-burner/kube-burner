@@ -11,7 +11,7 @@ setup_file() {
   export QPS=3
   export BURST=3
   export GC=true
-  export CHURN_TYPE=namespaces
+  export CHURN_MODE=namespaces
   export TEST_KUBECONFIG; TEST_KUBECONFIG=$(mktemp -d)/kubeconfig
   export TEST_KUBECONTEXT=test-context
   export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
