@@ -72,7 +72,7 @@ jobs:
       cycles: {{ .CHURN_CYCLES }}
       percent: 20
       delay: 5s
-      type: {{ .CHURN_TYPE }}
+      mode: {{ .CHURN_MODE }}
     gc: {{env "JOBGC" }}
     namespaceLabels:
       foo: bar
