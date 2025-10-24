@@ -98,7 +98,7 @@ func (ex *JobExecutor) setupCreateJob() {
 }
 
 // RunCreateJob executes a creation job
-func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string, churning bool) {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -387,7 +387,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
 		util.CleanupNamespaces(ctx, ex.clientSet, "churndelete=delete")
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{}, true)
+		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 		time.Sleep(ex.ChurnConfig.Delay)
 		cyclesCount++
