@@ -105,7 +105,7 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			if skipLogFile {
+			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
@@ -156,7 +156,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
-	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Dump output file")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd
@@ -176,7 +176,7 @@ func healthCheck() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			var uuid = uid.NewString()
-			if skipLogFile {
+			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
 			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
@@ -185,7 +185,7 @@ func healthCheck() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
-	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Dump output file")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	return cmd
 }
 
@@ -204,7 +204,7 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			if skipLogFile {
+			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
@@ -221,7 +221,7 @@ func destroyCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
-	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Dump log file")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
@@ -245,7 +245,7 @@ func measureCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			if skipLogFile {
+			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
 			f, err := fileutils.GetWorkloadReader(configFile, nil)
@@ -309,7 +309,7 @@ func measureCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
-	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Dump log file")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	return cmd
 }
 
@@ -337,7 +337,7 @@ func indexCmd() *cobra.Command {
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			if skipLogFile {
+			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
 			configSpec.GlobalConfig.UUID = uuid
@@ -408,7 +408,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVar(&esServer, "es-server", "", "Elastic Search endpoint")
 	cmd.Flags().StringVar(&esIndex, "es-index", "", "Elastic Search index")
 	cmd.Flags().StringVar(&tarballName, "tarball-name", "", "Dump collected metrics into a tarball with the given name, requires local indexing")
-	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Dump log file")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
