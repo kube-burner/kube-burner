@@ -214,7 +214,7 @@ func (ex *JobExecutor) waitForPod(ns string, labelSelector string) error {
 }
 
 func (ex *JobExecutor) waitForBuild(ns string, obj *object, labelSelector string) error {
-	buildStatus := []string{"New", "Pending", "Running"}
+	buildStatus := []string{"New", "Pending", "Running", "Failed"}
 	var build types.UnstructuredContent
 	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		ex.limiter.Wait(context.TODO())
