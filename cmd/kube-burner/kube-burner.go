@@ -78,7 +78,7 @@ func initCmd() *cobra.Command {
 	var kubeConfig, kubeContext string
 	var metricsEndpoint, configFile, configMap, metricsProfile, alertProfile string
 	var uuid, userMetadata, namespace string
-	var skipTLSVerify bool
+	var skipTLSVerify, skipLogFile bool
 	var timeout time.Duration
 	var userDataFile string
 	var allowMissingKeys bool
@@ -105,7 +105,9 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			util.SetupFileLogging(uuid)
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
@@ -154,6 +156,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd
@@ -161,6 +164,7 @@ func initCmd() *cobra.Command {
 
 func healthCheck() *cobra.Command {
 	var kubeConfig, kubeContext string
+	var skipLogFile bool
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "health-check",
@@ -172,13 +176,16 @@ func healthCheck() *cobra.Command {
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			var uuid = uid.NewString()
-			util.SetupFileLogging(uuid)
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
 			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
 		},
 	}
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	return cmd
 }
 
@@ -186,6 +193,7 @@ func destroyCmd() *cobra.Command {
 	var uuid string
 	var timeout time.Duration
 	var kubeConfig, kubeContext string
+	var skipLogFile bool
 	var rc int
 	cmd := &cobra.Command{
 		Use:   "destroy",
@@ -196,7 +204,9 @@ func destroyCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupFileLogging(uuid)
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
 			dynamicClient := dynamic.NewForConfigOrDie(restConfig)
@@ -211,6 +221,7 @@ func destroyCmd() *cobra.Command {
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.MarkFlagRequired("uuid")
 	return cmd
 }
@@ -223,6 +234,7 @@ func measureCmd() *cobra.Command {
 	var jobName string
 	var userMetadata string
 	var kubeConfig, kubeContext string
+	var skipLogFile bool
 	indexerList := make(map[string]indexers.Indexer)
 	metadata := make(map[string]any)
 	cmd := &cobra.Command{
@@ -233,7 +245,9 @@ func measureCmd() *cobra.Command {
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupFileLogging(uuid)
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
 			f, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
@@ -295,6 +309,7 @@ func measureCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	return cmd
 }
 
@@ -304,7 +319,7 @@ func indexCmd() *cobra.Command {
 	var username, password, uuid, token, userMetadata string
 	var esServer, esIndex, metricsDirectory string
 	var configSpec config.Spec
-	var skipTLSVerify bool
+	var skipTLSVerify, skipLogFile bool
 	var prometheusStep time.Duration
 	var tarballName string
 	var indexer config.MetricsEndpoint
@@ -322,7 +337,9 @@ func indexCmd() *cobra.Command {
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			util.SetupFileLogging(uuid)
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
 			configSpec.GlobalConfig.UUID = uuid
 			metricsProfiles := strings.FieldsFunc(metricsProfile, func(r rune) bool {
 				return r == ',' || r == ' '
@@ -391,6 +408,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVar(&esServer, "es-server", "", "Elastic Search endpoint")
 	cmd.Flags().StringVar(&esIndex, "es-index", "", "Elastic Search index")
 	cmd.Flags().StringVar(&tarballName, "tarball-name", "", "Dump collected metrics into a tarball with the given name, requires local indexing")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
