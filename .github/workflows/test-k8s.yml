@@ -46,7 +46,7 @@ jobs:
         persist-credentials: false
 
     - name: Download kube-burner binary
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: kube-burner
         path: /tmp/
