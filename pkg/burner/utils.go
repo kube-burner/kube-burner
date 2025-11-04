@@ -52,6 +52,7 @@ var (
 		ReplicaSet:     {commonUnderlyingObjectLabelsPath},
 		StatefulSet:    {commonUnderlyingObjectLabelsPath, []string{"spec", "selector", "matchLabels"}},
 		VirtualMachine: {commonUnderlyingObjectLabelsPath},
+		Job:            {commonUnderlyingObjectLabelsPath},
 	}
 
 	kindToLabelPathsInArray = map[string][][][]string{
