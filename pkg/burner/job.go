@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -112,7 +111,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 			}
 			watcherStartErrors := watcherManager.Wait()
-			slices.Concat(errs, watcherStartErrors)
+			errs = append(errs, watcherStartErrors...)
 			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
@@ -211,7 +210,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance = nil
 			}
 			watcherStopErrs := watcherManager.StopAll()
-			slices.Concat(errs, watcherStopErrs)
+			errs = append(errs, watcherStopErrs...)
 			if jobExecutor.GC {
 				jobExecutor.gc(ctx, nil)
 			}
