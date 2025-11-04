@@ -233,7 +233,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 
 			maps.Copy(copiedLabels, newObject.GetLabels())
 			newObject.SetLabels(copiedLabels)
-			updateChildLabels(newObject, map[string]string{"kube-burner-runid": ex.runid})
+			updateChildLabels(newObject, copiedLabels)
 
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
