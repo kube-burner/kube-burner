@@ -49,9 +49,9 @@ var supportedServiceLatencyJobTypes = map[config.JobType]struct{}{
 
 type serviceLatency struct {
 	BaseMeasurement
-
-	epLister  lcorev1.EndpointsLister
-	svcLister lcorev1.ServiceLister
+	stopInformerCh chan struct{}
+	epLister       lcorev1.EndpointsLister
+	svcLister      lcorev1.ServiceLister
 }
 
 type svcMetric struct {
@@ -204,21 +204,23 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	// Create shared informer factory for typed clients
 	clientset := kubernetes.NewForConfigOrDie(s.RestConfig)
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-
 	// Endpoint lister & informer from typed client
 	s.epLister = factory.Core().V1().Endpoints().Lister()
 	epInformer := factory.Core().V1().Endpoints().Informer()
+	svcInformer := factory.Core().V1().Services().Informer()
 
 	// Start the informer
-	stopCh := make(chan struct{})
-	go epInformer.Run(stopCh)
+	s.stopInformerCh = make(chan struct{})
+	factory.Start(s.stopInformerCh)
 
 	// Wait for the endpoint informer cache to sync
-	if !cache.WaitForCacheSync(stopCh, epInformer.HasSynced) {
+	if !cache.WaitForCacheSync(s.stopInformerCh, epInformer.HasSynced) {
 		return fmt.Errorf("failed to sync endpoint informer cache")
 	}
-
-	s.svcLister = lcorev1.NewServiceLister(s.watchers[0].Informer.GetIndexer())
+	if !cache.WaitForCacheSync(s.stopInformerCh, svcInformer.HasSynced) {
+		return fmt.Errorf("failed to sync service informer cache")
+	}
+	s.svcLister = factory.Core().V1().Services().Lister()
 	return nil
 }
 
@@ -228,6 +230,7 @@ func (s *serviceLatency) Stop() error {
 	defer func() {
 		cancel()
 		s.stopWatchers()
+		close(s.stopInformerCh)
 	}()
 	kutil.CleanupNamespaces(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
