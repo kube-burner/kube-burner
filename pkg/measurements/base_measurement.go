@@ -96,7 +96,7 @@ func (bm *BaseMeasurement) stopWatchers() {
 
 func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getLatency func(any) map[string]float64) error {
 	var err error
-	defer bm.stopWatchers()
+	bm.stopWatchers()
 	errorRate := normalizeMetrics()
 	if errorRate > 10.00 {
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")

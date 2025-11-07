@@ -14,7 +14,7 @@ jobs:
   - name: precedence-measurements
     measurements:
       - name: podLatency
-    jobIterations: 5
+    jobIterations: 1
     namespace: precedence-measurements
     namespacedIterations: true
     preLoadImages: false
@@ -32,7 +32,7 @@ jobs:
     measurements:
       - name: serviceLatency
         svcTimeout: 5s
-    jobIterations: 5
+    jobIterations: 1
     namespace: merge-measurements
     namespacedIterations: true
     preLoadImages: false
