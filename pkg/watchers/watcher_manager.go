@@ -60,7 +60,7 @@ func (wm *WatcherManager) Start(kind, apiVersion string, labelSelector map[strin
 			gvr,
 			corev1.NamespaceAll,
 			func(options *metav1.ListOptions) {
-				options.LabelSelector = labels.SelectorFromSet(labelSelector).String()
+				options.LabelSelector = labels.Set(labelSelector).String()
 			},
 			nil,
 		)

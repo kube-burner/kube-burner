@@ -44,7 +44,7 @@ jobs:
     objects:
     - kubeVirtOp: start
       labelSelector:
-        kube-burner-job: {{ $createVMsJobName }}
+        kube-burner.io/job: {{ $createVMsJobName }}
 
 
   - name: wait-running
@@ -58,7 +58,7 @@ jobs:
     - apiVersion: kubevirt.io/v1
       kind: VirtualMachine
       labelSelector:
-        kube-burner-job: {{ $createVMsJobName }}
+        kube-burner.io/job: {{ $createVMsJobName }}
 
 
   # cleanup the experiment
@@ -71,9 +71,9 @@ jobs:
 
     - kind: VirtualMachine
       labelSelector:
-        kube-burner-job: {{ $createVMsJobName }}
+        kube-burner.io/job: {{ $createVMsJobName }}
       apiVersion: kubevirt.io/v1
 
     - kind: Namespace
       labelSelector:
-        kube-burner-job: {{ $createVMsJobName }}
+        kube-burner.io/job: {{ $createVMsJobName }}

@@ -16,7 +16,6 @@ package burner
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
@@ -24,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 )
@@ -31,11 +31,13 @@ import (
 // Cleanup resources specific to kube-burner with in a given list of namespaces
 func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
 	for _, namespace := range namespacesToDelete {
-		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
-		for _, obj := range ex.objects {
-			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
+		labelSelector := labels.Set{
+			config.KubeBurnerLabelJob: ex.Name,
 		}
-		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
+		for _, obj := range ex.objects {
+			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector.String())
+		}
+		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector.String())
 	}
 }
 

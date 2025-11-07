@@ -101,9 +101,9 @@ func (ex *JobExecutor) setupCreateJob() {
 func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
-		"kube-burner-job":   ex.Name,
-		"kube-burner-uuid":  ex.uuid,
-		"kube-burner-runid": ex.runid,
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelUUID:  ex.uuid,
+		config.KubeBurnerLabelRunID: ex.runid,
 	}
 	var wg sync.WaitGroup
 	var ns string
@@ -142,10 +142,10 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 				}
 			}
 			kbLabels := map[string]string{
-				"kube-burner-uuid":                 ex.uuid,
-				"kube-burner-job":                  ex.Name,
-				"kube-burner-index":                strconv.Itoa(objectIndex),
-				"kube-burner-runid":                ex.runid,
+				config.KubeBurnerLabelUUID:         ex.uuid,
+				config.KubeBurnerLabelJob:          ex.Name,
+				config.KubeBurnerLabelRunID:        ex.runid,
+				config.KubeBurnerLabelIndex:        strconv.Itoa(objectIndex),
 				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 			}
 			ex.objects[objectIndex].LabelSelector = kbLabels
