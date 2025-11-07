@@ -29,7 +29,6 @@ import (
 	"slices"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
-	kconfig "github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	mutil "github.com/kube-burner/kube-burner/v2/pkg/measurements/util"
@@ -59,10 +58,10 @@ const (
 	netpolLatencyQuantilesMeasurement = "netpolLatencyQuantilesMeasurement"
 )
 
-var supportedNetpolLatencyJobTypes = map[kconfig.JobType]struct{}{
-	kconfig.CreationJob: {},
-	kconfig.PatchJob:    {},
-	kconfig.DeletionJob: {},
+var supportedNetpolLatencyJobTypes = map[config.JobType]struct{}{
+	config.CreationJob: {},
+	config.PatchJob:    {},
+	config.DeletionJob: {},
 }
 
 var proxyPortForwarder *mutil.PodPortForwarder
@@ -115,13 +114,13 @@ type netpolLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newNetpolLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	return netpolLatencyMeasurementFactory{
 		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *kconfig.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
+func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
 	return &netpolLatency{
 		BaseMeasurement: nplmf.NewBaseLatency(jobConfig, clientSet, restConfig, netpolLatencyMeasurement, netpolLatencyQuantilesMeasurement, embedCfg),
 	}
@@ -207,7 +206,7 @@ func (n *netpolLatency) handleCreateNetpol(obj any) {
 }
 
 // Render the network policy from the object template using iteration details as input
-func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
+func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj config.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
 
 	templateData := map[string]any{
 		"JobName":   n.JobConfig.Name,
@@ -446,7 +445,7 @@ func (n *netpolLatency) processResults() {
 }
 
 // Read network policy object template
-func readTemplate(o kconfig.Object, embedCfg *fileutils.EmbedConfiguration) ([]byte, error) {
+func readTemplate(o config.Object, embedCfg *fileutils.EmbedConfiguration) ([]byte, error) {
 	f, err := fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
@@ -458,7 +457,7 @@ func readTemplate(o kconfig.Object, embedCfg *fileutils.EmbedConfiguration) ([]b
 	return t, err
 }
 
-func getObjectType(o kconfig.Object, t []byte) string {
+func getObjectType(o config.Object, t []byte) string {
 	// Deserialize YAML
 	cleanTemplate, err := kutil.CleanupTemplate(t)
 	if err != nil {
