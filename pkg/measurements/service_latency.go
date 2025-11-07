@@ -28,6 +28,7 @@ import (
 	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -194,7 +195,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
 			name:          "svcWatcher",
 			resource:      sgvr,
-			labelSelector: fmt.Sprintf("kube-burner-runid=%v", s.Runid),
+			labelSelector: labels.Set{config.KubeBurnerLabelRunID: s.Runid}.String(),
 			handlers: &cache.ResourceEventHandlerFuncs{
 				AddFunc: s.handleCreateSvc,
 			},

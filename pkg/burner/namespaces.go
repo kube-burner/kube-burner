@@ -16,7 +16,7 @@ package burner
 
 import (
 	"context"
-	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/kube-burner/kube-burner/pkg/config"
@@ -24,28 +24,34 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // Cleanup resources specific to kube-burner for a given iteration range
 func CleanupIterations(ctx context.Context, ex JobExecutor, iterationStart, iterationEnd int, namespace string) {
 	for i := iterationStart; i < iterationEnd; i++ {
-		labelSelector := fmt.Sprintf("kube-burner-job=%s,%s=%d", ex.Name, config.KubeBurnerLabelJobIteration, i)
-		for _, obj := range ex.objects {
-			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
+		labelSelector := labels.Set{
+			config.KubeBurnerLabelJob:          ex.Name,
+			config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 		}
-		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
+		for _, obj := range ex.objects {
+			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector.String())
+		}
+		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector.String())
 	}
 }
 
 // Cleanup resources specific to kube-burner with in a given list of namespaces
 func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
 	for _, namespace := range namespacesToDelete {
-		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
-		for _, obj := range ex.objects {
-			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
+		labelSelector := labels.Set{
+			config.KubeBurnerLabelJob: ex.Name,
 		}
-		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
+		for _, obj := range ex.objects {
+			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector.String())
+		}
+		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector.String())
 	}
 }
 

@@ -35,6 +35,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/rest"
 )
@@ -414,7 +415,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]JobEx
 }
 
 func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
-	labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
+	labelSelector := labels.Set{config.KubeBurnerLabelJob: ex.Name}.String()
 	if wg != nil {
 		defer wg.Done()
 	}

@@ -147,7 +147,7 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(j.RestConfig),
 				name:          "jobWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", j.Runid),
+				labelSelector: labels.Set{config.KubeBurnerLabelRunID: j.Runid}.String(),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: j.handleCreateJob,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -164,9 +164,8 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var jobs []batchv1.Job
-	labelSelector := labels.SelectorFromSet(j.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: labels.Set(j.JobConfig.NamespaceLabels).String(),
 	}
 	namespaces := strings.Split(j.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
