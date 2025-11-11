@@ -206,7 +206,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	factory := informers.NewSharedInformerFactory(clientset, 0)
 	// EndpointSlice/Service lister & informer from typed client
 	s.epsLister = factory.Discovery().V1().EndpointSlices().Lister()
-  s.svcLister = factory.Core().V1().Services().Lister()
+    s.svcLister = factory.Core().V1().Services().Lister()
 	epsInformer := factory.Discovery().V1().EndpointSlices().Informer()
 	svcInformer := factory.Core().V1().Services().Informer()
 
