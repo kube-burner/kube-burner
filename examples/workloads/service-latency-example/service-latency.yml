@@ -1,0 +1,31 @@
+global:
+  measurements:
+    - name: serviceLatency
+      svcTimeout: 30s
+  clusterHealth: true
+
+jobs:
+  - name: service-latency
+    jobIterations: 50
+    qps: 10
+    burst: 10
+    namespacedIterations: true
+    namespace: service-latency
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: false
+    objects:
+
+      - objectTemplate: templates/deployment.yml
+        replicas: 3
+        inputVars:
+          podReplicas: 3
+
+      - objectTemplate: templates/service.yml
+        replicas: 3
+
+      - objectTemplate: templates/secret.yml
+        replicas: 10
+
+      - objectTemplate: templates/configmap.yml
+        replicas: 10
