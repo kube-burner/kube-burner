@@ -145,7 +145,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vsl.RestConfig),
 				name:          "vsWatcher",
 				resource:      gvr,
-				labelSelector: labels.Set{config.KubeBurnerLabelRunID: vsl.Runid}.String(),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vsl.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vsl.handleCreateVolumeSnapshot,
 					UpdateFunc: func(oldObj, newObj any) {

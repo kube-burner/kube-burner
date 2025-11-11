@@ -174,7 +174,7 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
 				name:          "podWatcher",
 				resource:      gvr,
-				labelSelector: labels.Set{config.KubeBurnerLabelRunID: p.Runid}.String(),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePod,
 					UpdateFunc: func(oldObj, newObj any) {
