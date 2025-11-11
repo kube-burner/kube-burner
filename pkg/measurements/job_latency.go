@@ -147,7 +147,7 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(j.RestConfig),
 				name:          "jobWatcher",
 				resource:      gvr,
-				labelSelector: labels.Set{config.KubeBurnerLabelRunID: j.Runid}.String(),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, j.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: j.handleCreateJob,
 					UpdateFunc: func(oldObj, newObj any) {

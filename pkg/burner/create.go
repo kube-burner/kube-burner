@@ -146,7 +146,6 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 				config.KubeBurnerLabelJob:          ex.Name,
 				config.KubeBurnerLabelIndex:        strconv.Itoa(objectIndex),
 				config.KubeBurnerLabelRunID:        ex.runid,
-				config.KubeBurnerLabelIndex:        strconv.Itoa(objectIndex),
 				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 			}
 			ex.objects[objectIndex].LabelSelector = kbLabels

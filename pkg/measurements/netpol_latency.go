@@ -39,7 +39,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -510,7 +509,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(n.RestConfig),
 				name:          "netpolWatcher",
 				resource:      gvr,
-				labelSelector: labels.Set{config.KubeBurnerLabelRunID: n.Runid}.String(),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, n.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNetpol,
 				},

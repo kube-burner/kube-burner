@@ -309,7 +309,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
 				name:          "vmWatcher",
 				resource:      vmgvr,
-				labelSelector: labels.Set{config.KubeBurnerLabelRunID: vmi.Runid}.String(),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVM,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -321,7 +321,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
 				name:          "vmiWatcher",
 				resource:      vmigvr,
-				labelSelector: labels.Set{config.KubeBurnerLabelRunID: vmi.Runid}.String(),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMI,
 					UpdateFunc: func(oldObj, newObj any) {

@@ -181,7 +181,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(dv.RestConfig),
 				name:          "dvWatcher",
 				resource:      gvr,
-				labelSelector: labels.Set{config.KubeBurnerLabelRunID: dv.Runid}.String(),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, dv.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: dv.handleCreateDV,
 					UpdateFunc: func(oldObj, newObj any) {

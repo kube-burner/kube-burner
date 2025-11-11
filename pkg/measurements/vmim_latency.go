@@ -191,7 +191,7 @@ func (vmiml *vmimLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vmiml.RestConfig),
 				name:          "vmimWatcher",
 				resource:      gvr,
-				labelSelector: labels.Set{config.KubeBurnerLabelRunID: vmiml.Runid}.String(),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmiml.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmiml.handleCreateVMIM,
 					UpdateFunc: func(oldObj, newObj any) {
