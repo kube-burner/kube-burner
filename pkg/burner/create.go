@@ -485,7 +485,7 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 func (ex *JobExecutor) verifyDelete(deletedObjects []churnDeletedObject) {
 	for _, obj := range deletedObjects {
 		wait.PollUntilContextCancel(context.TODO(), time.Second, true, func(ctx context.Context) (done bool, err error) {
-			_, err = ex.dynamicClient.Resource(obj.gvr).Get(context.TODO(), obj.object.GetName(), metav1.GetOptions{})
+			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(context.TODO(), obj.object.GetName(), metav1.GetOptions{})
 			if kerrors.IsNotFound(err) {
 				return true, nil
 			}
