@@ -20,6 +20,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -89,7 +90,7 @@ func (ex *JobExecutor) setupCreateJob() {
 }
 
 // RunCreateJob executes a creation job
-func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int) {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		"kube-burner-job":   ex.Name,
@@ -98,12 +99,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	}
 	var wg sync.WaitGroup
 	var ns string
-	var namespacesCreated = make(map[string]bool)
-	var namespacesWaited = make(map[string]bool)
+	var namespacesWaited []string
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
-		ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+		ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
 	}
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
@@ -118,7 +118,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsRequired && ex.NamespacedIterations {
-			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
 		}
 		for objectIndex, obj := range ex.objects {
 			if obj.gvr == (schema.GroupVersionResource{}) {
@@ -129,7 +129,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 					if ex.NamespacedIterations {
 						nsName = ex.generateNamespace(i)
 					}
-					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations)
 				}
 			}
 			labels := map[string]string{
@@ -151,11 +151,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
-			if !ex.NamespacedIterations || !namespacesWaited[ns] {
+			if !ex.NamespacedIterations || !slices.Contains(namespacesWaited, ns) {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
 				ex.waitForObjects(ns)
-				namespacesWaited[ns] = true
+				namespacesWaited = append(namespacesWaited, ns)
 			}
 		}
 		if ex.JobIterationDelay > 0 {
@@ -172,10 +172,10 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.nsRequired && ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
-				if namespacesWaited[ns] {
+				if slices.Contains(namespacesWaited, ns) {
 					continue
 				}
-				namespacesWaited[ns] = true
+				namespacesWaited = append(namespacesWaited, ns)
 			}
 			sem <- 1
 			wg.Add(1)
@@ -293,15 +293,14 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 	}, 1*time.Second, 3, 0, timeout)
 }
 
-func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[string]string, waitListNamespaces *[]string, namespacesCreated map[string]bool) string {
-	if namespacesCreated[ns] {
+func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[string]string) string {
+	if slices.Contains(ex.createdNamespaces, ns) {
 		return ns
 	}
 	if err := util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 		log.Error(err.Error())
 	}
-	namespacesCreated[ns] = true
-	*waitListNamespaces = append(*waitListNamespaces, ns)
+	ex.createdNamespaces = append(ex.createdNamespaces, ns)
 	return ns
 }
 
@@ -375,7 +374,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
 		}
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})
+		ex.RunCreateJob(ctx, randStart, numToChurn+randStart)
 		log.Infof("Sleeping for %v", ex.ChurnDelay)
 		time.Sleep(ex.ChurnDelay)
 		cyclesCount++
