@@ -118,8 +118,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
 				if jobExecutor.Cleanup {
-					// No timeout for initial job cleanup
-					jobExecutor.gc(context.TODO(), nil)
+					jobExecutor.gc(ctx, nil)
 				}
 				if jobExecutor.Churn {
 					log.Info("Churning enabled")
