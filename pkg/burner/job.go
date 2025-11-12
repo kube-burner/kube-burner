@@ -77,8 +77,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var executedJobs []prometheus.Job
 	var jobExecutors []JobExecutor
 	var msWg, gcWg sync.WaitGroup
-	var gcCtx context.Context
-	var cancelGC context.CancelFunc
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -86,7 +84,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	globalWaitMap := make(map[string][]string)
 	executorMap := make(map[string]JobExecutor)
 	returnMap := make(map[string]returnPair)
-	timeoutGCStarted := false
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
 	defer cancel()
@@ -221,10 +218,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
 			//nolint:govet
-			gcCtx, _ = context.WithTimeout(context.Background(), globalConfig.GCTimeout)
 			for _, jobExecutor := range jobExecutors {
 				gcWg.Add(1)
-				go jobExecutor.gc(gcCtx, &gcWg)
+				go jobExecutor.gc(ctx, &gcWg)
 			}
 			if globalConfig.GCMetrics {
 				cleanupStart := time.Now().UTC()
@@ -272,26 +268,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 		errs = append(errs, err)
 		rc = rcTimeout
-		if globalConfig.GC {
-			gcCtx, cancelGC = context.WithTimeout(context.Background(), globalConfig.GCTimeout)
-			defer cancelGC()
-			for _, jobExecutor := range jobExecutors[:len(executedJobs)-1] {
-				gcWg.Add(1)
-				go jobExecutor.gc(gcCtx, &gcWg)
-			}
-			timeoutGCStarted = true
-		}
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	if globalConfig.GC {
-		// When GC is enabled and GCMetrics is disabled, we assume previous GC operation ran in background, so we have to ensure there's no garbage left
-		// Also wait if timeout GC was started, regardless of GCMetrics setting
-		if !globalConfig.GCMetrics || timeoutGCStarted {
-			log.Info("Garbage collecting jobs")
-			gcWg.Wait()
-		}
-		// When GC times out and job execution has finished successfully, return timeout
-		if gcCtx.Err() == context.DeadlineExceeded && rc == 0 {
+		log.Info("Waiting for garbage collection to finish")
+		gcWg.Wait()
+		if ctx.Err() == context.DeadlineExceeded && rc == 0 {
 			errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
 			rc = rcTimeout
 		}
