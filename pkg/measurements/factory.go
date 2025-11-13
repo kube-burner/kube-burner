@@ -176,12 +176,3 @@ func (ms *Measurements) Index(jobName string, indexerList map[string]indexers.In
 		measurement.Index(jobName, indexerList)
 	}
 }
-
-func (ms *Measurements) GetMetrics() []*sync.Map {
-	var metricList []*sync.Map
-	for name, measurement := range ms.MeasurementsMap {
-		log.Infof("Fetching metrics from measurement: %s", name)
-		metricList = append(metricList, measurement.GetMetrics())
-	}
-	return metricList
-}
