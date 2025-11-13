@@ -102,6 +102,7 @@ Where `quantileName` matches with the pod conditions and can be:
 - `Initialized`: All init containers in the pod have started successfully
 - `ContainersReady`: Indicates whether all containers in the pod are ready.
 - `Ready`: The pod is able to service requests and should be added to the load balancing pools of all matching services.
+- `ContainersStarted`: All containers in the pod have started successfully. This is the timestamp of the latest container started event.
 
 !!! note
     We also log the errorRate of the latencies for user's understanding. It indicates the percentage of pods out of all pods in the workload that got errored during the latency calculations. Currently the threshold for the errorRate is 10% and we do not log latencies if the error is > 10% which indicates a problem with environment.(i.e system under test)

@@ -17,6 +17,7 @@ package measurements
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,7 @@ import (
 const (
 	podLatencyMeasurement          = "podLatencyMeasurement"
 	podLatencyQuantilesMeasurement = "podLatencyQuantilesMeasurement"
+	containersStarted              = "ContainersStarted"
 )
 
 var (
@@ -66,6 +68,8 @@ type podMetric struct {
 	podReady                      time.Time
 	PodReadyLatency               int `json:"podReadyLatency"`
 	readyToStartContainers        time.Time
+	ContainersStartedLatency      int `json:"containersStartedLatency"`
+	containersStarted             time.Time
 	ReadyToStartContainersLatency int    `json:"readyToStartContainersLatency"`
 	MetricName                    string `json:"metricName"`
 	UUID                          string `json:"uuid"`
@@ -157,7 +161,7 @@ func (p *podLatency) handleUpdatePod(obj any) {
 							pm.containersReady = c.LastTransitionTime.UTC()
 						}
 					case corev1.PodReady:
-						log.Debugf("Pod %s is ready", pod.Name)
+						pm.containersStarted = p.getStartedTimeFromEvent(pod)
 						pm.podReady = c.LastTransitionTime.UTC()
 					}
 				}
@@ -171,11 +175,34 @@ func (p *podLatency) handleUpdatePod(obj any) {
 func (p *podLatency) getScheduledTimeFromEvent(pod *corev1.Pod) time.Time {
 	eventList, _ := p.eventLister.List(labels.Everything())
 	for _, event := range eventList {
-		if event.InvolvedObject.UID == pod.UID {
+		if event.InvolvedObject.UID == pod.UID && event.Reason == "Scheduled" {
 			return event.EventTime.Time
 		}
 	}
 	return time.Time{}
+}
+
+// getStartedTimeFromEvent returns the timestamp of the latest container started event in the pod
+func (p *podLatency) getStartedTimeFromEvent(pod *corev1.Pod) time.Time {
+	var timestamp time.Time
+	eventList, _ := p.eventLister.List(labels.Everything())
+	for _, event := range eventList {
+		if event.InvolvedObject.UID == pod.UID && event.Reason == "Started" {
+			// The event name is in the format "pod.name.timestamp" in hexadecimal
+			// https://github.com/kubernetes/client-go/blob/v0.34.2/tools/record/event.go#L492
+			eventName := strings.Split(event.Name, ".")
+			eventTsInt, err := strconv.ParseInt(eventName[1], 16, 64)
+			if err != nil {
+				log.Warnf("failed to parse event timestamp: %v", err)
+				continue
+			}
+			eventTs := time.Unix(0, eventTsInt)
+			if timestamp.Before(eventTs) {
+				timestamp = eventTs
+			}
+		}
+	}
+	return timestamp
 }
 
 // start podLatency measurement
@@ -207,10 +234,11 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 		"events",
 		corev1.NamespaceAll,
 		func(options *metav1.ListOptions) {
-			options.FieldSelector = "reason=Scheduled,involvedObject.kind=Pod"
+			options.FieldSelector = "involvedObject.kind=Pod"
 		},
 	)
 	eventInformer := cache.NewSharedIndexInformer(lw, &corev1.Event{}, 0, cache.Indexers{})
+	p.stopInformerCh = make(chan struct{})
 	go eventInformer.Run(p.stopInformerCh)
 	if !cache.WaitForCacheSync(p.stopInformerCh, eventInformer.HasSynced) {
 		return fmt.Errorf("failed to sync event informer cache")
@@ -313,6 +341,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 			errorFlag = 1
 			m.PodReadyLatency = 0
 		}
+		m.ContainersStartedLatency = int(m.containersStarted.Sub(m.Timestamp).Milliseconds())
 		totalPods++
 		erroredPods += errorFlag
 		p.NormLatencies = append(p.NormLatencies, m)
@@ -332,6 +361,7 @@ func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
 		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
 		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
+		containersStarted:                        float64(podMetric.ContainersStartedLatency),
 	}
 }
 
