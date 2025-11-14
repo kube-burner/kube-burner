@@ -296,10 +296,10 @@ check_metric_recorded() {
   local job=$1
   local type=$2
   local metric=$3
-  local m
-  m=$(cat ${METRICS_FOLDER}/${type}Measurement-${job}.json | jq .[0].${metric})
-  if [[ ${m} -eq 0 ]]; then
+  if ! jq -e .[0].${metric} ${METRICS_FOLDER}/${type}Measurement-${job}.json; then
       echo "metric ${type}/${metric} was not recorded for ${job}"
+      echo "Content of ${METRICS_FOLDER}/${type}Measurement-${job}.json"
+      cat ${METRICS_FOLDER}/${type}Measurement-${job}.json
       return 1
   fi
 }
@@ -308,10 +308,10 @@ check_quantile_recorded() {
   local job=$1
   local type=$2
   local quantileName=$3
-
-  MEASUREMENT=$(cat ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json | jq --arg name "${quantileName}" '[.[] | select(.quantileName == $name)][0].avg')
-  if [[ ${MEASUREMENT} -eq 0 ]]; then
+  if ! jq -e --arg name "${quantileName}" '[.[] | select(.quantileName == $name)][0].avg' ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json; then
     echo "Quantile for ${type}/${quantileName} was not recorded for ${job}"
+    echo "Content of ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json"
+    cat ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json
     return 1
   fi
 }
