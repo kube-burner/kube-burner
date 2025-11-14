@@ -124,7 +124,6 @@ func initCmd() *cobra.Command {
 				log.Error("Config error")
 				fmt.Printf("%s", err.Error())
 				os.Exit(1)
-				// log.Printf("Config error: %s", err.Error())
 			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      &configSpec,
