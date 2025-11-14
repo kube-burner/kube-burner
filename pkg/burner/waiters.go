@@ -68,7 +68,6 @@ var (
 func (ex *JobExecutor) waitForObjects(ns string) {
 	for _, obj := range ex.objects {
 		ex.waitForObject(ns, obj)
-
 	}
 	if ns != "" {
 		log.Infof("Actions in namespace %v completed", ns)
