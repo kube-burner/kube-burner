@@ -414,7 +414,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]JobEx
 }
 
 func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
-	labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
+	labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelJob, ex.Name)
 	if wg != nil {
 		defer wg.Done()
 	}

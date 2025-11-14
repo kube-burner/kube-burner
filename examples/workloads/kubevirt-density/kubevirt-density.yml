@@ -23,19 +23,19 @@ jobs:
     objects:
 
     - kind: VirtualMachine
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: kubevirt.io/v1
 
     - kind: VirtualMachineInstance
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: kubevirt.io/v1
 
     - kind: Pod
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: v1
 
     - kind: Namespace
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
 
   # create the VMs
   - name: kubevirt-density
@@ -81,16 +81,16 @@ jobs:
     objects:
 
     - kind: VirtualMachine
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: kubevirt.io/v1
 
     - kind: VirtualMachineInstance
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: kubevirt.io/v1
 
     - kind: Pod
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: v1
 
     - kind: Namespace
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}

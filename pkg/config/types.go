@@ -253,6 +253,10 @@ const (
 )
 
 const (
+	KubeBurnerLabelJob          = "kube-burner.io/job"
+	KubeBurnerLabelUUID         = "kube-burner.io/uuid"
+	KubeBurnerLabelRunID        = "kube-burner.io/runid"
+	KubeBurnerLabelIndex        = "kube-burner.io/index"
 	KubeBurnerLabelJobIteration = "kube-burner.io/job-iteration"
 	KubeBurnerLabelReplica      = "kube-burner.io/replica"
 )

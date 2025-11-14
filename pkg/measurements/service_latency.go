@@ -195,7 +195,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
 			name:          "svcWatcher",
 			resource:      sgvr,
-			labelSelector: fmt.Sprintf("kube-burner-runid=%v", s.Runid),
+			labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, s.Runid),
 			handlers: &cache.ResourceEventHandlerFuncs{
 				AddFunc: s.handleCreateSvc,
 			},

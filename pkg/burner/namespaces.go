@@ -30,7 +30,7 @@ import (
 // Cleanup resources specific to kube-burner for a given iteration range
 func CleanupIterations(ctx context.Context, ex JobExecutor, iterationStart, iterationEnd int, namespace string) {
 	for i := iterationStart; i < iterationEnd; i++ {
-		labelSelector := fmt.Sprintf("kube-burner-job=%s,%s=%d", ex.Name, config.KubeBurnerLabelJobIteration, i)
+		labelSelector := fmt.Sprintf("%s=%s,%s=%d", config.KubeBurnerLabelJob, ex.Name, config.KubeBurnerLabelJobIteration, i)
 		for _, obj := range ex.objects {
 			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 		}
@@ -40,8 +40,8 @@ func CleanupIterations(ctx context.Context, ex JobExecutor, iterationStart, iter
 
 // Cleanup resources specific to kube-burner with in a given list of namespaces
 func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
+	labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelJob, ex.Name)
 	for _, namespace := range namespacesToDelete {
-		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
 		for _, obj := range ex.objects {
 			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 		}

@@ -38,7 +38,7 @@ jobs:
     objects:
       - kind: Deployment
         objectTemplate: templates/deployment_patch_move_worker.yaml
-        labelSelector: {kube-burner-job: pvc-move}
+        labelSelector: {kube-burner.io/job: pvc-move}
         patchType: "application/strategic-merge-patch+json"
         apiVersion: apps/v1
         inputVars:
@@ -54,8 +54,8 @@ jobs:
     waitForDeletion: true
     objects:
       - kind: Deployment
-        labelSelector: {kube-burner-job: pvc-move}
+        labelSelector: {kube-burner.io/job: pvc-move}
         apiVersion: apps/v1
       - kind: PersistentVolumeClaim
-        labelSelector: {kube-burner-job: pvc-move}
+        labelSelector: {kube-burner.io/job: pvc-move}
         apiVersion: v1
