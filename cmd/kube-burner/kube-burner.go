@@ -121,7 +121,7 @@ func initCmd() *cobra.Command {
 			}
 			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
 			if err != nil {
-				log.Printf("Config error")
+				log.Error("Config error")
 				fmt.Printf("%s", err.Error())
 				os.Exit(1)
 				// log.Printf("Config error: %s", err.Error())
