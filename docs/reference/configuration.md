@@ -39,7 +39,6 @@ In this section is described global job configuration, it holds the following pa
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 60s         |
 | `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
 | `gcMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
-| `gcTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 | `waitWhenFinished` | Wait for all pods/jobs (including probes) to be running/completed when all jobs are completed           | Boolean  | false   |
 | `clusterHealth` | Checks if all the nodes are in "Ready" state                                             | Boolean        | false      |
 | `timeout` | Global benchmark timeout                                             | Duration        | 4hr      |

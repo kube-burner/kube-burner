@@ -47,7 +47,6 @@ var configSpec = Spec{
 	GlobalConfig: GlobalConfig{
 		GC:                false,
 		GCMetrics:         false,
-		GCTimeout:         1 * time.Hour,
 		RequestTimeout:    60 * time.Second,
 		Measurements:      []mtypes.Measurement{},
 		WaitWhenFinished:  false,

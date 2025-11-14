@@ -90,8 +90,6 @@ type GlobalConfig struct {
 	GC bool `yaml:"gc" json:"gc"`
 	// WaitWhenFinished Wait for pods to be running when all the jobs are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
-	// GCTimeout garbage collection timeout
-	GCTimeout time.Duration `yaml:"gcTimeout"`
 	// Boolean flag to collect metrics during garbage collection
 	GCMetrics bool `yaml:"gcMetrics"`
 	// Boolean flag to check for cluster-health
