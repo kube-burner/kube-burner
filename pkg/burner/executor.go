@@ -39,7 +39,7 @@ type ObjectFinalizer func(ex *JobExecutor, obj *object)
 type JobExecutor struct {
 	config.Job
 	objects           []*object
-	createdNamespaces []string
+	createdNamespaces map[string]bool
 	uuid              string
 	runid             string
 	limiter           *rate.Limiter

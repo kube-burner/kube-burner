@@ -375,7 +375,7 @@ func runWaitList(jobExecutors []JobExecutor) {
 		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(executor.restConfig.QPS))
-		for _, ns := range executor.createdNamespaces {
+		for ns := range executor.createdNamespaces {
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {

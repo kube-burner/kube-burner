@@ -20,7 +20,6 @@ import (
 	"io"
 	"math"
 	"math/rand"
-	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -108,7 +107,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	}
 	var wg sync.WaitGroup
 	var ns string
-	var namespacesWaited []string
+	var namespacesWaited = make(map[string]bool)
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
@@ -160,11 +159,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
-			if !ex.NamespacedIterations || !slices.Contains(namespacesWaited, ns) {
+			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
 				ex.waitForObjects(ns)
-				namespacesWaited = append(namespacesWaited, ns)
+				namespacesWaited[ns] = true
 			}
 		}
 		if ex.JobIterationDelay > 0 {
@@ -181,10 +180,10 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		for i := iterationStart; i < iterationEnd; i++ {
 			if ex.nsRequired && ex.NamespacedIterations {
 				ns = ex.generateNamespace(i)
-				if slices.Contains(namespacesWaited, ns) {
+				if namespacesWaited[ns] {
 					continue
 				}
-				namespacesWaited = append(namespacesWaited, ns)
+				namespacesWaited[ns] = true
 			}
 			sem <- 1
 			wg.Add(1)
@@ -307,13 +306,13 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 }
 
 func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[string]string) string {
-	if slices.Contains(ex.createdNamespaces, ns) {
+	if ex.createdNamespaces[ns] {
 		return ns
 	}
 	if err := util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 		log.Error(err.Error())
 	}
-	ex.createdNamespaces = append(ex.createdNamespaces, ns)
+	ex.createdNamespaces[ns] = true
 	return ns
 }
 
