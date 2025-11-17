@@ -300,7 +300,6 @@ check_metric_recorded() {
   m=$(cat ${METRICS_FOLDER}/${type}Measurement-${job}.json | jq .[0].${metric})
   if [[ ${m} -eq 0 ]]; then
       echo "metric ${type}/${metric} was not recorded for ${job}"
-      cat ${METRICS_FOLDER}/${type}Measurement-${job}.json
       return 1
   fi
 }
