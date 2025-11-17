@@ -188,7 +188,7 @@ func (p *podLatency) getStartedTimeFromEvent(pod *corev1.Pod) time.Time {
 	eventList, _ := p.eventLister.List(labels.Everything())
 	for _, event := range eventList {
 		if event.InvolvedObject.UID == pod.UID && event.Reason == "Started" {
-			// The event name is in the format "pod.name.timestamp" in hexadecimal
+			// The event name is in the format "podName.timestamp", where timestamp in hexadecimal format
 			// https://github.com/kubernetes/client-go/blob/v0.34.2/tools/record/event.go#L492
 			eventName := strings.Split(event.Name, ".")
 			eventTsInt, err := strconv.ParseInt(eventName[1], 16, 64)
@@ -197,6 +197,7 @@ func (p *podLatency) getStartedTimeFromEvent(pod *corev1.Pod) time.Time {
 				continue
 			}
 			eventTs := time.Unix(0, eventTsInt)
+			// In pods with multiple containers, pick the timestamp of the latest "Started" event observed
 			if timestamp.Before(eventTs) {
 				timestamp = eventTs
 			}
