@@ -74,8 +74,8 @@ github.com/chzyer/readline v1.5.1/go.mod h1:Eh+b79XXUwfKfcPLepksvw2tcLE/Ct21YObk
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/chzyer/test v1.0.0/go.mod h1:2JlltgoNkt4TW/z9V/IzDdFaMTM2JPIi26O1pF38GC8=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/cloud-bulldozer/go-commons/v2 v2.1.1 h1:rmLXPG7o2SbJjJWWHDnz7QmntpGs7kRiaxG9SLJS3L4=
-github.com/cloud-bulldozer/go-commons/v2 v2.1.1/go.mod h1:aNO6P9yANMO8x7Q+7D9uErmIEpAT4o8RLM8n8kMTlRA=
+github.com/cloud-bulldozer/go-commons/v2 v2.2.0 h1:Hmt9HOYBOkkfksLSU3R33NeMvCnC6LKJmnBQf4e5iKc=
+github.com/cloud-bulldozer/go-commons/v2 v2.2.0/go.mod h1:aWgDuOnrSubDLZzAfIh2Qz0ewo4bouTBm7Sg0aeUjDA=
 github.com/containernetworking/cni v0.7.1/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=

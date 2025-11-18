@@ -7,7 +7,7 @@ toolchain go1.23.4
 require (
 	dario.cat/mergo v1.0.1
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/cloud-bulldozer/go-commons/v2 v2.1.1
+	github.com/cloud-bulldozer/go-commons/v2 v2.2.0
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.16
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0
