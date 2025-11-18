@@ -123,7 +123,9 @@ func initCmd() *cobra.Command {
 			}
 			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
 			if err != nil {
-				log.Fatalf("Config error: %s", err.Error())
+				log.Error("Config error")
+				fmt.Printf("%s", err.Error())
+				os.Exit(1)
 			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      &configSpec,
