@@ -96,7 +96,7 @@ func (bm *BaseMeasurement) stopWatchers() {
 
 func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getLatency func(any) map[string]float64) error {
 	var err error
-	defer bm.stopWatchers()
+	bm.stopWatchers()
 	errorRate := normalizeMetrics()
 	if errorRate > 10.00 {
 		log.Error("Latency errors beyond 10%. Hence invalidating the results")
@@ -108,7 +108,7 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 	}
 	for _, q := range bm.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %v max: %v avg: %v", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %v 99th: %vms max: %vms avg: %vms", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
 		log.Infof("%v error rate was: %.2f", bm.MeasurementName, errorRate)

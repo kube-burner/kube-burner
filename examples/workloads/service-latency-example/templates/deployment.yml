@@ -2,23 +2,21 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{.name}}-{{.Replica}}
+  name: {{.JobName}}-{{.Replica}}
 spec:
   replicas: {{.podReplicas}}
   selector:
     matchLabels:
-      app: {{.name}}-{{.Replica}}
-  strategy:
-    resources: {}
+      app: {{.JobName}}-{{.Replica}}
   template:
     metadata:
       labels:
-        app: {{.name}}-{{.Replica}}
+        app: {{.JobName}}-{{.Replica}}
     spec:
       nodeSelector:
         node-role.kubernetes.io/worker: ""
       containers:
-      - image: registry.k8s.io/pause:3.10
+      - image: quay.io/cloud-bulldozer/nginx:latest
         volumeMounts:
         - name: secret-1
           mountPath: /secret1
@@ -32,9 +30,7 @@ spec:
         ports:
          - containerPort: 8080
            protocol: TCP
-        name: {{.name}}
-        env:
-        {{- template "env_func" (dict "envName" .envName "envVar" .envVar "n" 4 "indent" 8) }}
+        name: {{.JobName}}
       volumes:
       - name: secret-1
         secret:
