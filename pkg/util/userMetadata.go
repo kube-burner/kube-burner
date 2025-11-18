@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kube-burner/kube-burner/pkg/errors"
+	"github.com/kube-burner/kube-burner/v2/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )

@@ -35,8 +35,8 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 )
 
 const (

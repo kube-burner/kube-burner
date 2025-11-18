@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
-	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
+	mtypes "github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"k8s.io/client-go/rest"
 )
 
