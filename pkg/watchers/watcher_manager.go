@@ -52,8 +52,7 @@ func (wm *WatcherManager) Start(kind, apiVersion string, labelSelector map[strin
 		watcherName := kindLower + "_watcher_" + indexNum + "_replica_" + replicaNum
 		gvr, err := util.ResourceToGVR(wm.restConfig, kind, apiVersion)
 		if err != nil {
-			wm.recordError(fmt.Errorf("error getting GVR for %s: %w", kindLower, err))
-			return
+			log.Warnf("Skipping watcher for %s: %s", kindLower, err)
 		}
 		watcher := NewWatcher(
 			dynamic.NewForConfigOrDie(wm.restConfig),

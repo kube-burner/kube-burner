@@ -75,11 +75,25 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+// UnmarshalYAML implements Unmarshaller to customize churn defaults
+func (c *ChurnConfig) UnmarshalYAML(unmarshal func(any) error) error {
+	type rawChurn ChurnConfig
+	churn := rawChurn{
+		Mode: ChurnNamespaces,
+	}
+	if err := unmarshal(&churn); err != nil {
+		return err
+	}
+	*c = ChurnConfig(churn)
+	return nil
+}
+
 // UnmarshalYAML implements Unmarshaller to customize object defaults
 func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
 		Wait:     true,
+		Churn:    true,
 		Replicas: 1,
 	}
 	if err := unmarshal(&object); err != nil {
@@ -118,11 +132,6 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		WaitForDeletion:        true,
 		PreLoadImages:          true,
 		PreLoadPeriod:          1 * time.Minute,
-		Churn:                  false,
-		ChurnCycles:            100,
-		ChurnPercent:           10,
-		ChurnDuration:          1 * time.Hour,
-		ChurnDelay:             5 * time.Minute,
 		MetricsClosing:         AfterJobPause,
 		Measurements:           []mtypes.Measurement{},
 	}
@@ -213,9 +222,6 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		if len(job.Namespace) > 62 {
 			log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
 			configSpec.Jobs[i].Namespace = job.Namespace[:57]
-		}
-		if !job.NamespacedIterations && job.Churn {
-			log.Fatal("Cannot have Churn enabled without Namespaced Iterations also enabled")
 		}
 		if job.JobIterations < 1 && (job.JobType == CreationJob || job.JobType == ReadJob) {
 			log.Fatalf("Job %s has < 1 iterations", job.Name)
@@ -350,4 +356,9 @@ func validateGC() error {
 		}
 	}
 	return nil
+}
+
+// checks if Churn is enabled
+func IsChurnEnabled(job Job) bool {
+	return job.ChurnConfig.Duration > 0 || job.ChurnConfig.Cycles > 0
 }
