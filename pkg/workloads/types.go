@@ -18,8 +18,8 @@ import (
 	"time"
 
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/v2/ocp-metadata"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 )
 
 type Config struct {
