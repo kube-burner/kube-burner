@@ -19,24 +19,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 )
-
-// Cleanup resources specific to kube-burner for a given iteration range
-func CleanupIterations(ctx context.Context, ex JobExecutor, iterationStart, iterationEnd int, namespace string) {
-	for i := iterationStart; i < iterationEnd; i++ {
-		labelSelector := fmt.Sprintf("kube-burner-job=%s,%s=%d", ex.Name, config.KubeBurnerLabelJobIteration, i)
-		for _, obj := range ex.objects {
-			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
-		}
-		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
-	}
-}
 
 // Cleanup resources specific to kube-burner with in a given list of namespaces
 func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
@@ -58,7 +48,7 @@ func CleanupNamespaceResourcesUsingGVR(ctx context.Context, ex JobExecutor, obj 
 		return
 	}
 	for _, item := range resources.Items {
-		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{}); err != nil {
+		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
 			if !errors.IsNotFound(err) {
 				log.Errorf("Error deleting %v/%v in %v: %v", item.GetKind(), item.GetName(), namespace, err)
 			}
@@ -82,6 +72,10 @@ func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, names
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		allDeleted := true
 		for _, obj := range objects {
+			// If churning is enabled and object doesn't have churning enabled we skip that object from deletion wait
+			if config.IsChurnEnabled(ex.Job) && !obj.Churn {
+				continue
+			}
 			if obj.namespaced {
 				resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 				objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})

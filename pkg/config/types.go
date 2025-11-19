@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
-	mtypes "github.com/kube-burner/kube-burner/pkg/measurements/types"
+	mtypes "github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"k8s.io/client-go/rest"
 )
 
@@ -90,8 +90,6 @@ type GlobalConfig struct {
 	GC bool `yaml:"gc" json:"gc"`
 	// WaitWhenFinished Wait for pods to be running when all the jobs are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
-	// GCTimeout garbage collection timeout
-	GCTimeout time.Duration `yaml:"gcTimeout"`
 	// Boolean flag to collect metrics during garbage collection
 	GCMetrics bool `yaml:"gcMetrics"`
 	// Boolean flag to check for cluster-health
@@ -129,6 +127,8 @@ type Object struct {
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
 	// KubeVirt Operation
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
+	// Churn object
+	Churn bool `yaml:"churn" json:"churn,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -159,7 +159,7 @@ type Job struct {
 	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout" json:"maxWaitTimeout,omitempty"`
 	// WaitForDeletion wait for objects to be definitively deleted
 	WaitForDeletion bool `yaml:"waitForDeletion" json:"waitForDeletion,omitempty"`
-	// PodWait wait for all pods to be running before moving forward to the next iteration
+	//  wait for all pods to be running before moving forward to the next iteration
 	PodWait bool `yaml:"podWait" json:"podWait,omitempty"`
 	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
@@ -183,16 +183,8 @@ type Job struct {
 	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"-"`
 	// NamespaceAnnotations add custom annotations to namespaces created by kube-burner
 	NamespaceAnnotations map[string]string `yaml:"namespaceAnnotations" json:"-"`
-	// Churn workload
-	Churn bool `yaml:"churn" json:"churn,omitempty"`
-	// Churn cycles
-	ChurnCycles int `yaml:"churnCycles" json:"churnCycles,omitempty"`
-	// Churn percentage
-	ChurnPercent int `yaml:"churnPercent" json:"churnPercent,omitempty"`
-	// Churn duration
-	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration,omitempty"`
-	// Churn delay between sets
-	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
+	// ChurnConfig options
+	ChurnConfig ChurnConfig `yaml:"churnConfig" json:"churnConfig,omitempty"`
 	// Skip this job from indexing
 	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
 	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
@@ -240,6 +232,20 @@ type StatusPath struct {
 	Value string `yaml:"value" json:"value"`
 }
 
+// Churn options
+type ChurnConfig struct {
+	// number of churn loop iterations
+	Cycles int `yaml:"cycles" json:"cycles,omitempty"`
+	// percentage of objects to churn
+	Percent int `yaml:"percent" json:"percent,omitempty"`
+	// duration of the churn stage
+	Duration time.Duration `yaml:"duration" json:"duration,omitempty"`
+	// Delay between sets
+	Delay time.Duration `yaml:"delay" json:"delay,omitempty"`
+	// Churning mode
+	Mode ChurnMode `yaml:"mode" json:"mode,omitempty"`
+}
+
 type KubeClientProvider struct {
 	restConfig *rest.Config
 }
@@ -255,6 +261,7 @@ const (
 const (
 	KubeBurnerLabelJobIteration = "kube-burner.io/job-iteration"
 	KubeBurnerLabelReplica      = "kube-burner.io/replica"
+	KubeBurnerLabelChurnDelete  = "kube-burner.io/churn-delete="
 )
 
 // MetricsCLosing strategy
@@ -271,3 +278,10 @@ var metricsClosing = map[MetricsClosing]struct{}{
 	AfterMeasurements: {},
 	AfterJob:          {},
 }
+
+type ChurnMode string
+
+const (
+	ChurnNamespaces ChurnMode = "namespaces"
+	ChurnObjects    ChurnMode = "objects"
+)

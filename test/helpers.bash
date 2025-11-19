@@ -297,7 +297,12 @@ check_metric_recorded() {
   local type=$2
   local metric=$3
   local m
-  m=$(cat ${METRICS_FOLDER}/${type}Measurement-${job}.json | jq .[0].${metric})
+  local metricFile=${METRICS_FOLDER}/${type}Measurement-${job}.json
+  if [ ! -f ${metricFile} ]; then
+    echo "metric file ${metricFile} not present"
+    return 1
+  fi
+  m=$(cat ${metricFile} | jq .[0].${metric})
   if [[ ${m} -eq 0 ]]; then
       echo "metric ${type}/${metric} was not recorded for ${job}"
       return 1

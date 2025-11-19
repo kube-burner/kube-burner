@@ -17,7 +17,7 @@ package burner
 import (
 	"fmt"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
 )
 
 const (

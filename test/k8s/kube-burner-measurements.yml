@@ -17,6 +17,7 @@ jobs:
     jobIterations: 1
     namespace: precedence-measurements
     namespacedIterations: true
+    preLoadImages: false
     podWait: false
     cleanup: true
     objects:
@@ -34,6 +35,7 @@ jobs:
     jobIterations: 1
     namespace: merge-measurements
     namespacedIterations: true
+    preLoadImages: false
     podWait: false
     cleanup: true
     objects:

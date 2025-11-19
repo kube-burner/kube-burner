@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"golang.org/x/exp/maps"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"

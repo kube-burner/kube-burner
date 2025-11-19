@@ -9,7 +9,7 @@ spec:
     spec:
       source:
         registry:
-          url: "docker://quay.io/containerdisks/fedora:40"
+          url: {{ .osImage }}
       storage:
         volumeMode: Filesystem
         accessModes:
@@ -17,7 +17,7 @@ spec:
         storageClassName: {{ .storageClassName }}
         resources:
           requests:
-            storage: "6Gi"
+            storage: {{ .osImageSize }}
   running: true
   template:
     spec:
