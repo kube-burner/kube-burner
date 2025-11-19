@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/kube-burner/kube-burner/pkg/burner/types"
-	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/burner/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
 )
 
 var (
@@ -68,7 +68,6 @@ var (
 func (ex *JobExecutor) waitForObjects(ns string) {
 	for _, obj := range ex.objects {
 		ex.waitForObject(ns, obj)
-
 	}
 	if ns != "" {
 		log.Infof("Actions in namespace %v completed", ns)
@@ -86,7 +85,7 @@ func (ex *JobExecutor) waitForObject(ns string, obj *object) {
 		ns = obj.namespace
 	}
 
-	labelSelector := map[string]string{"kube-burner-runid": ex.runid}
+	labelSelector := map[string]string{"kube-burner-runid": ex.runid, "kube-burner-uuid": ex.uuid}
 	maps.Copy(labelSelector, obj.WaitOptions.LabelSelector)
 	labelSelectorString := labels.Set(labelSelector).String()
 

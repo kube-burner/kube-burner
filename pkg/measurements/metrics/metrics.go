@@ -19,7 +19,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/montanaflynn/stats"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"

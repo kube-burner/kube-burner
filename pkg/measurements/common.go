@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"time"
 
-	kutil "github.com/kube-burner/kube-burner/pkg/util"
+	kutil "github.com/kube-burner/kube-burner/v2/pkg/util"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
