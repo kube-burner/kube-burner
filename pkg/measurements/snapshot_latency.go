@@ -145,7 +145,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vsl.RestConfig),
 				name:          "vsWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vsl.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vsl.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vsl.handleCreateVolumeSnapshot,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -165,9 +165,8 @@ func (vsl *volumeSnapshotLatency) Stop() error {
 func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var volumeSnapshots []volumesnapshotv1.VolumeSnapshot
-	labelSelector := labels.SelectorFromSet(vsl.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: labels.Set(vsl.JobConfig.NamespaceLabels).String(),
 	}
 	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(vsl.RestConfig)
 	if err != nil {

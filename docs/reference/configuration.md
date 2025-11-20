@@ -251,7 +251,7 @@ This allows kube-burner to check the status at all the specified key/value pairs
 
 ### Default labels
 
-All objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. They are used for internal purposes, but they can also be used by the users.
+All objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>`. They are used for internal purposes, but they can also be used by the users.
 
 ## Job types
 
@@ -273,11 +273,11 @@ This type of job deletes objects described in the objects list. Using delete as 
 ```yaml
 objects:
 - kind: Deployment
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
   apiVersion: apps/v1
 
 - kind: Secret
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
 ```
 
 Where:
@@ -302,11 +302,11 @@ This type of job reads objects described in the objects list. Using read as job 
 ```yaml
 objects:
 - kind: Deployment
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
   apiVersion: apps/v1
 
 - kind: Secret
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
 ```
 
 Where:
@@ -331,7 +331,7 @@ This type of job can be used to patch objects with the template described in the
 ```yaml
 objects:
 - kind: Deployment
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
   objectTemplate: templates/deployment_patch_add_label.json
   patchType: "application/strategic-merge-patch+json"
   apiVersion: apps/v1
@@ -352,7 +352,7 @@ Valid patch types:
 - application/strategic-merge-patch+json
 - application/apply-patch+yaml (requires YAML)
 
-As mentioned previously, all objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. Therefore, you can design a workload with one job to create objects and another one to patch or remove the objects created by the previous.
+As mentioned previously, all objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>`. Therefore, you can design a workload with one job to create objects and another one to patch or remove the objects created by the previous.
 
 ```yaml
 jobs:
@@ -370,11 +370,11 @@ jobs:
   jobType: delete
   objects:
   - kind: Deployment
-    labelSelector: {kube-burner-job: create-objects}
+    labelSelector: {kube-burner.io/job: create-objects}
     apiVersion: apps/v1
 
   - kind: Secret
-    labelSelector: {kube-burner-job: create-objects}
+    labelSelector: {kube-burner.io/job: create-objects}
 ```
 
 ### Kubevirt
@@ -384,7 +384,7 @@ This type of job can be used to execute `virtctl` commands described in the obje
 ```yaml
 objects:
 - kubeVirtOp: start
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
   inputVars:
     force: true
 ```

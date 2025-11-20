@@ -48,7 +48,7 @@ setup() {
 }
 
 teardown() {
-  kubectl delete ns -l kube-burner-uuid="${UUID}" --ignore-not-found
+  kubectl delete ns -l kube-burner.io/uuid="${UUID}" --ignore-not-found
 }
 
 teardown_file() {
@@ -70,21 +70,21 @@ teardown_file() {
   export JOBGC=true
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid="${UUID}" --log-level=debug
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
-  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
+  check_destroyed_pods default kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
 }
 
 @test "kube-burner init: gc=false; preload=true; churn-mode=objects" {
   export GC=false PRELOAD_IMAGES=true
   export CHURN_CYCLES=2 CHURN_MODE=objects
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
-  check_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 5
-  check_running_pods kube-burner-job=namespaced,kube-burner-uuid="${UUID}" 10
+  check_ns kube-burner.io/job=namespaced,kube-burner.io/uuid="${UUID}" 5
+  check_running_pods kube-burner.io/job=namespaced,kube-burner.io/uuid="${UUID}" 10
   check_running_pods_in_ns default 5
   ${KUBE_BURNER} destroy --uuid "${UUID}"
-  kubectl delete pod -l kube-burner-uuid=${UUID} -n default
-  check_destroyed_ns kube-burner-job=namespaced,kube-burner-uuid="${UUID}"
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  kubectl delete pod -l kube-burner.io/uuid=${UUID} -n default
+  check_destroyed_ns kube-burner.io/job=namespaced,kube-burner.io/uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; vm-latency-indexing=true" {
@@ -92,16 +92,16 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid="${UUID}" --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json  ${METRICS_FOLDER}/vmiLatencyMeasurement-kubevirt-density.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-kubevirt-density.json
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
-  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
+  check_destroyed_pods default kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
 }
 
 @test "kube-burner init: local-indexing=true; pod-latency-metrics-indexing=true" {
   export LOCAL_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
-  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
+  check_destroyed_pods default kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; alerting=true"  {
@@ -109,16 +109,16 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json  ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
-  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
+  check_destroyed_pods default kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
 }
 
 @test "kube-burner init: os-indexing=true; local-indexing=true; metrics-endpoint=true" {
   export ES_INDEXING=true LOCAL_INDEXING=true TIMESERIES_INDEXER=local-indexing
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug -e metrics-endpoints.yaml
   check_file_list ${METRICS_FOLDER}/jobSummary.json  ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
-  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
+  check_destroyed_pods default kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
 }
 
 @test "kube-burner index: local-indexing=true; tarball=true" {
@@ -143,7 +143,7 @@ teardown_file() {
 @test "kube-burner init: delete=true; os-indexing=true; local-indexing=true" {
   export ES_INDEXING=true LOCAL_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner-delete.yml --uuid "${UUID}" --log-level=debug
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-delete-job.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-delete-job.json ${METRICS_FOLDER}/prometheusBuildInfo.json
 }
@@ -157,15 +157,15 @@ teardown_file() {
 
 @test "kube-burner init: kubeconfig" {
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug --kubeconfig="${TEST_KUBECONFIG}"
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
-  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
+  check_destroyed_pods default kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
 }
 
 @test "kube-burner init: kubeconfig kube-context" {
   run_cmd kubectl --kubeconfig "${TEST_KUBECONFIG}" config unset current-context
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
-  check_destroyed_ns kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
-  check_destroyed_pods default kube-burner-job=not-namespaced,kube-burner-uuid="${UUID}"
+  check_destroyed_ns kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
+  check_destroyed_pods default kube-burner.io/job=not-namespaced,kube-burner.io/uuid="${UUID}"
 }
 
 @test "kube-burner cluster health check" {
@@ -187,7 +187,7 @@ teardown_file() {
   export WAIT_FOR_CONDITION="True"
   export WAIT_CUSTOM_STATUS_PATH='(.conditions.[] | select(.type == "Available")).status'
   run_cmd ${KUBE_BURNER} init -c  kube-burner.yml --uuid="${UUID}" --log-level=debug
-  check_custom_status_path kube-burner-uuid="${UUID}" "{.items[*].status.conditions[].type}" Available
+  check_custom_status_path kube-burner.io/uuid="${UUID}" "{.items[*].status.conditions[].type}" Available
   ${KUBE_BURNER} destroy --uuid "${UUID}"
 }
 

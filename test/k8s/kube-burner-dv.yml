@@ -55,7 +55,7 @@ jobs:
   objects:
   - kubeVirtOp: stop
     labelSelector:
-      kube-burner-job: create-vm
+      kube-burner.io/job: create-vm
 
 # Create the DV in a separate job to make sure it is ready before continuing
 - name: create-base-image-dv
@@ -91,7 +91,7 @@ jobs:
 
     waitOptions:
       labelSelector:
-        kube-burner-job: create-base-image-dv
+        kube-burner.io/job: create-base-image-dv
 
 - name: create-snapshot
   jobType: create

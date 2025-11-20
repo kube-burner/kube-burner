@@ -30,8 +30,8 @@ import (
 
 // Cleanup resources specific to kube-burner with in a given list of namespaces
 func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
+	labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelJob, ex.Name)
 	for _, namespace := range namespacesToDelete {
-		labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
 		for _, obj := range ex.objects {
 			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 		}

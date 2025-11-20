@@ -37,37 +37,37 @@ jobs:
     objects:
     - kubeVirtOp: stop
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
     - kubeVirtOp: start
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
     - kubeVirtOp: restart
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
     - kubeVirtOp: pause
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
     - kubeVirtOp: unpause
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
     - kubeVirtOp: stop
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
       inputVars:
         force: true
     - kubeVirtOp: start
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
       inputVars:
         startPaused: true
     - kubeVirtOp: unpause
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
       inputVars:
         force: true
     - kubeVirtOp: migrate
       labelSelector:
-        kube-burner-job: kubevirt-ops
+        kube-burner.io/job: kubevirt-ops
       # Tests are executed on a single node cluster. As a result, migrate does not complete
       wait: false
 
@@ -80,8 +80,8 @@ jobs:
     objects:
 
     - kind: VirtualMachine
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector: {kube-burner.io/job: kubevirt-ops}
       apiVersion: kubevirt.io/v1
 
     - kind: Namespace
-      labelSelector: {kube-burner-job: kubevirt-ops}
+      labelSelector: {kube-burner.io/job: kubevirt-ops}

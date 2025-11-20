@@ -309,7 +309,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
 				name:          "vmWatcher",
 				resource:      vmgvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVM,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -321,7 +321,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
 				name:          "vmiWatcher",
 				resource:      vmigvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmi.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmi.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMI,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -333,12 +333,10 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
 				name:          "podWatcher",
 				resource:      pgvr,
-				labelSelector: labels.Set(
-					map[string]string{
-						"kubevirt.io":       "virt-launcher",
-						"kube-burner-runid": vmi.Runid,
-					},
-				).String(),
+				labelSelector: labels.Set{
+					"kubevirt.io":               "virt-launcher",
+					config.KubeBurnerLabelRunID: vmi.Runid,
+				}.String(),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmi.handleCreateVMIPod,
 					UpdateFunc: func(oldObj, newObj any) {
