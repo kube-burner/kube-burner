@@ -61,6 +61,7 @@ type JobExecutor struct {
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
 	ex := JobExecutor{
 		Job:               job,
+		createdNamespaces: make(map[string]bool),
 		limiter:           rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		uuid:              configSpec.GlobalConfig.UUID,
 		runid:             configSpec.GlobalConfig.RUNID,
