@@ -104,3 +104,33 @@ jobs:
     - objectTemplate: objectTemplates/secret.yml
       replicas: 1
       runOnce: true
+
+{{ if .CRD }}
+  - name: test-crd
+    jobType: create
+    jobIterations: 1
+    namespacedIterations: false
+    namespace: cr-crd
+    cleanup: false
+    podWait: false
+    qps: 10
+    burst: 10
+    jobPause: 10s
+    objects:
+    - objectTemplate: objectTemplates/crd.yml
+      replicas: 1
+
+  - name: test-resources
+    jobType: create
+    jobIterations: 1
+    namespacedIterations: false
+    namespace: cr-crd
+    cleanup: false
+    podWait: false
+    qps: 10
+    burst: 10
+    jobPause: 10s
+    objects:
+    - objectTemplate: objectTemplates/cr.yml
+      replicas: 5
+{{ end }}

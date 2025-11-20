@@ -189,6 +189,32 @@ check_running_custom_resources_in_ns() {
   fi
 }
 
+verify_object_count(){
+  local resource=$1
+  local count=$2
+  local namespace=$3
+  local selector=$4
+  local fieldSelector=$5
+  local CMD="kubectl get $1 -o json"
+  if [[ -n ${namespace} ]]; then
+    CMD+=" -n ${namespace}"
+  else
+    CMD+=" -A"
+  fi
+  if [[ -n ${selector} ]]; then
+    CMD+=" -l ${selector}"
+  fi
+  if [[ -n ${fieldSelector} ]]; then
+    CMD+=" --field-selector ${fieldSelector}"
+  fi
+  echo "${CMD}"
+  counted=$(${CMD} | jq '.items | length')
+  if [[ ${counted} != "${count}" ]]; then
+    echo "Expected ${count} ${resource}(s), seen ${counted}"
+    return 1
+  fi
+}
+
 check_file_list() {
   for f in "${@}"; do
     if [[ ! -f ${f} ]]; then
