@@ -341,9 +341,9 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
 	// Create timer for the churn duration
 	timer := time.After(ex.ChurnConfig.Duration)
 	nsLabels := labels.Set{
-		"kube-burner-job":   ex.Name,
-		"kube-burner-uuid":  ex.uuid,
-		"kube-burner-runid": ex.runid,
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelUUID:  ex.uuid,
+		config.KubeBurnerLabelRunID: ex.runid,
 	}
 	// List namespaces to churn
 	jobNamespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(nsLabels).String()})
@@ -422,8 +422,8 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 			if obj.Churn {
 				labelSelector := obj.LabelSelector
 				// Remove these labels to list all objects
-				delete(labelSelector, "kube-burner.io/job-iteration")
-				delete(labelSelector, "kube-burner.io/replica")
+				delete(labelSelector, config.KubeBurnerLabelJobIteration)
+				delete(labelSelector, config.KubeBurnerLabelReplica)
 				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 					LabelSelector: labels.FormatLabels(labelSelector),
 				})
