@@ -77,3 +77,19 @@ load helpers.bash
   run_cmd ${KUBE_BURNER} index --uuid=${UUID} -e metrics-endpoints.yaml --es-server=${ES_SERVER} --es-index=${ES_INDEX}
   check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/prometheusRSS.json collected-metrics/prometheusRSS.json
 }
+
+# bats test_tags=subsystem:custom-kubeconfig
+@test "kube-burner init: kubeconfig" {
+  run_cmd kubectl --kubeconfig "${TEST_KUBECONFIG}" config unset current-context
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
+}
+
+# bats test_tags=subsystem:waiters
+@test "kube-burner init: waitOptions for Deployment" {
+  export GC=false
+  export WAIT_FOR_CONDITION="True"
+  export WAIT_CUSTOM_STATUS_PATH='(.conditions.[] | select(.type == "Available")).status'
+  run_cmd ${KUBE_BURNER} init -c  kube-burner.yml --uuid=${UUID} --log-level=debug
+  check_custom_status_path kube-burner-uuid=${UUID} "{.items[*].status.conditions[].type}" Available
+  ${KUBE_BURNER} destroy --uuid ${UUID}
+}
