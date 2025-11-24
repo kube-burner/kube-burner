@@ -120,7 +120,7 @@ This subcommand can be used to evaluate alerts configured in the given alert pro
 
 ## Destroy
 
-This subcommand requires the `uuid` flag to destroy all namespaces labeled with `kube-burner-uuid=<UUID>`.
+This subcommand requires the `uuid` flag to destroy all namespaces labeled with `kube-burner.io/uuid=<UUID>`.
 
 ## Health Check
 

@@ -37,17 +37,17 @@ jobs:
     objects:
       - kind: Deployment
         objectTemplate: templates/deployment_patch_add_label.json
-        labelSelector: {kube-burner-job: api-intensive}
+        labelSelector: {kube-burner.io/job: api-intensive}
         patchType: "application/json-patch+json"
         apiVersion: apps/v1
       - kind: Deployment
         objectTemplate: templates/deployment_patch_add_pod_2.yaml
-        labelSelector: {kube-burner-job: api-intensive}
+        labelSelector: {kube-burner.io/job: api-intensive}
         patchType: "application/apply-patch+yaml"
         apiVersion: apps/v1
       - kind: Deployment
         objectTemplate: templates/deployment_patch_add_label.yaml
-        labelSelector: {kube-burner-job: api-intensive}
+        labelSelector: {kube-burner.io/job: api-intensive}
         patchType: "application/strategic-merge-patch+json"
         apiVersion: apps/v1
 
@@ -58,7 +58,7 @@ jobs:
     waitForDeletion: true
     objects:
       - kind: Deployment
-        labelSelector: {kube-burner-job: api-intensive}
+        labelSelector: {kube-burner.io/job: api-intensive}
         apiVersion: apps/v1
 
   - name: ensure-pods-removal
@@ -68,7 +68,7 @@ jobs:
     waitForDeletion: true
     objects:
       - kind: Pod
-        labelSelector: {kube-burner-job: api-intensive}
+        labelSelector: {kube-burner.io/job: api-intensive}
 
   - name: remove-services
     qps: 2
@@ -77,7 +77,7 @@ jobs:
     waitForDeletion: true
     objects:
       - kind: Service
-        labelSelector: {kube-burner-job: api-intensive}
+        labelSelector: {kube-burner.io/job: api-intensive}
 
   - name: remove-configmaps-secrets
     qps: 2
@@ -85,7 +85,7 @@ jobs:
     jobType: delete
     objects:
       - kind: ConfigMap
-        labelSelector: {kube-burner-job: api-intensive}
+        labelSelector: {kube-burner.io/job: api-intensive}
       - kind: Secret
-        labelSelector: {kube-burner-job: api-intensive}
+        labelSelector: {kube-burner.io/job: api-intensive}
 
