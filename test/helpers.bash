@@ -53,6 +53,7 @@ setup() {
   export ALERTING=""
   export TIMESERIES_INDEXER=""
   export CRD=""
+  export SVC_LATENCY=""
 }
 
 teardown() {
@@ -282,7 +283,7 @@ check_custom_status_path() {
 }
 
 check_metric_value() {
-  sleep 3 # There's some delay on the documents to show up in OpenSearch
+  sleep 3 # There's some delay before the documents show up in OpenSearch
   for metric in "${@}"; do
     endpoint="${ES_SERVER}/${ES_INDEX}/_search?q=uuid.keyword:${UUID}+AND+metricName.keyword:${metric}"
     RESULT=$(curl -sS ${endpoint} | jq '.hits.total.value // error')

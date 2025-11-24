@@ -124,3 +124,4 @@ test: lint test-k8s
 
 test-k8s:
 	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(FILTER_TAGS) -F pretty -T --print-output-on-failure test-k8s.bats -j $(JOBS)
+

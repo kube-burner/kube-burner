@@ -10,19 +10,21 @@ load helpers.bash
   export GC=false
   export PRELOAD_IMAGES=true
   export CRD=true
+  export LOCAL_INDEXING=true
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --log-level=debug
-  verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
+  verify_object_count TestCR 5 "" kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
   kubectl delete -f objectTemplates/crd.yml
-  verify_object_count namespace 5 "" kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID}
-  verify_object_count pod 10 "" kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID} status.phase==Running
-  verify_object_count pod 5 default kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID} status.phase==Running
+  JOB_NAME=namespaced-${BATS_TEST_NUMBER}
+  verify_object_count namespace 5 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
+  verify_object_count pod 10 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count pod 5 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
   ${KUBE_BURNER} destroy --uuid ${UUID}
   kubectl delete pod -l kube-burner.io/uuid=${UUID} -n default
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
   verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
-  check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/jobLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/jobLatencyQuantilesMeasurement-namespaced.json
+  check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/jobLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/jobLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
 # bats test_tags=subsystem:core
@@ -31,13 +33,14 @@ load helpers.bash
   export ALERTING=true
   export CHURN_CYCLES=2
   export JOBGC=true
-  export PRELOAD_IMAGES=true
-  export CHURN_MODE=objects
+  export CHURN_MODE=object
+  export SVC_LATENCY=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug
-  check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement alert
+  JOB_NAME=namespaced-${BATS_TEST_NUMBER}
+  check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement svcLatencyMeasurement svcLatencyQuantilesMeasurement alert
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
   verify_object_count pod 0 "" kube-burner.io/uuid=${UUID}
-  check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
+  check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
 # bats test_tags=subsystem:indexing
@@ -62,20 +65,19 @@ load helpers.bash
 @test "kube-burner init: os-indexing=true; local-indexing=true; metrics-endpoint=true" {
   export ES_INDEXING=true LOCAL_INDEXING=true TIMESERIES_INDEXER=local-indexing
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug -e metrics-endpoints.yaml
-  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
+  JOB_NAME=namespaced-${BATS_TEST_NUMBER}
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
-# bats test_tags=subsystem:indexing,ci:parallel
-@test "kube-burner index: local-indexing=true; tarball=true" {
-  run_cmd ${KUBE_BURNER} index --uuid=${UUID} -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz --start="$(date -d "-2 minutes" +%s)"
-  check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/top2PrometheusCPU-start.json collected-metrics/prometheusRSS.json
-  run_cmd ${KUBE_BURNER} import --tarball=metrics.tgz --es-server=${ES_SERVER} --es-index=${ES_INDEX}
-}
-
-# bats test_tags=subsystem:indexing,ci:parallel
-@test "kube-burner index: metrics-endpoint=true; os-indexing=true" {
-  run_cmd ${KUBE_BURNER} index --uuid=${UUID} -e metrics-endpoints.yaml --es-server=${ES_SERVER} --es-index=${ES_INDEX}
-  check_file_list collected-metrics/top2PrometheusCPU.json collected-metrics/prometheusRSS.json collected-metrics/prometheusRSS.json
+# bats test_tags=subsystem:indexing
+@test "kube-burner index: local-indexing=true; os-indexing=true; tarball=true" {
+  sleep 1m 
+  run_cmd ${KUBE_BURNER} index --uuid=${UUID} -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz --start="$(date -d "-1 minutes" +%s)" --metrics-directory=${METRICS_FOLDER}
+  check_file_list ${METRICS_FOLDER}/top2PrometheusCPU.json ${METRICS_FOLDER}/top2PrometheusCPU-start.json ${METRICS_FOLDER}/prometheusRSS.json
+  run_cmd ${KUBE_BURNER} import --tarball=metrics.tgz --es-server=${ES_SERVER} --es-index=${ES_INDEX} --metrics-directory=${METRICS_FOLDER}
+  rm -rf ${METRICS_FOLDER:?}/*
+  run_cmd ${KUBE_BURNER} index --uuid=${UUID} -e metrics-endpoints.yaml --es-server=${ES_SERVER} --es-index=${ES_INDEX} --metrics-directory=${METRICS_FOLDER}
+  check_file_list ${METRICS_FOLDER}/top2PrometheusCPU.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/prometheusRSS.json
 }
 
 # bats test_tags=subsystem:custom-kubeconfig

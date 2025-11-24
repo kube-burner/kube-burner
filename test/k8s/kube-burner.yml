@@ -13,8 +13,10 @@ global:
 {{ if .TIMESERIES_INDEXER }}
     timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}
+{{ if .SVC_LATENCY }}
   - name: serviceLatency
     svcTimeout: 5s
+{{ end }}
   - name: jobLatency
 metricsEndpoints:
 {{ if .ES_INDEXING }}
@@ -53,9 +55,8 @@ jobs:
       apiVersion: v1
       labelSelector: {foo: bar}
       replicas: 2
-    - kind: MyClusterResource
-      apiVersion: example.com/v1
-      labelSelector: {foo: bar}
+    - kind: StorageClass
+      apiVersion: storage.k8s.io/v1
       replicas: 1
     namespacedIterations: true
     preLoadImages: {{ .PRELOAD_IMAGES }}
@@ -120,6 +121,7 @@ jobs:
       replicas: 1
 
   - name: cr-{{ .BATS_TEST_NUMBER }}
+    namespace: cr-{{ .BATS_TEST_NUMBER }}
     jobType: create
     jobIterations: 1
     namespacedIterations: false
