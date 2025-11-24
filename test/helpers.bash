@@ -11,7 +11,7 @@ KIND_YAML=${KIND_YAML:-kind.yml}
 KUBEVIRT_CR=${KUBEVIRT_CR:-objectTemplates/kubevirt-cr.yaml}
 
 setup_file() {
-  cd k8s
+  cd k8s || exit 1
   export BATS_TEST_TIMEOUT=1800
   export JOB_ITERATIONS=4
   export QPS=3
