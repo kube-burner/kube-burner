@@ -170,7 +170,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
 				name:          "pvcWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePVC,
 					UpdateFunc: func(oldObj, newObj any) {
