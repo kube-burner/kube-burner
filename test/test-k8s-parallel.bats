@@ -38,7 +38,7 @@ load helpers.bash
 # bats test_tags=subsystem:job-type-delete
 @test "kube-burner init: delete=true" {
   run_cmd ${KUBE_BURNER} init -c kube-burner-delete.yml --uuid ${UUID} --log-level=debug
-  verify_object_count namespace 0 "" kube-burner-uuid=${UUID}
+  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
 }
 
 # bats test_tags=subsystem:job-type-read

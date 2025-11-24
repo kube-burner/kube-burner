@@ -12,16 +12,16 @@ load helpers.bash
   export CRD=true
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --log-level=debug
-  verify_object_count TestCR 5 cr-crd kube-burner-uuid=${UUID}
+  verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
   kubectl delete -f objectTemplates/crd.yml
-  verify_object_count namespace 5 "" kube-burner-job=namespaced,kube-burner-uuid=${UUID}
-  verify_object_count pod 10 "" kube-burner-job=namespaced,kube-burner-uuid=${UUID} status.phase==Running
-  verify_object_count pod 5 default kube-burner-job=namespaced,kube-burner-uuid=${UUID} status.phase==Running
+  verify_object_count namespace 5 "" kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID}
+  verify_object_count pod 10 "" kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count pod 5 default kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID} status.phase==Running
   ${KUBE_BURNER} destroy --uuid ${UUID}
-  kubectl delete pod -l kube-burner-uuid=${UUID} -n default
-  verify_object_count namespace 0 "" kube-burner-uuid=${UUID}
-  verify_object_count pod 0 default kube-burner-uuid=${UUID}
+  kubectl delete pod -l kube-burner.io/uuid=${UUID} -n default
+  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
+  verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/jobLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/jobLatencyQuantilesMeasurement-namespaced.json
 }
 
@@ -35,8 +35,8 @@ load helpers.bash
   export CHURN_MODE=objects
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement alert
-  verify_object_count namespace 0 "" kube-burner-uuid=${UUID}
-  verify_object_count pod 0 "" kube-burner-uuid=${UUID}
+  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
+  verify_object_count pod 0 "" kube-burner.io/uuid=${UUID}
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
 }
 
@@ -90,6 +90,6 @@ load helpers.bash
   export WAIT_FOR_CONDITION="True"
   export WAIT_CUSTOM_STATUS_PATH='(.conditions.[] | select(.type == "Available")).status'
   run_cmd ${KUBE_BURNER} init -c  kube-burner.yml --uuid=${UUID} --log-level=debug
-  check_custom_status_path kube-burner-uuid=${UUID} "{.items[*].status.conditions[].type}" Available
+  check_custom_status_path kube-burner.io/uuid=${UUID} "{.items[*].status.conditions[].type}" Available
   ${KUBE_BURNER} destroy --uuid ${UUID}
 }
