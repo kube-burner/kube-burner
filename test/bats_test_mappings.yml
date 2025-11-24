@@ -1,0 +1,27 @@
+paths:
+  - label: subsystem:alerting
+    paths:
+    - pkg/alerting/*
+    - pkg/prometheus/*
+  - label: subsystem:indexing
+    paths:
+    - pkg/alerting/*
+    - pkg/prometheus/*
+  - label: subsystem:health-check
+    paths:
+    - pkg/util/cluster_health.go
+  - label: subsystem:job-type-read
+    paths:
+    - pkg/burner/job_type_read.go
+  - label: subsystem:job-type-delete
+    paths:
+    - pkg/burner/job_type_delete.go
+  - label: subsystem:job-type-kubevirt
+    paths:
+    - pkg/burner/job_type_kubevirt.go
+  - label: subsystem:job-type-patch
+    paths:
+    - pkg/burner/job_type_patch.go
+  - label: subsystem:measurements
+    paths:
+    - pkg/measurements/*

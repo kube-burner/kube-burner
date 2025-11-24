@@ -10,6 +10,68 @@ KUBE_BURNER=${KUBE_BURNER:-kube-burner}
 KIND_YAML=${KIND_YAML:-kind.yml}
 KUBEVIRT_CR=${KUBEVIRT_CR:-objectTemplates/kubevirt-cr.yaml}
 
+setup_file() {
+  cd k8s
+  export BATS_TEST_TIMEOUT=1800
+  export JOB_ITERATIONS=4
+  export QPS=3
+  export BURST=3
+  export TEST_KUBECONFIG; TEST_KUBECONFIG=$(mktemp -d)/kubeconfig
+  export TEST_KUBECONTEXT=test-context
+  export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
+  export ES_INDEX="kube-burner"
+  export DEPLOY_GRAFANA=${DEPLOY_GRAFANA:-false}
+  if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
+    setup-kind
+  fi
+  create_test_kubeconfig
+  setup-prometheus
+  if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
+    $OCI_BIN rm -f opensearch
+    $OCI_BIN network rm -f monitoring
+    setup-shared-network
+    setup-opensearch
+    if [ "$DEPLOY_GRAFANA" = "true" ]; then
+      $OCI_BIN rm -f grafana
+      setup-grafana
+      configure-grafana-datasource
+      deploy-grafana-dashboards
+    fi
+  fi
+}
+
+setup() {
+  export UUID; UUID=$(uuidgen)
+  export METRICS_FOLDER="metrics-${UUID}"
+  export ES_INDEXING=""
+  export CHURN_CYCLES=0
+  export CHURN_MODE=namespaces
+  export PRELOAD_IMAGES=false
+  export GC=true
+  export JOBGC=false
+  export LOCAL_INDEXING=""
+  export ALERTING=""
+  export TIMESERIES_INDEXER=""
+  export CRD=""
+}
+
+teardown() {
+  kubectl delete ns -l kube-burner-uuid=${UUID} --ignore-not-found
+}
+
+teardown_file() {
+  if [[ "${USE_EXISTING_CLUSTER,,}" != "yes" ]]; then
+    destroy-kind
+  fi
+  $OCI_BIN rm -f prometheus
+  if [[ -z "$PERFSCALE_PROD_ES_SERVER" ]]; then
+    if [ "$DEPLOY_GRAFANA" = "false" ]; then
+      $OCI_BIN rm -f opensearch
+      $OCI_BIN network rm -f monitoring
+    fi
+  fi
+}
+
 setup-kind() {
   KIND_FOLDER=${KIND_FOLDER:-$(mktemp -d)}
   echo "Downloading kind"
