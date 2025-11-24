@@ -1,8 +1,8 @@
 ---
-apiVersion: testcrd.example.com/v1
-kind: TestCR
+apiVersion: example.com/v1
+kind: {{ .JobName }}
 metadata:
-  name: test{{.Replica}}
+  name: test-{{.Replica}}
 spec:
   workload: {{randAlpha 5}}
   iterations: {{.Iteration}}

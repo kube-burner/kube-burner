@@ -40,7 +40,7 @@ metricsEndpoints:
 {{ end }}
 
 jobs:
-  - name: namespaced
+  - name: namespaced-{{ .BATS_TEST_NUMBER }}
     jobType: create
     jobIterations: {{ add .JOB_ITERATIONS 1 }}
     qps: {{ .QPS }}
@@ -61,7 +61,7 @@ jobs:
     preLoadImages: {{ .PRELOAD_IMAGES }}
     preLoadPeriod: 2s
     cleanup: true
-    namespace: namespaced
+    namespace: namespaced-{{ .BATS_TEST_NUMBER }}
     podWait: false
     waitWhenFinished: true
     verifyObjects: true
@@ -106,11 +106,10 @@ jobs:
       runOnce: true
 
 {{ if .CRD }}
-  - name: test-crd
+  - name: crd-{{ .BATS_TEST_NUMBER }}
     jobType: create
     jobIterations: 1
     namespacedIterations: false
-    namespace: cr-crd
     cleanup: false
     podWait: false
     qps: 10
@@ -120,11 +119,10 @@ jobs:
     - objectTemplate: objectTemplates/crd.yml
       replicas: 1
 
-  - name: test-resources
+  - name: cr-{{ .BATS_TEST_NUMBER }}
     jobType: create
     jobIterations: 1
     namespacedIterations: false
-    namespace: cr-crd
     cleanup: false
     podWait: false
     qps: 10

@@ -3,7 +3,7 @@ apiVersion: v1
 metadata:
   labels:
     app: pause
-  name: pod-{{.Iteration}}-{{.Replica}}
+  name: {{.UUID}}-{{.Iteration}}-{{.Replica}}
   namespace: default
 spec:
   containers:
