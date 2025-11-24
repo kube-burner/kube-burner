@@ -115,6 +115,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
 				if jobExecutor.Cleanup {
+					log.Info("Cleaning up previous runs")
 					jobExecutor.gc(ctx, nil)
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
