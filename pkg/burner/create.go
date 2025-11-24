@@ -124,10 +124,10 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
 		}
-		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsRequired && ex.NamespacedIterations {
 			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
 		}
+		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
 			if obj.gvr == (schema.GroupVersionResource{}) {
 				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
@@ -375,8 +375,9 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
 		for _, ns := range namespacesToDelete {
 			_, err = ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
 			if err != nil {
-				log.Errorf("Error patching namespace %s: %v", ns.Name, err)
+				log.Errorf("Error applying label '%v' to namespace %s: %v", delPatch, ns.Name, err)
 			}
+			ex.createdNamespaces[ns.Name] = false
 		}
 		// 1 hour timeout to delete namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
