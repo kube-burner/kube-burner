@@ -76,12 +76,12 @@ To become a Maintainer you need to demonstrate the following:
   * Adding new test scenarios
 
 A new Maintainer must be proposed by an existing maintainer by sending a message to the
-[maintainers mailing list](cncf-kube-burner-maintainers@lists.cncf.io). A simple majority vote of existing Maintainers
+[maintainers mailing list](mailto:cncf-kube-burner-maintainers@lists.cncf.io). A simple majority vote of existing Maintainers
 approves the application.  Maintainers nominations will be evaluated without prejudice
 to employer or demographics.
 
 Maintainers who are selected will be granted the necessary GitHub rights,
-and invited to the [private maintainer mailing list](cncf-kube-burner-maintainers@lists.cncf.io).
+and invited to the [private maintainer mailing list](mailto:cncf-kube-burner-maintainers@lists.cncf.io).
 
 ### Removing a Maintainer
 
@@ -120,7 +120,7 @@ accused of a CoC violation.
 ## CNCF Resources
 
 Any Maintainer may suggest a request for CNCF resources, either in the
-[mailing list](cncf-kube-burner-maintainers@lists.cncf.io), or during a
+[mailing list](mailto:cncf-kube-burner-maintainers@lists.cncf.io), or during a
 meeting.  A simple majority of Maintainers approves the request.  The Maintainers
 may also choose to delegate working with the CNCF to non-Maintainer community
 members, who will then be added to the [CNCF's Maintainer List](https://github.com/cncf/foundation/blob/main/project-maintainers.csv)
@@ -130,7 +130,7 @@ for that purpose.
 
 [Code of Conduct](./code-of-conduct.md)
 violations by community members will be discussed and resolved
-on the [private Maintainer mailing list](cncf-kube-burner-maintainers@lists.cncf.io).  If a Maintainer is directly involved
+on the [private Maintainer mailing list](mailto:cncf-kube-burner-maintainers@lists.cncf.io).  If a Maintainer is directly involved
 in the report, the Maintainers will instead designate two Maintainers to work
 with the CNCF Code of Conduct Committee in resolving it.
 
@@ -149,7 +149,7 @@ holes and breaches according to the [security policy](./SECURITY.md).
 
 While most business in Kube-burner is conducted by "[lazy consensus](https://community.apache.org/committers/lazyConsensus.html)", 
 periodically the Maintainers may need to vote on specific actions or changes.
-A vote can be taken on [the private Maintainer mailing list](cncf-kube-burner-maintainers@lists.cncf.io) for security or conduct matters.  
+A vote can be taken on [the private Maintainer mailing list](mailto:cncf-kube-burner-maintainers@lists.cncf.io) for security or conduct matters.  
 Votes may also be taken at [the developer meeting](#meetings). Any Maintainer may
 demand a vote be taken.
 

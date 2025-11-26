@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +46,11 @@ var (
 		string(corev1.PodInitialized):  {},
 		string(corev1.PodReady):        {},
 		string(corev1.PodScheduled):    {},
+	}
+	supportedPodLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.PatchJob:    {},
+		config.DeletionJob: {},
 	}
 )
 
@@ -169,7 +174,7 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
 				name:          "podWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePod,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -186,9 +191,8 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var pods []corev1.Pod
-	labelSelector := labels.SelectorFromSet(p.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: labels.Set(p.JobConfig.NamespaceLabels).String(),
 	}
 	namespaces := strings.Split(p.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
@@ -300,4 +304,9 @@ func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
 		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
 	}
+}
+
+func (p *podLatency) IsCompatible() bool {
+	_, exists := supportedPodLatencyJobTypes[p.JobConfig.JobType]
+	return exists
 }

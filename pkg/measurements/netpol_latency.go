@@ -28,12 +28,12 @@ import (
 	"maps"
 	"slices"
 
-	kconfig "github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	mutil "github.com/kube-burner/kube-burner/pkg/measurements/util"
-	kutil "github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	mutil "github.com/kube-burner/kube-burner/v2/pkg/measurements/util"
+	kutil "github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -56,6 +56,12 @@ const (
 	netpolLatencyMeasurement          = "netpolLatencyMeasurement"
 	netpolLatencyQuantilesMeasurement = "netpolLatencyQuantilesMeasurement"
 )
+
+var supportedNetpolLatencyJobTypes = map[config.JobType]struct{}{
+	config.CreationJob: {},
+	config.PatchJob:    {},
+	config.DeletionJob: {},
+}
 
 var proxyPortForwarder *mutil.PodPortForwarder
 var nsPodAddresses = make(map[string]map[string][]string)
@@ -107,13 +113,13 @@ type netpolLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newNetpolLatencyMeasurementFactory(configSpec kconfig.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newNetpolLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
 	return netpolLatencyMeasurementFactory{
 		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
 	}, nil
 }
 
-func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *kconfig.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
+func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
 	return &netpolLatency{
 		BaseMeasurement: nplmf.NewBaseLatency(jobConfig, clientSet, restConfig, netpolLatencyMeasurement, netpolLatencyQuantilesMeasurement, embedCfg),
 	}
@@ -199,7 +205,7 @@ func (n *netpolLatency) handleCreateNetpol(obj any) {
 }
 
 // Render the network policy from the object template using iteration details as input
-func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj kconfig.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
+func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj config.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
 
 	templateData := map[string]any{
 		"JobName":   n.JobConfig.Name,
@@ -438,7 +444,7 @@ func (n *netpolLatency) processResults() {
 }
 
 // Read network policy object template
-func readTemplate(o kconfig.Object, embedCfg *fileutils.EmbedConfiguration) ([]byte, error) {
+func readTemplate(o config.Object, embedCfg *fileutils.EmbedConfiguration) ([]byte, error) {
 	f, err := fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
@@ -450,7 +456,7 @@ func readTemplate(o kconfig.Object, embedCfg *fileutils.EmbedConfiguration) ([]b
 	return t, err
 }
 
-func getObjectType(o kconfig.Object, t []byte) string {
+func getObjectType(o config.Object, t []byte) string {
 	// Deserialize YAML
 	cleanTemplate, err := kutil.CleanupTemplate(t)
 	if err != nil {
@@ -503,7 +509,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(n.RestConfig),
 				name:          "netpolWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", n.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, n.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNetpol,
 				},
@@ -570,4 +576,9 @@ func (n *netpolLatency) normalizeMetrics() {
 
 func (n *netpolLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
+}
+
+func (n *netpolLatency) IsCompatible() bool {
+	_, exists := supportedNetpolLatencyJobTypes[n.JobConfig.JobType]
+	return exists
 }

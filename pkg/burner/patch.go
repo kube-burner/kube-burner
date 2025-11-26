@@ -20,17 +20,16 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ex *JobExecutor) setupPatchJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupPatchJob() {
 	log.Debugf("Preparing patch job: %s", ex.Name)
 	ex.itemHandler = patchHandler
 	if len(ex.ExecutionMode) == 0 {
@@ -45,7 +44,7 @@ func (ex *JobExecutor) setupPatchJob(mapper meta.RESTMapper) {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
 		log.Infof("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1, ex.embedCfg))
+		ex.objects = append(ex.objects, newObject(o, ex.mapper, APIVersionV1, ex.embedCfg))
 	}
 }
 

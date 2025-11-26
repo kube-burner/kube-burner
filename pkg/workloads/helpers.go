@@ -16,15 +16,16 @@ package workloads
 
 import (
 	"embed"
-	"fmt"
+	"io/fs"
+	"os"
 	"path"
 
-	"github.com/kube-burner/kube-burner/pkg/burner"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
-	"github.com/kube-burner/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/v2/pkg/burner"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -105,26 +106,45 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVar
 	return rc
 }
 
-// ExtractWorkload extracts the given workload and metrics profile to the current directory
-func ExtractWorkload(embedConfig embed.FS, embedFSDir string, workload string, rootCfg ...string) error {
-	dirContent, err := embedConfig.ReadDir(path.Join(embedFSDir, workload))
-	if err != nil {
-		return err
-	}
-	workloadContent, _ := embedConfig.ReadFile(embedFSDir)
-	if err = util.CreateFile(fmt.Sprintf("%v.yml", workload), workloadContent); err != nil {
-		return err
-	}
-	for _, f := range dirContent {
-		fileContent, _ := embedConfig.ReadFile(path.Join(embedFSDir, workload, f.Name()))
-		err := util.CreateFile(f.Name(), fileContent)
+// ExtractWorkload extracts the given workload and metrics profile from the embedded filesystem to the current directory.
+// Parameters:
+//   - embedConfig: The embedded filesystem containing workload and metrics directories.
+//   - embedFSDir: The root directory of the embedded filesystem.
+//   - folders: List of directories to be extracted.
+func ExtractWorkload(embedConfig embed.FS, embedFSDir string, folders []string) error {
+	for _, folder := range folders {
+		subFS, err := fs.Sub(embedConfig, path.Join(embedFSDir, folder))
 		if err != nil {
 			return err
 		}
+		if err := extractDirectory(subFS, "."); err != nil {
+			return err
+		}
 	}
-	for _, f := range rootCfg {
-		fileContent, _ := embedConfig.ReadFile(path.Join(embedFSDir, f))
-		if err = util.CreateFile(f, fileContent); err != nil {
+	return nil
+}
+
+// Extracts a directory recursively
+func extractDirectory(subFS fs.FS, dirPath string) error {
+	dirContent, err := fs.ReadDir(subFS, dirPath)
+	if err != nil {
+		return err
+	}
+	for _, f := range dirContent {
+		if f.IsDir() {
+			err := os.MkdirAll(path.Join(dirPath, f.Name()), 0755)
+			if err != nil {
+				return err
+			}
+			extractDirectory(subFS, path.Join(dirPath, f.Name()))
+			continue
+		}
+		filePath := path.Join(dirPath, f.Name())
+		fileContent, err := fs.ReadFile(subFS, filePath)
+		if err != nil {
+			return err
+		}
+		if util.CreateFile(filePath, fileContent) != nil {
 			return err
 		}
 	}

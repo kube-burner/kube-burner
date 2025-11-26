@@ -7,9 +7,11 @@ K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
 KUBE_BURNER=${KUBE_BURNER:-kube-burner}
+KIND_YAML=${KIND_YAML:-kind.yml}
+KUBEVIRT_CR=${KUBEVIRT_CR:-objectTemplates/kubevirt-cr.yaml}
 
 setup-kind() {
-  KIND_FOLDER=$(mktemp -d)
+  KIND_FOLDER=${KIND_FOLDER:-$(mktemp -d)}
   echo "Downloading kind"
   # Kind is currently unavailable for ppc64le architecture, it is required that the binary is built for usage.
   if [[ "$ARCH" == "ppc64le" ]]
@@ -23,11 +25,11 @@ setup-kind() {
     IMAGE=kindest/node:"${K8S_VERSION}"
   fi
   echo "Deploying cluster"
-  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config kind.yml --image ${IMAGE} --name kind --wait 300s -v=1
+  "${KIND_FOLDER}/kind-linux-${ARCH}" create cluster --config ${KIND_YAML} --image ${IMAGE} --name kind --wait 300s -v=1
   echo "Deploying kubevirt operator"
   KUBEVIRT_VERSION=$(gh release view --repo kubevirt/kubevirt --json tagName -q '.tagName')
   kubectl create -f https://github.com/kubevirt/kubevirt/releases/download/"${KUBEVIRT_VERSION}"/kubevirt-operator.yaml
-  kubectl create -f objectTemplates/kubevirt-cr.yaml
+  kubectl create -f ${KUBEVIRT_CR}
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt deployments/virt-operator
   kubectl wait --for=condition=Available --timeout=600s -n kubevirt kv/kubevirt
   # Install CDI
@@ -164,7 +166,7 @@ check_destroyed_pods() {
 }
 
 check_running_pods() {
-  running_pods=$(kubectl get pod -A -l ${1} --field-selector=status.phase==Running -o json | jq '.items | length')
+  running_pods=$(kubectl get pod -A -l "${1}" --field-selector=status.phase==Running -o json | jq '.items | length')
   if [[ "${running_pods}" != "${2}" ]]; then
     echo "Running pods in cluster labeled with ${1} different from expected: Expected=${2}, observed=${running_pods}"
     return 1
@@ -172,11 +174,19 @@ check_running_pods() {
 }
 
 check_running_pods_in_ns() {
-    running_pods=$(kubectl get pod -n "${1}" -l kube-burner-job=namespaced --field-selector=status.phase==Running -o json | jq '.items | length')
-    if [[ "${running_pods}" != "${2}" ]]; then
-      echo "Running pods in namespace $1 different from expected. Expected=${2}, observed=${running_pods}"
-      return 1
-    fi
+  running_pods=$(kubectl get pod -n "${1}" -l kube-burner.io/job=namespaced --field-selector=status.phase==Running -o json | jq '.items | length')
+  if [[ "${running_pods}" != "${2}" ]]; then
+    echo "Running pods in namespace $1 different from expected. Expected=${2}, observed=${running_pods}"
+    return 1
+  fi
+}
+
+check_running_custom_resources_in_ns() {
+  running_resources=$(kubectl get "${1}" -n "${2}" -l kube-burner.io/job=test-resources -o json | jq '.items | length')
+  if [[ "${running_resources}" != "${3}" ]]; then
+    echo "Running ${1}s in namespace $2 different from expected. Expected=${3}, observed=${running_resources}"
+    return 1
+  fi
 }
 
 check_file_list() {
@@ -286,10 +296,15 @@ check_metric_recorded() {
   local job=$1
   local type=$2
   local metric=$3
-  local m
-  m=$(cat ${METRICS_FOLDER}/${type}Measurement-${job}.json | jq .[0].${metric})
-  if [[ ${m} -eq 0 ]]; then
+  local metric_file=${METRICS_FOLDER}/${type}Measurement-${job}.json
+  if [ ! -f ${metric_file} ]; then
+    echo "metric file ${metric_file} not present"
+    return 1
+  fi
+  if ! jq -e .[0].${metric} ${metric_file}; then
       echo "metric ${type}/${metric} was not recorded for ${job}"
+      echo "Content of ${METRICS_FOLDER}/${type}Measurement-${job}.json"
+      cat ${METRICS_FOLDER}/${type}Measurement-${job}.json
       return 1
   fi
 }
@@ -298,10 +313,15 @@ check_quantile_recorded() {
   local job=$1
   local type=$2
   local quantileName=$3
-
-  MEASUREMENT=$(cat ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json | jq --arg name "${quantileName}" '[.[] | select(.quantileName == $name)][0].avg')
-  if [[ ${MEASUREMENT} -eq 0 ]]; then
+  local metric_file=${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json
+  if [ ! -f ${metric_file} ]; then
+    echo "metric file ${metric_file} not present"
+    return 1
+  fi
+  if ! jq -e --arg name "${quantileName}" '[.[] | select(.quantileName == $name)][0].avg' ${metric_file}; then
     echo "Quantile for ${type}/${quantileName} was not recorded for ${job}"
+    echo "Content of ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json"
+    cat ${METRICS_FOLDER}/${type}QuantilesMeasurement-${job}.json
     return 1
   fi
 }

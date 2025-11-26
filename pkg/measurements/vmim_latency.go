@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,6 +50,11 @@ var (
 		"VirtualMachineInstanceMigration" + string(kvv1.MigrationTargetReady):     {},
 		"VirtualMachineInstanceMigration" + string(kvv1.MigrationRunning):         {},
 		"VirtualMachineInstanceMigration" + string(kvv1.MigrationSucceeded):       {},
+	}
+	supportedVMIMLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.KubeVirtJob: {},
+		config.DeletionJob: {},
 	}
 )
 
@@ -186,7 +191,7 @@ func (vmiml *vmimLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vmiml.RestConfig),
 				name:          "vmimWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vmiml.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmiml.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmiml.handleCreateVMIM,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -202,9 +207,8 @@ func (vmiml *vmimLatency) Start(measurementWg *sync.WaitGroup) error {
 func (vmiml *vmimLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var vmims []kvv1.VirtualMachineInstanceMigration
-	labelSelector := labels.SelectorFromSet(vmiml.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: labels.Set(vmiml.JobConfig.NamespaceLabels).String(),
 	}
 	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(vmiml.RestConfig)
 	if err != nil {
@@ -352,4 +356,9 @@ func (vmiml *vmimLatency) getLatency(normLatency any) map[string]float64 {
 		string(kvv1.MigrationRunning):         float64(vmimMetric.RunningLatency),
 		string(kvv1.MigrationSucceeded):       float64(vmimMetric.SucceededLatency),
 	}
+}
+
+func (vmiml *vmimLatency) IsCompatible() bool {
+	_, exists := supportedVMIMLatencyJobTypes[vmiml.JobConfig.JobType]
+	return exists
 }

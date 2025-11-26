@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	corev1 "k8s.io/api/core/v1"
@@ -52,8 +52,7 @@ func (wm *WatcherManager) Start(kind, apiVersion string, labelSelector map[strin
 		watcherName := kindLower + "_watcher_" + indexNum + "_replica_" + replicaNum
 		gvr, err := util.ResourceToGVR(wm.restConfig, kind, apiVersion)
 		if err != nil {
-			wm.recordError(fmt.Errorf("error getting GVR for %s: %w", kindLower, err))
-			return
+			log.Warnf("Skipping watcher for %s: %s", kindLower, err)
 		}
 		watcher := NewWatcher(
 			dynamic.NewForConfigOrDie(wm.restConfig),
@@ -61,7 +60,7 @@ func (wm *WatcherManager) Start(kind, apiVersion string, labelSelector map[strin
 			gvr,
 			corev1.NamespaceAll,
 			func(options *metav1.ListOptions) {
-				options.LabelSelector = labels.SelectorFromSet(labelSelector).String()
+				options.LabelSelector = labels.Set(labelSelector).String()
 			},
 			nil,
 		)

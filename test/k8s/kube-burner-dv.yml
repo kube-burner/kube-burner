@@ -1,6 +1,8 @@
 {{- $diskVolumeName := "base-vm-rootdisk" -}}
 {{- $testNameSpace := "datavolume-latency" -}}
 {{- $cloneDataVolumeName := "cloned-volume" -}}
+{{- $osImage := "docker://quay.io/kubevirt/cirros-container-disk-demo:v1.6.3" -}}
+{{- $osImageSize := "1Gi" -}}
 ---
 global:
   measurements:
@@ -40,6 +42,8 @@ jobs:
       vmName: base-vm
       rootDiskVolumeName: {{ $diskVolumeName }}
       storageClassName: {{ .STORAGE_CLASS_NAME }}
+      osImage: {{ $osImage }}
+      osImageSize: {{ $osImageSize }}
 
 - name: stop-vm
   jobType: kubevirt
@@ -51,7 +55,7 @@ jobs:
   objects:
   - kubeVirtOp: stop
     labelSelector:
-      kube-burner-job: create-vm
+      kube-burner.io/job: create-vm
 
 # Create the DV in a separate job to make sure it is ready before continuing
 - name: create-base-image-dv
@@ -83,9 +87,11 @@ jobs:
       storageClassName: {{ .STORAGE_CLASS_NAME }}
       sourceNamespace: {{ $testNameSpace }}
       sourcePVCName: {{ $diskVolumeName }}
+      osImageSize: {{ $osImageSize }}
+
     waitOptions:
       labelSelector:
-        kube-burner-job: create-base-image-dv
+        kube-burner.io/job: create-base-image-dv
 
 - name: create-snapshot
   jobType: create

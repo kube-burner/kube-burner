@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,6 +45,10 @@ const (
 var (
 	supportedJobConditions = map[string]struct{}{
 		string(batchv1.JobComplete): {},
+	}
+	supportedJobLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.PatchJob:    {},
 	}
 )
 
@@ -143,7 +147,7 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(j.RestConfig),
 				name:          "jobWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", j.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, j.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: j.handleCreateJob,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -160,9 +164,8 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var jobs []batchv1.Job
-	labelSelector := labels.SelectorFromSet(j.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: labels.Set(j.JobConfig.NamespaceLabels).String(),
 	}
 	namespaces := strings.Split(j.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
@@ -230,4 +233,9 @@ func (j *jobLatency) getLatency(normLatency any) map[string]float64 {
 		jobStartTimeMeasurement:     float64(jobMetric.StartTimeLatency),
 		string(batchv1.JobComplete): float64(jobMetric.CompletionLatency),
 	}
+}
+
+func (j *jobLatency) IsCompatible() bool {
+	_, exists := supportedJobLatencyJobTypes[j.JobConfig.JobType]
+	return exists
 }

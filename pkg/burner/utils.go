@@ -16,8 +16,8 @@ package burner
 
 import (
 	"context"
-	"fmt"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -30,11 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 )
 
 const (
@@ -59,7 +61,8 @@ var (
 	}
 )
 
-func setLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
+// updates the labels in the object
+func udpateLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
 	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
 	if !found {
 		labelMap = make(map[string]any, len(labels))
@@ -80,20 +83,18 @@ func setLabelsInArray(obj *unstructured.Unstructured, labels map[string]string, 
 		innerObj := unstructured.Unstructured{}
 		innerObj.SetUnstructuredContent(a.(map[string]any))
 
-		setLabels(&innerObj, labels, templatePath)
+		udpateLabels(&innerObj, labels, templatePath)
 	}
 	unstructured.SetNestedSlice(obj.Object, array, arrayPath...)
 }
 
-// Helps to set metadata labels
-func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string) {
-	// Will be useful for the resources like Deployments and Replicasets. Because
-	// object.SetLabels(labels) doesn't actually set labels for the underlying
-	// objects (i.e Pods under deployment/replicastes). So this function should help
-	// us achieve that without breaking any of our labeling functionality.
+// updates the labels in the child resources
+// labeling these resources is required for some measurements to work properly
+// as they rely on those labels to watch the objects
+func updateChildLabels(obj *unstructured.Unstructured, labels map[string]string) {
 	paths := kindToLabelPaths[obj.GetKind()]
 	for _, path := range paths {
-		setLabels(obj, labels, path)
+		udpateLabels(obj, labels, path)
 	}
 
 	// Do the same for elements stored in array (e.g. dataVolumeTemplates in VirtualMachine)
@@ -111,6 +112,21 @@ func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructure
 	return o, gvk
 }
 
+// resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements
+func (ex *JobExecutor) resolveObjectMapping(obj *object) {
+	ex.mapper.Reset()
+	mapping, err := ex.mapper.RESTMapping(obj.gvk.GroupKind())
+	if err != nil {
+		log.Fatal(err)
+	}
+	obj.gvr = mapping.Resource
+	obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+	obj.Kind = obj.gvk.Kind
+	if obj.namespaced && obj.namespace == "" {
+		ex.nsRequired = true
+	}
+}
+
 // Verify verifies the number of created objects
 func (ex *JobExecutor) Verify() bool {
 	var objList *unstructured.UnstructuredList
@@ -118,8 +134,14 @@ func (ex *JobExecutor) Verify() bool {
 	success := true
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
+		selector := labels.Set{
+			config.KubeBurnerLabelUUID:  ex.uuid,
+			config.KubeBurnerLabelRunID: ex.runid,
+			config.KubeBurnerLabelJob:   ex.Name,
+			config.KubeBurnerLabelIndex: strconv.Itoa(objectIndex),
+		}
 		listOptions := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-runid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.runid, ex.Name, objectIndex),
+			LabelSelector: selector.String(),
 			Limit:         objectLimit,
 		}
 		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
@@ -173,12 +195,10 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 }
 
 // newMapper returns a discovery RESTMapper
-func newRESTMapper(discoveryClient *discovery.DiscoveryClient) meta.RESTMapper {
-	apiGroupResouces, err := restmapper.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
+func newRESTMapper(config *rest.Config) *restmapper.DeferredDiscoveryRESTMapper {
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+	cachedDiscovery := memory.NewMemCacheClient(discoveryClient)
+	return restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
 }
 
 func (ex *JobExecutor) Run(ctx context.Context) []error {

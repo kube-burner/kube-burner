@@ -18,21 +18,21 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubevirtV1 "kubevirt.io/api/core/v1"
 	"kubevirt.io/client-go/kubecli"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 )
 
 const (
@@ -78,19 +78,13 @@ var supportedOps = map[config.KubeVirtOpType]*OperationConfig{
 			timeGreaterThan:      false,
 		},
 	},
-	config.KubeVirtOpUnpause: {
-		conditionCheckConfig: ConditionCheckConfig{
-			conditionType:        conditionTypeReady,
-			conditionCheckParams: []ConditionCheckParam{conditionCheckParamStatusTrue},
-			timeGreaterThan:      false,
-		},
-	},
+	config.KubeVirtOpUnpause:      nil,
 	config.KubeVirtOpMigrate:      nil,
 	config.KubeVirtOpAddVolume:    nil,
 	config.KubeVirtOpRemoveVolume: nil,
 }
 
-func (ex *JobExecutor) setupKubeVirtJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupKubeVirtJob() {
 	var err error
 	if len(ex.ExecutionMode) == 0 {
 		ex.ExecutionMode = config.ExecutionModeSequential
@@ -113,7 +107,7 @@ func (ex *JobExecutor) setupKubeVirtJob(mapper meta.RESTMapper) {
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		obj := newObject(o, mapper, kubeVirtAPIVersionV1, ex.embedCfg)
+		obj := newObject(o, ex.mapper, kubeVirtAPIVersionV1, ex.embedCfg)
 
 		if o.KubeVirtOp == config.KubeVirtOpMigrate && obj.waitGVR == nil {
 			obj.waitGVR = &schema.GroupVersionResource{
@@ -165,6 +159,14 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	case config.KubeVirtOpPause:
 		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Pause(context.Background(), item.GetName(), &kubevirtV1.PauseOptions{})
 	case config.KubeVirtOpUnpause:
+		if len(obj.WaitOptions.CustomStatusPaths) == 0 {
+			obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
+				{
+					Key:   "[((.conditions // []) | .[] | select(.type == \"Paused\"))] | length == 0 | tostring",
+					Value: "true",
+				},
+			}
+		}
 		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Unpause(context.Background(), item.GetName(), &kubevirtV1.UnpauseOptions{})
 	case config.KubeVirtOpMigrate:
 		if len(obj.WaitOptions.CustomStatusPaths) == 0 {
@@ -183,10 +185,10 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: fmt.Sprintf("%s-%s-%v-", item.GetName(), ex.Name, iteration),
 				Labels: map[string]string{
-					"kube-burner-uuid":                 ex.uuid,
-					"kube-burner-runid":                ex.runid,
-					"kube-burner-job":                  ex.Name,
-					config.KubeBurnerLabelJobIteration: fmt.Sprintf("%v", iteration),
+					config.KubeBurnerLabelUUID:         ex.uuid,
+					config.KubeBurnerLabelRunID:        ex.runid,
+					config.KubeBurnerLabelJob:          ex.Name,
+					config.KubeBurnerLabelJobIteration: strconv.Itoa(iteration),
 				},
 			},
 			Spec: kubevirtV1.VirtualMachineInstanceMigrationSpec{

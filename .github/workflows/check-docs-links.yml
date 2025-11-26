@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: 3.x
 
@@ -28,10 +28,10 @@ jobs:
         run: mkdocs build
 
       - name: Link Checker
-        uses: lycheeverse/lychee-action@v2.4.1
+        uses: lycheeverse/lychee-action@v2.7.0
         with:
-          args: --verbose --no-progress --exclude-mail --exclude-loopback './docs/**/*.md'
+          lycheeVersion: v0.20.1
+          args: --verbose --no-progress --exclude-loopback './docs/**/*.md'
           fail: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          

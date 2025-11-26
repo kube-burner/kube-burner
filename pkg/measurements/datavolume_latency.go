@@ -31,10 +31,10 @@ import (
 	"kubevirt.io/client-go/kubecli"
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -50,6 +50,12 @@ var (
 		string(cdiv1beta1.DataVolumeReady):   {},
 	}
 )
+
+var supportedDvLatencyJobTypes = map[config.JobType]struct{}{
+	config.CreationJob: {},
+	config.PatchJob:    {},
+	config.KubeVirtJob: {},
+}
 
 // dvMetric holds data about DataVolume creation process
 type dvMetric struct {
@@ -175,7 +181,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(dv.RestConfig),
 				name:          "dvWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", dv.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, dv.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: dv.handleCreateDV,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -195,9 +201,8 @@ func (dv *dvLatency) Stop() error {
 func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var dataVolumes []cdiv1beta1.DataVolume
-	labelSelector := labels.SelectorFromSet(dv.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: labels.Set(dv.JobConfig.NamespaceLabels).String(),
 	}
 	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(dv.RestConfig)
 	if err != nil {
@@ -266,9 +271,10 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 
 		m.DVRunningLatency = int(m.dvRunning.Sub(m.Timestamp).Milliseconds())
 		if m.DVRunningLatency < 0 {
+			// Running condition may be missed when creating empty volumes.
+			// Since we validated that the volume is Ready, assume the Running latency is 0 and don't report an error
 			log.Tracef("DVRunningLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.DVBoundLatency = 0
+			m.DVRunningLatency = 0
 		}
 
 		m.DVReadyLatency = int(m.dvReady.Sub(m.Timestamp).Milliseconds())
@@ -295,4 +301,9 @@ func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
 		string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
 		string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
 	}
+}
+
+func (dv *dvLatency) IsCompatible() bool {
+	_, exists := supportedDvLatencyJobTypes[dv.JobConfig.JobType]
+	return exists
 }

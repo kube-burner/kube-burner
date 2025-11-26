@@ -2,6 +2,35 @@
 
 Kube-burner allows you to get further metrics using other mechanisms or data sources, such as the Kubernetes API. These mechanisms are called measurements.
 
+Measurements can be configured at two levels:
+
+1. Global measurements: Defined in the global configuration section, these measurements will run for all jobs in the benchmark.
+2. Job-specific measurements: Defined within each job's configuration, these measurements only run for that specific job.
+
+If a measurement is defined both globally and in a job-specific configuration, the job-specific one takes precedence
+
+Example of global measurements:
+```yaml
+global:
+  measurements:
+    - name: podLatency
+    - name: serviceLatency
+
+jobs:
+  - name: job1
+```
+
+Example of job-specific measurements:
+```yaml
+jobs:
+  - name: job1
+    measurements:
+      - name: podLatency
+  - name: job2
+    measurements:
+      - name: serviceLatency
+```
+
 Measurements are enabled in the `measurements` object of the configuration file. This object contains a list of measurements with their options.
 
 ## Pod latency
@@ -1016,9 +1045,8 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
 
 ```shell
-kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2
+kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner.io/job=cluster-density-v2
 time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
-time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
 time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
 time="2023-11-19 17:46:06" level=info msg="Stopping measurement: podLatency" file="factory.go:118"
 time="2023-11-19 17:46:06" level=info msg="Evaluating latency thresholds" file="metrics.go:60"

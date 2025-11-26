@@ -20,19 +20,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/metrics"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	mutil "github.com/kube-burner/kube-burner/pkg/measurements/util"
-	kutil "github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	mutil "github.com/kube-burner/kube-burner/v2/pkg/measurements/util"
+	kutil "github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	lcorev1 "k8s.io/client-go/listers/core/v1"
+	ldiscoveryv1 "k8s.io/client-go/listers/discovery/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -42,11 +44,17 @@ const (
 	svcLatencyQuantilesMeasurement = "svcLatencyQuantilesMeasurement"
 )
 
+var supportedServiceLatencyJobTypes = map[config.JobType]struct{}{
+	config.CreationJob: {},
+	config.PatchJob:    {},
+}
+
 type serviceLatency struct {
 	BaseMeasurement
-
-	epLister  lcorev1.EndpointsLister
-	svcLister lcorev1.ServiceLister
+	stopInformerCh    chan struct{}
+	epsLister         ldiscoveryv1.EndpointSliceLister
+	svcLister         lcorev1.ServiceLister
+	svcLatencyChecker *mutil.SvcLatencyChecker
 }
 
 type svcMetric struct {
@@ -83,7 +91,6 @@ func (slmf serviceLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Jo
 }
 
 func (s *serviceLatency) handleCreateSvc(obj any) {
-	// TODO Magic annotation to skip service
 	svc, err := kutil.ConvertAnyToTyped[corev1.Service](obj)
 	if err != nil {
 		log.Errorf("failed to convert to Service: %v", err)
@@ -107,15 +114,11 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 			}
 			ipAssignedLatency = time.Since(now)
 		}
-		if err := s.waitForEndpoints(svc); err != nil {
+		if err := s.waitForEndpointSlices(svc); err != nil {
 			log.Fatal(err)
 		}
 		endpointsReadyTs := time.Now().UTC()
-		log.Debugf("Endpoints %v/%v ready", svc.Namespace, svc.Name)
-		svcLatencyChecker, err := mutil.NewSvcLatencyChecker(s.ClientSet, *s.RestConfig)
-		if err != nil {
-			log.Error(err)
-		}
+		log.Debugf("EndpointSlices for service %v/%v ready", svc.Namespace, svc.Name)
 		for _, specPort := range svc.Spec.Ports {
 			if specPort.Protocol == corev1.ProtocolTCP { // Support TCP protocol
 				switch svc.Spec.Type {
@@ -123,7 +126,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 					ips = svc.Spec.ClusterIPs
 					port = specPort.Port
 				case corev1.ServiceTypeNodePort:
-					ips = []string{svcLatencyChecker.Pod.Status.HostIP}
+					ips = []string{s.svcLatencyChecker.Pod.Status.HostIP}
 					port = specPort.NodePort
 				case corev1.ServiceTypeLoadBalancer:
 					for _, ingress := range svc.Status.LoadBalancer.Ingress {
@@ -139,7 +142,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 					return
 				}
 				for _, ip := range ips {
-					err = svcLatencyChecker.Ping(ip, port, s.Config.ServiceTimeout)
+					err = s.svcLatencyChecker.Ping(ip, port, s.Config.ServiceTimeout)
 					if err != nil {
 						log.Error(err)
 						return
@@ -166,6 +169,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 
 // start service latency measurement
 func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
+	var err error
 	defer measurementWg.Done()
 
 	s.LatencyQuantiles, s.NormLatencies = nil, nil
@@ -173,12 +177,14 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 		s.ClientSet,
 		types.SvcLatencyNs,
 		types.SvcLatencyCheckerName,
-		"quay.io/cloud-bulldozer/fedora-nc:latest",
+		"quay.io/kube-burner/fedora-nc:latest",
 		[]string{"sleep", "inf"},
 	); err != nil {
 		return err
 	}
-
+	if s.svcLatencyChecker, err = mutil.NewSvcLatencyChecker(s.ClientSet, *s.RestConfig); err != nil {
+		return fmt.Errorf("error creating SvcLatencyChecker: %v", err)
+	}
 	sgvr, err := kutil.ResourceToGVR(s.RestConfig, "Service", "v1")
 	if err != nil {
 		return fmt.Errorf("error getting GVR for %s: %w", "Service", err)
@@ -189,31 +195,32 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
 			name:          "svcWatcher",
 			resource:      sgvr,
-			labelSelector: fmt.Sprintf("kube-burner-runid=%v", s.Runid),
+			labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, s.Runid),
 			handlers: &cache.ResourceEventHandlerFuncs{
 				AddFunc: s.handleCreateSvc,
 			},
 		},
 	})
-
 	// Create shared informer factory for typed clients
 	clientset := kubernetes.NewForConfigOrDie(s.RestConfig)
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-
-	// Endpoint lister & informer from typed client
-	s.epLister = factory.Core().V1().Endpoints().Lister()
-	epInformer := factory.Core().V1().Endpoints().Informer()
+	// EndpointSlice/Service lister & informer from typed client
+	s.epsLister = factory.Discovery().V1().EndpointSlices().Lister()
+	s.svcLister = factory.Core().V1().Services().Lister()
+	epsInformer := factory.Discovery().V1().EndpointSlices().Informer()
+	svcInformer := factory.Core().V1().Services().Informer()
 
 	// Start the informer
-	stopCh := make(chan struct{})
-	go epInformer.Run(stopCh)
+	s.stopInformerCh = make(chan struct{})
+	factory.Start(s.stopInformerCh)
 
 	// Wait for the endpoint informer cache to sync
-	if !cache.WaitForCacheSync(stopCh, epInformer.HasSynced) {
+	if !cache.WaitForCacheSync(s.stopInformerCh, epsInformer.HasSynced) {
 		return fmt.Errorf("failed to sync endpoint informer cache")
 	}
-
-	s.svcLister = lcorev1.NewServiceLister(s.watchers[0].Informer.GetIndexer())
+	if !cache.WaitForCacheSync(s.stopInformerCh, svcInformer.HasSynced) {
+		return fmt.Errorf("failed to sync service informer cache")
+	}
 	return nil
 }
 
@@ -223,13 +230,14 @@ func (s *serviceLatency) Stop() error {
 	defer func() {
 		cancel()
 		s.stopWatchers()
+		close(s.stopInformerCh)
 	}()
 	kutil.CleanupNamespaces(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
 	for _, q := range s.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
-		log.Infof("%s: %s 99th: %dms max: %dms avg: %dms", s.JobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
+		log.Infof("serviceLatency: %s: %s 99th: %dms max: %dms avg: %dms", s.JobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
 	}
 	return nil
 }
@@ -265,15 +273,17 @@ func (s *serviceLatency) normalizeMetrics() {
 	}
 }
 
-func (s *serviceLatency) waitForEndpoints(svc *corev1.Service) error {
+func (s *serviceLatency) waitForEndpointSlices(svc *corev1.Service) error {
 	err := wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-		endpoints, err := s.epLister.Endpoints(svc.Namespace).Get(svc.Name)
+		endpointSlices, err := s.epsLister.EndpointSlices(svc.Namespace).List(labels.SelectorFromSet(map[string]string{"kubernetes.io/service-name": svc.Name}))
 		if err != nil {
 			return false, nil
 		}
-		for _, subset := range endpoints.Subsets {
-			if len(subset.Addresses) > 0 {
-				return true, nil
+		for _, endpointSlice := range endpointSlices {
+			for _, endpoint := range endpointSlice.Endpoints {
+				if len(endpoint.Addresses) > 0 {
+					return true, nil
+				}
 			}
 		}
 		return false, nil
@@ -297,4 +307,9 @@ func (s *serviceLatency) waitForIngress(svc *corev1.Service) error {
 
 func (s *serviceLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
+}
+
+func (s *serviceLatency) IsCompatible() bool {
+	_, exists := supportedServiceLatencyJobTypes[s.JobConfig.JobType]
+	return exists
 }

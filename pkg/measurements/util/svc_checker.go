@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -22,12 +22,12 @@ type SvcLatencyChecker struct {
 	restConfig rest.Config
 }
 
-func NewSvcLatencyChecker(clientSet kubernetes.Interface, restConfig rest.Config) (SvcLatencyChecker, error) {
+func NewSvcLatencyChecker(clientSet kubernetes.Interface, restConfig rest.Config) (*SvcLatencyChecker, error) {
 	pod, err := clientSet.CoreV1().Pods(types.SvcLatencyNs).Get(context.TODO(), types.SvcLatencyCheckerName, metav1.GetOptions{})
 	if err != nil {
-		return SvcLatencyChecker{}, err
+		return nil, err
 	}
-	return SvcLatencyChecker{
+	return &SvcLatencyChecker{
 		Pod:        pod,
 		clientSet:  clientSet,
 		restConfig: restConfig,

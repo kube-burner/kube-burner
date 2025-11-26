@@ -39,7 +39,6 @@ jobs:
   # create the VMs
   - name: kubevirt-density
     jobType: create
-    jobIterations: 1
     qps: 20
     burst: 20
     namespacedIterations: false

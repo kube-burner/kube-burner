@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -155,11 +155,11 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					}
 				}
 				if target.BearerToken != "" {
-					command = []string{"curl", "-sSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
+					command = []string{"curl", "-fsSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
 				} else if target.Cert != "" && target.Key != "" {
-					command = []string{"curl", "-sSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
+					command = []string{"curl", "-fsSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
 				} else {
-					command = []string{"curl", "-sSLk", target.URL}
+					command = []string{"curl", "-fsSLk", target.URL}
 				}
 				req := p.ClientSet.CoreV1().
 					RESTClient().
@@ -268,4 +268,8 @@ func (p *pprof) copyCertsToPod(pod corev1.Pod, cert, privKey io.Reader) error {
 	}
 	log.Infof("Certificate and private key copied into %s %s", pod.Name, pod.Spec.Containers[0].Name)
 	return nil
+}
+
+func (p *pprof) IsCompatible() bool {
+	return true
 }

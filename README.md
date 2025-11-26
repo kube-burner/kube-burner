@@ -17,13 +17,22 @@ Kube-burner is a binary application written in golang that makes extensive usage
 
 ![Demo](docs/media/demo.gif)
 
-## Code of Conduct
-
-This project is for everyone. We ask that our users and contributors take a few minutes to review our [Code of Conduct](./code-of-conduct.md).
 
 ## Documentation
 
 Documentation is [available here](https://kube-burner.github.io/kube-burner/)
+
+## Quick start
+
+Install latest stable version with:
+
+```shell
+curl -Ls https://raw.githubusercontent.com/kube-burner/kube-burner/refs/heads/main/hack/install.sh | sh
+```
+
+> [!NOTE]
+> Default installation path is `${HOME}/.local/bin/`, you can change it by setting `INSTALL_DIR` environment variable
+> before running the script
 
 ## Downloading Kube-burner
 
@@ -31,7 +40,10 @@ In case you want to start tinkering with Kube-burner now:
 
 - You can find the binaries in the [releases section of the repository](https://github.com/kube-burner/kube-burner/releases).
 - There's also a container image available at [quay](https://quay.io/repository/kube-burner/kube-burner?tab=tags).
-- Example configuration files can be found at the [examples directory](./examples).
+
+### Example configs
+
+Example configuration files can be found at the [examples directory](./examples/workloads).
 
 ## Building from Source
 
@@ -49,3 +61,7 @@ The default builds produce static binaries that work across all Linux distributi
 Please read the [Contributing section](https://kube-burner.github.io/kube-burner/latest/contributing/) before contributing to this project. It provides information on how to contribute, guidelines for setting an environment a CI checks to be done before commiting code.
 
 This project utilizes a Continuous Integration (CI) pipeline to ensure code quality and maintain project standards. The CI process automatically builds, tests, and verifies the project on each commit and pull request.
+
+## Code of Conduct
+
+This project is for everyone. We ask that our users and contributors take a few minutes to review our [Code of Conduct](./code-of-conduct.md).

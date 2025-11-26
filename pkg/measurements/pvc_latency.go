@@ -19,10 +19,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
@@ -41,6 +41,11 @@ var (
 		string(corev1.ClaimPending): {},
 		string(corev1.ClaimBound):   {},
 		string(corev1.ClaimLost):    {},
+	}
+	supportedPvcLatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.PatchJob:    {},
+		config.DeletionJob: {},
 	}
 )
 
@@ -165,7 +170,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
 				name:          "pvcWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", p.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePVC,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -250,4 +255,9 @@ func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.ClaimBound):   float64(pvcMetric.BindingLatency),
 		string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
 	}
+}
+
+func (p *pvcLatency) IsCompatible() bool {
+	_, exists := supportedPvcLatencyJobTypes[p.JobConfig.JobType]
+	return exists
 }

@@ -20,16 +20,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (ex *JobExecutor) setupDeleteJob(mapper meta.RESTMapper) {
+func (ex *JobExecutor) setupDeleteJob() {
 	log.Debugf("Preparing delete job: %s", ex.Name)
 	ex.itemHandler = deleteHandler
 	if ex.WaitForDeletion {
@@ -43,7 +42,7 @@ func (ex *JobExecutor) setupDeleteJob(mapper meta.RESTMapper) {
 	ex.WaitWhenFinished = false
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, mapper, APIVersionV1, ex.embedCfg))
+		ex.objects = append(ex.objects, newObject(o, ex.mapper, APIVersionV1, ex.embedCfg))
 	}
 }
 
