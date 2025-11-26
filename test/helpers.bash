@@ -194,11 +194,6 @@ check_files_dont_exist() {
   return 0
 }
 
-
-print_events() {
-  kubectl get events --sort-by='.lastTimestamp' -A
-}
-
 check_custom_status_path() {
   label=$1
   statusPath=$2
