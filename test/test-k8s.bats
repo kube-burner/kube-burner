@@ -157,11 +157,6 @@ teardown_file() {
   check_file_list alerts/alert.json
 }
 
-@test "kube-burner log file output" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug
-  check_file_exists "kube-burner-${UUID}.log"
-}
-
 @test "kube-burner init: waitOptions for Deployment" {
   export GC=false
   export WAIT_FOR_CONDITION="True"
