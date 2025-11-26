@@ -343,6 +343,11 @@ func (p *podLatency) normalizeMetrics() float64 {
 			m.PodReadyLatency = 0
 		}
 		m.ContainersStartedLatency = int(m.containersStarted.Sub(m.Timestamp).Milliseconds())
+		if m.ContainersStartedLatency < 0 {
+			log.Tracef("ContainersStartedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+			errorFlag = 1
+			m.ContainersStartedLatency = 0
+		}
 		totalPods++
 		erroredPods += errorFlag
 		p.NormLatencies = append(p.NormLatencies, m)
