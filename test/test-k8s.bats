@@ -38,6 +38,7 @@ setup() {
   export UUID; UUID=$(uuidgen)
   export METRICS_FOLDER="metrics-${UUID}"
   export ES_INDEXING=""
+  export CHURN_MODE=""
   export CHURN_CYCLES=0
   export PRELOAD_IMAGES=false
   export GC=true
@@ -45,6 +46,7 @@ setup() {
   export LOCAL_INDEXING=""
   export ALERTING=""
   export TIMESERIES_INDEXER=""
+  export CRD=""
 }
 
 teardown() {
@@ -74,16 +76,16 @@ teardown_file() {
   export CHURN_MODE=namespaces
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --log-level=debug
-  verify_object_count TestCR 5 cr-crd kube-burner-uuid=${UUID}
+  verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
   kubectl delete -f objectTemplates/crd.yml
-  verify_object_count namespace 5 "" kube-burner-job=namespaced,kube-burner-uuid=${UUID}
-  verify_object_count pod 10 "" kube-burner-job=namespaced,kube-burner-uuid=${UUID} status.phase==Running
-  verify_object_count pod 5 default kube-burner-job=namespaced,kube-burner-uuid=${UUID} status.phase==Running
+  verify_object_count namespace 5 "" kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID}
+  verify_object_count pod 10 "" kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count pod 5 default kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID} status.phase==Running
   ${KUBE_BURNER} destroy --uuid ${UUID}
-  kubectl delete pod -l kube-burner-uuid=${UUID} -n default
-  verify_object_count namespace 0 "" kube-burner-uuid=${UUID}
-  verify_object_count pod 0 default kube-burner-uuid=${UUID}
+  kubectl delete pod -l kube-burner.io/uuid=${UUID} -n default
+  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
+  verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/jobLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/jobLatencyQuantilesMeasurement-namespaced.json
 }
 
@@ -95,8 +97,8 @@ teardown_file() {
   export CHURN_MODE=objects
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement alert
-  verify_object_count namespace 0 "" kube-burner-uuid=${UUID}
-  verify_object_count pod 0 "" kube-burner-uuid=${UUID}
+  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
+  verify_object_count pod 0 "" kube-burner.io/uuid=${UUID}
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyMeasurement-namespaced.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-namespaced.json
 }
 
@@ -144,7 +146,7 @@ teardown_file() {
 @test "kube-burner init: kubeconfig; kubecontext" {
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-  verify_object_count pod 0 default kube-burner-job=namespaced,kube-burner-uuid=${UUID}
+  verify_object_count pod 0 default kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID}
 }
 
 @test "kube-burner cluster health check" {

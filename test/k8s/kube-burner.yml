@@ -25,7 +25,7 @@ metricsEndpoints:
       defaultIndex: {{ .ES_INDEX }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
-    alerts: [alert-profile.yaml]
+    alerts: [alerts.yml]
 {{ end }}
 {{ end }}
 {{ if .LOCAL_INDEXING }}
@@ -35,7 +35,7 @@ metricsEndpoints:
       metricsDirectory: {{ .METRICS_FOLDER }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
-    alerts: [alert-profile.yaml]
+    alerts: [alerts.yml]
 {{ end }}
 {{ end }}
 
@@ -106,7 +106,7 @@ jobs:
       runOnce: true
 
 {{ if .CRD }}
-  - name: crd-{{ .BATS_TEST_NUMBER }}
+  - name: crd
     jobType: create
     jobIterations: 1
     namespacedIterations: false
@@ -119,8 +119,8 @@ jobs:
     - objectTemplate: objectTemplates/crd.yml
       replicas: 1
 
-  - name: cr-{{ .BATS_TEST_NUMBER }}
-    namespace: cr-{{ .BATS_TEST_NUMBER }}
+  - name: cr-crd
+    namespace: cr-crd
     jobType: create
     jobIterations: 1
     namespacedIterations: false
