@@ -39,7 +39,6 @@ setup() {
   export METRICS_FOLDER="metrics-${UUID}"
   export ES_INDEXING=""
   export CHURN_CYCLES=0
-  export CHURN_MODE=namespaces
   export PRELOAD_IMAGES=false
   export GC=true
   export JOBGC=false
@@ -72,6 +71,7 @@ teardown_file() {
   export CRD=true
   export PRELOAD_IMAGES=true
   export LOCAL_INDEXING=true
+  export CHURN_MODE=namespaces
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --log-level=debug
   verify_object_count TestCR 5 cr-crd kube-burner-uuid=${UUID}
@@ -207,7 +207,7 @@ teardown_file() {
   # Verify that the default value is used when the variable is not set
   verify_object_count deployment ${REPLICAS} ${NAMESPACE} kube-burner.io/unset=unset
   # Verify that the from-file-override label was set from the input file
-  verify_object_count deployment ${REPLICAS} ${NAMESPACE} kube-burner.from-file-override/from-file=from-file
+  verify_object_count deployment ${REPLICAS} ${NAMESPACE} kube-burner/from-file-override=from-file
   kubectl delete ns ${NAMESPACE}
 }
 
