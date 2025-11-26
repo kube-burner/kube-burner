@@ -66,10 +66,9 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner init: churn-mode=namespaces; preload=true; absolute-path=true; job-gc=true; crd=true" {
+@test "kube-burner init: churn-mode=namespaces; preload=true; absolute-path=true; crd=true" {
   export CHURN_CYCLES=2
   export GC=false
-  export JOBGC=true
   export CRD=true
   export PRELOAD_IMAGES=true
   export LOCAL_INDEXING=true
@@ -90,11 +89,11 @@ teardown_file() {
 }
 
 @test "kube-burner init: churn-mode=objects, local-indexing=true; os-indexing=true" {
-  export ES_INDEXING=true
+  export CHURN_MODE=objects
+  export ES_INDEXING=true LOCAL_INDEXING=true
   export ALERTING=true
   export CHURN_CYCLES=2
-  export JOBGC=true
-  export CHURN_MODE=objects
+  export GC=false JOBGC=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement alert
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
@@ -104,7 +103,7 @@ teardown_file() {
 
 @test "kube-burner init: preload=true; os-indexing=true; local-indexing=true; vm-latency-indexing=true" {
   export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
-  export PRELOAD_IMAGES=true
+  export PRELOAD_IMAGES=true  # VM image preload
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json  ${METRICS_FOLDER}/vmiLatencyMeasurement-kubevirt-density.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-kubevirt-density.json
@@ -146,7 +145,7 @@ teardown_file() {
 @test "kube-burner init: kubeconfig; kubecontext" {
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-  verify_object_count pod 0 default kube-burner.io/job=namespaced,kube-burner.io/uuid=${UUID}
+  verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
 }
 
 @test "kube-burner cluster health check" {
@@ -209,7 +208,7 @@ teardown_file() {
   # Verify that the default value is used when the variable is not set
   verify_object_count deployment ${REPLICAS} ${NAMESPACE} kube-burner.io/unset=unset
   # Verify that the from-file-override label was set from the input file
-  verify_object_count deployment ${REPLICAS} ${NAMESPACE} kube-burner/from-file-override=from-file
+  verify_object_count deployment ${REPLICAS} ${NAMESPACE} kube-burner.io/from-file-override=from-file
   kubectl delete ns ${NAMESPACE}
 }
 
