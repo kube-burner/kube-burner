@@ -1023,7 +1023,7 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
     pprofInterval: 30m
     pprofDirectory: pprof-data
     nodeAffinity:
-      kubernetes.io/hostname : "kubebrowse-cluster-worker"
+      kubernetes.io/hostname : "cluster-worker"
     pprofTargets:
     - name: kube-apiserver-heap
       namespace: "openshift-kube-apiserver"
