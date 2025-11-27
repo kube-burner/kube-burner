@@ -94,3 +94,11 @@ const (
 	SvcLatencyNs          = "kube-burner-service-latency"
 	SvcLatencyCheckerName = "svc-checker"
 )
+
+const (
+	PprofNamespace   = "pprof-collector"
+	PprofDaemonSet   = "pprof-collector"
+	PprofSA          = "pprof-collector"
+	PprofRole        = "pprof-collector"
+	PprofRoleBinding = "pprof-collector"
+)

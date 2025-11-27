@@ -6,20 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-)
-
-const (
-	pprofNamespace   = "pprof-collector"
-	pprofDaemonSet   = "pprof-collector"
-	pprofSA          = "pprof-collector"
-	pprofRole        = "pprof-collector"
-	pprofRoleBinding = "pprof-collector"
 )
 
 func (p *pprof) needsDaemonSet() bool {
@@ -32,14 +25,14 @@ func (p *pprof) waitForDaemonSetReady() error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	log.Infof("Waiting for DaemonSet %s pods to be ready", pprofDaemonSet)
+	log.Infof("Waiting for DaemonSet %s pods to be ready", types.PprofDaemonSet)
 
 	for {
 		select {
 		case <-timeout:
 			return fmt.Errorf("timeout waiting for DaemonSet pods to be ready")
 		case <-ticker.C:
-			ds, err := p.ClientSet.AppsV1().DaemonSets(pprofNamespace).Get(ctx, pprofDaemonSet, metav1.GetOptions{})
+			ds, err := p.ClientSet.AppsV1().DaemonSets(types.PprofNamespace).Get(ctx, types.PprofDaemonSet, metav1.GetOptions{})
 			if err != nil {
 				log.Warnf("Error getting DaemonSet status: %v", err)
 				continue
@@ -47,11 +40,11 @@ func (p *pprof) waitForDaemonSetReady() error {
 
 			// Check if all desired pods are ready
 			if ds.Status.NumberReady > 0 && ds.Status.NumberReady == ds.Status.DesiredNumberScheduled {
-				log.Infof("DaemonSet %s is ready with %d/%d pods", pprofDaemonSet, ds.Status.NumberReady, ds.Status.DesiredNumberScheduled)
+				log.Infof("DaemonSet %s is ready with %d/%d pods", types.PprofDaemonSet, ds.Status.NumberReady, ds.Status.DesiredNumberScheduled)
 
 				// Additional check: verify pods are actually running
-				podList, err := p.ClientSet.CoreV1().Pods(pprofNamespace).List(ctx, metav1.ListOptions{
-					LabelSelector: labels.Set(map[string]string{"app": pprofDaemonSet}).String(),
+				podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(ctx, metav1.ListOptions{
+					LabelSelector: labels.Set(map[string]string{"app": types.PprofDaemonSet}).String(),
 				})
 				if err != nil {
 					log.Warnf("Error listing pods: %v", err)
@@ -84,7 +77,7 @@ func (p *pprof) deployDaemonSet() error {
 	// Create namespace
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: pprofNamespace,
+			Name: types.PprofNamespace,
 		},
 	}
 	_, err := p.ClientSet.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
@@ -95,11 +88,11 @@ func (p *pprof) deployDaemonSet() error {
 	// Create ServiceAccount
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pprofSA,
-			Namespace: pprofNamespace,
+			Name:      types.PprofSA,
+			Namespace: types.PprofNamespace,
 		},
 	}
-	_, err = p.ClientSet.CoreV1().ServiceAccounts(pprofNamespace).Create(ctx, sa, metav1.CreateOptions{})
+	_, err = p.ClientSet.CoreV1().ServiceAccounts(types.PprofNamespace).Create(ctx, sa, metav1.CreateOptions{})
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("failed to create serviceaccount: %v", err)
 	}
@@ -107,7 +100,7 @@ func (p *pprof) deployDaemonSet() error {
 	// Create ClusterRole with kubelet permissions
 	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: pprofRole,
+			Name: types.PprofRole,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -129,18 +122,18 @@ func (p *pprof) deployDaemonSet() error {
 	// Create ClusterRoleBinding
 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: pprofRoleBinding,
+			Name: types.PprofRoleBinding,
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     pprofRole,
+			Name:     types.PprofRole,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
-				Name:      pprofSA,
-				Namespace: pprofNamespace,
+				Name:      types.PprofSA,
+				Namespace: types.PprofNamespace,
 			},
 		},
 	}
@@ -151,12 +144,12 @@ func (p *pprof) deployDaemonSet() error {
 
 	// Create DaemonSet
 	ds := p.buildDaemonSet()
-	_, err = p.ClientSet.AppsV1().DaemonSets(pprofNamespace).Create(ctx, ds, metav1.CreateOptions{})
+	_, err = p.ClientSet.AppsV1().DaemonSets(types.PprofNamespace).Create(ctx, ds, metav1.CreateOptions{})
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("failed to create daemonset: %v", err)
 	}
 
-	log.Infof("DaemonSet %s deployed in namespace %s", pprofDaemonSet, pprofNamespace)
+	log.Infof("DaemonSet %s deployed in namespace %s", types.PprofDaemonSet, types.PprofNamespace)
 	return nil
 }
 
@@ -193,23 +186,23 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 	}
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pprofDaemonSet,
-			Namespace: pprofNamespace,
+			Name:      types.PprofDaemonSet,
+			Namespace: types.PprofNamespace,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": pprofDaemonSet,
+					"app": types.PprofDaemonSet,
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": pprofDaemonSet,
+						"app": types.PprofDaemonSet,
 					},
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: pprofSA,
+					ServiceAccountName: types.PprofSA,
 					HostNetwork:        hostNetwork,
 					Affinity:           affinity,
 					Containers: []corev1.Container{

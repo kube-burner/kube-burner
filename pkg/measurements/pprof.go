@@ -113,8 +113,8 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
 	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
 	if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
-		labelSelector := labels.Set(map[string]string{"app": pprofDaemonSet}).String()
-		podList, err := p.ClientSet.CoreV1().Pods(pprofNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector,
+		labelSelector := labels.Set(map[string]string{"app": types.PprofDaemonSet}).String()
+		podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector,
 			FieldSelector: "status.phase=Running",
 		})
 		if err != nil {
@@ -222,7 +222,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 						Post().
 						Resource("pods").
 						Name(pod.Name).
-						Namespace(pprofNamespace).
+						Namespace(types.PprofNamespace).
 						SubResource("exec")
 				} else {
 					// Pod-level collection (etcd, api-server, etc.)
