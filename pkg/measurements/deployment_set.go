@@ -19,6 +19,16 @@ func (p *pprof) needsDaemonSet() bool {
 	return len(p.Config.NodeAffinity) > 0
 }
 
+// needsCRIOSocket checks if any pprofTarget uses a unix socket URL (CRI-O)
+func (p *pprof) needsCRIOSocket() bool {
+	for _, target := range p.Config.PProfTargets {
+		if strings.HasPrefix(target.URL, "unix://") {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *pprof) waitForDaemonSetReady() error {
 	ctx := context.TODO()
 	timeout := time.After(2 * time.Minute)
@@ -109,8 +119,8 @@ func (p *pprof) deployDaemonSet() error {
 			},
 			{
 				APIGroups: []string{""},
-				Resources: []string{"nodes/proxy"},
-				Verbs:     []string{"get"},
+				Resources: []string{"nodes", "nodes/proxy", "nodes/stats", "nodes/metrics"},
+				Verbs:     []string{"get", "list"},
 			},
 		},
 	}
@@ -179,11 +189,17 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 			)
 		}
 	}
-	// hostPathSocket := corev1.HostPathSocket
-	mountPath := p.Config.PProfDirectory
-	if !strings.HasPrefix(mountPath, "/") {
-		mountPath = "/" + mountPath
+	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
+	hostPath := p.Config.PProfDirectory
+	if !strings.HasPrefix(hostPath, "/") {
+		hostPath = "/var/tmp/" + hostPath
+		log.Warnf("PProfDirectory %s is not an absolute path, using %s", p.Config.PProfDirectory, hostPath)
 	}
+
+	// Build volume mounts and volumes based on configuration
+	volumeMounts := p.buildVolumeMounts(hostPath)
+	volumes := p.buildVolumes(hostPath, hostPathDirectoryOrCreate)
+
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      types.PprofDaemonSet,
@@ -208,7 +224,7 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 					Containers: []corev1.Container{
 						{
 							Name:  "pprof-collector",
-							Image: "quay.io/curl/curl:latest",
+							Image: "curlimages/curl:8.5.0",
 							Command: []string{
 								"sh",
 								"-c",
@@ -217,74 +233,98 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 							SecurityContext: &corev1.SecurityContext{
 								Privileged: &privileged,
 							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "pprof-data-directory",
-									MountPath: mountPath,
-								},
-								{
-									Name:      "kubelet-ca",
-									MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
-									ReadOnly:  true,
-								},
-								// socket mount for CRI-O
-								// {
-								// 	Name:      "crio-socket",
-								// 	MountPath: "/var/run/crio/crio.sock",
-								// },
-							},
+							VolumeMounts: volumeMounts,
 						},
 					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "pprof-data-directory",
-							VolumeSource: corev1.VolumeSource{
-								HostPath: &corev1.HostPathVolumeSource{
-									Path: p.Config.PProfDirectory,
-								},
-							},
-						},
-						{
-							Name: "kubelet-ca",
-							VolumeSource: corev1.VolumeSource{
-								Projected: &corev1.ProjectedVolumeSource{
-									Sources: []corev1.VolumeProjection{
-										{
-											ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
-												Path: "token",
-											},
-										},
-										{
-											ConfigMap: &corev1.ConfigMapProjection{
-												LocalObjectReference: corev1.LocalObjectReference{
-													Name: "kube-root-ca.crt",
-												},
-												Items: []corev1.KeyToPath{
-													{
-														Key:  "ca.crt",
-														Path: "ca.crt",
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						// {
-						// 	Name: "crio-socket",
-						// 	VolumeSource: corev1.VolumeSource{
-						// 		HostPath: &corev1.HostPathVolumeSource{
-						// 			Path: "/var/run/crio/crio.sock",
-						// 			Type: &hostPathSocket,
-						// 		},
-						// 	},
-						// },
-					},
+					Volumes: volumes,
 				},
 			},
 		},
 	}
 
 	return ds
+}
+
+// buildVolumeMounts creates volume mounts for pprof data, kubelet CA, and optionally CRI-O socket
+func (p *pprof) buildVolumeMounts(hostPath string) []corev1.VolumeMount {
+	mounts := []corev1.VolumeMount{
+		{
+			Name:      "pprof-data-directory",
+			MountPath: hostPath,
+		},
+		{
+			Name:      "kubelet-ca",
+			MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+			ReadOnly:  true,
+		},
+	}
+
+	// Add CRI-O socket mount if any target uses unix socket
+	if p.needsCRIOSocket() {
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      "crio-socket",
+			MountPath: "/var/run/crio/crio.sock",
+		})
+		log.Infof("CRI-O socket mount enabled for unix socket pprof targets")
+	}
+
+	return mounts
+}
+
+// buildVolumes creates volumes, conditionally adding CRI-O socket if needed
+func (p *pprof) buildVolumes(hostPath string, hostPathDirectoryOrCreate corev1.HostPathType) []corev1.Volume {
+	volumes := []corev1.Volume{
+		{
+			Name: "pprof-data-directory",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: hostPath,
+					Type: &hostPathDirectoryOrCreate,
+				},
+			},
+		},
+		{
+			Name: "kubelet-ca",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+								Path: "token",
+							},
+						},
+						{
+							ConfigMap: &corev1.ConfigMapProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "kube-root-ca.crt",
+								},
+								Items: []corev1.KeyToPath{
+									{
+										Key:  "ca.crt",
+										Path: "ca.crt",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Add CRI-O socket volume if any target uses unix socket
+	if p.needsCRIOSocket() {
+		hostPathSocket := corev1.HostPathSocket
+		volumes = append(volumes, corev1.Volume{
+			Name: "crio-socket",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/var/run/crio/crio.sock",
+					Type: &hostPathSocket,
+				},
+			},
+		})
+	}
+
+	return volumes
 }

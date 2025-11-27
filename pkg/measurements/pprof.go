@@ -133,7 +133,6 @@ func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
 
 func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 	var err error
-	var command []string
 	for pos, target := range p.Config.PProfTargets {
 		log.Infof("Collecting %s pprof", target.Name)
 		podList := p.getPods(target)
@@ -164,12 +163,17 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 			wg.Add(1)
 			go func(target types.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
-				if p.daemonSetDeployed {
+
+				// Determine identifier for filename
+				identifier := pod.Name
+				if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
 					if nodeName := pod.Spec.NodeName; nodeName != "" {
+						identifier = nodeName
 						log.Infof("Collecting pprof from pod %s on node %s", pod.Name, nodeName)
 					}
 				}
-				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Name, time.Now().Unix())
+
+				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, identifier, time.Now().Unix())
 				f, err := os.Create(path.Join(p.Config.PProfDirectory, pprofFile))
 				var stderr bytes.Buffer
 				if err != nil {
@@ -183,64 +187,8 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 						return
 					}
 				}
-				var pprofReq *rest.Request
 
-				// Build command based on target type
-				if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
-					// Node-level collection via DaemonSet
-					if strings.HasPrefix(target.URL, "unix://") {
-						// Unix socket (CRI-O)
-						socketPath := strings.TrimPrefix(target.URL, "unix://")
-
-						// Extract the pprof path from target.URL or use default
-						pprofPath := "/debug/pprof/profile"
-						if strings.Contains(target.Name, "heap") {
-							pprofPath = "/debug/pprof/heap"
-						} else if strings.Contains(target.Name, "goroutine") {
-							pprofPath = "/debug/pprof/goroutine"
-						}
-
-						// Convert duration to seconds for CPU profiling
-						seconds := int(p.Config.PProfInterval.Seconds())
-						if seconds > 300 {
-							seconds = 30 // Cap at 30 seconds for CPU profiling
-						}
-
-						command = []string{"curl", "-fsSLk",
-							"--unix-socket", socketPath,
-							fmt.Sprintf("http://localhost%s?seconds=%d", pprofPath, seconds),
-						}
-						log.Infof("Using unix socket: %s", socketPath)
-					} else {
-						// HTTP/HTTPS endpoint (kubelet)
-						command = []string{"sh", "-c",
-							fmt.Sprintf("curl -fsSLk -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt %s", target.URL),
-						}
-					}
-					pprofReq = p.ClientSet.CoreV1().
-						RESTClient().
-						Post().
-						Resource("pods").
-						Name(pod.Name).
-						Namespace(types.PprofNamespace).
-						SubResource("exec")
-				} else {
-					// Pod-level collection (etcd, api-server, etc.)
-					if target.BearerToken != "" {
-						command = []string{"curl", "-fsSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
-					} else if target.Cert != "" && target.Key != "" {
-						command = []string{"curl", "-fsSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
-					} else {
-						command = []string{"curl", "-fsSLk", target.URL}
-					}
-					pprofReq = p.ClientSet.CoreV1().
-						RESTClient().
-						Post().
-						Resource("pods").
-						Name(pod.Name).
-						Namespace(pod.Namespace).
-						SubResource("exec")
-				}
+				command, pprofReq := p.buildPProfRequest(target, pod)
 
 				log.Debugf("Collecting pprof using URL: %s", pprofReq.URL())
 				pprofReq.VersionedParams(&corev1.PodExecOptions{
@@ -250,7 +198,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					Stderr:    true,
 					Stdout:    true,
 				}, scheme.ParameterCodec)
-				log.Debugf("Executing %s in pod %s", command, pod.Name)
+				log.Debugf("Executing %s in pod %s (namespace: %s)", command, pod.Name, pod.Namespace)
 				exec, err := remotecommand.NewSPDYExecutor(p.RestConfig, "POST", pprofReq.URL())
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
@@ -270,6 +218,69 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 		}
 	}
 	wg.Wait()
+}
+
+func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod) ([]string, *rest.Request) {
+	var pprofReq *rest.Request
+	var command []string
+
+	// Build command based on target type
+	if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
+		// Node-level collection via DaemonSet
+		if strings.HasPrefix(target.URL, "unix://") {
+			// Unix socket (CRI-O)
+			socketPath := strings.TrimPrefix(target.URL, "unix://")
+
+			// Extract the pprof path from target.URL or use default
+			pprofPath := "/debug/pprof/profile"
+			if strings.Contains(target.Name, "heap") {
+				pprofPath = "/debug/pprof/heap"
+			} else if strings.Contains(target.Name, "goroutine") {
+				pprofPath = "/debug/pprof/goroutine"
+			}
+
+			// Convert duration to seconds for CPU profiling
+			seconds := int(p.Config.PProfInterval.Seconds())
+			if seconds > 300 {
+				seconds = 30 // Cap at 30 seconds for CPU profiling
+			}
+
+			command = []string{"curl", "-fsSLk",
+				"--unix-socket", socketPath,
+				fmt.Sprintf("http://localhost%s?seconds=%d", pprofPath, seconds),
+			}
+			log.Debugf("Using unix socket: %s for %s", socketPath, pprofPath)
+		} else {
+			// HTTPS endpoint (kubelet) - use insecure since kubelet typically uses self-signed certs
+			command = []string{"sh", "-c",
+				fmt.Sprintf("curl -fsSLk -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" %s", target.URL),
+			}
+		}
+		pprofReq = p.ClientSet.CoreV1().
+			RESTClient().
+			Post().
+			Resource("pods").
+			Name(pod.Name).
+			Namespace(types.PprofNamespace).
+			SubResource("exec")
+	} else {
+		// Pod-level collection (etcd, api-server, etc.)
+		if target.BearerToken != "" {
+			command = []string{"curl", "-fsSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
+		} else if target.Cert != "" && target.Key != "" {
+			command = []string{"curl", "-fsSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
+		} else {
+			command = []string{"curl", "-fsSLk", target.URL}
+		}
+		pprofReq = p.ClientSet.CoreV1().
+			RESTClient().
+			Post().
+			Resource("pods").
+			Name(pod.Name).
+			Namespace(pod.Namespace).
+			SubResource("exec")
+	}
+	return command, pprofReq
 }
 
 func (p *pprof) Collect(measurementWg *sync.WaitGroup) {
