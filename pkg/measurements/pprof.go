@@ -44,7 +44,8 @@ import (
 type pprof struct {
 	BaseMeasurement
 
-	stopChannel chan bool
+	stopChannel       chan bool
+	daemonSetDeployed bool
 }
 
 type pprofLatencyMeasurementFactory struct {
@@ -76,6 +77,17 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	if err != nil {
 		log.Fatalf("Error creating pprof directory: %s", err)
 	}
+	if p.needsDaemonSet() {
+		if err := p.deployDaemonSet(); err != nil {
+			log.Errorf("Error deploying DaemonSet: %s", err)
+			return err
+		}
+		p.daemonSetDeployed = true
+		if err := p.waitForDaemonSetReady(); err != nil {
+			log.Errorf("Error waiting for DaemonSet to be ready: %s", err)
+			return err
+		}
+	}
 	p.stopChannel = make(chan bool)
 	p.getPProf(&wg, true)
 	wg.Wait()
@@ -99,6 +111,18 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 }
 
 func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
+	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
+	if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
+		labelSelector := labels.Set(map[string]string{"app": pprofDaemonSet}).String()
+		podList, err := p.ClientSet.CoreV1().Pods(pprofNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector,
+			FieldSelector: "status.phase=Running",
+		})
+		if err != nil {
+			log.Errorf("Error found listing DaemonSet pods: %s", err)
+			return []corev1.Pod{}
+		}
+		return podList.Items
+	}
 	labelSelector := labels.Set(target.LabelSelector).String()
 	podList, err := p.ClientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
@@ -140,6 +164,11 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 			wg.Add(1)
 			go func(target types.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
+				if p.daemonSetDeployed {
+					if nodeName := pod.Spec.NodeName; nodeName != "" {
+						log.Infof("Collecting pprof from pod %s on node %s", pod.Name, nodeName)
+					}
+				}
 				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Name, time.Now().Unix())
 				f, err := os.Create(path.Join(p.Config.PProfDirectory, pprofFile))
 				var stderr bytes.Buffer
@@ -154,22 +183,67 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 						return
 					}
 				}
-				if target.BearerToken != "" {
-					command = []string{"curl", "-fsSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
-				} else if target.Cert != "" && target.Key != "" {
-					command = []string{"curl", "-fsSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
+				var pprofReq *rest.Request
+
+				// Build command based on target type
+				if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
+					// Node-level collection via DaemonSet
+					if strings.HasPrefix(target.URL, "unix://") {
+						// Unix socket (CRI-O)
+						socketPath := strings.TrimPrefix(target.URL, "unix://")
+
+						// Extract the pprof path from target.URL or use default
+						pprofPath := "/debug/pprof/profile"
+						if strings.Contains(target.Name, "heap") {
+							pprofPath = "/debug/pprof/heap"
+						} else if strings.Contains(target.Name, "goroutine") {
+							pprofPath = "/debug/pprof/goroutine"
+						}
+
+						// Convert duration to seconds for CPU profiling
+						seconds := int(p.Config.PProfInterval.Seconds())
+						if seconds > 300 {
+							seconds = 30 // Cap at 30 seconds for CPU profiling
+						}
+
+						command = []string{"curl", "-fsSLk",
+							"--unix-socket", socketPath,
+							fmt.Sprintf("http://localhost%s?seconds=%d", pprofPath, seconds),
+						}
+						log.Infof("Using unix socket: %s", socketPath)
+					} else {
+						// HTTP/HTTPS endpoint (kubelet)
+						command = []string{"sh", "-c",
+							fmt.Sprintf("curl -fsSLk -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt %s", target.URL),
+						}
+					}
+					pprofReq = p.ClientSet.CoreV1().
+						RESTClient().
+						Post().
+						Resource("pods").
+						Name(pod.Name).
+						Namespace(pprofNamespace).
+						SubResource("exec")
 				} else {
-					command = []string{"curl", "-fsSLk", target.URL}
+					// Pod-level collection (etcd, api-server, etc.)
+					if target.BearerToken != "" {
+						command = []string{"curl", "-fsSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
+					} else if target.Cert != "" && target.Key != "" {
+						command = []string{"curl", "-fsSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
+					} else {
+						command = []string{"curl", "-fsSLk", target.URL}
+					}
+					pprofReq = p.ClientSet.CoreV1().
+						RESTClient().
+						Post().
+						Resource("pods").
+						Name(pod.Name).
+						Namespace(pod.Namespace).
+						SubResource("exec")
 				}
-				req := p.ClientSet.CoreV1().
-					RESTClient().
-					Post().
-					Resource("pods").
-					Name(pod.Name).
-					Namespace(pod.Namespace).
-					SubResource("exec")
-				log.Debugf("Collecting pprof using URL: %s", req.URL())
-				req.VersionedParams(&corev1.PodExecOptions{
+
+				log.Debugf("Collecting pprof using URL: %s", pprofReq.URL())
+				pprofReq.VersionedParams(&corev1.PodExecOptions{
 					Command:   command,
 					Container: pod.Spec.Containers[0].Name,
 					Stdin:     false,
@@ -177,7 +251,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					Stdout:    true,
 				}, scheme.ParameterCodec)
 				log.Debugf("Executing %s in pod %s", command, pod.Name)
-				exec, err := remotecommand.NewSPDYExecutor(p.RestConfig, "POST", req.URL())
+				exec, err := remotecommand.NewSPDYExecutor(p.RestConfig, "POST", pprofReq.URL())
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
 				}
@@ -189,6 +263,8 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 				if err != nil {
 					log.Errorf("Failed to get pprof from %s: %s", pod.Name, stderr.String())
 					os.Remove(f.Name())
+				} else {
+					log.Infof("Successfully collected pprof data: %s", pprofFile)
 				}
 			}(p.Config.PProfTargets[pos], pod)
 		}

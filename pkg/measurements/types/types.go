@@ -48,6 +48,8 @@ type Measurement struct {
 	PProfInterval time.Duration `yaml:"pprofInterval"`
 	// PProfDirectory output directory
 	PProfDirectory string `yaml:"pprofDirectory"`
+	// NodeAffinity node affinity configuration
+	NodeAffinity map[string]string `yaml:"nodeAffinity"`
 	// Service latency endpoint timeout
 	ServiceTimeout time.Duration `yaml:"svcTimeout"`
 	// Defines the indexer for quantile metrics
