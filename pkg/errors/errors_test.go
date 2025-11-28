@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 
-	"github.com/kube-burner/kube-burner/pkg/errors"
+	"github.com/kube-burner/kube-burner/v2/pkg/errors"
 )
 
 func TestErrors(t *testing.T) {

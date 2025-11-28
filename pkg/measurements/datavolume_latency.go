@@ -31,10 +31,10 @@ import (
 	"kubevirt.io/client-go/kubecli"
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -181,7 +181,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(dv.RestConfig),
 				name:          "dvWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", dv.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, dv.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: dv.handleCreateDV,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -201,9 +201,8 @@ func (dv *dvLatency) Stop() error {
 func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var dataVolumes []cdiv1beta1.DataVolume
-	labelSelector := labels.SelectorFromSet(dv.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: labels.Set(dv.JobConfig.NamespaceLabels).String(),
 	}
 	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(dv.RestConfig)
 	if err != nil {

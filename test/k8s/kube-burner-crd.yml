@@ -25,8 +25,8 @@ jobs:
     objects:
 
     - kind: BurnerTest
-      labelSelector: {kube-burner-job: crd}
+      labelSelector: {kube-burner.io/job: crd}
       apiVersion: kube-burner.io/v1
 
     - kind: Namespace
-      labelSelector: {kube-burner-job: crd}
+      labelSelector: {kube-burner.io/job: crd}

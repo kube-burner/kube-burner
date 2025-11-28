@@ -19,9 +19,9 @@ import (
 
 	"dario.cat/mergo"
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
@@ -175,13 +175,4 @@ func (ms *Measurements) Index(jobName string, indexerList map[string]indexers.In
 		log.Infof("Indexing collected data from measurement: %s", name)
 		measurement.Index(jobName, indexerList)
 	}
-}
-
-func (ms *Measurements) GetMetrics() []*sync.Map {
-	var metricList []*sync.Map
-	for name, measurement := range ms.MeasurementsMap {
-		log.Infof("Fetching metrics from measurement: %s", name)
-		metricList = append(metricList, measurement.GetMetrics())
-	}
-	return metricList
 }

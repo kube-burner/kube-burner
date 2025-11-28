@@ -25,14 +25,14 @@ import (
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	uid "github.com/google/uuid"
-	"github.com/kube-burner/kube-burner/pkg/alerting"
-	"github.com/kube-burner/kube-burner/pkg/burner"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements"
-	"github.com/kube-burner/kube-burner/pkg/prometheus"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
-	"github.com/kube-burner/kube-burner/pkg/util/metrics"
+	"github.com/kube-burner/kube-burner/v2/pkg/alerting"
+	"github.com/kube-burner/kube-burner/v2/pkg/burner"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
+	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -123,7 +123,9 @@ func initCmd() *cobra.Command {
 			}
 			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
 			if err != nil {
-				log.Fatalf("Config error: %s", err.Error())
+				log.Error("Config error")
+				fmt.Printf("%s", err.Error())
+				os.Exit(1)
 			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      &configSpec,
@@ -212,7 +214,7 @@ func destroyCmd() *cobra.Command {
 			dynamicClient := dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
+			labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelUUID, uuid)
 			util.CleanupNamespaces(ctx, clientSet, labelSelector)
 			util.CleanupNonNamespacedResources(ctx, clientSet, dynamicClient, labelSelector)
 		},

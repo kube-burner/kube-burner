@@ -42,7 +42,7 @@ jobs:
     objects:
     - kind: Deployment
       objectTemplate: objectTemplates/deployment_patch_label.yaml
-      labelSelector: {kube-burner-job: sequential-patch}
+      labelSelector: {kube-burner.io/job: sequential-patch}
       patchType: "application/strategic-merge-patch+json"
       apiVersion: apps/v1
       inputVars:

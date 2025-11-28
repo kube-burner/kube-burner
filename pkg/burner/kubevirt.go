@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,8 +31,8 @@ import (
 	kubevirtV1 "kubevirt.io/api/core/v1"
 	"kubevirt.io/client-go/kubecli"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 )
 
 const (
@@ -184,10 +185,10 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: fmt.Sprintf("%s-%s-%v-", item.GetName(), ex.Name, iteration),
 				Labels: map[string]string{
-					"kube-burner-uuid":                 ex.uuid,
-					"kube-burner-runid":                ex.runid,
-					"kube-burner-job":                  ex.Name,
-					config.KubeBurnerLabelJobIteration: fmt.Sprintf("%v", iteration),
+					config.KubeBurnerLabelUUID:         ex.uuid,
+					config.KubeBurnerLabelRunID:        ex.runid,
+					config.KubeBurnerLabelJob:          ex.Name,
+					config.KubeBurnerLabelJobIteration: strconv.Itoa(iteration),
 				},
 			},
 			Spec: kubevirtV1.VirtualMachineInstanceMigrationSpec{

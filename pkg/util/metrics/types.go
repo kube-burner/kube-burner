@@ -16,10 +16,10 @@ package metrics
 
 import (
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
-	"github.com/kube-burner/kube-burner/pkg/alerting"
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/prometheus"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/alerting"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 )
 
 // ScraperConfig holds data related to scraper and target indexer

@@ -39,7 +39,6 @@ In this section is described global job configuration, it holds the following pa
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 60s         |
 | `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
 | `gcMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
-| `gcTimeout`               | Garbage collection timeout                                                                       | Duration        | 1h   |
 | `waitWhenFinished` | Wait for all pods/jobs (including probes) to be running/completed when all jobs are completed           | Boolean  | false   |
 | `clusterHealth` | Checks if all the nodes are in "Ready" state                                             | Boolean        | false      |
 | `timeout` | Global benchmark timeout                                             | Duration        | 4hr      |
@@ -124,11 +123,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `preloadNodeLabels`          | Add node selector labels for the resources created in preload stage                                                                   | Object   | {}       |
 | `namespaceLabels`            | Add custom labels to the namespaces created by kube-burner                                                                            | Object   | {}       |
 | `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}       |
-| `churn`                      | Churn the workload. Only supports namespace based workloads                                                                           | Boolean  | false    |
-| `churnCycles`                | Number of churn cycles to execute                                                                                                     | Integer  | 100      |
-| `churnPercent`               | Percentage of the jobIterations to churn each period                                                                                  | Integer  | 10       |
-| `churnDuration`              | Length of time that the job is churned for                                                                                            | Duration | 1h       |
-| `churnDelay`                 | Length of time to wait between each churn period                                                                                      | Duration | 5m       |
+| `churnConfig`                | Configures job churning, only supported for create jobs, see [churning jobs section](#churning-jobs)                                  | Object   | {}       |
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
 | `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
@@ -256,7 +251,7 @@ This allows kube-burner to check the status at all the specified key/value pairs
 
 ### Default labels
 
-All objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. They are used for internal purposes, but they can also be used by the users.
+All objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>`. They are used for internal purposes, but they can also be used by the users.
 
 ## Job types
 
@@ -278,11 +273,11 @@ This type of job deletes objects described in the objects list. Using delete as 
 ```yaml
 objects:
 - kind: Deployment
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
   apiVersion: apps/v1
 
 - kind: Secret
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
 ```
 
 Where:
@@ -307,11 +302,11 @@ This type of job reads objects described in the objects list. Using read as job 
 ```yaml
 objects:
 - kind: Deployment
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
   apiVersion: apps/v1
 
 - kind: Secret
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
 ```
 
 Where:
@@ -336,7 +331,7 @@ This type of job can be used to patch objects with the template described in the
 ```yaml
 objects:
 - kind: Deployment
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
   objectTemplate: templates/deployment_patch_add_label.json
   patchType: "application/strategic-merge-patch+json"
   apiVersion: apps/v1
@@ -357,7 +352,7 @@ Valid patch types:
 - application/strategic-merge-patch+json
 - application/apply-patch+yaml (requires YAML)
 
-As mentioned previously, all objects created by kube-burner are labeled with `kube-burner-uuid=<UUID>,kube-burner-job=<jobName>,kube-burner-index=<objectIndex>`. Therefore, you can design a workload with one job to create objects and another one to patch or remove the objects created by the previous.
+As mentioned previously, all objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>`. Therefore, you can design a workload with one job to create objects and another one to patch or remove the objects created by the previous.
 
 ```yaml
 jobs:
@@ -375,11 +370,11 @@ jobs:
   jobType: delete
   objects:
   - kind: Deployment
-    labelSelector: {kube-burner-job: create-objects}
+    labelSelector: {kube-burner.io/job: create-objects}
     apiVersion: apps/v1
 
   - kind: Secret
-    labelSelector: {kube-burner-job: create-objects}
+    labelSelector: {kube-burner.io/job: create-objects}
 ```
 
 ### Kubevirt
@@ -389,7 +384,7 @@ This type of job can be used to execute `virtctl` commands described in the obje
 ```yaml
 objects:
 - kubeVirtOp: start
-  labelSelector: {kube-burner-job: cluster-density}
+  labelSelector: {kube-burner.io/job: cluster-density}
   inputVars:
     force: true
 ```
@@ -483,26 +478,60 @@ Patch jobs support different execution modes
 
 ## Churning Jobs
 
-Churn is the deletion and re-creation of objects, and is supported for namespace-based jobs only. This occurs after the job has completed
-but prior to uploading metrics, if applicable. It deletes a percentage of contiguous namespaces randomly chosen and re-creates them
+Only supported in create jobs, churn is the deletion and re-creation of objects, and is supported for namespace-based jobs only. This occurs after the job has completed
+but prior to uploading metrics, if applicable. It deletes a percentage of contiguous randomly chosen namespaces or objects within those namespaces and re-creates them
 with all of the appropriate objects. It will then wait for a specified delay (or none if set to `0`) before deleting and recreating the
-next randomly chosen set. This cycle continues until the churn duration has passed.
+next randomly chosen set. This cycle continues until the churn duration/cycles has passed.
 
 An example implementation that would churn 20% of the 100 job iterations for 2 hours with no delay between sets:
 
 ```yaml
 jobs:
-- name: cluster-density
+- name: churning-job
   jobIterations: 100
   namespacedIterations: true
   namespace: churning
-  churn: true
-  churnPercent: 20
-  churnDuration: 2h
-  churnDelay: 0s
+  churnConfig:
+    percent: 20
+    duration: 2h
   objects:
   - objectTemplate: deployment.yml
     replicas: 10
+
+  - objectTemplate: service.yml
+    replicas: 10
+```
+
+### Supported options
+
+Churn supports the following options:
+
+- `cycles`: Number of churn cycles to execute
+- `percent`: Percentage of the jobIterations to churn each period
+- `duration`: Length of time that the job is churned for
+- `delay`: Length of time to wait between each churn period
+- `mode`: Churning mode, either `namespaces`, to churn entire namespaces or `objects`, to churn individual objects of the job's namespaces. Defaults to `namespaces`.
+
+!!! note
+    In order to enable churning for a job, either `duration` or `cycles` must be set. It's possible to use both at the same time.
+
+### Disable churning on individual objects
+
+By default, when churning type is configured to `object`, all namespaced objects in the job's namespace are churned. But it's possible to skip individual objects by using the flag `churn: false` in the object definition.
+
+```yaml
+jobs:
+- name: churning-job
+  jobIterations: 100
+  namespacedIterations: true
+  namespace: churning
+  churnConfig:
+    percent: 20
+    cycles: 10
+  objects:
+  - objectTemplate: deployment.yml
+    replicas: 10
+    churn: false
 
   - objectTemplate: service.yml
     replicas: 10

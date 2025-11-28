@@ -19,9 +19,9 @@ import (
 
 	"maps"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/util"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -39,6 +39,7 @@ type ObjectFinalizer func(ex *JobExecutor, obj *object)
 type JobExecutor struct {
 	config.Job
 	objects           []*object
+	createdNamespaces map[string]bool
 	uuid              string
 	runid             string
 	limiter           *rate.Limiter
@@ -60,6 +61,7 @@ type JobExecutor struct {
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
 	ex := JobExecutor{
 		Job:               job,
+		createdNamespaces: make(map[string]bool),
 		limiter:           rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		uuid:              configSpec.GlobalConfig.UUID,
 		runid:             configSpec.GlobalConfig.RUNID,

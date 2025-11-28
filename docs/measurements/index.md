@@ -1046,9 +1046,8 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
 
 ```shell
-kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2
+kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner.io/job=cluster-density-v2
 time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
-time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
 time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
 time="2023-11-19 17:46:06" level=info msg="Stopping measurement: podLatency" file="factory.go:118"
 time="2023-11-19 17:46:06" level=info msg="Evaluating latency thresholds" file="metrics.go:60"

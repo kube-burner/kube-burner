@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-burner/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,9 +33,9 @@ import (
 	"k8s.io/utils/ptr"
 	"kubevirt.io/client-go/kubecli"
 
-	"github.com/kube-burner/kube-burner/pkg/config"
-	"github.com/kube-burner/kube-burner/pkg/measurements/types"
-	"github.com/kube-burner/kube-burner/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 )
 
 const (
@@ -145,7 +145,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vsl.RestConfig),
 				name:          "vsWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("kube-burner-runid=%v", vsl.Runid),
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vsl.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vsl.handleCreateVolumeSnapshot,
 					UpdateFunc: func(oldObj, newObj any) {
@@ -165,9 +165,8 @@ func (vsl *volumeSnapshotLatency) Stop() error {
 func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 	defer measurementWg.Done()
 	var volumeSnapshots []volumesnapshotv1.VolumeSnapshot
-	labelSelector := labels.SelectorFromSet(vsl.JobConfig.NamespaceLabels)
 	options := metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
+		LabelSelector: labels.Set(vsl.JobConfig.NamespaceLabels).String(),
 	}
 	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(vsl.RestConfig)
 	if err != nil {
