@@ -35,7 +35,7 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 		for _, obj := range ex.objects {
 			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 		}
-		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
+		waitForDeleteNamespacedResources(ctx, ex, namespace, labelSelector)
 	}
 }
 
@@ -68,10 +68,10 @@ func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, ex JobExecutor, 
 	util.DeleteNonNamespacedResources(ctx, resources, resourceInterface)
 }
 
-func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, namespace string, objects []*object, labelSelector string) {
+func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, namespace string, labelSelector string) {
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		allDeleted := true
-		for _, obj := range objects {
+		for _, obj := range ex.objects {
 			// If churning is enabled and object doesn't have churning enabled we skip that object from deletion wait
 			if config.IsChurnEnabled(ex.Job) && !obj.Churn {
 				continue
