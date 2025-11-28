@@ -48,6 +48,8 @@ type Measurement struct {
 	PProfInterval time.Duration `yaml:"pprofInterval"`
 	// PProfDirectory output directory
 	PProfDirectory string `yaml:"pprofDirectory"`
+	// NodeAffinity node affinity configuration
+	NodeAffinity map[string]string `yaml:"nodeAffinity"`
 	// Service latency endpoint timeout
 	ServiceTimeout time.Duration `yaml:"svcTimeout"`
 	// Defines the indexer for quantile metrics
@@ -91,4 +93,12 @@ type PProftarget struct {
 const (
 	SvcLatencyNs          = "kube-burner-service-latency"
 	SvcLatencyCheckerName = "svc-checker"
+)
+
+const (
+	PprofNamespace   = "pprof-collector"
+	PprofDaemonSet   = "pprof-collector"
+	PprofSA          = "pprof-collector"
+	PprofRole        = "pprof-collector"
+	PprofRoleBinding = "pprof-collector"
 )
