@@ -18,6 +18,7 @@ spec:
         - sleep
         - infinity
         image: {{.containerImage}}
+        imagePullPolicy: IfNotPresent
         name: ci-app
         env: 
         {{- template "env_func" (dict "envName" .envName "envVar" .envVar "n" 4 "indent" 8) }}
