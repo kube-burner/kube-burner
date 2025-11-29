@@ -48,7 +48,7 @@ setup() {
   export TIMESERIES_INDEXER=""
   export CRD=""
   export SVC_LATENCY=""
-  export JOB_NAME=ci-${BATS_TEST_NUMBER}
+  export JOB_NAME=kube-burner-ci-${BATS_TEST_NUMBER}
 }
 
 teardown() {
@@ -102,23 +102,16 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
-@test "kube-burner-virt.yml: os-indexing=true; local-indexing=true; vm-latency-indexing=true" {
-  export ES_INDEXING=true LOCAL_INDEXING=true ALERTING=true
+@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true" {
   export PRELOAD_IMAGES=true  # VM image preload
-  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
-  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
   verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
 }
 
-@test "kube-burner.yml: metrics-endpoints=true" {
-  export ES_INDEXING=true LOCAL_INDEXING=true TIMESERIES_INDEXER=local-indexing
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug -e metrics-endpoints.yaml
-  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json
-}
-
 @test "kube-burner index: local-indexing=true; tarball=true" {
-  sleep 1m
+  sleep 1m # Sleep is required to prevent collecting metrics right after spinning up the cluster, which can lead to missing datapoints
   run_cmd ${KUBE_BURNER} index --uuid=${UUID} -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz --start="$(date -d "-30 seconds" +%s)" --metrics-directory=${METRICS_FOLDER}
   check_file_list ${METRICS_FOLDER}/top2PrometheusCPU.json ${METRICS_FOLDER}/top2PrometheusCPU-start.json ${METRICS_FOLDER}/prometheusRSS.json
   run_cmd ${KUBE_BURNER} import --tarball=metrics.tgz --es-server=${ES_SERVER} --es-index=${ES_INDEX} --metrics-directory ${METRICS_FOLDER}

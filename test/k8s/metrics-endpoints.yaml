@@ -8,3 +8,12 @@
     metricsDirectory: {{ .METRICS_FOLDER }}
   metrics:
   - metrics-profile.yaml
+- endpoint: http://localhost:9090
+  indexer:
+    type: opensearch
+    esServers: ["{{ .ES_SERVER }}"]
+    defaultIndex: {{ .ES_INDEX }}
+  metrics:
+  - metrics-profile.yaml
+  alerts:
+  - alerts.yml
