@@ -130,6 +130,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				if ctx.Err() != nil {
 					return
 				}
+				if config.IsChurnEnabled(jobExecutor.Job) {
+					churnStart := time.Now().UTC()
+					executedJobs[jobExecutorIdx].ChurnStart = &churnStart
+					jobExecutor.RunCreateJobWithChurn(ctx)
+					churnEnd := time.Now().UTC()
+					executedJobs[jobExecutorIdx].ChurnEnd = &churnEnd
+				}
 				// If object verification is enabled
 				if jobExecutor.VerifyObjects && !jobExecutor.Verify() {
 					err := errors.New("object verification failed")
@@ -139,13 +146,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 						errs = append(errs, err)
 					}
 					log.Error(err.Error())
-				}
-				if config.IsChurnEnabled(jobExecutor.Job) {
-					churnStart := time.Now().UTC()
-					executedJobs[jobExecutorIdx].ChurnStart = &churnStart
-					jobExecutor.RunCreateJobWithChurn(ctx)
-					churnEnd := time.Now().UTC()
-					executedJobs[jobExecutorIdx].ChurnEnd = &churnEnd
 				}
 			} else {
 				jobExecutor.Run(ctx)
