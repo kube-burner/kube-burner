@@ -20,7 +20,7 @@ metricsEndpoints:
       defaultIndex: {{ .ES_INDEX }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
-    alerts: [alert-profile.yaml]
+    alerts: [alerts.yml]
 {{ end }}
 {{ end }}
 {{ if .LOCAL_INDEXING }}
@@ -30,7 +30,7 @@ metricsEndpoints:
       metricsDirectory: {{ .METRICS_FOLDER }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
-    alerts: [alert-profile.yaml]
+    alerts: [alerts.yml]
 {{ end }}
 {{ end }}
 
