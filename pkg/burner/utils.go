@@ -15,7 +15,9 @@
 package burner
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"math"
 	"strconv"
 	"sync"
@@ -34,6 +36,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
+
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
@@ -106,10 +110,38 @@ func updateChildLabels(obj *unstructured.Unstructured, labels map[string]string)
 
 func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
 	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
+	log.Debugf("Decoded object GVK: %v", gvk)
 	if err != nil {
 		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
 	}
 	return o, gvk
+}
+
+func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unstructured, []*schema.GroupVersionKind) {
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(y), 4096)
+	var gvks []*schema.GroupVersionKind
+	var objects []*unstructured.Unstructured
+	for {
+		uns := &unstructured.Unstructured{}
+		err := decoder.Decode(uns)
+		if err != nil {
+			if err != io.EOF {
+				break
+			}
+			break
+		}
+		if len(uns.Object) == 0 {
+			break
+		}
+		gvk := uns.GroupVersionKind()
+		log.Debugf("Decoded object GVK: %v", gvk)
+		objects = append(objects, uns)
+		gvks = append(gvks, &gvk)
+	}
+	if len(objects) == 0 {
+		log.Fatalf("Error decoding YAML (%s): no objects found", fileName)
+	}
+	return objects, gvks
 }
 
 // resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements

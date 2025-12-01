@@ -94,47 +94,57 @@ func preLoadImages(job JobExecutor, clientSet kubernetes.Interface) error {
 
 func getJobImages(job JobExecutor) ([]string, error) {
 	var imageList []string
-	var unstructuredObject unstructured.Unstructured
 	for _, object := range job.objects {
 		renderedObj, err := util.RenderTemplate(object.objectSpec, object.InputVars, util.MissingKeyZero, job.functionTemplates)
 		if err != nil {
 			return imageList, err
 		}
-		yamlToUnstructured(object.ObjectTemplate, renderedObj, &unstructuredObject)
-		switch unstructuredObject.GetKind() {
-		case Deployment, DaemonSet, ReplicaSet, Job, StatefulSet:
-			var pod NestedPod
-			runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObject.UnstructuredContent(), &pod)
-			for _, i := range pod.Spec.Template.Containers {
+		// yamlToUnstructured(object.ObjectTemplate, renderedObj, &unstructuredObject)
+		unsList, _ := yamlToUnstructuredMultiple(object.ObjectTemplate, renderedObj)
+		for _, uns := range unsList {
+			images := extractImagesFromObject(uns, renderedObj)
+			imageList = append(imageList, images...)
+		}
+
+	}
+	return imageList, nil
+}
+
+func extractImagesFromObject(uns *unstructured.Unstructured, renderedObj []byte) []string {
+	var imageList []string
+	switch uns.GetKind() {
+	case Deployment, DaemonSet, ReplicaSet, Job, StatefulSet:
+		var pod NestedPod
+		runtime.DefaultUnstructuredConverter.FromUnstructured(uns.UnstructuredContent(), &pod)
+		for _, i := range pod.Spec.Template.Containers {
+			imageList = append(imageList, i.Image)
+		}
+	case Pod:
+		var pod corev1.Pod
+		runtime.DefaultUnstructuredConverter.FromUnstructured(uns.UnstructuredContent(), &pod)
+		for _, i := range pod.Spec.Containers {
+			if i.Image != "" {
 				imageList = append(imageList, i.Image)
 			}
-		case Pod:
-			var pod corev1.Pod
-			runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObject.UnstructuredContent(), &pod)
-			for _, i := range pod.Spec.Containers {
-				if i.Image != "" {
-					imageList = append(imageList, i.Image)
-				}
+		}
+	case VirtualMachineInstance:
+		var vmi VMI
+		yaml.Unmarshal(renderedObj, &vmi)
+		for _, volume := range vmi.Spec.Volumes {
+			if volume.ContainerDisk.Image != "" {
+				imageList = append(imageList, volume.ContainerDisk.Image)
 			}
-		case VirtualMachineInstance:
-			var vmi VMI
-			yaml.Unmarshal(renderedObj, &vmi)
-			for _, volume := range vmi.Spec.Volumes {
-				if volume.ContainerDisk.Image != "" {
-					imageList = append(imageList, volume.ContainerDisk.Image)
-				}
-			}
-		case VirtualMachine, VirtualMachineInstanceReplicaSet:
-			var nestedVM NestedVM
-			yaml.Unmarshal(renderedObj, &nestedVM)
-			for _, volume := range nestedVM.Spec.Template.Spec.Volumes {
-				if volume.ContainerDisk.Image != "" {
-					imageList = append(imageList, volume.ContainerDisk.Image)
-				}
+		}
+	case VirtualMachine, VirtualMachineInstanceReplicaSet:
+		var nestedVM NestedVM
+		yaml.Unmarshal(renderedObj, &nestedVM)
+		for _, volume := range nestedVM.Spec.Template.Spec.Volumes {
+			if volume.ContainerDisk.Image != "" {
+				imageList = append(imageList, volume.ContainerDisk.Image)
 			}
 		}
 	}
-	return imageList, nil
+	return imageList
 }
 
 func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {

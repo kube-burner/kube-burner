@@ -39,9 +39,8 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -125,13 +124,13 @@ func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Jo
 	}
 }
 
-func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
-	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
-	if err != nil {
-		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
-	}
-	return o, gvk
-}
+// func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
+// 	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
+// 	if err != nil {
+// 		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
+// 	}
+// 	return o, gvk
+// }
 
 func getNamespacesByLabel(s *metav1.LabelSelector) []string {
 	var namespaces []string
@@ -205,7 +204,36 @@ func (n *netpolLatency) handleCreateNetpol(obj any) {
 }
 
 // Render the network policy from the object template using iteration details as input
-func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj config.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
+// func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj config.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
+
+// 	templateData := map[string]any{
+// 		"JobName":   n.JobConfig.Name,
+// 		"Iteration": strconv.Itoa(iteration),
+// 		"UUID":      n.Uuid,
+// 		"Replica":   strconv.Itoa(replica),
+// 	}
+// 	maps.Copy(templateData, obj.InputVars)
+// 	renderedObj, err := kutil.RenderTemplate(objectSpec, templateData, kutil.MissingKeyError, []string{})
+// 	if err != nil {
+// 		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
+// 	}
+
+// 	networkingv1.AddToScheme(scheme.Scheme)
+// 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
+// 	netpolObj, _, err := decode(renderedObj, nil, nil)
+// 	if err != nil {
+// 		log.Fatalf("Failed to decode YAML file: %v", err)
+// 	}
+
+// 	networkPolicy, ok := netpolObj.(*networkingv1.NetworkPolicy)
+// 	if !ok {
+// 		log.Fatalf("YAML file is not a SecurityGroup")
+// 	}
+// 	return networkPolicy
+// }
+
+// Render the network policy from the object template using iteration details as input
+func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj config.Object, objectSpec []byte) []*networkingv1.NetworkPolicy {
 
 	templateData := map[string]any{
 		"JobName":   n.JobConfig.Name,
@@ -221,16 +249,37 @@ func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj config.
 
 	networkingv1.AddToScheme(scheme.Scheme)
 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
-	netpolObj, _, err := decode(renderedObj, nil, nil)
-	if err != nil {
-		log.Fatalf("Failed to decode YAML file: %v", err)
-	}
 
-	networkPolicy, ok := netpolObj.(*networkingv1.NetworkPolicy)
-	if !ok {
-		log.Fatalf("YAML file is not a SecurityGroup")
+	var policies []*networkingv1.NetworkPolicy
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(renderedObj), 4096)
+
+	for {
+		var rawObj map[string]interface{}
+		err := decoder.Decode(&rawObj)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Warnf("Error decoding YAML document: %v", err)
+			break
+		}
+		objBytes, err := json.Marshal(rawObj)
+		if err != nil {
+			log.Fatalf("Error marshaling raw object: %v", err)
+		}
+		netpolObj, _, err := decode(objBytes, nil, nil)
+		if err != nil {
+			log.Fatalf("Failed to decode NetworkPolicy: %v", err)
+		}
+		networkPolicy, ok := netpolObj.(*networkingv1.NetworkPolicy)
+		if !ok {
+			continue
+		}
+
+		policies = append(policies, networkPolicy)
+
 	}
-	return networkPolicy
+	return policies
 }
 
 // It parses the network policy object for each iteration and identify the remote pods from which the namespace has to allow ingress traffic.
@@ -245,75 +294,92 @@ func (n *netpolLatency) prepareConnections() {
 		if err != nil {
 			log.Fatalf("Error in readTemplate %s: %s", obj.ObjectTemplate, err)
 		}
-		if getObjectType(obj, cleanTemplate) != "NetworkPolicy" {
+
+		if !hasNetworkPolicy(obj, cleanTemplate) {
 			continue
 		}
+
 		for i := range n.JobConfig.JobIterations {
 			for r := 1; r <= obj.Replicas; r++ {
-				networkPolicy := n.getNetworkPolicy(i, r, obj, cleanTemplate)
-				nsIndex := i / n.JobConfig.IterationsPerNamespace
-				namespace := fmt.Sprintf("%s-%d", n.JobConfig.Namespace, nsIndex)
-				localPods := addPodsByLabel(n.ClientSet, namespace, &networkPolicy.Spec.PodSelector)
-				for _, ingress := range networkPolicy.Spec.Ingress {
-					var ingressPorts []int32
-					for _, from := range ingress.From {
-						// support only selector based connection testing
-						if from.NamespaceSelector == nil && from.PodSelector == nil {
-							continue
-						}
-						for _, port := range ingress.Ports {
-							if *port.Protocol != corev1.ProtocolTCP {
-								log.Fatalf("Only TCP ports supported in testing")
-							}
-							// Server listens on only one port for ping test
-							if port.Port.IntVal == serverPingTestPort {
-								ingressPorts = append(ingressPorts, port.Port.IntVal)
-								break
-							}
-						}
-						namespaces := getNamespacesByLabel(from.NamespaceSelector)
-						for _, namespace := range namespaces {
-							remoteAddrs := addPodsByLabel(n.ClientSet, namespace, from.PodSelector)
-							for _, ra := range remoteAddrs {
-								// exclude sending connection request to same ip address
-								otherIPs := []string{}
-								for _, ip := range localPods {
-									if ip != ra {
-										// Network policies in the same namespace might use same remote address (i.e remote namespace pod)
-										ar := fmt.Sprintf("%s:%s", ra, ip)
-										if addrReuse[ar] == nil {
-											addrReuse[ar] = []string{networkPolicy.Name}
-											// Avoid a peer pod pinging multiple times to same local pod because of pod reuse by network policies
-											otherIPs = append(otherIPs, ip)
-										} else {
-											// check if network policy doesn't exist in the addrReuse
-											if !slices.Contains(addrReuse[ar], networkPolicy.Name) {
-												addrReuse[ar] = append(addrReuse[ar], networkPolicy.Name)
 
+				for _, networkPolicy := range n.getNetworkPolicies(i, r, obj, cleanTemplate) {
+
+					// networkPolicy := n.getNetworkPolicy(i, r, obj, cleanTemplate)
+					nsIndex := i / n.JobConfig.IterationsPerNamespace
+					namespace := fmt.Sprintf("%s-%d", n.JobConfig.Namespace, nsIndex)
+					localPods := addPodsByLabel(n.ClientSet, namespace, &networkPolicy.Spec.PodSelector)
+					for _, ingress := range networkPolicy.Spec.Ingress {
+						var ingressPorts []int32
+						for _, from := range ingress.From {
+							// support only selector based connection testing
+							if from.NamespaceSelector == nil && from.PodSelector == nil {
+								continue
+							}
+							for _, port := range ingress.Ports {
+								if *port.Protocol != corev1.ProtocolTCP {
+									log.Fatalf("Only TCP ports supported in testing")
+								}
+								// Server listens on only one port for ping test
+								if port.Port.IntVal == serverPingTestPort {
+									ingressPorts = append(ingressPorts, port.Port.IntVal)
+									break
+								}
+							}
+							namespaces := getNamespacesByLabel(from.NamespaceSelector)
+							for _, namespace := range namespaces {
+								remoteAddrs := addPodsByLabel(n.ClientSet, namespace, from.PodSelector)
+								for _, ra := range remoteAddrs {
+									// exclude sending connection request to same ip address
+									otherIPs := []string{}
+									for _, ip := range localPods {
+										if ip != ra {
+											// Network policies in the same namespace might use same remote address (i.e remote namespace pod)
+											ar := fmt.Sprintf("%s:%s", ra, ip)
+											if addrReuse[ar] == nil {
+												addrReuse[ar] = []string{networkPolicy.Name}
+												// Avoid a peer pod pinging multiple times to same local pod because of pod reuse by network policies
+												otherIPs = append(otherIPs, ip)
+											} else {
+												// check if network policy doesn't exist in the addrReuse
+												if !slices.Contains(addrReuse[ar], networkPolicy.Name) {
+													addrReuse[ar] = append(addrReuse[ar], networkPolicy.Name)
+
+												}
 											}
 										}
 									}
-								}
-								if len(otherIPs) == 0 {
-									continue
-								}
-								conn := connection{
-									Addresses: otherIPs,
-									Ports:     ingressPorts,
-									Netpol:    networkPolicy.Name,
-								}
-								if connections[ra] == nil {
-									connections[ra] = []connection{conn}
-								} else {
-									connections[ra] = append(connections[ra], conn)
+									if len(otherIPs) == 0 {
+										continue
+									}
+									conn := connection{
+										Addresses: otherIPs,
+										Ports:     ingressPorts,
+										Netpol:    networkPolicy.Name,
+									}
+									if connections[ra] == nil {
+										connections[ra] = []connection{conn}
+									} else {
+										connections[ra] = append(connections[ra], conn)
+									}
 								}
 							}
 						}
 					}
+
 				}
 			}
 		}
 	}
+}
+
+// hasNetwork policy checks if the object is a network policy
+func hasNetworkPolicy(obj config.Object, t []byte) bool {
+	for _, kind := range getObjectTypes(obj, t) {
+		if kind == "NetworkPolicy" {
+			return true
+		}
+	}
+	return false
 }
 
 // Send connections information to proxy pod
@@ -456,15 +522,47 @@ func readTemplate(o config.Object, embedCfg *fileutils.EmbedConfiguration) ([]by
 	return t, err
 }
 
-func getObjectType(o config.Object, t []byte) string {
-	// Deserialize YAML
+// func getObjectType(o config.Object, t []byte) string {
+// 	// Deserialize YAML
+// 	cleanTemplate, err := kutil.CleanupTemplate(t)
+// 	if err != nil {
+// 		log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
+// 	}
+// 	uns := &unstructured.Unstructured{}
+// 	yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
+// 	return uns.GetKind()
+// }
+
+func getObjectTypes(o config.Object, t []byte) []string {
 	cleanTemplate, err := kutil.CleanupTemplate(t)
 	if err != nil {
 		log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
 	}
-	uns := &unstructured.Unstructured{}
-	yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
-	return uns.GetKind()
+	var kinds []string
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(cleanTemplate), 4096)
+
+	for {
+		var rawObj map[string]interface{}
+		err := decoder.Decode(&rawObj)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Warnf("Error decoding YAML document in %s: %v", o.ObjectTemplate, err)
+			break
+		}
+
+		// Skip empty documents
+		if len(rawObj) == 0 {
+			continue
+		}
+
+		uns := &unstructured.Unstructured{Object: rawObj}
+		kinds = append(kinds, uns.GetKind())
+	}
+
+	return kinds
+
 }
 
 // Start network policy measurement
