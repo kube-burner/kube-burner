@@ -22,6 +22,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
@@ -149,6 +150,75 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 	return nil
 }
 
+// deepMerge recursively merges src into dst, handling both maps and slices with numeric keys
+func deepMerge(dst, src map[string]interface{}) {
+	for key, srcVal := range src {
+		dstVal, exists := dst[key]
+
+		if !exists {
+			dst[key] = srcVal
+			continue
+		}
+
+		// Check if dst value is a slice and src key might be numeric index access
+		if dstSlice, dstIsSlice := dstVal.([]interface{}); dstIsSlice {
+			if srcMap, srcIsMap := srcVal.(map[string]interface{}); srcIsMap {
+				// src has numeric keys like {"0": {...}, "1": {...}}
+				for idxStr, idxVal := range srcMap {
+					if idx, err := strconv.Atoi(idxStr); err == nil && idx >= 0 && idx < len(dstSlice) {
+						// Merge into slice element
+						if elemMap, elemIsMap := dstSlice[idx].(map[string]interface{}); elemIsMap {
+							if idxValMap, idxValIsMap := idxVal.(map[string]interface{}); idxValIsMap {
+								deepMerge(elemMap, idxValMap)
+							} else {
+								dstSlice[idx] = idxVal
+							}
+						} else {
+							dstSlice[idx] = idxVal
+						}
+					}
+				}
+				continue
+			}
+		}
+
+		// Both are maps - merge recursively
+		srcMap, srcIsMap := srcVal.(map[string]interface{})
+		dstMap, dstIsMap := dstVal.(map[string]interface{})
+		if srcIsMap && dstIsMap {
+			deepMerge(dstMap, srcMap)
+			continue
+		}
+
+		// Otherwise, override with src value
+		dst[key] = srcVal
+	}
+}
+
+// applySetVars merges setVars into the raw YAML map before unmarshaling to Spec
+func applySetVars(configData []byte, setVars map[string]interface{}) ([]byte, error) {
+	if len(setVars) == 0 {
+		return configData, nil
+	}
+
+	// Parse YAML into a generic map
+	var configMap map[string]interface{}
+	if err := yaml.Unmarshal(configData, &configMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config for merging: %v", err)
+	}
+
+	// Deep merge setVars into configMap
+	deepMerge(configMap, setVars)
+
+	// Marshal back to YAML
+	mergedData, err := yaml.Marshal(configMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal merged config: %v", err)
+	}
+
+	return mergedData, nil
+}
+
 func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (map[string]any, error) {
 	// Get environment variables
 	templateVars := util.EnvToMap()
@@ -177,11 +247,13 @@ func getInputData(userDataFileReader io.Reader, additionalVars map[string]any) (
 }
 
 func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec, error) {
-	return ParseWithUserdata(uuid, timeout, configFileReader, nil, false, nil)
+	return ParseWithUserdata(uuid, timeout, configFileReader, nil, false, nil, nil)
 }
 
 // Parse parses a configuration file
-func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]any) (Spec, error) {
+// setVars contains --set flag values with dot notation support (e.g., jobs.0.jobIterations=5)
+func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]any, setVars map[string]interface{}) (Spec, error) {
+
 	cfg, err := io.ReadAll(configFileReader)
 	if err != nil {
 		return configSpec, fmt.Errorf("error reading configuration file: %s", err)
@@ -203,6 +275,16 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err != nil {
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}
+
+	// Apply --set overrides to the rendered config BEFORE unmarshaling to Spec
+	if len(setVars) > 0 {
+		renderedCfg, err = applySetVars(renderedCfg, setVars)
+		if err != nil {
+			return configSpec, fmt.Errorf("error applying --set overrides: %s", err)
+		}
+		log.Debugf("Config after applying --set overrides:\n%s", string(renderedCfg))
+	}
+
 	cfgReader := bytes.NewReader(renderedCfg)
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
