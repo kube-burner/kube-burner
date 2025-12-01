@@ -117,6 +117,12 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		if err := s.waitForEndpointSlices(svc); err != nil {
 			log.Fatal(err)
 		}
+		// This conditionals prevents a nil pointer dereference panic that can happen when the
+		// measurement is stopped by end of job J, and then the benchmark continues with job J+1,
+		// so this goroutine can still be runnning in the background as it performs polling
+		if s.epsLister == nil {
+			return
+		}
 		endpointsReadyTs := time.Now().UTC()
 		log.Debugf("EndpointSlices for service %v/%v ready", svc.Namespace, svc.Name)
 		for _, specPort := range svc.Spec.Ports {
@@ -275,6 +281,9 @@ func (s *serviceLatency) normalizeMetrics() {
 
 func (s *serviceLatency) waitForEndpointSlices(svc *corev1.Service) error {
 	err := wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+		if s.epsLister == nil {
+			return true, nil
+		}
 		endpointSlices, err := s.epsLister.EndpointSlices(svc.Namespace).List(labels.SelectorFromSet(map[string]string{"kubernetes.io/service-name": svc.Name}))
 		if err != nil {
 			return false, nil
