@@ -17,6 +17,7 @@ package measurements
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	lcorev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -38,6 +40,7 @@ import (
 const (
 	podLatencyMeasurement          = "podLatencyMeasurement"
 	podLatencyQuantilesMeasurement = "podLatencyQuantilesMeasurement"
+	containersStarted              = "ContainersStarted"
 )
 
 var (
@@ -65,6 +68,8 @@ type podMetric struct {
 	podReady                      time.Time
 	PodReadyLatency               int `json:"podReadyLatency"`
 	readyToStartContainers        time.Time
+	ContainersStartedLatency      int `json:"containersStartedLatency"`
+	containersStarted             time.Time
 	ReadyToStartContainersLatency int    `json:"readyToStartContainersLatency"`
 	MetricName                    string `json:"metricName"`
 	UUID                          string `json:"uuid"`
@@ -79,6 +84,8 @@ type podMetric struct {
 
 type podLatency struct {
 	BaseMeasurement
+	eventLister    lcorev1.EventLister
+	stopInformerCh chan struct{}
 }
 
 type podLatencyMeasurementFactory struct {
@@ -135,7 +142,10 @@ func (p *podLatency) handleUpdatePod(obj any) {
 					switch c.Type {
 					case corev1.PodScheduled:
 						if pm.scheduled.IsZero() {
-							pm.scheduled = c.LastTransitionTime.UTC()
+							pm.scheduled = p.getScheduledTimeFromEvent(pod)
+							if pm.scheduled.IsZero() {
+								pm.scheduled = c.LastTransitionTime.UTC()
+							}
 							pm.NodeName = pod.Spec.NodeName
 						}
 					case corev1.PodReadyToStartContainers:
@@ -151,7 +161,7 @@ func (p *podLatency) handleUpdatePod(obj any) {
 							pm.containersReady = c.LastTransitionTime.UTC()
 						}
 					case corev1.PodReady:
-						log.Debugf("Pod %s is ready", pod.Name)
+						pm.containersStarted = p.getStartedTimeFromEvent(pod)
 						pm.podReady = c.LastTransitionTime.UTC()
 					}
 				}
@@ -159,6 +169,41 @@ func (p *podLatency) handleUpdatePod(obj any) {
 			p.Metrics.Store(string(pod.UID), pm)
 		}
 	}
+}
+
+// getScheduledTimeFromEvent returns scheduled time in microseconds precission from event
+func (p *podLatency) getScheduledTimeFromEvent(pod *corev1.Pod) time.Time {
+	eventList, _ := p.eventLister.List(labels.Everything())
+	for _, event := range eventList {
+		if event.InvolvedObject.UID == pod.UID && event.Reason == "Scheduled" {
+			return event.EventTime.Time
+		}
+	}
+	return time.Time{}
+}
+
+// getStartedTimeFromEvent returns the timestamp of the latest container started event in the pod
+func (p *podLatency) getStartedTimeFromEvent(pod *corev1.Pod) time.Time {
+	var timestamp time.Time
+	eventList, _ := p.eventLister.List(labels.Everything())
+	for _, event := range eventList {
+		if event.InvolvedObject.UID == pod.UID && event.Reason == "Started" {
+			// The event name is in the format "podName.timestamp", where timestamp in hexadecimal format
+			// https://github.com/kubernetes/client-go/blob/v0.34.2/tools/record/event.go#L492
+			eventName := strings.Split(event.Name, ".")
+			eventTsInt, err := strconv.ParseInt(eventName[1], 16, 64)
+			if err != nil {
+				log.Warnf("failed to parse event timestamp: %v", err)
+				continue
+			}
+			eventTs := time.Unix(0, eventTsInt)
+			// In pods with multiple containers, pick the timestamp of the latest "Started" event observed
+			if timestamp.Before(eventTs) {
+				timestamp = eventTs
+			}
+		}
+	}
+	return timestamp
 }
 
 // start podLatency measurement
@@ -184,6 +229,22 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 			},
 		},
 	)
+	clientset := kubernetes.NewForConfigOrDie(p.RestConfig)
+	lw := cache.NewFilteredListWatchFromClient(
+		clientset.CoreV1().RESTClient(),
+		"events",
+		corev1.NamespaceAll,
+		func(options *metav1.ListOptions) {
+			options.FieldSelector = "involvedObject.kind=Pod"
+		},
+	)
+	eventInformer := cache.NewSharedIndexInformer(lw, &corev1.Event{}, 0, cache.Indexers{})
+	p.stopInformerCh = make(chan struct{})
+	go eventInformer.Run(p.stopInformerCh)
+	if !cache.WaitForCacheSync(p.stopInformerCh, eventInformer.HasSynced) {
+		return fmt.Errorf("failed to sync event informer cache")
+	}
+	p.eventLister = lcorev1.NewEventLister(eventInformer.GetIndexer())
 	return nil
 }
 
@@ -235,6 +296,7 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops podLatency measurement
 func (p *podLatency) Stop() error {
+	close(p.stopInformerCh)
 	return p.StopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 
@@ -251,11 +313,6 @@ func (p *podLatency) normalizeMetrics() float64 {
 		}
 		// latencyTime should be always larger than zero, however, in some cases, it might be a
 		// negative value due to the precision of timestamp can only get to the level of second
-		// and also the creation timestamp we capture using time.Now().UTC() might even have a
-		// delay over 1s in some cases. The microsecond and nanosecond have been discarded purposely
-		// in kubelet, this is because apiserver does not support RFC339NANO. The newly introduced
-		// v2 latencies are currently under AB testing which blindly trust kubernetes as source of
-		// truth and will prevent us from those over 1s delays as well as <0 cases.
 		errorFlag := 0
 		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
 		if m.ContainersReadyLatency < 0 {
@@ -284,6 +341,12 @@ func (p *podLatency) normalizeMetrics() float64 {
 			errorFlag = 1
 			m.PodReadyLatency = 0
 		}
+		m.ContainersStartedLatency = int(m.containersStarted.Sub(m.Timestamp).Milliseconds())
+		if m.ContainersStartedLatency < 0 {
+			log.Tracef("ContainersStartedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+			errorFlag = 1
+			m.ContainersStartedLatency = 0
+		}
 		totalPods++
 		erroredPods += errorFlag
 		p.NormLatencies = append(p.NormLatencies, m)
@@ -303,6 +366,7 @@ func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
 		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
 		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
+		containersStarted:                        float64(podMetric.ContainersStartedLatency),
 	}
 }
 

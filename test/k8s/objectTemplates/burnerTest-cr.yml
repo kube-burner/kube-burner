@@ -1,6 +1,0 @@
-apiVersion: kube-burner.io/v1
-kind: BurnerTest
-metadata:
- name: crd-creation-{{ .Iteration }}-{{ .Replica }}
-spec:
- uuid: {{ uuidv4 }}
