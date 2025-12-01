@@ -43,10 +43,12 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 func CleanupNamespaceResourcesUsingGVR(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) {
 	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-	log.Debugf("Deleting %ss labeled with %s in %s", obj.Kind, labelSelector, namespace)
 	if err != nil {
 		log.Errorf("Unable to list %vs in %v: %v", obj.Kind, namespace, err)
 		return
+	}
+	if len(resources.Items) > 0 {
+		log.Infof("Deleting %d %ss labeled with %s in %s", len(resources.Items), obj.Kind, labelSelector, namespace)
 	}
 	for _, item := range resources.Items {
 		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
@@ -59,14 +61,16 @@ func CleanupNamespaceResourcesUsingGVR(ctx context.Context, ex JobExecutor, obj 
 
 // Cleanup non-namespaced resources using executor list
 func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, ex JobExecutor, object *object, labelSelector string) {
-	log.Infof("Deleting non-namespace %v with selector %v", object.Kind, labelSelector)
 	resourceInterface := ex.dynamicClient.Resource(object.gvr)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		log.Debugf("Unable to list resources for object: %v error: %v. Hence skipping it", object.Object, err)
 		return
 	}
-	util.DeleteNonNamespacedResources(ctx, resources, resourceInterface)
+	if len(resources.Items) > 0 {
+		log.Infof("Deleting %d %ss labeled with %s", len(resources.Items), object.Kind, labelSelector)
+		util.DeleteNonNamespacedResources(ctx, resources, resourceInterface)
+	}
 }
 
 func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, namespace string, labelSelector string) {
