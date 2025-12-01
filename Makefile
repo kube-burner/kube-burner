@@ -30,6 +30,9 @@ CONTAINER_NAME = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)
 CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)-$(ARCH)
 MANIFEST_ARCHS ?= amd64 arm64 ppc64le s390x
 
+# Bats
+JOBS ?= $(shell nproc)
+
 all: lint build images push
 
 help:
@@ -119,4 +122,4 @@ manifest-build:
 test: lint test-k8s
 
 test-k8s:
-	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats
+	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats -j $(JOBS)
