@@ -37,12 +37,12 @@ metricsEndpoints:
 
 jobs:
   # create the VMs
-  - name: kubevirt-density
+  - name: {{ .JOB_NAME }}
     jobType: create
     qps: 20
     burst: 20
     namespacedIterations: false
-    namespace: kubevirt-density
+    namespace: {{ .JOB_NAME }}
     verifyObjects: true
     errorOnVerify: true
     jobIterationDelay: 1s
