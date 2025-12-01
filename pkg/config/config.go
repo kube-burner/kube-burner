@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
@@ -251,7 +252,6 @@ func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec
 }
 
 // Parse parses a configuration file
-// setVars contains --set flag values with dot notation support (e.g., jobs.0.jobIterations=5)
 func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]any, setVars map[string]interface{}) (Spec, error) {
 
 	cfg, err := io.ReadAll(configFileReader)
@@ -276,7 +276,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		return configSpec, fmt.Errorf("error rendering configuration template: %s", err)
 	}
 
-	// Apply --set overrides to the rendered config BEFORE unmarshaling to Spec
+	// Apply --set overrides to the rendered config
 	if len(setVars) > 0 {
 		renderedCfg, err = applySetVars(renderedCfg, setVars)
 		if err != nil {
@@ -443,4 +443,66 @@ func validateGC() error {
 // checks if Churn is enabled
 func IsChurnEnabled(job Job) bool {
 	return job.ChurnConfig.Duration > 0 || job.ChurnConfig.Cycles > 0
+}
+
+// setNestedValue sets a value in a nested map based on dot notation keys
+func setNestedValue(m map[string]interface{}, key string, value interface{}) {
+	keys := strings.Split(key, ".")
+	current := m
+	for i, k := range keys {
+		if i == len(keys)-1 {
+			current[k] = value
+		} else {
+			if _, ok := current[k]; !ok {
+				current[k] = make(map[string]interface{})
+			}
+			if nested, ok := current[k].(map[string]interface{}); ok {
+				current = nested
+			} else {
+				newMap := make(map[string]interface{})
+				current[k] = newMap
+				current = newMap
+			}
+		}
+	}
+}
+
+// parseValue converts string value to appropriate type (int, float, bool, or string)
+func parseValue(value string) interface{} {
+	// parse as integer
+	if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
+		return int(intVal)
+	}
+	// parse as float
+	if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+		return floatVal
+	}
+	// parse as boolean
+	if boolVal, err := strconv.ParseBool(value); err == nil {
+		return boolVal
+	}
+	// Return as string
+	return value
+}
+
+func ParseSetValues(setValues []string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	for _, val := range setValues {
+		pairs := strings.Split(val, ",")
+		for _, pair := range pairs {
+			pair = strings.TrimSpace(pair)
+			if pair == "" {
+				continue
+			}
+			parts := strings.SplitN(pair, "=", 2)
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid --set value: %s. Must be in the format key=value", pair)
+			}
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			// Convert value to appropriate type
+			setNestedValue(result, key, parseValue(value))
+		}
+	}
+	return result, nil
 }

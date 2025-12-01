@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -110,7 +109,7 @@ func initCmd() *cobra.Command {
 			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
-			setVars, err := parseSetValues(setValues)
+			setVars, err := config.ParseSetValues(setValues)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -544,69 +543,6 @@ func alertCmd() *cobra.Command {
 	cmd.MarkFlagRequired("alert-profile")
 	cmd.Flags().SortFlags = false
 	return cmd
-}
-
-// setNestedValue
-
-func setNestedValue(m map[string]interface{}, key string, value interface{}) {
-	keys := strings.Split(key, ".")
-	current := m
-	for i, k := range keys {
-		if i == len(keys)-1 {
-			current[k] = value
-		} else {
-			if _, ok := current[k]; !ok {
-				current[k] = make(map[string]interface{})
-			}
-			if nested, ok := current[k].(map[string]interface{}); ok {
-				current = nested
-			} else {
-				newMap := make(map[string]interface{})
-				current[k] = newMap
-				current = newMap
-			}
-		}
-	}
-}
-
-// parseValue converts string value to appropriate type (int, float, bool, or string)
-func parseValue(value string) interface{} {
-	// Try to parse as integer
-	if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
-		return int(intVal)
-	}
-	// Try to parse as float
-	if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
-		return floatVal
-	}
-	// Try to parse as boolean
-	if boolVal, err := strconv.ParseBool(value); err == nil {
-		return boolVal
-	}
-	// Return as string
-	return value
-}
-
-func parseSetValues(setValues []string) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
-	for _, val := range setValues {
-		pairs := strings.Split(val, ",")
-		for _, pair := range pairs {
-			pair = strings.TrimSpace(pair)
-			if pair == "" {
-				continue
-			}
-			parts := strings.SplitN(pair, "=", 2)
-			if len(parts) != 2 {
-				return nil, fmt.Errorf("invalid --set value: %s. Must be in the format key=value", pair)
-			}
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			// Convert value to appropriate type
-			setNestedValue(result, key, parseValue(value))
-		}
-	}
-	return result, nil
 }
 
 // executes rootCmd
