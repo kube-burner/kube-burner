@@ -28,13 +28,14 @@ import (
 
 type object struct {
 	config.Object
-	gvr        schema.GroupVersionResource
-	gvk        *schema.GroupVersionKind
-	waitGVR    *schema.GroupVersionResource
-	objectSpec []byte
-	namespace  string
-	namespaced bool
-	ready      bool
+	gvr           schema.GroupVersionResource
+	gvk           *schema.GroupVersionKind
+	waitGVR       *schema.GroupVersionResource
+	objectSpec    []byte
+	namespace     string
+	namespaced    bool
+	ready         bool
+	documentIndex int
 }
 
 func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
