@@ -113,7 +113,6 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			// log.Debugf("Parsed --set values: %+v", setVars)
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
