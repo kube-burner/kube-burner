@@ -297,9 +297,9 @@ teardown_file() {
 @test "--set: override namespace name" {
   local CUSTOM_NS="set-flag-test-ns"
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.namespace=${CUSTOM_NS} --set jobs.0.jobIterations=1
-  # Verify namespace with custom name exists
+  # Verify namespace with custom name exists (namespace index starts at 0)
   run kubectl get ns -l kube-burner.io/uuid=${UUID} -o jsonpath='{.items[0].metadata.name}'
-  [[ "$output" == "${CUSTOM_NS}-1" ]]
+  [[ "$output" == "${CUSTOM_NS}-0" ]]
 }
 
 @test "--set: override maxWaitTimeout" {
@@ -330,8 +330,9 @@ teardown_file() {
 @test "--set: combined with --user-data" {
   export NAMESPACE="set-userdata-combo"
   export deploymentLabelFromEnv="from-env"
-  export REPLICAS=2
+  # 2 jobIterations * 2 replicas = 4 deployments total
+  local EXPECTED_DEPLOYMENTS=4
   run_cmd ${KUBE_BURNER} init -c kube-burner-userdata.yml --user-data=objectTemplates/userdata-test.yml --uuid=${UUID} --set jobs.0.jobIterations=2 --log-level=debug
-  verify_object_count deployment ${REPLICAS} ${NAMESPACE} kube-burner.io/from-file=from-file
+  verify_object_count deployment ${EXPECTED_DEPLOYMENTS} ${NAMESPACE} kube-burner.io/from-file=from-file
   kubectl delete ns ${NAMESPACE}
 }
