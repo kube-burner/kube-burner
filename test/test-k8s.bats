@@ -260,24 +260,24 @@ teardown_file() {
 }
 
 @test "--set: single value override" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.verifyObjects=false,jobs.0.waitWhenFinished=false
   # Verify namespaces exist (gc=false means they should remain)
   verify_object_count namespace 5 "" kube-burner.io/uuid=${UUID}
 }
 
 @test "--set: multiple comma-separated values" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false,jobs.0.jobIterations=2
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false,jobs.0.jobIterations=2,jobs.0.verifyObjects=false,jobs.0.waitWhenFinished=false
   # Verify reduced job iterations (2 instead of default)
   verify_object_count namespace 2 "" kube-burner.io/uuid=${UUID}
 }
 
 @test "--set: multiple flags" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.jobIterations=3
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.jobIterations=3,jobs.0.verifyObjects=false,jobs.0.waitWhenFinished=false
   verify_object_count namespace 3 "" kube-burner.io/uuid=${UUID}
 }
 
 @test "--set: override jobIterations with array index" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.jobIterations=1
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.jobIterations=1,jobs.0.verifyObjects=false,jobs.0.waitWhenFinished=false
   verify_object_count namespace 1 "" kube-burner.io/uuid=${UUID}
 }
 
@@ -298,7 +298,9 @@ teardown_file() {
   local CUSTOM_NS="set-flag-test-ns"
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.namespace=${CUSTOM_NS} --set jobs.0.jobIterations=1
   # Verify namespace with custom name exists (namespace index starts at 0)
+  # Verify namespace with custom name exists (namespace index starts at 0)
   run kubectl get ns -l kube-burner.io/uuid=${UUID} -o jsonpath='{.items[0].metadata.name}'
+  [[ "$output" == "${CUSTOM_NS}-0" ]]
   [[ "$output" == "${CUSTOM_NS}-0" ]]
 }
 
