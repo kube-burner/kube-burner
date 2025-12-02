@@ -198,10 +198,6 @@ func deepMerge(dst, src map[string]interface{}) {
 
 // applySetVars merges setVars into the raw YAML map before unmarshaling to Spec
 func applySetVars(configData []byte, setVars map[string]interface{}) ([]byte, error) {
-	if len(setVars) == 0 {
-		return configData, nil
-	}
-
 	// Parse YAML into a generic map
 	var configMap map[string]interface{}
 	if err := yaml.Unmarshal(configData, &configMap); err != nil {
@@ -282,7 +278,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		if err != nil {
 			return configSpec, fmt.Errorf("error applying --set overrides: %s", err)
 		}
-		log.Debugf("Config after applying --set overrides:\n%s", string(renderedCfg))
+		log.Tracef("Config after applying --set overrides:\n%s", string(renderedCfg))
 	}
 
 	cfgReader := bytes.NewReader(renderedCfg)
@@ -456,19 +452,13 @@ func setNestedValue(m map[string]interface{}, key string, value interface{}) {
 			if _, ok := current[k]; !ok {
 				current[k] = make(map[string]interface{})
 			}
-			if nested, ok := current[k].(map[string]interface{}); ok {
-				current = nested
-			} else {
-				newMap := make(map[string]interface{})
-				current[k] = newMap
-				current = newMap
-			}
+			current = current[k].(map[string]interface{})
 		}
 	}
 }
 
 // parseValue converts string value to appropriate type (int, float, bool, or string)
-func parseValue(value string) interface{} {
+func parseValue(value string) any {
 	// parse as integer
 	if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
 		return int(intVal)
