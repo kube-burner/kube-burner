@@ -202,6 +202,8 @@ type Job struct {
 	GC bool `yaml:"gc" json:"gc"`
 	// Measurements job-specific measurements to enable
 	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
+	//PreLoadImage allows for custom images
+	PreLoadImage string `yaml:"preLoadImage" json:"preLoadImage,omitempty"`
 }
 
 type WaitOptions struct {
