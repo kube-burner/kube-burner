@@ -152,7 +152,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 // deepMerge recursively merges src into dst, handling both maps and slices with numeric keys
-func deepMerge(dst, src map[string]interface{}) {
+func deepMerge(dst, src map[string]any) {
 	for key, srcVal := range src {
 		dstVal, exists := dst[key]
 
@@ -197,7 +197,7 @@ func deepMerge(dst, src map[string]interface{}) {
 }
 
 // applySetVars merges setVars into the raw YAML map before unmarshaling to Spec
-func applySetVars(configData []byte, setVars map[string]interface{}) ([]byte, error) {
+func applySetVars(configData []byte, setVars map[string]any) ([]byte, error) {
 	// Parse YAML into a generic map
 	var configMap map[string]interface{}
 	if err := yaml.Unmarshal(configData, &configMap); err != nil {
@@ -248,7 +248,7 @@ func Parse(uuid string, timeout time.Duration, configFileReader io.Reader) (Spec
 }
 
 // Parse parses a configuration file
-func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]any, setVars map[string]interface{}) (Spec, error) {
+func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, userDataFileReader io.Reader, allowMissingKeys bool, additionalVars map[string]any, setVars map[string]any) (Spec, error) {
 
 	cfg, err := io.ReadAll(configFileReader)
 	if err != nil {
@@ -442,7 +442,7 @@ func IsChurnEnabled(job Job) bool {
 }
 
 // setNestedValue sets a value in a nested map based on dot notation keys
-func setNestedValue(m map[string]interface{}, key string, value interface{}) {
+func setNestedValue(m map[string]any, key string, value any) {
 	keys := strings.Split(key, ".")
 	current := m
 	for i, k := range keys {
@@ -475,7 +475,7 @@ func parseValue(value string) any {
 	return value
 }
 
-func ParseSetValues(setValues []string) (map[string]interface{}, error) {
+func ParseSetValues(setValues []string) (map[string]any, error) {
 	result := make(map[string]interface{})
 	for _, pair := range setValues {
 		pair = strings.TrimSpace(pair)
