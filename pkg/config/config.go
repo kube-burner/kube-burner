@@ -487,22 +487,19 @@ func parseValue(value string) interface{} {
 
 func ParseSetValues(setValues []string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
-	for _, val := range setValues {
-		pairs := strings.Split(val, ",")
-		for _, pair := range pairs {
-			pair = strings.TrimSpace(pair)
-			if pair == "" {
-				continue
-			}
-			parts := strings.SplitN(pair, "=", 2)
-			if len(parts) != 2 {
-				return nil, fmt.Errorf("invalid --set value: %s. Must be in the format key=value", pair)
-			}
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			// Convert value to appropriate type
-			setNestedValue(result, key, parseValue(value))
+	for _, pair := range setValues {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
 		}
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid --set value: %s. Must be in the format key=value", pair)
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		// Convert value to appropriate type
+		setNestedValue(result, key, parseValue(value))
 	}
 	return result, nil
 }

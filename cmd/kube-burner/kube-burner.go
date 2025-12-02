@@ -164,7 +164,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
-	cmd.Flags().StringArrayVar(&setValues, "set", []string{}, "Set arbitrary key=value pairs to override values in the config file")
+	cmd.Flags().StringSliceVar(&setValues, "set", []string{}, "Set arbitrary key=value pairs to override values in the config file")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd
