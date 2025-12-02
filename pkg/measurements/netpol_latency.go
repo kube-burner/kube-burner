@@ -204,35 +204,6 @@ func (n *netpolLatency) handleCreateNetpol(obj any) {
 }
 
 // Render the network policy from the object template using iteration details as input
-// func (n *netpolLatency) getNetworkPolicy(iteration int, replica int, obj config.Object, objectSpec []byte) *networkingv1.NetworkPolicy {
-
-// 	templateData := map[string]any{
-// 		"JobName":   n.JobConfig.Name,
-// 		"Iteration": strconv.Itoa(iteration),
-// 		"UUID":      n.Uuid,
-// 		"Replica":   strconv.Itoa(replica),
-// 	}
-// 	maps.Copy(templateData, obj.InputVars)
-// 	renderedObj, err := kutil.RenderTemplate(objectSpec, templateData, kutil.MissingKeyError, []string{})
-// 	if err != nil {
-// 		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
-// 	}
-
-// 	networkingv1.AddToScheme(scheme.Scheme)
-// 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
-// 	netpolObj, _, err := decode(renderedObj, nil, nil)
-// 	if err != nil {
-// 		log.Fatalf("Failed to decode YAML file: %v", err)
-// 	}
-
-// 	networkPolicy, ok := netpolObj.(*networkingv1.NetworkPolicy)
-// 	if !ok {
-// 		log.Fatalf("YAML file is not a SecurityGroup")
-// 	}
-// 	return networkPolicy
-// }
-
-// Render the network policy from the object template using iteration details as input
 func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj config.Object, objectSpec []byte) []*networkingv1.NetworkPolicy {
 
 	templateData := map[string]any{
@@ -521,17 +492,6 @@ func readTemplate(o config.Object, embedCfg *fileutils.EmbedConfiguration) ([]by
 	}
 	return t, err
 }
-
-// func getObjectType(o config.Object, t []byte) string {
-// 	// Deserialize YAML
-// 	cleanTemplate, err := kutil.CleanupTemplate(t)
-// 	if err != nil {
-// 		log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
-// 	}
-// 	uns := &unstructured.Unstructured{}
-// 	yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
-// 	return uns.GetKind()
-// }
 
 func getObjectTypes(o config.Object, t []byte) []string {
 	cleanTemplate, err := kutil.CleanupTemplate(t)
