@@ -237,7 +237,11 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
 				return
 			}
-
+			// replicaWg is necessary because we want to wait for all replicas
+			// to be created before running any other action such as verify objects,
+			// wait for ready, etc. Without this wait group, running for example,
+			// verify objects can lead into a race condition when some objects
+			// hasn't been created yet
 			replicaWg.Add(1)
 			go func(gvr schema.GroupVersionResource, newObj *unstructured.Unstructured, n string, namespaced bool) {
 				defer replicaWg.Done()
