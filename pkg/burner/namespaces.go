@@ -32,6 +32,7 @@ import (
 func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
 	labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelJob, ex.Name)
 	for _, namespace := range namespacesToDelete {
+		log.Infof("Deleting namespace %s using GVR", namespace)
 		for _, obj := range ex.objects {
 			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 		}
@@ -42,7 +43,7 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 func CleanupNamespaceResourcesUsingGVR(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) {
 	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-	log.Infof("Deleting %ss labeled with %s in %s", obj.Kind, labelSelector, namespace)
+	log.Debugf("Deleting %ss labeled with %s in %s", obj.Kind, labelSelector, namespace)
 	if err != nil {
 		log.Errorf("Unable to list %vs in %v: %v", obj.Kind, namespace, err)
 		return

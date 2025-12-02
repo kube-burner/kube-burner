@@ -243,7 +243,7 @@ func (s *serviceLatency) Stop() error {
 	for _, q := range s.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
 		// Divide nanoseconds by 1e6 to get milliseconds
-		log.Infof("serviceLatency: %s: %s 99th: %dms max: %dms avg: %dms", s.JobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
+		log.Infof("serviceLatency: %s: %s 99th: %d ms max: %d ms avg: %d ms", s.JobConfig.Name, pq.QuantileName, pq.P99/1e6, pq.Max/1e6, pq.Avg/1e6)
 	}
 	return nil
 }
