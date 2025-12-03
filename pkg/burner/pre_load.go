@@ -99,7 +99,6 @@ func getJobImages(job JobExecutor) ([]string, error) {
 		if err != nil {
 			return imageList, err
 		}
-		// yamlToUnstructured(object.ObjectTemplate, renderedObj, &unstructuredObject)
 		unsList, _ := yamlToUnstructuredMultiple(object.ObjectTemplate, renderedObj)
 		for _, uns := range unsList {
 			images := extractImagesFromObject(uns, renderedObj)
