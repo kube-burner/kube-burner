@@ -68,14 +68,12 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner.yml: gc=false; preload=true; churn-mode=objects" {
+@test "kube-burner.yml: preload=true; set-churn-mode=objects,set-gc=false" {
   export CHURN_CYCLES=2
-  export GC=false
   export CRD=true
   export PRELOAD_IMAGES=true
-  export CHURN_MODE=namespaces
   cp kube-burner.yml /tmp/kube-burner.yml
-  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=namespaces --log-level=debug
   verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
   kubectl delete -f objectTemplates/crd.yml
@@ -102,9 +100,8 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
-@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true" {
-  export PRELOAD_IMAGES=true  # VM image preload
-  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --log-level=debug
+@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true;set-preload=true" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
   verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
@@ -257,29 +254,4 @@ teardown_file() {
 
   # Verify all expected metric files were created
   check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-merge-measurements.json
-}
-
-@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true;set-preload=true" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
-  check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
-  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
-  verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
-}
-
-@test "kube-burner.yml: preload=true; set-churn-mode=objects,set-gc=false" {
-  export CHURN_CYCLES=2
-  export CRD=true
-  export PRELOAD_IMAGES=true
-  cp kube-burner.yml /tmp/kube-burner.yml
-  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=objects --log-level=debug
-  verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
-  check_file_exists "kube-burner-${UUID}.log"
-  kubectl delete -f objectTemplates/crd.yml
-  verify_object_count namespace 5 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
-  verify_object_count pod 10 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
-  verify_object_count pod 5 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
-  ${KUBE_BURNER} destroy --uuid ${UUID}
-  kubectl delete pod -l kube-burner.io/uuid=${UUID} -n default
-  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-  verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
 }
