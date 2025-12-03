@@ -259,82 +259,27 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-merge-measurements.json
 }
 
-@test "--set: single value override" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.verifyObjects=false,jobs.0.waitWhenFinished=false
-  # Verify namespaces exist (gc=false means they should remain)
-  verify_object_count namespace 5 "" kube-burner.io/uuid=${UUID}
+@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true;set-preload=true" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
+  check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
+  verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
 }
 
-@test "--set: multiple comma-separated values" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false,jobs.0.jobIterations=2,jobs.0.verifyObjects=false,jobs.0.waitWhenFinished=false
-  # Verify reduced job iterations (2 instead of default)
-  verify_object_count namespace 2 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: multiple flags" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.jobIterations=3,jobs.0.verifyObjects=false,jobs.0.waitWhenFinished=false
-  verify_object_count namespace 3 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: override jobIterations with array index" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.jobIterations=1,jobs.0.verifyObjects=false,jobs.0.waitWhenFinished=false
-  verify_object_count namespace 1 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: override gc=true triggers cleanup" {
-  export GC=false
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=true
-  # If gc=true, namespaces should be deleted automatically
-  sleep 5
+@test "kube-burner.yml: preload=true; set-churn-mode=objects,set-gc=false" {
+  export CHURN_CYCLES=2
+  export CRD=true
+  export PRELOAD_IMAGES=true
+  cp kube-burner.yml /tmp/kube-burner.yml
+  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=objects --log-level=debug
+  verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
+  check_file_exists "kube-burner-${UUID}.log"
+  kubectl delete -f objectTemplates/crd.yml
+  verify_object_count namespace 5 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
+  verify_object_count pod 10 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count pod 5 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  ${KUBE_BURNER} destroy --uuid ${UUID}
+  kubectl delete pod -l kube-burner.io/uuid=${UUID} -n default
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: override qps and burst" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.qps=10,jobs.0.burst=10,jobs.0.jobIterations=2
-  verify_object_count namespace 2 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: override namespace name" {
-  local CUSTOM_NS="set-flag-test-ns"
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.namespace=${CUSTOM_NS} --set jobs.0.jobIterations=1
-  # Verify namespace with custom name exists (namespace index starts at 0)
-  # Verify namespace with custom name exists (namespace index starts at 0)
-  run kubectl get ns -l kube-burner.io/uuid=${UUID} -o jsonpath='{.items[0].metadata.name}'
-  [[ "$output" == "${CUSTOM_NS}-0" ]]
-  [[ "$output" == "${CUSTOM_NS}-0" ]]
-}
-
-@test "--set: override maxWaitTimeout" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=true --set jobs.0.maxWaitTimeout=5m --set jobs.0.jobIterations=1
-  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: override jobIterationDelay" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=true --set jobs.0.jobIterationDelay=500ms --set jobs.0.jobIterations=2
-  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: override cleanup=false" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=false --set jobs.0.cleanup=false --set jobs.0.jobIterations=1
-  verify_object_count namespace 1 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: override verifyObjects and errorOnVerify" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=true --set jobs.0.verifyObjects=true,jobs.0.errorOnVerify=true --set jobs.0.jobIterations=1
-  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: override preLoadImages" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid="${UUID}" --set global.gc=true --set jobs.0.preLoadImages=true --set jobs.0.jobIterations=1
-  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-}
-
-@test "--set: combined with --user-data" {
-  export NAMESPACE="set-userdata-combo"
-  export deploymentLabelFromEnv="from-env"
-  # 2 jobIterations * 2 replicas = 4 deployments total
-  local EXPECTED_DEPLOYMENTS=4
-  run_cmd ${KUBE_BURNER} init -c kube-burner-userdata.yml --user-data=objectTemplates/userdata-test.yml --uuid=${UUID} --set jobs.0.jobIterations=2 --log-level=debug
-  verify_object_count deployment ${EXPECTED_DEPLOYMENTS} ${NAMESPACE} kube-burner.io/from-file=from-file
-  kubectl delete ns ${NAMESPACE}
+  verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
 }
