@@ -87,6 +87,9 @@ func (ex *JobExecutor) setupCreateJob() {
 			if err == nil {
 				obj.gvr = mapping.Resource
 				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+			} else {
+				obj.gvr = schema.GroupVersionResource{}
+				obj.gvk = gvk
 			}
 			obj.Kind = gvk.Kind
 			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
