@@ -16,8 +16,8 @@ package burner
 
 import (
 	"context"
-	"fmt"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -134,8 +134,14 @@ func (ex *JobExecutor) Verify() bool {
 	success := true
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
+		selector := labels.Set{
+			config.KubeBurnerLabelUUID:  ex.uuid,
+			config.KubeBurnerLabelRunID: ex.runid,
+			config.KubeBurnerLabelJob:   ex.Name,
+			config.KubeBurnerLabelIndex: strconv.Itoa(objectIndex),
+		}
 		listOptions := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-runid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.runid, ex.Name, objectIndex),
+			LabelSelector: selector.String(),
 			Limit:         objectLimit,
 		}
 		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {

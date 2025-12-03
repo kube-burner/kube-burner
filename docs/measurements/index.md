@@ -102,6 +102,7 @@ Where `quantileName` matches with the pod conditions and can be:
 - `Initialized`: All init containers in the pod have started successfully
 - `ContainersReady`: Indicates whether all containers in the pod are ready.
 - `Ready`: The pod is able to service requests and should be added to the load balancing pools of all matching services.
+- `ContainersStarted`: All containers in the pod have started successfully. This is the timestamp of the latest container started event.
 
 !!! note
     We also log the errorRate of the latencies for user's understanding. It indicates the percentage of pods out of all pods in the workload that got errored during the latency calculations. Currently the threshold for the errorRate is 10% and we do not log latencies if the error is > 10% which indicates a problem with environment.(i.e system under test)
@@ -1045,9 +1046,8 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
 
 ```shell
-kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner-job=cluster-density-v2
+kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner.io/job=cluster-density-v2
 time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
-time="2023-11-19 17:46:05" level=info msg="map[kube-burner-job:cluster-density-v2]" file="kube-burner.go:247"
 time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
 time="2023-11-19 17:46:06" level=info msg="Stopping measurement: podLatency" file="factory.go:118"
 time="2023-11-19 17:46:06" level=info msg="Evaluating latency thresholds" file="metrics.go:60"

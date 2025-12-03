@@ -85,7 +85,7 @@ func (ex *JobExecutor) waitForObject(ns string, obj *object) {
 		ns = obj.namespace
 	}
 
-	labelSelector := map[string]string{"kube-burner-runid": ex.runid, "kube-burner-uuid": ex.uuid}
+	labelSelector := map[string]string{config.KubeBurnerLabelRunID: ex.runid}
 	maps.Copy(labelSelector, obj.WaitOptions.LabelSelector)
 	labelSelectorString := labels.Set(labelSelector).String()
 

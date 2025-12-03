@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -82,8 +81,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
-	globalWaitMap := make(map[string][]string)
-	executorMap := make(map[string]JobExecutor)
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
@@ -110,7 +107,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			watcherStartErrors := watcherManager.Wait()
 			errs = append(errs, watcherStartErrors...)
-			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
 				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg)
@@ -119,6 +115,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
 				if jobExecutor.Cleanup {
+					log.Info("Cleaning up previous runs")
 					jobExecutor.gc(ctx, nil)
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
@@ -129,9 +126,16 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces)
+				jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations)
 				if ctx.Err() != nil {
 					return
+				}
+				if config.IsChurnEnabled(jobExecutor.Job) {
+					churnStart := time.Now().UTC()
+					executedJobs[jobExecutorIdx].ChurnStart = &churnStart
+					jobExecutor.RunCreateJobWithChurn(ctx)
+					churnEnd := time.Now().UTC()
+					executedJobs[jobExecutorIdx].ChurnEnd = &churnEnd
 				}
 				// If object verification is enabled
 				if jobExecutor.VerifyObjects && !jobExecutor.Verify() {
@@ -143,15 +147,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 					log.Error(err.Error())
 				}
-				if config.IsChurnEnabled(jobExecutor.Job) {
-					churnStart := time.Now().UTC()
-					executedJobs[len(executedJobs)-1].ChurnStart = &churnStart
-					jobExecutor.RunCreateJobWithChurn(ctx)
-					churnEnd := time.Now().UTC()
-					executedJobs[len(executedJobs)-1].ChurnEnd = &churnEnd
-				}
-				globalWaitMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = waitListNamespaces
-				executorMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = jobExecutor
 			} else {
 				jobExecutor.Run(ctx)
 				if ctx.Err() != nil {
@@ -171,19 +166,19 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
-				executedJobs[len(executedJobs)-1].End = jobEnd
-				executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
+				executedJobs[jobExecutorIdx].End = jobEnd
+				executedJobs[jobExecutorIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if jobExecutor.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
 				time.Sleep(jobExecutor.JobPause)
 			}
 			if jobExecutor.MetricsClosing == config.AfterJobPause {
-				executedJobs[len(executedJobs)-1].End = time.Now().UTC()
-				executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
+				executedJobs[jobExecutorIdx].End = time.Now().UTC()
+				executedJobs[jobExecutorIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if !globalConfig.WaitWhenFinished {
-				elapsedTime := jobEnd.Sub(executedJobs[len(executedJobs)-1].Start).Round(time.Second)
+				elapsedTime := jobEnd.Sub(executedJobs[jobExecutorIdx].Start).Round(time.Second)
 				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
 			}
 			if !jobExecutor.MetricsAggregate {
@@ -194,8 +189,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					innerRC = rcMeasurement
 				}
 				if jobExecutor.MetricsClosing == config.AfterMeasurements {
-					executedJobs[len(executedJobs)-1].End = time.Now().UTC()
-					executedJobs[len(executedJobs)-1].ObjectOperations = jobExecutor.objectOperations
+					executedJobs[jobExecutorIdx].End = time.Now().UTC()
+					executedJobs[jobExecutorIdx].ObjectOperations = jobExecutor.objectOperations
 				}
 				if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
 					msWg.Add(1)
@@ -213,7 +208,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 		}
 		if globalConfig.WaitWhenFinished {
-			runWaitList(globalWaitMap, executorMap)
+			runWaitList(jobExecutors)
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
@@ -375,14 +370,13 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 }
 
 // Runs on wait list at the end of benchmark
-func runWaitList(globalWaitMap map[string][]string, executorMap map[string]JobExecutor) {
+func runWaitList(jobExecutors []JobExecutor) {
 	var wg sync.WaitGroup
-	for executorUUID, namespaces := range globalWaitMap {
-		executor := executorMap[executorUUID]
+	for _, executor := range jobExecutors {
 		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
 		// This semaphore is used to limit the maximum number of concurrent goroutines
 		sem := make(chan int, int(executor.restConfig.QPS))
-		for _, ns := range namespaces {
+		for ns := range executor.createdNamespaces {
 			sem <- 1
 			wg.Add(1)
 			go func(ns string) {
@@ -396,7 +390,7 @@ func runWaitList(globalWaitMap map[string][]string, executorMap map[string]JobEx
 }
 
 func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
-	labelSelector := fmt.Sprintf("kube-burner-job=%s", ex.Name)
+	labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelJob, ex.Name)
 	if wg != nil {
 		defer wg.Done()
 	}
@@ -428,6 +422,7 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 			CleanupNonNamespacedResourcesUsingGVR(ctx, *ex, obj, labelSelector)
 		} else if obj.namespace != "" { // When the object has a fixed namespace not generated by kube-burner
 			CleanupNamespaceResourcesUsingGVR(ctx, *ex, obj, obj.namespace, labelSelector)
+			waitForDeleteNamespacedResources(ctx, *ex, obj.namespace, labelSelector)
 		}
 	}
 }

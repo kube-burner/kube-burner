@@ -98,21 +98,20 @@ func (ex *JobExecutor) setupCreateJob() {
 }
 
 // RunCreateJob executes a creation job
-func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int) {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
-		"kube-burner-job":   ex.Name,
-		"kube-burner-uuid":  ex.uuid,
-		"kube-burner-runid": ex.runid,
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelUUID:  ex.uuid,
+		config.KubeBurnerLabelRunID: ex.runid,
 	}
 	var wg sync.WaitGroup
 	var ns string
-	var namespacesCreated = make(map[string]bool)
 	var namespacesWaited = make(map[string]bool)
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
-		ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+		ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
 	}
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
@@ -125,10 +124,10 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
 		}
-		log.Debugf("Creating object replicas from iteration %d", i)
 		if ex.nsRequired && ex.NamespacedIterations {
-			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
 		}
+		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
 			if obj.gvr == (schema.GroupVersionResource{}) {
 				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
@@ -138,14 +137,14 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 					if ex.NamespacedIterations {
 						nsName = ex.generateNamespace(i)
 					}
-					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations, waitListNamespaces, namespacesCreated)
+					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations)
 				}
 			}
 			kbLabels := map[string]string{
-				"kube-burner-uuid":                 ex.uuid,
-				"kube-burner-job":                  ex.Name,
-				"kube-burner-index":                strconv.Itoa(objectIndex),
-				"kube-burner-runid":                ex.runid,
+				config.KubeBurnerLabelUUID:         ex.uuid,
+				config.KubeBurnerLabelJob:          ex.Name,
+				config.KubeBurnerLabelIndex:        strconv.Itoa(objectIndex),
+				config.KubeBurnerLabelRunID:        ex.runid,
 				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 			}
 			ex.objects[objectIndex].LabelSelector = kbLabels
@@ -306,15 +305,14 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 	}, 1*time.Second, 3, 0, timeout)
 }
 
-func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[string]string, waitListNamespaces *[]string, namespacesCreated map[string]bool) string {
-	if namespacesCreated[ns] {
+func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[string]string) string {
+	if ex.createdNamespaces[ns] {
 		return ns
 	}
 	if err := util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
 		log.Error(err.Error())
 	}
-	namespacesCreated[ns] = true
-	*waitListNamespaces = append(*waitListNamespaces, ns)
+	ex.createdNamespaces[ns] = true
 	return ns
 }
 
@@ -341,9 +339,9 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
 	// Create timer for the churn duration
 	timer := time.After(ex.ChurnConfig.Duration)
 	nsLabels := labels.Set{
-		"kube-burner-job":   ex.Name,
-		"kube-burner-uuid":  ex.uuid,
-		"kube-burner-runid": ex.runid,
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelUUID:  ex.uuid,
+		config.KubeBurnerLabelRunID: ex.runid,
 	}
 	// List namespaces to churn
 	jobNamespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(nsLabels).String()})
@@ -377,8 +375,9 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
 		for _, ns := range namespacesToDelete {
 			_, err = ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
 			if err != nil {
-				log.Errorf("Error patching namespace %s: %v", ns.Name, err)
+				log.Errorf("Error applying label '%v' to namespace %s: %v", delPatch, ns.Name, err)
 			}
+			ex.createdNamespaces[ns.Name] = false
 		}
 		// 1 hour timeout to delete namespaces
 		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
@@ -387,7 +386,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
 		util.CleanupNamespaces(ctx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		log.Info("Re-creating deleted objects")
 		// Re-create objects that were deleted
-		ex.RunCreateJob(ctx, randStart, numToChurn+randStart, &[]string{})
+		ex.RunCreateJob(ctx, randStart, numToChurn+randStart)
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 		time.Sleep(ex.ChurnConfig.Delay)
 		cyclesCount++
@@ -422,8 +421,8 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 			if obj.Churn {
 				labelSelector := obj.LabelSelector
 				// Remove these labels to list all objects
-				delete(labelSelector, "kube-burner.io/job-iteration")
-				delete(labelSelector, "kube-burner.io/replica")
+				delete(labelSelector, config.KubeBurnerLabelJobIteration)
+				delete(labelSelector, config.KubeBurnerLabelReplica)
 				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 					LabelSelector: labels.FormatLabels(labelSelector),
 				})

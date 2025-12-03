@@ -20,7 +20,7 @@ metricsEndpoints:
       defaultIndex: {{ .ES_INDEX }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
-    alerts: [alert-profile.yaml]
+    alerts: [alerts.yml]
 {{ end }}
 {{ end }}
 {{ if .LOCAL_INDEXING }}
@@ -30,19 +30,19 @@ metricsEndpoints:
       metricsDirectory: {{ .METRICS_FOLDER }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
-    alerts: [alert-profile.yaml]
+    alerts: [alerts.yml]
 {{ end }}
 {{ end }}
 
 
 jobs:
   # create the VMs
-  - name: kubevirt-density
+  - name: {{ .JOB_NAME }}
     jobType: create
     qps: 20
     burst: 20
     namespacedIterations: false
-    namespace: kubevirt-density
+    namespace: {{ .JOB_NAME }}
     verifyObjects: true
     errorOnVerify: true
     jobIterationDelay: 1s

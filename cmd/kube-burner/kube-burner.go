@@ -214,7 +214,7 @@ func destroyCmd() *cobra.Command {
 			dynamicClient := dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			labelSelector := fmt.Sprintf("kube-burner-uuid=%s", uuid)
+			labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelUUID, uuid)
 			util.CleanupNamespaces(ctx, clientSet, labelSelector)
 			util.CleanupNonNamespacedResources(ctx, clientSet, dynamicClient, labelSelector)
 		},
