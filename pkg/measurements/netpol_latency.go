@@ -124,14 +124,6 @@ func (nplmf netpolLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Jo
 	}
 }
 
-// func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
-// 	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
-// 	if err != nil {
-// 		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
-// 	}
-// 	return o, gvk
-// }
-
 func getNamespacesByLabel(s *metav1.LabelSelector) []string {
 	var namespaces []string
 	if s.MatchLabels != nil {
@@ -231,8 +223,7 @@ func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj confi
 			if err == io.EOF {
 				break
 			}
-			log.Warnf("Error decoding YAML document: %v", err)
-			break
+			log.Fatalf("Error decoding YAML document: %v", err)
 		}
 		objBytes, err := json.Marshal(rawObj)
 		if err != nil {
@@ -274,8 +265,6 @@ func (n *netpolLatency) prepareConnections() {
 			for r := 1; r <= obj.Replicas; r++ {
 
 				for _, networkPolicy := range n.getNetworkPolicies(i, r, obj, cleanTemplate) {
-
-					// networkPolicy := n.getNetworkPolicy(i, r, obj, cleanTemplate)
 					nsIndex := i / n.JobConfig.IterationsPerNamespace
 					namespace := fmt.Sprintf("%s-%d", n.JobConfig.Namespace, nsIndex)
 					localPods := addPodsByLabel(n.ClientSet, namespace, &networkPolicy.Spec.PodSelector)

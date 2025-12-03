@@ -124,17 +124,13 @@ func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unst
 	for {
 		uns := &unstructured.Unstructured{}
 		err := decoder.Decode(uns)
-		if err != nil {
-			if err != io.EOF {
-				break
-			}
+		if err != nil || err == io.EOF {
 			break
 		}
 		if len(uns.Object) == 0 {
 			break
 		}
 		gvk := uns.GroupVersionKind()
-		log.Debugf("Decoded object GVK: %v", gvk)
 		objects = append(objects, uns)
 		gvks = append(gvks, &gvk)
 	}

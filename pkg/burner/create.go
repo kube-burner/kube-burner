@@ -87,9 +87,6 @@ func (ex *JobExecutor) setupCreateJob() {
 			if err == nil {
 				obj.gvr = mapping.Resource
 				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-			} else {
-				obj.gvr = schema.GroupVersionResource{}
-				obj.gvk = gvk
 			}
 			obj.Kind = gvk.Kind
 			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
@@ -232,7 +229,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			newObject.SetLabels(objectLabels)
 			updateChildLabels(newObject, objectLabels)
 
-			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
 			if err != nil {
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
 				return
@@ -243,13 +240,13 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			// verify objects can lead into a race condition when some objects
 			// hasn't been created yet
 			replicaWg.Add(1)
-			go func(gvr schema.GroupVersionResource, newObj *unstructured.Unstructured, n string, namespaced bool) {
+			go func(n string) {
 				defer replicaWg.Done()
-				if !namespaced {
+				if !obj.namespaced {
 					n = ""
 				}
-				ex.createRequest(ctx, gvr, n, newObj, ex.MaxWaitTimeout)
-			}(mapping.Resource, newObject, ns, mapping.Scope.Name() == meta.RESTScopeNameNamespace)
+				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
+			}(ns)
 		}(r)
 	}
 	wg.Wait()
