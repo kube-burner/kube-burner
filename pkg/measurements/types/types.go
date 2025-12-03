@@ -96,9 +96,9 @@ const (
 )
 
 const (
-	PprofNamespace   = "pprof-collector"
-	PprofDaemonSet   = "pprof-collector"
-	PprofSA          = "pprof-collector"
-	PprofRole        = "pprof-collector"
-	PprofRoleBinding = "pprof-collector"
+	PprofNamespace   = "kube-burner-pprof-collector"
+	PprofDaemonSet   = "kube-burner-pprof-collector"
+	PprofSA          = "kube-burner-pprof-collector"
+	PprofRole        = "kube-burner-pprof-collector"
+	PprofRoleBinding = "kube-burner-pprof-collector"
 )

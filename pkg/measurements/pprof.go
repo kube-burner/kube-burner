@@ -110,10 +110,10 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	return nil
 }
 
-func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
+func (p *pprof) getPods(target types.PProftarget, pprofNodeTarget map[string]string, isNodeTarget bool) []corev1.Pod {
 	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
-	if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
-		labelSelector := labels.Set(map[string]string{"app": types.PprofDaemonSet}).String()
+	if isNodeTarget { // Node target
+		labelSelector := labels.Set(pprofNodeTarget).String()
 		podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector,
 			FieldSelector: "status.phase=Running",
 		})
@@ -135,7 +135,8 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 	var err error
 	for pos, target := range p.Config.PProfTargets {
 		log.Infof("Collecting %s pprof", target.Name)
-		podList := p.getPods(target)
+		pprofNodeTarget, isNodeTarget := p.getPprofNodeTargets(target)
+		podList := p.getPods(target, pprofNodeTarget, isNodeTarget)
 		for _, pod := range podList {
 			var cert, privKey io.Reader
 			if target.CertFile != "" && target.KeyFile != "" && first {

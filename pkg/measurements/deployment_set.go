@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -44,7 +45,7 @@ func (p *pprof) waitForDaemonSetReady() error {
 		case <-ticker.C:
 			ds, err := p.ClientSet.AppsV1().DaemonSets(types.PprofNamespace).Get(ctx, types.PprofDaemonSet, metav1.GetOptions{})
 			if err != nil {
-				log.Warnf("Error getting DaemonSet status: %v", err)
+				log.Warnf("Error getting DaemonSet statusanjay7178:feat/node-process-profiling-v2s: %v", err)
 				continue
 			}
 
@@ -91,7 +92,7 @@ func (p *pprof) deployDaemonSet() error {
 		},
 	}
 	_, err := p.ClientSet.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create namespace: %v", err)
 	}
 
@@ -103,7 +104,7 @@ func (p *pprof) deployDaemonSet() error {
 		},
 	}
 	_, err = p.ClientSet.CoreV1().ServiceAccounts(types.PprofNamespace).Create(ctx, sa, metav1.CreateOptions{})
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create serviceaccount: %v", err)
 	}
 
@@ -125,7 +126,7 @@ func (p *pprof) deployDaemonSet() error {
 		},
 	}
 	_, err = p.ClientSet.RbacV1().ClusterRoles().Create(ctx, clusterRole, metav1.CreateOptions{})
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create clusterrole: %v", err)
 	}
 
@@ -148,18 +149,18 @@ func (p *pprof) deployDaemonSet() error {
 		},
 	}
 	_, err = p.ClientSet.RbacV1().ClusterRoleBindings().Create(ctx, clusterRoleBinding, metav1.CreateOptions{})
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create clusterrolebinding: %v", err)
 	}
 
 	// Create DaemonSet
 	ds := p.buildDaemonSet()
 	_, err = p.ClientSet.AppsV1().DaemonSets(types.PprofNamespace).Create(ctx, ds, metav1.CreateOptions{})
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create daemonset: %v", err)
 	}
 
-	log.Infof("DaemonSet %s deployed in namespace %s", types.PprofDaemonSet, types.PprofNamespace)
+	log.Infof("pprof-collector: DaemonSet %s deployed in namespace %s", types.PprofDaemonSet, types.PprofNamespace)
 	return nil
 }
 
@@ -327,4 +328,12 @@ func (p *pprof) buildVolumes(hostPath string, hostPathDirectoryOrCreate corev1.H
 	}
 
 	return volumes
+}
+
+func (p *pprof) getPprofNodeTargets(target types.PProftarget) (map[string]string, bool) {
+	if target.LabelSelector == nil {
+		return map[string]string{"app": types.PprofDaemonSet}, true
+	} else {
+		return nil, false
+	}
 }
