@@ -315,10 +315,10 @@ func (p *pprof) buildVolumes(hostPath string, hostPathDirectoryOrCreate corev1.H
 	return volumes
 }
 
-func (p *pprof) getPprofNodeTargets(target types.PProftarget) (map[string]string, bool) {
+func (p *pprof) getPprofNodeTargets(target types.PProftarget) map[string]string {
 	if target.LabelSelector == nil {
-		return map[string]string{"app": types.PprofDaemonSet}, true
+		return map[string]string{"app": types.PprofDaemonSet}
 	} else {
-		return nil, false
+		return nil
 	}
 }
