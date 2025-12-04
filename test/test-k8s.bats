@@ -68,7 +68,8 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner.yml: preload=true; set-churn-mode=objects,set-gc=false" {
+# bats test_tags=subsystem:preload,subsystem:indexing
+@test "kube-burner.yml: preload=true; set-churn-mode=namespaces; set-gc=false" {
   export CRD=true
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=namespaces,jobs.0.preLoadImages=true,jobs.0.churnConfig.cycles=2 --log-level=debug
@@ -84,6 +85,7 @@ teardown_file() {
   verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
 }
 
+# bats test_tags=subsystem:indexing
 @test "kube-burner.yml: churn-mode=objects, local-indexing=true; os-indexing=true" {
   export CHURN_MODE=objects
   export ES_INDEXING=true LOCAL_INDEXING=true
@@ -98,13 +100,15 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
-@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true;set-preload=true" {
+# bats test_tags=subsystem:preload,subsystem:indexing
+@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true; set-preload=true" {
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
   verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
 }
 
+# bats test_tags=subsystem:indexing
 @test "kube-burner index: local-indexing=true; tarball=true" {
   sleep 1m # Sleep is required to prevent collecting metrics right after spinning up the cluster, which can lead to missing datapoints
   run_cmd ${KUBE_BURNER} index --uuid=${UUID} -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz --start="$(date -d "-30 seconds" +%s)" --metrics-directory=${METRICS_FOLDER}
@@ -116,6 +120,7 @@ teardown_file() {
   rm -rf ${METRICS_FOLDER:?}/*
 }
 
+# bats test_tags=subsystem:job-type-delete
 @test "kube-burner-delete.yml: delete=true; os-indexing=true; local-indexing=true" {
   export ES_INDEXING=true LOCAL_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner-delete.yml --uuid ${UUID} --log-level=debug
@@ -124,6 +129,7 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-delete-job.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-delete-job.json ${METRICS_FOLDER}/prometheusBuildInfo.json
 }
 
+# bats test_tags=subsystem:job-type-read,subsystem:custom-kubeconfig
 @test "kube-burner-read.yml: read; os-indexing=true; local-indexing=true" {
   export ES_INDEXING=true LOCAL_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
@@ -131,15 +137,18 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
 }
 
+# bats test_tags=subsystem:health-check
 @test "kube-burner cluster health check" {
   run_cmd ${KUBE_BURNER} health-check
 }
 
+# bats test_tags=subsystem:alerting
 @test "kube-burner check-alerts" {
   run_cmd ${KUBE_BURNER} check-alerts -a alerts.yml -u http://localhost:9090 --metrics-directory=alerts
   check_file_list alerts/alert.json
 }
 
+# bats test_tags=subsystem:waiters
 @test "kube-burner.yml: waitOptions for Deployment" {
   export GC=false
   export WAIT_FOR_CONDITION="True"
@@ -149,6 +158,7 @@ teardown_file() {
   ${KUBE_BURNER} destroy --uuid ${UUID}
 }
 
+# bats test_tags=subsystem:job-type-patch
 @test "kube-burner-sequential-patch.yml: sequential patch" {
   export NAMESPACE="sequential-patch"
   export LABEL_KEY="sequential.patch.test"
@@ -165,10 +175,12 @@ teardown_file() {
   run_cmd kubectl delete deployment failing-up
 }
 
+# bats test_tags=subsystem:job-type-kubevirt
 @test "kube-burner-virt-operations.yml: jobType kubevirt" {
   run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid=${UUID} --log-level=debug
 }
 
+# bats test_tags=subsystem:core
 @test "kube-burner-userdata.yml: user data file" {
   export NAMESPACE="userdata"
   export deploymentLabelFromEnv="from-env"
@@ -190,6 +202,7 @@ teardown_file() {
   kubectl delete ns ${NAMESPACE}
 }
 
+# bats test_tags=subsystem:measurements
 @test "kube-burner-dv.yml: datavolume latency" {
   if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
     echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
@@ -217,6 +230,7 @@ teardown_file() {
   check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
 }
 
+# bats test_tags=subsystem:indexing
 @test "kube-burner-metrics-aggregate.yml: metrics aggregation" {
   export STORAGE_CLASS_NAME
   STORAGE_CLASS_NAME=$(get_default_storage_class)
@@ -234,6 +248,7 @@ teardown_file() {
   done
 }
 
+# bats test_tags=subsystem:measurements
 @test "kube-burner-measurements.yml: Verify measurements configuration" {
   export LOCAL_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner-measurements.yml --uuid=${UUID} --log-level=debug
