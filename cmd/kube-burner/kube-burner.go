@@ -83,6 +83,7 @@ func initCmd() *cobra.Command {
 	var userDataFile string
 	var allowMissingKeys bool
 	var rc int
+	var setValues []string
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -108,6 +109,10 @@ func initCmd() *cobra.Command {
 			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
+			setVars, err := config.ParseSetValues(setValues)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
@@ -121,7 +126,7 @@ func initCmd() *cobra.Command {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
 			}
-			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil)
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil, setVars)
 			if err != nil {
 				log.Error("Config error")
 				fmt.Printf("%s", err.Error())
@@ -159,6 +164,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
+	cmd.Flags().StringSliceVar(&setValues, "set", []string{}, "Set arbitrary key=value pairs to override values in the config file")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd
