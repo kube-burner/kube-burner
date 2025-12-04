@@ -110,7 +110,7 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 
 func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
 	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
-	if p.needsDaemonSet() { // Node target
+	if p.getPprofNodeTargets(target) != nil { // Node target
 		labelSelector := labels.Set(p.getPprofNodeTargets(target)).String()
 		podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector,
 			FieldSelector: "status.phase=Running",
@@ -164,9 +164,6 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 
 				// Determine identifier for filename
 				identifier := pod.Name
-				if p.needsDaemonSet() {
-					identifier = pod.Spec.NodeName
-				}
 
 				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, identifier, time.Now().Unix())
 				f, err := os.Create(path.Join(p.Config.PProfDirectory, pprofFile))
@@ -220,7 +217,7 @@ func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod) ([]s
 	var command []string
 
 	// Build command based on target type
-	if p.needsDaemonSet() {
+	if p.getPprofNodeTargets(target) != nil {
 		// Node-level collection via DaemonSet
 		if strings.HasPrefix(target.URL, "unix://") {
 			// Unix socket (CRI-O)
