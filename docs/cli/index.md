@@ -48,6 +48,7 @@ This is the main subcommand; it triggers a new kube-burner benchmark and it supp
 - `user-metadata`: YAML file path containing custom user-metadata to be indexed along with the `jobSummary` document.
 - `user-data`: YAML or JSON file path containing input variables for rendering the configuration file.
 - `allow-missing`: Allow missing keys in the config file. Needed when using the [`default`](https://masterminds.github.io/sprig/defaults.html) template function
+- `set`: Set arbitrary `key=value` pairs to override values in the configuration file. Similar to Helm's `--set` flag, this allows you to override base YAML values directly from the command line. Multiple values can be specified by separating them with commas or by using multiple `--set` flags. Nested keys are supported using dot notation, and array indices can be used with numeric keys (e.g., `jobs.0.name=test`).
 
 !!! Note "Prometheus authentication"
     Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.
@@ -56,6 +57,14 @@ With the above, running a kube-burner benchmark would be as simple as:
 
 ```console
 kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`
+```
+
+To override configuration values directly from the command line using the `--set` flag:
+
+```console
+kube-burner init -c ./examples/workloads/kubelet-density/kubelet-density.yml \
+  --set global.gc=false,global.timeout=1h \
+  --set jobs.0.name=test,jobs.0.jobIterations=5
 ```
 
 Kube-burner also supports remote configuration files served by a web server. To use it, rather than a path, pass a URL. For example:
