@@ -13,8 +13,10 @@ global:
 {{ if .TIMESERIES_INDEXER }}
     timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
 {{ end }}
+{{ if .SVC_LATENCY }}
   - name: serviceLatency
     svcTimeout: 5s
+{{ end }}
   - name: jobLatency
 metricsEndpoints:
 {{ if .ES_INDEXING }}
@@ -25,7 +27,7 @@ metricsEndpoints:
       defaultIndex: {{ .ES_INDEX }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
-    alerts: [alert-profile.yaml]
+    alerts: [alerts.yml]
 {{ end }}
 {{ end }}
 {{ if .LOCAL_INDEXING }}
@@ -35,12 +37,12 @@ metricsEndpoints:
       metricsDirectory: {{ .METRICS_FOLDER }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
-    alerts: [alert-profile.yaml]
+    alerts: [alerts.yml]
 {{ end }}
 {{ end }}
 
 jobs:
-  - name: namespaced
+  - name: {{ .JOB_NAME }}
     jobType: create
     jobIterations: {{ add .JOB_ITERATIONS 1 }}
     qps: {{ .QPS }}
@@ -53,15 +55,14 @@ jobs:
       apiVersion: v1
       labelSelector: {foo: bar}
       replicas: 2
-    - kind: MyClusterResource
-      apiVersion: example.com/v1
-      labelSelector: {foo: bar}
+    - kind: StorageClass
+      apiVersion: storage.k8s.io/v1
       replicas: 1
     namespacedIterations: true
     preLoadImages: {{ .PRELOAD_IMAGES }}
     preLoadPeriod: 2s
     cleanup: true
-    namespace: namespaced
+    namespace: {{ .JOB_NAME }}
     podWait: false
     waitWhenFinished: true
     verifyObjects: true
@@ -104,3 +105,32 @@ jobs:
     - objectTemplate: objectTemplates/secret.yml
       replicas: 1
       runOnce: true
+
+{{ if .CRD }}
+  - name: crd
+    jobType: create
+    jobIterations: 1
+    namespacedIterations: false
+    cleanup: false
+    podWait: false
+    qps: 10
+    burst: 10
+    jobPause: 10s
+    objects:
+    - objectTemplate: objectTemplates/crd.yml
+      replicas: 1
+
+  - name: cr-crd
+    namespace: cr-crd
+    jobType: create
+    jobIterations: 1
+    namespacedIterations: false
+    cleanup: false
+    podWait: false
+    qps: 10
+    burst: 10
+    jobPause: 10s
+    objects:
+    - objectTemplate: objectTemplates/cr.yml
+      replicas: 5
+{{ end }}

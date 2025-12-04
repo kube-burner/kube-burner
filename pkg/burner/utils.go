@@ -274,7 +274,7 @@ func (ex *JobExecutor) runSequential(ctx context.Context) []error {
 			}
 		}
 		if ex.WaitWhenFinished {
-			if err := ex.waitForObjects(""); len(err) > 0 {
+			if err := ex.waitForObjects(""); err != nil {
 				errs = append(errs, err...)
 			}
 		}

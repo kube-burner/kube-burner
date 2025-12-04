@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -82,8 +81,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
-	globalWaitMap := make(map[string][]string)
-	executorMap := make(map[string]JobExecutor)
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
@@ -110,7 +107,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			watcherStartErrors := watcherManager.Wait()
 			errs = append(errs, watcherStartErrors...)
-			var waitListNamespaces []string
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
 				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg)
@@ -130,12 +126,19 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations, &waitListNamespaces); len(jobErrs) > 0 {
+				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations); jobErrs != nil {
 					errs = append(errs, jobErrs...)
 					innerRC = 1
 				}
 				if ctx.Err() != nil {
 					return
+				}
+				if config.IsChurnEnabled(jobExecutor.Job) {
+					churnStart := time.Now().UTC()
+					executedJobs[jobExecutorIdx].ChurnStart = &churnStart
+					jobExecutor.RunCreateJobWithChurn(ctx)
+					churnEnd := time.Now().UTC()
+					executedJobs[jobExecutorIdx].ChurnEnd = &churnEnd
 				}
 				// If object verification is enabled
 				if jobExecutor.VerifyObjects && !jobExecutor.Verify() {
@@ -147,18 +150,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 					log.Error(err.Error())
 				}
-				if config.IsChurnEnabled(jobExecutor.Job) {
-					churnStart := time.Now().UTC()
-					executedJobs[jobExecutorIdx].ChurnStart = &churnStart
-					if jobErrs := jobExecutor.RunCreateJobWithChurn(ctx); len(jobErrs) > 0 {
-						errs = append(errs, jobErrs...)
-						innerRC = 1
-					}
-					churnEnd := time.Now().UTC()
-					executedJobs[jobExecutorIdx].ChurnEnd = &churnEnd
-				}
-				globalWaitMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = waitListNamespaces
-				executorMap[strconv.Itoa(jobExecutorIdx)+jobExecutor.Name] = jobExecutor
 			} else {
 				if jobErrs := jobExecutor.Run(ctx); len(jobErrs) > 0 {
 					errs = append(errs, jobErrs...)
@@ -223,10 +214,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 		}
 		if globalConfig.WaitWhenFinished {
-			if waitErrs := runWaitList(globalWaitMap, executorMap); len(waitErrs) > 0 {
-				errs = append(errs, waitErrs...)
-				innerRC = 1
-			}
+			runWaitList(jobExecutors)
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
@@ -389,39 +377,32 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 }
 
 // Runs on wait list at the end of benchmark
-func runWaitList(globalWaitMap map[string][]string, executorMap map[string]JobExecutor) []error {
-	var wg sync.WaitGroup
-	errChan := make(chan []error, len(globalWaitMap))
-	for executorUUID, namespaces := range globalWaitMap {
-		executor := executorMap[executorUUID]
+func runWaitList(jobExecutors []JobExecutor) []error {
+	var allErrs []error
+	var mu sync.Mutex
+	for _, executor := range jobExecutors {
 		log.Infof("Waiting up to %s for actions to be completed", executor.MaxWaitTimeout)
-		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(executor.restConfig.QPS))
-		for _, ns := range namespaces {
-			sem <- 1
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, int(executor.restConfig.QPS))
+		for ns := range executor.createdNamespaces {
+			ns := ns
+			sem <- struct{}{}
 			wg.Add(1)
-			go func(ns string) {
+			go func() {
 				defer func() {
 					<-sem
 					wg.Done()
 				}()
-				if err := executor.waitForObjects(ns); err != nil {
-					errChan <- err
+				if errs := executor.waitForObjects(ns); errs != nil {
+					mu.Lock()
+					allErrs = append(allErrs, errs...)
+					mu.Unlock()
 				}
-			}(ns)
+			}()
 		}
 		wg.Wait()
 	}
-	close(errChan)
-
-	var errs []error
-	for err := range errChan {
-		errs = append(errs, err...)
-	}
-	if len(errs) > 0 {
-		return errs
-	}
-	return nil
+	return allErrs
 }
 
 func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
@@ -457,6 +438,7 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 			CleanupNonNamespacedResourcesUsingGVR(ctx, *ex, obj, labelSelector)
 		} else if obj.namespace != "" { // When the object has a fixed namespace not generated by kube-burner
 			CleanupNamespaceResourcesUsingGVR(ctx, *ex, obj, obj.namespace, labelSelector)
+			waitForDeleteNamespacedResources(ctx, *ex, obj.namespace, labelSelector)
 		}
 	}
 }

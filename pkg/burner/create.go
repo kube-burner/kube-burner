@@ -98,7 +98,7 @@ func (ex *JobExecutor) setupCreateJob() {
 }
 
 // RunCreateJob executes a creation job
-func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int, waitListNamespaces *[]string) []error {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int) []error {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		config.KubeBurnerLabelJob:   ex.Name,
@@ -163,7 +163,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				if errs := ex.waitForObjects(ns); len(errs) > 0 {
+				if errs := ex.waitForObjects(ns); errs != nil {
 					waitErrors = append(waitErrors, errs...)
 				}
 				namespacesWaited[ns] = true
@@ -181,10 +181,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			waitErrors = append(waitErrors, errs...)
 		}
 	}
-	if len(waitErrors) > 0 {
-		return waitErrors
-	}
-	return nil
+	return waitErrors
 }
 
 // Simple integer division on the iteration allows us to batch iterations into
@@ -419,7 +416,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		util.CleanupNamespaces(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		// Re-create objects that were deleted
-		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart, &[]string{}); len(jobErrs) > 0 {
+		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
 			errs = append(errs, jobErrs...)
 		}
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)

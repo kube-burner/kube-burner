@@ -32,17 +32,18 @@ import (
 func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
 	labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelJob, ex.Name)
 	for _, namespace := range namespacesToDelete {
+		log.Infof("Deleting namespace %s using GVR", namespace)
 		for _, obj := range ex.objects {
 			CleanupNamespaceResourcesUsingGVR(ctx, ex, obj, namespace, labelSelector)
 		}
-		waitForDeleteNamespacedResources(ctx, ex, namespace, ex.objects, labelSelector)
+		waitForDeleteNamespacedResources(ctx, ex, namespace, labelSelector)
 	}
 }
 
 func CleanupNamespaceResourcesUsingGVR(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) {
 	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-	log.Infof("Deleting %ss labeled with %s in %s", obj.Kind, labelSelector, namespace)
+	log.Debugf("Deleting %ss labeled with %s in %s", obj.Kind, labelSelector, namespace)
 	if err != nil {
 		log.Errorf("Unable to list %vs in %v: %v", obj.Kind, namespace, err)
 		return
@@ -68,10 +69,10 @@ func CleanupNonNamespacedResourcesUsingGVR(ctx context.Context, ex JobExecutor, 
 	util.DeleteNonNamespacedResources(ctx, resources, resourceInterface)
 }
 
-func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, namespace string, objects []*object, labelSelector string) {
+func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, namespace string, labelSelector string) {
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		allDeleted := true
-		for _, obj := range objects {
+		for _, obj := range ex.objects {
 			// If churning is enabled and object doesn't have churning enabled we skip that object from deletion wait
 			if config.IsChurnEnabled(ex.Job) && !obj.Churn {
 				continue
