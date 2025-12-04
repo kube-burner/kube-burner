@@ -44,8 +44,7 @@ import (
 type pprof struct {
 	BaseMeasurement
 
-	stopChannel       chan bool
-	daemonSetDeployed bool
+	stopChannel chan bool
 }
 
 type pprofLatencyMeasurementFactory struct {
@@ -82,7 +81,6 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 			log.Errorf("Error deploying DaemonSet: %s", err)
 			return err
 		}
-		p.daemonSetDeployed = true
 		if err := p.waitForDaemonSetReady(); err != nil {
 			log.Errorf("Error waiting for DaemonSet to be ready: %s", err)
 			return err
@@ -167,11 +165,8 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 
 				// Determine identifier for filename
 				identifier := pod.Name
-				if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
-					if nodeName := pod.Spec.NodeName; nodeName != "" {
-						identifier = nodeName
-						log.Infof("Collecting pprof from pod %s on node %s", pod.Name, nodeName)
-					}
+				if p.needsDaemonSet() {
+					identifier = pod.Spec.NodeName
 				}
 
 				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, identifier, time.Now().Unix())
@@ -191,7 +186,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 
 				command, pprofReq := p.buildPProfRequest(target, pod)
 
-				log.Debugf("Collecting pprof using URL: %s", pprofReq.URL())
+				log.Tracef("Collecting pprof using URL: %s", pprofReq.URL())
 				pprofReq.VersionedParams(&corev1.PodExecOptions{
 					Command:   command,
 					Container: pod.Spec.Containers[0].Name,
@@ -213,7 +208,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					log.Errorf("Failed to get pprof from %s: %s", pod.Name, stderr.String())
 					os.Remove(f.Name())
 				} else {
-					log.Infof("Successfully collected pprof data: %s", pprofFile)
+					log.Debugf("Successfully collected pprof data: %s", pprofFile)
 				}
 			}(p.Config.PProfTargets[pos], pod)
 		}
@@ -226,7 +221,7 @@ func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod) ([]s
 	var command []string
 
 	// Build command based on target type
-	if p.daemonSetDeployed && len(target.LabelSelector) == 0 {
+	if p.needsDaemonSet() {
 		// Node-level collection via DaemonSet
 		if strings.HasPrefix(target.URL, "unix://") {
 			// Unix socket (CRI-O)

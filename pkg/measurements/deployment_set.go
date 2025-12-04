@@ -20,16 +20,6 @@ func (p *pprof) needsDaemonSet() bool {
 	return len(p.Config.NodeAffinity) > 0
 }
 
-// needsCRIOSocket checks if any pprofTarget uses a unix socket URL (CRI-O)
-func (p *pprof) needsCRIOSocket() bool {
-	for _, target := range p.Config.PProfTargets {
-		if strings.HasPrefix(target.URL, "unix://") {
-			return true
-		}
-	}
-	return false
-}
-
 func (p *pprof) waitForDaemonSetReady() error {
 	ctx := context.TODO()
 	timeout := time.After(2 * time.Minute)
@@ -166,34 +156,32 @@ func (p *pprof) deployDaemonSet() error {
 
 func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 	privileged := true
-	hostNetwork := true
 
 	affinity := &corev1.Affinity{}
-	if len(p.Config.NodeAffinity) > 0 {
-		affinity.NodeAffinity = &corev1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-				NodeSelectorTerms: []corev1.NodeSelectorTerm{
-					{
-						MatchExpressions: []corev1.NodeSelectorRequirement{},
-					},
+	affinity.NodeAffinity = &corev1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{
+				{
+					MatchExpressions: []corev1.NodeSelectorRequirement{},
 				},
 			},
-		}
-		for key, value := range p.Config.NodeAffinity {
-			affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions = append(
-				affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions,
-				corev1.NodeSelectorRequirement{
-					Key:      key,
-					Operator: corev1.NodeSelectorOpIn,
-					Values:   []string{value},
-				},
-			)
-		}
+		},
 	}
+	for key, value := range p.Config.NodeAffinity {
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions = append(
+			affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions,
+			corev1.NodeSelectorRequirement{
+				Key:      key,
+				Operator: corev1.NodeSelectorOpIn,
+				Values:   []string{value},
+			},
+		)
+	}
+
 	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
 	hostPath := p.Config.PProfDirectory
 	if !strings.HasPrefix(hostPath, "/") {
-		hostPath = "/var/tmp/" + hostPath
+		hostPath = "/mnt/" + hostPath
 		log.Warnf("PProfDirectory %s is not an absolute path, using %s", p.Config.PProfDirectory, hostPath)
 	}
 
@@ -220,7 +208,7 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: types.PprofSA,
-					HostNetwork:        hostNetwork,
+					HostNetwork:        true,
 					Affinity:           affinity,
 					Containers: []corev1.Container{
 						{
@@ -261,13 +249,11 @@ func (p *pprof) buildVolumeMounts(hostPath string) []corev1.VolumeMount {
 	}
 
 	// Add CRI-O socket mount if any target uses unix socket
-	if p.needsCRIOSocket() {
-		mounts = append(mounts, corev1.VolumeMount{
-			Name:      "crio-socket",
-			MountPath: "/var/run/crio/crio.sock",
-		})
-		log.Infof("CRI-O socket mount enabled for unix socket pprof targets")
-	}
+	mounts = append(mounts, corev1.VolumeMount{
+		Name:      "crio-socket",
+		MountPath: "/var/run/crio/crio.sock",
+	})
+	log.Infof("CRI-O socket mount enabled for unix socket pprof targets")
 
 	return mounts
 }
@@ -314,18 +300,17 @@ func (p *pprof) buildVolumes(hostPath string, hostPathDirectoryOrCreate corev1.H
 	}
 
 	// Add CRI-O socket volume if any target uses unix socket
-	if p.needsCRIOSocket() {
-		hostPathSocket := corev1.HostPathSocket
-		volumes = append(volumes, corev1.Volume{
-			Name: "crio-socket",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/var/run/crio/crio.sock",
-					Type: &hostPathSocket,
-				},
+
+	hostPathSocket := corev1.HostPathSocket
+	volumes = append(volumes, corev1.Volume{
+		Name: "crio-socket",
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/var/run/crio/crio.sock",
+				Type: &hostPathSocket,
 			},
-		})
-	}
+		},
+	})
 
 	return volumes
 }
