@@ -17,7 +17,6 @@ package burner
 import (
 	"bytes"
 	"context"
-	"io"
 	"math"
 	"strconv"
 	"sync"
@@ -110,7 +109,6 @@ func updateChildLabels(obj *unstructured.Unstructured, labels map[string]string)
 
 func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
 	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
-	log.Debugf("Decoded object GVK: %v", gvk)
 	if err != nil {
 		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
 	}
@@ -124,7 +122,7 @@ func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unst
 	for {
 		uns := &unstructured.Unstructured{}
 		err := decoder.Decode(uns)
-		if err != nil || err == io.EOF {
+		if err != nil {
 			break
 		}
 		if len(uns.Object) == 0 {
