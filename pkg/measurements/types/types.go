@@ -88,6 +88,8 @@ type PProftarget struct {
 	Cert string `yaml:"cert"`
 	// Key Private key content
 	Key string `yaml:"key"`
+	// UnixSocketPath Unix socket path
+	UnixSocketPath string `yaml:"unixSocketPath"`
 }
 
 const (

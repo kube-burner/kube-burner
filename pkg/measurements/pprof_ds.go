@@ -12,7 +12,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 )
 
@@ -21,55 +21,23 @@ func (p *pprof) needsDaemonSet() bool {
 }
 
 func (p *pprof) waitForDaemonSetReady() error {
-	ctx := context.TODO()
-	timeout := time.After(2 * time.Minute)
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
 	log.Infof("Waiting for DaemonSet %s pods to be ready", types.PprofDaemonSet)
-
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for DaemonSet pods to be ready")
-		case <-ticker.C:
-			ds, err := p.ClientSet.AppsV1().DaemonSets(types.PprofNamespace).Get(ctx, types.PprofDaemonSet, metav1.GetOptions{})
-			if err != nil {
-				log.Warnf("Error getting DaemonSet status: %v", err)
-				continue
-			}
-
-			// Check if all desired pods are ready
-			if ds.Status.NumberReady > 0 && ds.Status.NumberReady == ds.Status.DesiredNumberScheduled {
-				log.Infof("DaemonSet %s is ready with %d/%d pods", types.PprofDaemonSet, ds.Status.NumberReady, ds.Status.DesiredNumberScheduled)
-
-				// Additional check: verify pods are actually running
-				podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(ctx, metav1.ListOptions{
-					LabelSelector: labels.Set(map[string]string{"app": types.PprofDaemonSet}).String(),
-				})
-				if err != nil {
-					log.Warnf("Error listing pods: %v", err)
-					continue
-				}
-
-				allRunning := true
-				for _, pod := range podList.Items {
-					if pod.Status.Phase != corev1.PodRunning {
-						allRunning = false
-						log.Debugf("Pod %s is in phase %s, waiting...", pod.Name, pod.Status.Phase)
-						break
-					}
-				}
-
-				if allRunning && len(podList.Items) > 0 {
-					log.Infof("All %d DaemonSet pods are running and ready", len(podList.Items))
-					return nil
-				}
-			} else {
-				log.Debugf("DaemonSet status: %d/%d pods ready", ds.Status.NumberReady, ds.Status.DesiredNumberScheduled)
-			}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+		ds, err := p.ClientSet.AppsV1().DaemonSets(types.PprofNamespace).Get(context.TODO(), types.PprofDaemonSet, metav1.GetOptions{})
+		if err != nil {
+			return true, err
 		}
+		if ds.Status.DesiredNumberScheduled != ds.Status.NumberReady {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("error waiting for DaemonSet/%s to be ready: %v", types.PprofDaemonSet, err)
 	}
+	return nil
 }
 
 func (p *pprof) deployDaemonSet() error {
@@ -82,7 +50,7 @@ func (p *pprof) deployDaemonSet() error {
 		},
 	}
 	_, err := p.ClientSet.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	if err != nil {
 		return fmt.Errorf("failed to create namespace: %v", err)
 	}
 
@@ -112,6 +80,12 @@ func (p *pprof) deployDaemonSet() error {
 				APIGroups: []string{""},
 				Resources: []string{"nodes", "nodes/proxy", "nodes/stats", "nodes/metrics"},
 				Verbs:     []string{"get", "list"},
+			},
+			{
+				APIGroups:     []string{"security.openshift.io"}, // Required for OpenShift
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"hostaccess"},
+				Verbs:         []string{"use"},
 			},
 		},
 	}
@@ -146,7 +120,7 @@ func (p *pprof) deployDaemonSet() error {
 	// Create DaemonSet
 	ds := p.buildDaemonSet()
 	_, err = p.ClientSet.AppsV1().DaemonSets(types.PprofNamespace).Create(ctx, ds, metav1.CreateOptions{})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	if err != nil {
 		return fmt.Errorf("failed to create daemonset: %v", err)
 	}
 
@@ -155,7 +129,6 @@ func (p *pprof) deployDaemonSet() error {
 }
 
 func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
-	privileged := true
 
 	affinity := &corev1.Affinity{}
 	affinity.NodeAffinity = &corev1.NodeAffinity{
@@ -177,11 +150,6 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 			},
 		)
 	}
-
-	hostPath := p.Config.PProfDirectory
-	// Build volume mounts and volumes based on configuration
-	volumeMounts := p.buildVolumeMounts(hostPath)
-	volumes := p.buildVolumes(hostPath, ptr.To(corev1.HostPathDirectoryOrCreate))
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -206,102 +174,33 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 					Affinity:           affinity,
 					Containers: []corev1.Container{
 						{
-							Name:  "pprof-collector",
-							Image: "curlimages/curl:8.5.0",
-							Command: []string{
-								"sh",
-								"-c",
-								"while true; do sleep 3600; done",
+							Name:    "pprof-collector",
+							Image:   "quay.io/kube-burner/fedora-nc:latest",
+							Command: []string{"sleep", "inf"},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "pprof-data-directory",
+									MountPath: "/mnt/var/run",
+								},
 							},
-							SecurityContext: &corev1.SecurityContext{
-								Privileged: &privileged,
-							},
-							VolumeMounts: volumeMounts,
 						},
 					},
-					Volumes: volumes,
+					Volumes: []corev1.Volume{
+						{
+							Name: "pprof-data-directory",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/var/run",
+									Type: ptr.To(corev1.HostPathDirectoryOrCreate),
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 	}
-
 	return ds
-}
-
-// buildVolumeMounts creates volume mounts for pprof data, kubelet CA, and optionally CRI-O socket
-func (p *pprof) buildVolumeMounts(hostPath string) []corev1.VolumeMount {
-	mounts := []corev1.VolumeMount{
-		{
-			Name:      "/mnt",
-			MountPath: hostPath,
-		},
-	}
-
-	// Add CRI-O socket mount if any target uses unix socket
-	mounts = append(mounts, corev1.VolumeMount{
-		Name:      "crio-socket",
-		MountPath: "/var/run/crio/crio.sock",
-	})
-	log.Infof("CRI-O socket mount enabled for unix socket pprof targets")
-
-	return mounts
-}
-
-// buildVolumes creates volumes, conditionally adding CRI-O socket if needed
-func (p *pprof) buildVolumes(hostPath string, hostPathDirectoryOrCreate *corev1.HostPathType) []corev1.Volume {
-	volumes := []corev1.Volume{
-		{
-			Name: "pprof-data-directory",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: hostPath,
-					Type: hostPathDirectoryOrCreate,
-				},
-			},
-		},
-		{
-			Name: "kubelet-ca",
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					Sources: []corev1.VolumeProjection{
-						{
-							ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
-								Path: "token",
-							},
-						},
-						{
-							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "kube-root-ca.crt",
-								},
-								Items: []corev1.KeyToPath{
-									{
-										Key:  "ca.crt",
-										Path: "ca.crt",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Add CRI-O socket volume if any target uses unix socket
-
-	hostPathSocket := corev1.HostPathSocket
-	volumes = append(volumes, corev1.Volume{
-		Name: "crio-socket",
-		VolumeSource: corev1.VolumeSource{
-			HostPath: &corev1.HostPathVolumeSource{
-				Path: "/var/run/crio/crio.sock",
-				Type: &hostPathSocket,
-			},
-		},
-	})
-
-	return volumes
 }
 
 func (p *pprof) getPprofNodeTargets(target types.PProftarget) map[string]string {

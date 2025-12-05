@@ -29,6 +29,7 @@ import (
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -43,7 +44,6 @@ import (
 
 type pprof struct {
 	BaseMeasurement
-
 	stopChannel chan bool
 }
 
@@ -161,13 +161,12 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 			wg.Add(1)
 			go func(target types.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
-
-				// Determine identifier for filename
-				identifier := pod.Name
-
-				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, identifier, time.Now().Unix())
-				f, err := os.Create(path.Join(p.Config.PProfDirectory, pprofFile))
+				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Name, time.Now().Unix())
+				if target.LabelSelector == nil {
+					pprofFile = fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Spec.NodeName, time.Now().Unix())
+				}
 				var stderr bytes.Buffer
+				f, err := os.Create(path.Join(p.Config.PProfDirectory, pprofFile))
 				if err != nil {
 					log.Errorf("Error creating pprof file %s: %s", pprofFile, err)
 					return
@@ -219,42 +218,15 @@ func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod) ([]s
 	// Build command based on target type
 	if p.getPprofNodeTargets(target) != nil {
 		// Node-level collection via DaemonSet
-		if strings.HasPrefix(target.URL, "unix://") {
-			// Unix socket (CRI-O)
-			socketPath := strings.TrimPrefix(target.URL, "unix://")
-
-			// Extract the pprof path from target.URL or use default
-			pprofPath := "/debug/pprof/profile"
-			if strings.Contains(target.Name, "heap") {
-				pprofPath = "/debug/pprof/heap"
-			} else if strings.Contains(target.Name, "goroutine") {
-				pprofPath = "/debug/pprof/goroutine"
-			}
-
-			// Convert duration to seconds for CPU profiling
-			seconds := int(p.Config.PProfInterval.Seconds())
-			if seconds > 300 {
-				seconds = 30 // Cap at 30 seconds for CPU profiling
-			}
-
+		if target.UnixSocketPath != "" {
 			command = []string{"curl", "-fsSLk",
-				"--unix-socket", socketPath,
-				fmt.Sprintf("http://localhost%s?seconds=%d", pprofPath, seconds),
-			}
-			log.Debugf("Using unix socket: %s for %s", socketPath, pprofPath)
+				"--unix-socket", path.Join("/mnt", target.UnixSocketPath), target.URL}
 		} else {
 			// HTTPS endpoint (kubelet) - use insecure since kubelet typically uses self-signed certs
 			command = []string{"sh", "-c",
-				fmt.Sprintf("curl -fsSLk -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" %s", target.URL),
+				fmt.Sprintf("curl -fsSLkH \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" %s", target.URL),
 			}
 		}
-		pprofReq = p.ClientSet.CoreV1().
-			RESTClient().
-			Post().
-			Resource("pods").
-			Name(pod.Name).
-			Namespace(types.PprofNamespace).
-			SubResource("exec")
 	} else {
 		// Pod-level collection (etcd, api-server, etc.)
 		if target.BearerToken != "" {
@@ -264,14 +236,14 @@ func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod) ([]s
 		} else {
 			command = []string{"curl", "-fsSLk", target.URL}
 		}
-		pprofReq = p.ClientSet.CoreV1().
-			RESTClient().
-			Post().
-			Resource("pods").
-			Name(pod.Name).
-			Namespace(pod.Namespace).
-			SubResource("exec")
 	}
+	pprofReq = p.ClientSet.CoreV1().
+		RESTClient().
+		Post().
+		Resource("pods").
+		Name(pod.Name).
+		Namespace(pod.Namespace).
+		SubResource("exec")
 	return command, pprofReq
 }
 
@@ -281,6 +253,20 @@ func (p *pprof) Collect(measurementWg *sync.WaitGroup) {
 
 func (p *pprof) Stop() error {
 	p.stopChannel <- true
+	if p.needsDaemonSet() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		err := p.ClientSet.RbacV1().ClusterRoles().Delete(ctx, types.PprofRole, metav1.DeleteOptions{})
+		if err != nil {
+			log.Errorf("Error deleting cluster role %s: %s", types.PprofRole, err)
+			return err
+		}
+		err = util.CleanupNamespaces(ctx, p.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.PprofNamespace))
+		if err != nil {
+			log.Errorf("Error cleaning up namespaces %s: %s", types.PprofNamespace, err)
+			return err
+		}
+	}
 	return nil
 }
 
