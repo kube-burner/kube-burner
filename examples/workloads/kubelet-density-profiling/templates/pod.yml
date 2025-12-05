@@ -1,0 +1,18 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: kubelet-density-{{.Iteration}}
+  labels:
+    name: kubelet-density
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  containers:
+  - name: kubelet-density
+    image: {{.containerImage}}
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+    imagePullPolicy: IfNotPresent
+    securityContext:
+      privileged: false
