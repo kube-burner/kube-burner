@@ -98,7 +98,7 @@ func (ex *JobExecutor) setupCreateJob() {
 }
 
 // RunCreateJob executes a creation job
-func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int) {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int) []error {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		config.KubeBurnerLabelJob:   ex.Name,
@@ -107,6 +107,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	}
 	var wg sync.WaitGroup
 	var ns string
+	var waitErrors []error
 	var namespacesWaited = make(map[string]bool)
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
@@ -118,7 +119,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	percent := 1
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
-			return
+			return []error{ctx.Err()}
 		}
 		if ex.JobIterations > 1 && i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
@@ -162,7 +163,9 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns)
+				if errs := ex.waitForObjects(ns); errs != nil {
+					waitErrors = append(waitErrors, errs...)
+				}
 				namespacesWaited[ns] = true
 			}
 		}
@@ -174,31 +177,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	// Wait for all replicas to be created
 	wg.Wait()
 	if ex.WaitWhenFinished {
-		log.Infof("Job Completed: waiting up to %s for objects to be ready/completed", ex.MaxWaitTimeout)
-		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(ex.restConfig.QPS))
-		for i := iterationStart; i < iterationEnd; i++ {
-			if ex.nsRequired && ex.NamespacedIterations {
-				ns = ex.generateNamespace(i)
-				if namespacesWaited[ns] {
-					continue
-				}
-				namespacesWaited[ns] = true
-			}
-			sem <- 1
-			wg.Add(1)
-			go func(ns string) {
-				ex.waitForObjects(ns)
-				<-sem
-				wg.Done()
-			}(ns)
-			// Wait for all namespaces to be ready
-			if !ex.NamespacedIterations {
-				break
-			}
+		if errs := ex.waitForCompletion(iterationStart, iterationEnd, ns, namespacesWaited); len(errs) > 0 {
+			waitErrors = append(waitErrors, errs...)
 		}
-		wg.Wait()
 	}
+	return waitErrors
 }
 
 // Simple integer division on the iteration allows us to batch iterations into
@@ -250,6 +233,51 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		}(r)
 	}
 	wg.Wait()
+}
+
+// waitForCompletion waits for objects to be ready across the relevant namespaces
+func (ex *JobExecutor) waitForCompletion(iterationStart, iterationEnd int, ns string, namespacesWaited map[string]bool) []error {
+	log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
+	// This semaphore limits the maximum number of concurrent goroutines
+	sem := make(chan int, int(ex.restConfig.QPS))
+	errChan := make(chan []error, 1)
+	var wg sync.WaitGroup
+	for i := iterationStart; i < iterationEnd; i++ {
+		if ex.nsRequired && ex.NamespacedIterations {
+			ns = ex.generateNamespace(i)
+			if namespacesWaited[ns] {
+				continue
+			}
+			namespacesWaited[ns] = true
+		}
+		sem <- 1
+		wg.Add(1)
+		go func(namespace string) {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+			if err := ex.waitForObjects(namespace); err != nil {
+				select {
+				case errChan <- err:
+				default:
+				}
+			}
+		}(ns)
+		// Wait for all namespaces to be ready
+		if !ex.NamespacedIterations {
+			break
+		}
+	}
+	wg.Wait()
+	close(errChan)
+
+	select {
+	case err := <-errChan:
+		return err
+	default:
+		return nil
+	}
 }
 
 func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
@@ -317,22 +345,24 @@ func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[st
 }
 
 // RunCreateJobWithChurn executes a churn creation job
-func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) {
+func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	// Cleanup namespaces based on the labels we added to the objects
 	log.Infof("Churning mode: %s", ex.ChurnConfig.Mode)
 	switch ex.ChurnConfig.Mode {
 	case config.ChurnNamespaces:
 		if !ex.nsRequired {
 			log.Info("No namespaces were created in this job, skipping churning stage")
-			return
+			return nil
 		}
-		ex.churnNamespaces(ctx)
+		return ex.churnNamespaces(ctx)
 	case config.ChurnObjects:
 		ex.churnObjects(ctx)
 	}
+	return nil
 }
 
-func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
+func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
+	var errs []error
 	delPatch := fmt.Sprintf(`{"metadata": {"labels": {"%s": ""}}}`, config.KubeBurnerLabelChurnDelete)
 	cyclesCount := 0
 	now := time.Now().UTC()
@@ -343,53 +373,56 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) {
 		config.KubeBurnerLabelUUID:  ex.uuid,
 		config.KubeBurnerLabelRunID: ex.runid,
 	}
-	// List namespaces to churn
+	// List namespace to churn
 	jobNamespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(nsLabels).String()})
 	if err != nil {
-		log.Fatalf("Unable to list namespaces: %v", err)
+		return []error{fmt.Errorf("unable to list namespaces: %w", err)}
 	}
 	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 
 	for {
-		var randStart int
 		if ex.ChurnConfig.Duration > 0 {
 			select {
 			case <-timer:
 				log.Info("Churn job complete")
-				return
+				return errs
 			default:
 				log.Debugf("Next churn iteration, workload churning started %v ago", time.Since(now))
 			}
 		}
 		// Exit if churn cycles are completed
 		if ex.ChurnConfig.Cycles > 0 && cyclesCount >= ex.ChurnConfig.Cycles {
-			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnConfig.Cycles)
-			return
+			log.Infof("Reached specified number of churn cycles (%d)", ex.ChurnConfig.Cycles)
+			return errs
 		}
+
 		// Max amount of churn is 100% of namespaces
+		var randStart int
 		if len(jobNamespaces.Items)-numToChurn+1 > 0 {
 			randStart = rand.Intn(len(jobNamespaces.Items) - numToChurn + 1)
 		}
 		// delete numToChurn namespaces starting at randStart
 		namespacesToDelete := jobNamespaces.Items[randStart : numToChurn+randStart]
 		for _, ns := range namespacesToDelete {
-			_, err = ex.clientSet.CoreV1().Namespaces().Patch(context.TODO(), ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
+			_, err = ex.clientSet.CoreV1().Namespaces().
+				Patch(ctx, ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
 			if err != nil {
-				log.Errorf("Error applying label '%v' to namespace %s: %v", delPatch, ns.Name, err)
+				log.Errorf("Error applying label to namespace %s: %v", ns.Name, err)
+				errs = append(errs, err)
 			}
 			ex.createdNamespaces[ns.Name] = false
 		}
-		// 1 hour timeout to delete namespaces
-		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-		defer cancel()
-		// Cleanup namespaces based on the labels we added to the objects
-		util.CleanupNamespaces(ctx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
-		log.Info("Re-creating deleted objects")
+		// 1 hour timeout to delete namespace
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
+		util.CleanupNamespaces(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		// Re-create objects that were deleted
-		ex.RunCreateJob(ctx, randStart, numToChurn+randStart)
+		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
+			errs = append(errs, jobErrs...)
+		}
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 		time.Sleep(ex.ChurnConfig.Delay)
 		cyclesCount++
+		cancel()
 	}
 }
 

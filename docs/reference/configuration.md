@@ -483,6 +483,8 @@ but prior to uploading metrics, if applicable. It deletes a percentage of contig
 with all of the appropriate objects. It will then wait for a specified delay (or none if set to `0`) before deleting and recreating the
 next randomly chosen set. This cycle continues until the churn duration/cycles has passed.
 
+When metrics are collected during churning, any range query datapoints that fall between the churn start and end times will have the `churnMetric` field set to `true` in the indexed metrics. This allows for identification of metrics captured during churning periods for analysis purposes.
+
 An example implementation that would churn 20% of the 100 job iterations for 2 hours with no delay between sets:
 
 ```yaml
