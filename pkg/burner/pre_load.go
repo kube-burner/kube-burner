@@ -104,7 +104,6 @@ func getJobImages(job JobExecutor) ([]string, error) {
 			images := extractImagesFromObject(uns, renderedObj)
 			imageList = append(imageList, images...)
 		}
-
 	}
 	return imageList, nil
 }

@@ -89,7 +89,6 @@ func (ex *JobExecutor) setupCreateJob() {
 				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 			} else {
 				obj.gvr = schema.GroupVersionResource{}
-				obj.gvk = gvk
 			}
 			obj.Kind = gvk.Kind
 			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
@@ -216,13 +215,6 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			defer wg.Done()
 			ex.limiter.Wait(context.TODO())
 			newObjects, gvks := ex.renderTemplateForObjectMultiple(obj, iteration, r)
-
-			// Only process the document that corresponds to this object's documentIndex
-			if obj.documentIndex >= len(newObjects) {
-				log.Errorf("Document index %d out of range for template %s", obj.documentIndex, obj.ObjectTemplate)
-				return
-			}
-
 			newObject := newObjects[obj.documentIndex]
 			gvk := gvks[obj.documentIndex]
 
