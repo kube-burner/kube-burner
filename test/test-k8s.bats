@@ -68,14 +68,10 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner.yml: gc=false; preload=true; churn-mode=objects" {
-  export CHURN_CYCLES=2
-  export GC=false
+@test "kube-burner.yml: preload=true; set-churn-mode=objects,set-gc=false" {
   export CRD=true
-  export PRELOAD_IMAGES=true
-  export CHURN_MODE=namespaces
   cp kube-burner.yml /tmp/kube-burner.yml
-  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=namespaces,jobs.0.preLoadImages=true,jobs.0.churnConfig.cycles=2 --log-level=debug
   verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
   kubectl delete -f objectTemplates/crd.yml
@@ -102,9 +98,8 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
-@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true" {
-  export PRELOAD_IMAGES=true  # VM image preload
-  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --log-level=debug
+@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true;set-preload=true" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
   verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}

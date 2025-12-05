@@ -81,7 +81,7 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVar
 	if err != nil {
 		log.Fatalf("Error reading configuration file: %v", err.Error())
 	}
-	ConfigSpec, err = config.ParseWithUserdata(wh.UUID, wh.Timeout, f, nil, false, additionalVars)
+	ConfigSpec, err = config.ParseWithUserdata(wh.UUID, wh.Timeout, f, nil, false, additionalVars, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
