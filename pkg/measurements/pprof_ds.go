@@ -3,7 +3,6 @@ package measurements
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
@@ -14,6 +13,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 )
 
 func (p *pprof) needsDaemonSet() bool {
@@ -35,7 +35,7 @@ func (p *pprof) waitForDaemonSetReady() error {
 		case <-ticker.C:
 			ds, err := p.ClientSet.AppsV1().DaemonSets(types.PprofNamespace).Get(ctx, types.PprofDaemonSet, metav1.GetOptions{})
 			if err != nil {
-				log.Warnf("Error getting DaemonSet statusanjay7178:feat/node-process-profiling-v2s: %v", err)
+				log.Warnf("Error getting DaemonSet status: %v", err)
 				continue
 			}
 
@@ -178,16 +178,10 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 		)
 	}
 
-	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
 	hostPath := p.Config.PProfDirectory
-	if !strings.HasPrefix(hostPath, "/") {
-		hostPath = "/mnt/" + hostPath
-		log.Warnf("PProfDirectory %s is not an absolute path, using %s", p.Config.PProfDirectory, hostPath)
-	}
-
 	// Build volume mounts and volumes based on configuration
 	volumeMounts := p.buildVolumeMounts(hostPath)
-	volumes := p.buildVolumes(hostPath, hostPathDirectoryOrCreate)
+	volumes := p.buildVolumes(hostPath, ptr.To(corev1.HostPathDirectoryOrCreate))
 
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -238,13 +232,8 @@ func (p *pprof) buildDaemonSet() *appsv1.DaemonSet {
 func (p *pprof) buildVolumeMounts(hostPath string) []corev1.VolumeMount {
 	mounts := []corev1.VolumeMount{
 		{
-			Name:      "pprof-data-directory",
+			Name:      "/mnt",
 			MountPath: hostPath,
-		},
-		{
-			Name:      "kubelet-ca",
-			MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
-			ReadOnly:  true,
 		},
 	}
 
@@ -259,14 +248,14 @@ func (p *pprof) buildVolumeMounts(hostPath string) []corev1.VolumeMount {
 }
 
 // buildVolumes creates volumes, conditionally adding CRI-O socket if needed
-func (p *pprof) buildVolumes(hostPath string, hostPathDirectoryOrCreate corev1.HostPathType) []corev1.Volume {
+func (p *pprof) buildVolumes(hostPath string, hostPathDirectoryOrCreate *corev1.HostPathType) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
 			Name: "pprof-data-directory",
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: hostPath,
-					Type: &hostPathDirectoryOrCreate,
+					Type: hostPathDirectoryOrCreate,
 				},
 			},
 		},
