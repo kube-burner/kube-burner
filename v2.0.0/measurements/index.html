@@ -764,13 +764,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="pprof collection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#node-pprof-collection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node pprof collection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#measure-subcommand-cli-example" class="md-nav__link">
+  <a href="#measure-subcommand-cli" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Measure subcommand CLI example
+        Measure subcommand CLI
       
     </span>
   </a>
@@ -1318,6 +1335,7 @@
 <li><code>Initialized</code>: All init containers in the pod have started successfully</li>
 <li><code>ContainersReady</code>: Indicates whether all containers in the pod are ready.</li>
 <li><code>Ready</code>: The pod is able to service requests and should be added to the load balancing pools of all matching services.</li>
+<li><code>ContainersStarted</code>: All containers in the pod have started successfully. This is the timestamp of the latest container started event.</li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2102,7 +2120,7 @@ In the first namespace, i.e network-policy-perf-0, network policy ingress-0-29 a
 <span class="p">]</span>
 </code></pre></div></p>
 <h2 id="pprof-collection">pprof collection<a class="headerlink" href="#pprof-collection" title="Permanent link">&para;</a></h2>
-<p>This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with <code>labelSelector</code> and running in <code>namespace</code>. This measurement uses an implementation similar to <code>kubectl exec</code>, and as soon as it connects to one pod it executes the command <code>curl &lt;pprofURL&gt;</code> to get the pprof data. pprof files are collected in a regular basis configured by the parameter <code>pprofInterval</code>, the collected pprof files are downloaded from the pods to the local directory configured by the parameter <code>pprofDirectory</code> which by default is <code>pprof</code>.</p>
+<p>This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with <code>labelSelector</code> and running in <code>namespace</code>. This measurement uses an implementation similar to <code>kubectl exec</code>, and as soon as it connects to one pod it executes the command <code>curl &lt;pprofURL&gt;</code> to get the pprof data. pprof files are collected in a regular basis configured by the parameter <code>pprofInterval</code>, the collected pprof files are downloaded from the pods to the local directory configured by the parameter <code>pprofDirectory</code>, by default is <code>pprof</code>.</p>
 <p>As some components require authentication to get profiling information, <code>kube-burner</code> provides two different modalities to address it:</p>
 <ul>
 <li><strong>Bearer token authentication</strong>: This modality is configured by the variable <code>bearerToken</code>, which holds a valid Bearer token that will be used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components</li>
@@ -2141,11 +2159,27 @@ In the first namespace, i.e network-policy-perf-0, network policy ingress-0-29 a
 <p class="admonition-title">Warning</p>
 <p>As mentioned before, this measurement requires the <code>curl</code> command to be available in the target pods.</p>
 </div>
-<h2 id="measure-subcommand-cli-example">Measure subcommand CLI example<a class="headerlink" href="#measure-subcommand-cli-example" title="Permanent link">&para;</a></h2>
+<h3 id="node-pprof-collection">Node pprof collection<a class="headerlink" href="#node-pprof-collection" title="Permanent link">&para;</a></h3>
+<p>Golang profiling information from node processes such as kubelet or crio can be collected as well. To do so, you need to set the <code>nodeAffinity</code> parameter to the desired node labels.
+When running, Kube-burner will create a DaemonSet with the configured node affinity, and a series of host path volumes and serviceaccount permissions (including a custom cluster role and cluster role binding), required to pull pprof data from these processes and store it in the local directory configured by the parameter <code>pprofDirectory</code>.</p>
+<p>Find below a configuration snippet to collect pprof HEAP profiling data from kubelet and cri-o from worker nodes:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">measurements</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pprof</span>
+<span class="w">    </span><span class="nt">pprofInterval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30m</span>
+<span class="w">    </span><span class="nt">pprofDirectory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pprof-data</span>
+<span class="w">    </span><span class="nt">nodeAffinity</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">node-role.kubernetes.io/worker</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+<span class="w">    </span><span class="nt">pprofTargets</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kubelet-heap</span>
+<span class="w">      </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://localhost:10250/debug/pprof/heap</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">crio-heap</span>
+<span class="w">      </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost/debug/pprof/heap</span>
+<span class="w">      </span><span class="nt">unixSocketPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/crio/crio.sock</span>
+</code></pre></div>
+<h2 id="measure-subcommand-cli">Measure subcommand CLI<a class="headerlink" href="#measure-subcommand-cli" title="Permanent link">&para;</a></h2>
 <p>Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.</p>
-<div class="highlight"><pre><span></span><code>kube-burner<span class="w"> </span>measure<span class="w"> </span>--uuid<span class="o">=</span>vchalla<span class="w"> </span>--namespaces<span class="o">=</span>cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4<span class="w"> </span>--selector<span class="o">=</span>kube-burner-job<span class="o">=</span>cluster-density-v2
+<div class="highlight"><pre><span></span><code>kube-burner<span class="w"> </span>measure<span class="w"> </span>--uuid<span class="o">=</span>vchalla<span class="w"> </span>--namespaces<span class="o">=</span>cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4<span class="w"> </span>--selector<span class="o">=</span>kube-burner.io/job<span class="o">=</span>cluster-density-v2
 <span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:05&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;📁 Creating indexer: elastic&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;kube-burner.go:226&quot;</span>
-<span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:05&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;map[kube-burner-job:cluster-density-v2]&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;kube-burner.go:247&quot;</span>
 <span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:05&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;📈 Registered measurement: podLatency&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;factory.go:85&quot;</span>
 <span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:06&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;Stopping measurement: podLatency&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;factory.go:118&quot;</span>
 <span class="nv">time</span><span class="o">=</span><span class="s2">&quot;2023-11-19 17:46:06&quot;</span><span class="w"> </span><span class="nv">level</span><span class="o">=</span>info<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">&quot;Evaluating latency thresholds&quot;</span><span class="w"> </span><span class="nv">file</span><span class="o">=</span><span class="s2">&quot;metrics.go:60&quot;</span>

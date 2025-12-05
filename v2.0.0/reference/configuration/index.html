@@ -1822,7 +1822,7 @@ This allows kube-burner to check the status at all the specified key/value pairs
 <p><code>waitOptions.kind</code>, <code>waitOptions.customStatusPaths</code> and <code>waitOptions.labelSelector</code> are fully optional. <code>waitOptions.kind</code> is used when an application has child objects to be waited &amp; <code>waitOptions.labelSelector</code> is used when we want to wait on objects with specific labels.</p>
 </div>
 <h3 id="default-labels">Default labels<a class="headerlink" href="#default-labels" title="Permanent link">&para;</a></h3>
-<p>All objects created by kube-burner are labeled with <code>kube-burner-uuid=&lt;UUID&gt;,kube-burner-job=&lt;jobName&gt;,kube-burner-index=&lt;objectIndex&gt;</code>. They are used for internal purposes, but they can also be used by the users.</p>
+<p>All objects created by kube-burner are labeled with <code>kube-burner.io/uuid=&lt;UUID&gt;,kube-burner.io/job=&lt;jobName&gt;,kube-burner.io/index=&lt;objectIndex&gt;</code>. They are used for internal purposes, but they can also be used by the users.</p>
 <h2 id="job-types">Job types<a class="headerlink" href="#job-types" title="Permanent link">&para;</a></h2>
 <p>Configured by the parameter <code>jobType</code>, kube-burner supports four types of jobs with different parameters each:</p>
 <ul>
@@ -1837,11 +1837,11 @@ This allows kube-burner to check the status at all the specified key/value pairs
 <p>This type of job deletes objects described in the objects list. Using delete as job type the objects list would have the following structure:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
-<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner.io/job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
 <span class="w">  </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
 
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
-<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner.io/job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p>Where:</p>
 <ul>
@@ -1862,11 +1862,11 @@ This allows kube-burner to check the status at all the specified key/value pairs
 <p>This type of job reads objects described in the objects list. Using read as job type the objects list would have the following structure:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
-<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner.io/job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
 <span class="w">  </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
 
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
-<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner.io/job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p>Where:</p>
 <ul>
@@ -1887,7 +1887,7 @@ This allows kube-burner to check the status at all the specified key/value pairs
 <p>This type of job can be used to patch objects with the template described in the object list. This object list has the following structure:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
-<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner.io/job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
 <span class="w">  </span><span class="nt">objectTemplate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">templates/deployment_patch_add_label.json</span>
 <span class="w">  </span><span class="nt">patchType</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;application/strategic-merge-patch+json&quot;</span>
 <span class="w">  </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
@@ -1907,7 +1907,7 @@ This allows kube-burner to check the status at all the specified key/value pairs
 <li>application/strategic-merge-patch+json</li>
 <li>application/apply-patch+yaml (requires YAML)</li>
 </ul>
-<p>As mentioned previously, all objects created by kube-burner are labeled with <code>kube-burner-uuid=&lt;UUID&gt;,kube-burner-job=&lt;jobName&gt;,kube-burner-index=&lt;objectIndex&gt;</code>. Therefore, you can design a workload with one job to create objects and another one to patch or remove the objects created by the previous.</p>
+<p>As mentioned previously, all objects created by kube-burner are labeled with <code>kube-burner.io/uuid=&lt;UUID&gt;,kube-burner.io/job=&lt;jobName&gt;,kube-burner.io/index=&lt;objectIndex&gt;</code>. Therefore, you can design a workload with one job to create objects and another one to patch or remove the objects created by the previous.</p>
 <div class="highlight"><pre><span></span><code><span class="nt">jobs</span><span class="p">:</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">create-objects</span>
 <span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">job-namespace</span>
@@ -1923,17 +1923,17 @@ This allows kube-burner to check the status at all the specified key/value pairs
 <span class="w">  </span><span class="nt">jobType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delete</span>
 <span class="w">  </span><span class="nt">objects</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
-<span class="w">    </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">create-objects</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner.io/job</span><span class="p">:</span><span class="w"> </span><span class="nv">create-objects</span><span class="p p-Indicator">}</span>
 <span class="w">    </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
 
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
-<span class="w">    </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">create-objects</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner.io/job</span><span class="p">:</span><span class="w"> </span><span class="nv">create-objects</span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <h3 id="kubevirt">Kubevirt<a class="headerlink" href="#kubevirt" title="Permanent link">&para;</a></h3>
 <p>This type of job can be used to execute <code>virtctl</code> commands described in the object list. This object list has the following structure:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">objects</span><span class="p">:</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kubeVirtOp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">start</span>
-<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner-job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">labelSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kube-burner.io/job</span><span class="p">:</span><span class="w"> </span><span class="nv">cluster-density</span><span class="p p-Indicator">}</span>
 <span class="w">  </span><span class="nt">inputVars</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">force</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
@@ -2014,6 +2014,7 @@ This requires that the timestamps on the cluster side are in UTC</p>
 but prior to uploading metrics, if applicable. It deletes a percentage of contiguous randomly chosen namespaces or objects within those namespaces and re-creates them
 with all of the appropriate objects. It will then wait for a specified delay (or none if set to <code>0</code>) before deleting and recreating the
 next randomly chosen set. This cycle continues until the churn duration/cycles has passed.</p>
+<p>When metrics are collected during churning, any range query datapoints that fall between the churn start and end times will have the <code>churnMetric</code> field set to <code>true</code> in the indexed metrics. This allows for identification of metrics captured during churning periods for analysis purposes.</p>
 <p>An example implementation that would churn 20% of the 100 job iterations for 2 hours with no delay between sets:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">jobs</span><span class="p">:</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">churning-job</span>

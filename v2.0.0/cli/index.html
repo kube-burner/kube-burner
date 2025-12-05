@@ -984,6 +984,7 @@ given rate. The actions taken by this tool are highly customizable and their ava
 <li><code>user-metadata</code>: YAML file path containing custom user-metadata to be indexed along with the <code>jobSummary</code> document.</li>
 <li><code>user-data</code>: YAML or JSON file path containing input variables for rendering the configuration file.</li>
 <li><code>allow-missing</code>: Allow missing keys in the config file. Needed when using the <a href="https://masterminds.github.io/sprig/defaults.html"><code>default</code></a> template function</li>
+<li><code>set</code>: Set arbitrary <code>key=value</code> pairs to override values in the configuration file. Similar to Helm's <code>--set</code> flag, this allows you to override base YAML values directly from the command line. Multiple values can be specified by separating them with commas or by using multiple <code>--set</code> flags. Nested keys are supported using dot notation, and array indices can be used with numeric keys (e.g., <code>jobs.0.name=test</code>).</li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Prometheus authentication</p>
@@ -991,6 +992,11 @@ given rate. The actions taken by this tool are highly customizable and their ava
 </div>
 <p>With the above, running a kube-burner benchmark would be as simple as:</p>
 <div class="highlight"><pre><span></span><code><span class="go">kube-burner init -c cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`</span>
+</code></pre></div>
+<p>To override configuration values directly from the command line using the <code>--set</code> flag:</p>
+<div class="highlight"><pre><span></span><code><span class="go">kube-burner init -c ./examples/workloads/kubelet-density/kubelet-density.yml \</span>
+<span class="go">  --set global.gc=false,global.timeout=1h \</span>
+<span class="go">  --set jobs.0.name=test,jobs.0.jobIterations=5</span>
 </code></pre></div>
 <p>Kube-burner also supports remote configuration files served by a web server. To use it, rather than a path, pass a URL. For example:</p>
 <div class="highlight"><pre><span></span><code><span class="go">kube-burner init -c http://web.domain.com:8080/cfg.yml --uuid 67f9ec6d-6a9e-46b6-a3bb-065cde988790`</span>
@@ -1061,7 +1067,7 @@ We can specify a list of namespaces and selector labels as input.</p>
 <h2 id="check-alerts">Check alerts<a class="headerlink" href="#check-alerts" title="Permanent link">&para;</a></h2>
 <p>This subcommand can be used to evaluate alerts configured in the given alert profile. Similar to <code>index</code>, the time range is given by the <code>start</code> and <code>end</code> flags.</p>
 <h2 id="destroy">Destroy<a class="headerlink" href="#destroy" title="Permanent link">&para;</a></h2>
-<p>This subcommand requires the <code>uuid</code> flag to destroy all namespaces labeled with <code>kube-burner-uuid=&lt;UUID&gt;</code>.</p>
+<p>This subcommand requires the <code>uuid</code> flag to destroy all namespaces labeled with <code>kube-burner.io/uuid=&lt;UUID&gt;</code>.</p>
 <h2 id="health-check">Health Check<a class="headerlink" href="#health-check" title="Permanent link">&para;</a></h2>
 <p>The <code>health-check</code> subcommand assesses the status of nodes within the cluster. It provides information on the overall health of the cluster, indicating whether it is in a healthy state. In the event of an unhealthy cluster, the subcommand returns a list of nodes that are not in a "Ready" state, helping users identify and address specific issues affecting cluster stability.</p>
 <h2 id="completion">Completion<a class="headerlink" href="#completion" title="Permanent link">&para;</a></h2>
