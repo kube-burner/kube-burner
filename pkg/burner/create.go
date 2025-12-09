@@ -77,6 +77,8 @@ func (ex *JobExecutor) setupCreateJob() {
 		// Get GVK for this specific object and Process if multi yaml document
 		for i, gvk := range gvks {
 			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			// Set Kind on the embedded Object before creating the object struct
+			o.Kind = gvk.Kind
 			obj := &object{
 				objectSpec:    t,
 				Object:        o,
@@ -90,7 +92,6 @@ func (ex *JobExecutor) setupCreateJob() {
 			} else {
 				obj.gvr = schema.GroupVersionResource{}
 			}
-			obj.Kind = gvk.Kind
 			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
 			if obj.namespaced && obj.namespace == "" {
 				ex.nsRequired = true
@@ -224,7 +225,12 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			newObject.SetLabels(objectLabels)
 			updateChildLabels(newObject, objectLabels)
 
+			// Before attempting to create an object, this error check confirms the REST mapping exists.
+			// If the mapping fails, the function returns early, preventing a futile create attempt.
+			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
+			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
 			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
+
 			if err != nil {
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
 				return
