@@ -282,6 +282,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	return rc, utilerrors.NewAggregate(errs)
 }
 
+func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) error {
+	jobExecutors := newExecutorList(configSpec, kubeClientProvider, nil)
+	for _, jobExecutor := range jobExecutors {
+		jobExecutor.gc(ctx, nil)
+	}
+	return nil
+}
+
 // If requests, preload the images used in the test into the node
 func handlePreloadImages(executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
 	clientSet, _ := kubeClientProvider.DefaultClientSet()

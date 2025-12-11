@@ -74,14 +74,13 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=namespaces,jobs.0.preLoadImages=true,jobs.0.churnConfig.cycles=2 --log-level=debug
   verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
-  kubectl delete -f objectTemplates/crd.yml
   verify_object_count namespace 5 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
   verify_object_count pod 10 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
   verify_object_count pod 5 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
-  ${KUBE_BURNER} destroy --uuid ${UUID}
-  kubectl delete pod -l kube-burner.io/uuid=${UUID} -n default
+  ${KUBE_BURNER} destroy -c /tmp/kube-burner.yml
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-  verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
+  verify_object_count pod 0 "" kube-burner.io/uuid=${UUID}
+  verify_object_count TestCR 0 cr-crd kube-burner.io/uuid=${UUID}
 }
 
 @test "kube-burner.yml: churn-mode=objects, local-indexing=true; os-indexing=true" {
@@ -144,9 +143,9 @@ teardown_file() {
   export GC=false
   export WAIT_FOR_CONDITION="True"
   export WAIT_CUSTOM_STATUS_PATH='(.conditions.[] | select(.type == "Available")).status'
-  run_cmd ${KUBE_BURNER} init -c  kube-burner.yml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug
   check_custom_status_path kube-burner.io/uuid=${UUID} "{.items[*].status.conditions[].type}" Available
-  ${KUBE_BURNER} destroy --uuid ${UUID}
+  ${KUBE_BURNER} destroy -c kube-burner.yml
 }
 
 @test "kube-burner-sequential-patch.yml: sequential patch" {
