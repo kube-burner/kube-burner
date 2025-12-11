@@ -118,7 +118,7 @@ func CleanupNonNamespacedResourcesByLabel(ctx context.Context, clientSet kuberne
 					log.Debugf("Unable to list resource %s: %v", resource.Name, err)
 					continue
 				}
-				if len(resources.Items) > 0 {
+				if len(resources.Items) == 0 {
 					log.Infof("Deleting %d %ss labeled with %s", len(resources.Items), resource.Kind, labelSelector)
 					DeleteNonNamespacedResources(ctx, resources, resourceInterface)
 				}
