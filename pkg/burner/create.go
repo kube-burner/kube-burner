@@ -117,6 +117,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
+	var previousNsIndex int = -1
 	for i := iterationStart; i < iterationEnd; i++ {
 		if ctx.Err() != nil {
 			return []error{ctx.Err()}
@@ -126,6 +127,13 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			percent++
 		}
 		if ex.nsRequired && ex.NamespacedIterations {
+			currentNsIndex := i / ex.IterationsPerNamespace
+			// Apply delay when moving to a new namespace (and it's not the first namespace)
+			if previousNsIndex >= 0 && currentNsIndex != previousNsIndex && ex.NamespaceDelay > 0 {
+				log.Infof("Namespace delay: sleeping for %v before creating new namespace", ex.NamespaceDelay)
+				time.Sleep(ex.NamespaceDelay)
+			}
+			previousNsIndex = currentNsIndex
 			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
