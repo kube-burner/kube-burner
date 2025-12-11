@@ -15,7 +15,7 @@ Usage:
 Available Commands:
   check-alerts Evaluate alerts for the given time range
   completion   Generates completion scripts for bash shell
-  destroy      Destroy old namespaces labeled with the given UUID.
+  destroy      Destroy benchmark assets
   health-check Check for Health Status of the cluster
   help         Help about any command
   import       Import metrics tarball
@@ -129,7 +129,7 @@ This subcommand can be used to evaluate alerts configured in the given alert pro
 
 ## Destroy
 
-This subcommand requires the `uuid` flag to destroy all namespaces labeled with `kube-burner.io/uuid=<UUID>`.
+This subcommand uses the provided configuration file to destroy the objects declared in it, using the defined deletion strategy. Can be used as an alternative approach to perform the benchmark garbage collection.
 
 ## Health Check
 
