@@ -221,8 +221,8 @@ func destroyCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelUUID, uuid)
-			util.CleanupNamespaces(ctx, clientSet, labelSelector)
-			util.CleanupNonNamespacedResources(ctx, clientSet, dynamicClient, labelSelector)
+			util.CleanupNamespacesByLabel(ctx, clientSet, labelSelector)
+			util.CleanupNonNamespacedResourcesByLabel(ctx, clientSet, dynamicClient, labelSelector)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")

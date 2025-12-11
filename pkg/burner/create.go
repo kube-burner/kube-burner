@@ -298,7 +298,9 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ns != "" {
 			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		} else {
-			uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			if !ex.nsChurning {
+				uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			}
 		}
 		if err != nil {
 			if kerrors.IsUnauthorized(err) {
@@ -350,6 +352,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	log.Infof("Churning mode: %s", ex.ChurnConfig.Mode)
 	switch ex.ChurnConfig.Mode {
 	case config.ChurnNamespaces:
+		ex.nsChurning = true // Enable namespace churning flag to prevent non namespaced objects to be churned
 		if !ex.nsRequired {
 			log.Info("No namespaces were created in this job, skipping churning stage")
 			return nil
@@ -414,7 +417,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		}
 		// 1 hour timeout to delete namespace
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
-		util.CleanupNamespaces(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
+		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		// Re-create objects that were deleted
 		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
 			errs = append(errs, jobErrs...)

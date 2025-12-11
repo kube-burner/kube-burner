@@ -536,7 +536,7 @@ func (n *netpolLatency) Stop() error {
 		cancel()
 		n.stopWatchers()
 	}()
-	kutil.CleanupNamespaces(ctx, n.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
+	kutil.CleanupNamespacesByLabel(ctx, n.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
 	n.normalizeMetrics()
 	for _, q := range n.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
