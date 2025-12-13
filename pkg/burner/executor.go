@@ -56,6 +56,7 @@ type JobExecutor struct {
 	mapper            *restmapper.DeferredDiscoveryRESTMapper
 	deletionStrategy  string
 	objectOperations  int32
+	nsChurning        bool
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {

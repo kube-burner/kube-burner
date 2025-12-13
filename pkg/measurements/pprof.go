@@ -261,7 +261,7 @@ func (p *pprof) Stop() error {
 			log.Errorf("Error deleting cluster role %s: %s", types.PprofRole, err)
 			return err
 		}
-		err = util.CleanupNamespaces(ctx, p.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.PprofNamespace))
+		err = util.CleanupNamespacesByLabel(ctx, p.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.PprofNamespace))
 		if err != nil {
 			log.Errorf("Error cleaning up namespaces %s: %s", types.PprofNamespace, err)
 			return err
