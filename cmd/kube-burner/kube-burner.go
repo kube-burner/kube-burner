@@ -197,24 +197,14 @@ func healthCheck() *cobra.Command {
 }
 
 func destroyCmd() *cobra.Command {
-	var uuid string
 	var timeout time.Duration
 	var kubeConfig, kubeContext, configFile string
 	var skipLogFile bool
-	var rc int
+	uuid := uid.NewString()
 	cmd := &cobra.Command{
 		Use:   "destroy",
 		Short: "Destroy benchmark assets",
-		PostRun: func(cmd *cobra.Command, args []string) {
-			log.Info("👋 Exiting kube-burner")
-			os.Exit(rc)
-		},
-		Args: cobra.NoArgs,
-		PreRun: func(cmd *cobra.Command, args []string) {
-			if uuid == "" {
-				uuid = uid.NewString()
-			}
-		},
+		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !skipLogFile {
 				util.SetupFileLogging(uuid)
