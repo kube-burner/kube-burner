@@ -37,7 +37,6 @@ import (
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -198,39 +197,51 @@ func healthCheck() *cobra.Command {
 }
 
 func destroyCmd() *cobra.Command {
-	var uuid string
 	var timeout time.Duration
-	var kubeConfig, kubeContext string
+	var kubeConfig, kubeContext, configFile string
 	var skipLogFile bool
-	var rc int
+	var userDataFile string
+	uuid := uid.NewString()
 	cmd := &cobra.Command{
 		Use:   "destroy",
-		Short: "Destroy old namespaces labeled with the given UUID.",
-		PostRun: func(cmd *cobra.Command, args []string) {
-			log.Info("👋 Exiting kube-burner ", uuid)
-			os.Exit(rc)
-		},
-		Args: cobra.NoArgs,
+		Short: "Destroy benchmark assets",
+		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
-			clientSet, restConfig := kubeClientProvider.ClientSet(0, 0)
-			dynamicClient := dynamic.NewForConfigOrDie(restConfig)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelUUID, uuid)
-			util.CleanupNamespacesByLabel(ctx, clientSet, labelSelector)
-			util.CleanupNonNamespacedResourcesByLabel(ctx, clientSet, dynamicClient, labelSelector)
+			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
+			if err != nil {
+				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
+			}
+			var userDataFileReader io.Reader
+			if userDataFile != "" {
+				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
+				if err != nil {
+					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
+				}
+			}
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, true, nil, nil)
+			if err != nil {
+				log.Error("Config error")
+				fmt.Printf("%s", err.Error())
+				os.Exit(1)
+			}
+			if err := burner.Destroy(ctx, configSpec, kubeClientProvider); err != nil {
+				log.Fatal(err.Error())
+			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
+	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
-	cmd.MarkFlagRequired("uuid")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.MarkFlagRequired("config")
 	return cmd
 }
 
