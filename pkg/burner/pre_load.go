@@ -79,7 +79,7 @@ func preLoadImages(job JobExecutor, clientSet kubernetes.Interface) error {
 		log.Infof("No images found to pre-load, continuing")
 		return nil
 	}
-	err = createDSs(clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
+	err = createDSs(clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels, job.PreLoadImage)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
@@ -137,7 +137,7 @@ func getJobImages(job JobExecutor) ([]string, error) {
 	return imageList, nil
 }
 
-func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
+func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string, preLoadImage string) error {
 	nsLabels := map[string]string{
 		"kube-burner-preload": "true",
 	}
@@ -170,8 +170,13 @@ func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabe
 					// Only Always restart policy is supported
 					Containers: []corev1.Container{
 						{
-							Name:            "sleep",
-							Image:           "registry.k8s.io/pause:3.1",
+							Name: "sleep",
+							Image: func() string {
+								if preLoadImage != "" {
+									return preLoadImage
+								}
+								return "registry.k8s.io/pause:3.1"
+							}(),
 							ImagePullPolicy: corev1.PullAlways,
 						},
 					},
