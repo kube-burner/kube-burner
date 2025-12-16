@@ -252,3 +252,12 @@ teardown_file() {
   # Verify all expected metric files were created
   check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-merge-measurements.json
 }
+
+@test "kube-burner-multi-doc.yml: multi-document YAML templates" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-multi-doc.yml --uuid=${UUID} --log-level=debug
+  # 3 iterations * 2 replicas * 2 pods per template = 12 pods total
+  # 6 frontend + 6 backend
+  verify_object_count pod 6 "" app=frontend,kube-burner.io/uuid=${UUID}
+  verify_object_count pod 6 "" app=backend,kube-burner.io/uuid=${UUID}
+  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
+}

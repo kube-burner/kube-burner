@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-doc-frontend-{{.Iteration}}-{{.Replica}}
+  labels:
+    foo: bar
+    app: frontend
+spec:
+  containers:
+    - name: pause
+      image: gcr.io/google_containers/pause:3.2
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-doc-backend-{{.Iteration}}-{{.Replica}}
+  labels:
+    foo: bar
+    app: backend
+spec:
+  containers:
+    - name: pause
+      image: gcr.io/google_containers/pause:3.2
