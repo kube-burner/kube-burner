@@ -260,6 +260,6 @@ teardown_file() {
   # 6 frontend + 6 backend
   verify_object_count pod 6 "" app=frontend,kube-burner.io/uuid=${UUID}
   verify_object_count pod 6 "" app=backend,kube-burner.io/uuid=${UUID}
-  ${KUBE_BURNER} destroy --uuid ${UUID}
+  ${KUBE_BURNER} destroy -c kube-burner-multi-doc.yml
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
 }
