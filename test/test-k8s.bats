@@ -70,13 +70,14 @@ teardown_file() {
 
 @test "kube-burner.yml: preload=true; set-churn-mode=namespaces,set-gc=false" {
   export CRD=true
+  export JOB_ITERATIONS=9
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=namespaces,jobs.0.preLoadImages=true,jobs.0.churnConfig.cycles=2 --log-level=debug
   verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
-  verify_object_count namespace 5 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
-  verify_object_count pod 10 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
-  verify_object_count pod 5 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count namespace 10 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
+  verify_object_count pod 20 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count pod 10 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
   ${KUBE_BURNER} destroy -c /tmp/kube-burner.yml
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
   verify_object_count pod 0 "" kube-burner.io/uuid=${UUID}
