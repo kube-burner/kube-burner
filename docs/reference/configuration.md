@@ -253,6 +253,73 @@ This allows kube-burner to check the status at all the specified key/value pairs
 
 All objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>`. They are used for internal purposes, but they can also be used by the users.
 
+### Multi-Document YAML Templates
+
+Kube-burner supports defining multiple Kubernetes resources in a single object template file using YAML document separators (`---`). This is useful when you need to create related resources together, such as a Gateway and VirtualService for Istio, or any combination of resources that logically belong together.
+
+When using multi-document YAML templates:
+
+- Each document in the template is parsed and created separately
+- All documents share the same `replicas` count and `inputVars`
+- Template variables like `{{.Iteration}}`, `{{.Replica}}`, `{{.JobName}}`, etc. are available in all documents
+- The network policy latency measurement also supports multi-document templates
+
+#### Example: Istio Gateway and VirtualService
+
+Create a file `istio-combined.yml`:
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: my-gateway-{{.Iteration}}
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: my-virtualservice-{{.Iteration}}
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - my-gateway-{{.Iteration}}
+  http:
+    - route:
+        - destination:
+            host: my-service
+            port:
+              number: 80
+```
+
+Reference this template in your job configuration:
+
+```yaml
+jobs:
+  - name: istio-density
+    jobIterations: 10
+    qps: 5
+    burst: 5
+    namespace: istio-test
+    objects:
+      - objectTemplate: ./istio-combined.yml
+        replicas: 1
+```
+
+This will create both the Gateway and VirtualService for each iteration, with proper templating applied to both resources.
+
+!!! note
+    Each document in the multi-document template is treated as a separate object internally, but they share the same replica configuration and input variables from the parent object definition.
+
 ## Job types
 
 Configured by the parameter `jobType`, kube-burner supports four types of jobs with different parameters each:
