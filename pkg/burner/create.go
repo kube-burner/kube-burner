@@ -127,14 +127,16 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			percent++
 		}
 		if ex.nsRequired && ex.NamespacedIterations {
-			currentNsIndex := i / ex.IterationsPerNamespace
+			currentNsName := ex.generateNamespace(i)
 			// Apply delay when moving to a new namespace (and it's not the first namespace)
-			if previousNsIndex >= 0 && currentNsIndex != previousNsIndex && ex.NamespaceDelay > 0 {
-				log.Infof("Namespace delay: sleeping for %v before creating new namespace", ex.NamespaceDelay)
-				time.Sleep(ex.NamespaceDelay)
-			}
-			previousNsIndex = currentNsIndex
-			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
+			if currentNsName != previousNsName {
+			    if ex.NamespaceDelay > 0 {
+				    log.Infof("Namespace delay: sleeping for %v before creating new namespace", ex.NamespaceDelay)
+				    time.Sleep(ex.NamespaceDelay)
+				}
+			    previousNsIndex = currentNsIndex
+                 ns = ex.createNamespace(currentNsName, nsLabels, nsAnnotations)
+             }
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
