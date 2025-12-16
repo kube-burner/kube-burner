@@ -200,6 +200,7 @@ func destroyCmd() *cobra.Command {
 	var timeout time.Duration
 	var kubeConfig, kubeContext, configFile string
 	var skipLogFile bool
+	var userDataFile string
 	uuid := uid.NewString()
 	cmd := &cobra.Command{
 		Use:   "destroy",
@@ -216,7 +217,14 @@ func destroyCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, nil, true, nil, nil)
+			var userDataFileReader io.Reader
+			if userDataFile != "" {
+				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
+				if err != nil {
+					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
+				}
+			}
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, true, nil, nil)
 			if err != nil {
 				log.Error("Config error")
 				fmt.Printf("%s", err.Error())
@@ -227,6 +235,7 @@ func destroyCmd() *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")

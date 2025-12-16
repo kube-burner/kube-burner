@@ -131,6 +131,9 @@ This subcommand can be used to evaluate alerts configured in the given alert pro
 
 This subcommand uses the provided configuration file to destroy the objects declared in it, using the defined deletion strategy. Can be used as an alternative approach to perform the benchmark garbage collection.
 
+!!! Note
+    The same config rendering logic with environment variables or user-data file applies here. It's up to the user to set the them accordingly to ensure the deletion of the desired objects.
+
 ## Health Check
 
 The `health-check` subcommand assesses the status of nodes within the cluster. It provides information on the overall health of the cluster, indicating whether it is in a healthy state. In the event of an unhealthy cluster, the subcommand returns a list of nodes that are not in a "Ready" state, helping users identify and address specific issues affecting cluster stability.
