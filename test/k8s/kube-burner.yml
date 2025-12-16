@@ -129,7 +129,6 @@ jobs:
     podWait: false
     qps: 10
     burst: 10
-    jobPause: 10s
     objects:
     - objectTemplate: objectTemplates/cr.yml
       replicas: 5

@@ -19,6 +19,7 @@ import (
 
 	ocpmetadata "github.com/cloud-bulldozer/go-commons/v2/ocp-metadata"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 )
 
@@ -33,9 +34,12 @@ type Config struct {
 
 type WorkloadHelper struct {
 	Config
-	kubeClientProvider *config.KubeClientProvider
-	MetadataAgent      ocpmetadata.Metadata
-	SummaryMetadata    map[string]interface{}
-	MetricsMetadata    map[string]interface{}
-	embedCfg           *fileutils.EmbedConfiguration
+	kubeClientProvider              *config.KubeClientProvider
+	MetadataAgent                   ocpmetadata.Metadata
+	SummaryMetadata                 map[string]interface{}
+	MetricsMetadata                 map[string]interface{}
+	embedCfg                        *fileutils.EmbedConfiguration
+	additionalVars                  map[string]any
+	additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory
+	setVars                         map[string]any
 }

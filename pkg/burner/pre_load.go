@@ -88,7 +88,7 @@ func preLoadImages(job JobExecutor, clientSet kubernetes.Interface) error {
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	util.CleanupNamespaces(ctx, clientSet, "kube-burner-preload=true")
+	util.CleanupNamespacesByLabel(ctx, clientSet, "kube-burner-preload=true")
 	return nil
 }
 
