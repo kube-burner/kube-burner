@@ -16,54 +16,50 @@ package burner
 
 import (
 	"context"
-	"embed"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
-	"path"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"maps"
+
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 )
 
-func setupCreateJob(jobConfig config.Job) Executor {
-	var err error
+type churnDeletedObject struct {
+	object *unstructured.Unstructured
+	gvr    schema.GroupVersionResource
+}
+
+func (ex *JobExecutor) setupCreateJob() {
 	var f io.Reader
-	mapper := newRESTMapper()
-	waitClientSet, waitRestConfig, err = config.GetClientSet(jobConfig.QPS*2, jobConfig.Burst*2)
-	if err != nil {
-		log.Fatalf("Error creating wait clientSet: %s", err.Error())
-	}
-	waitDynamicClient = dynamic.NewForConfigOrDie(waitRestConfig)
-	log.Debugf("Preparing create job: %s", jobConfig.Name)
-	ex := Executor{}
-	for _, o := range jobConfig.Objects {
+	var err error
+	log.Debugf("Preparing create job: %s", ex.Name)
+	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
 		}
 		log.Debugf("Rendering template: %s", o.ObjectTemplate)
-		e := embed.FS{}
-		if embedFS == e {
-			f, err = util.ReadConfig(o.ObjectTemplate)
-		} else {
-			objectTemplate := path.Join(embedFSDir, o.ObjectTemplate)
-			f, err = util.ReadEmbedConfig(embedFS, objectTemplate)
-		}
+		f, err = fileutils.GetWorkloadReader(o.ObjectTemplate, ex.embedCfg)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
@@ -73,83 +69,103 @@ func setupCreateJob(jobConfig config.Job) Executor {
 		}
 		// Deserialize YAML
 		uns := &unstructured.Unstructured{}
-		cleanTemplate, err := prepareTemplate(t)
+		cleanTemplate, err := util.CleanupTemplate(t)
 		if err != nil {
-			log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
+			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
-		_, gvk := yamlToUnstructured(cleanTemplate, uns)
-		mapping, err := mapper.RESTMapping(gvk.GroupKind())
-		if err != nil {
-			log.Fatal(err)
-		}
-		obj := object{
-			gvr:        mapping.Resource,
+		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
+		mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
+		obj := &object{
 			objectSpec: t,
-			kind:       gvk.Kind,
 			Object:     o,
+			namespace:  uns.GetNamespace(),
 		}
-		// If any of the objects is namespaced, we configure the job to create namepaces
-		if o.Namespaced {
-			ex.NamespacedIterations = true
+		if err == nil {
+			obj.gvr = mapping.Resource
+			obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+		} else {
+			obj.gvr = schema.GroupVersionResource{}
+			obj.gvk = gvk
 		}
-		obj.Namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-		log.Infof("Job %s: %d iterations with %d %s replicas", jobConfig.Name, jobConfig.JobIterations, obj.Replicas, gvk.Kind)
+		obj.Kind = gvk.Kind
+		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
+		if obj.namespaced && obj.namespace == "" {
+			ex.nsRequired = true
+		}
+		log.Debugf("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
 		ex.objects = append(ex.objects, obj)
 	}
-	return ex
 }
 
 // RunCreateJob executes a creation job
-func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNamespaces *[]string) {
+func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int) []error {
+	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
-		"kube-burner-job":   ex.Name,
-		"kube-burner-uuid":  ex.uuid,
-		"kube-burner-runid": ex.runid,
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelUUID:  ex.uuid,
+		config.KubeBurnerLabelRunID: ex.runid,
 	}
 	var wg sync.WaitGroup
 	var ns string
-	var err error
-	log.Infof("Running job %s", ex.Name)
-	for label, value := range ex.NamespaceLabels {
-		nsLabels[label] = value
-	}
-	if !ex.NamespacedIterations {
-		ns = ex.Namespace
-		if err = createNamespace(ns, nsLabels); err != nil {
-			log.Fatal(err.Error())
-		}
-		*waitListNamespaces = append(*waitListNamespaces, ns)
+	var waitErrors []error
+	var namespacesWaited = make(map[string]bool)
+	maps.Copy(nsLabels, ex.NamespaceLabels)
+	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
+	if ex.nsRequired && !ex.NamespacedIterations {
+		ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
 	}
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
-	var namespacesCreated = make(map[string]bool)
-	var namespacesWaited = make(map[string]bool)
 	for i := iterationStart; i < iterationEnd; i++ {
-		if i == iterationStart+iterationProgress*percent {
+		if ctx.Err() != nil {
+			return []error{ctx.Err()}
+		}
+		if ex.JobIterations > 1 && i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
 			percent++
 		}
-		log.Debugf("Creating object replicas from iteration %d", i)
-		if ex.NamespacedIterations {
-			ns = ex.generateNamespace(i)
-			if !namespacesCreated[ns] {
-				if err = createNamespace(ns, nsLabels); err != nil {
-					log.Error(err.Error())
-					continue
-				}
-				namespacesCreated[ns] = true
-				*waitListNamespaces = append(*waitListNamespaces, ns)
-			}
+		if ex.nsRequired && ex.NamespacedIterations {
+			ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
 		}
+		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
-			ex.replicaHandler(objectIndex, obj, ns, i, &wg)
+			if obj.gvr == (schema.GroupVersionResource{}) {
+				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
+				ex.resolveObjectMapping(obj)
+				if ex.nsRequired {
+					nsName := ex.Namespace
+					if ex.NamespacedIterations {
+						nsName = ex.generateNamespace(i)
+					}
+					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations)
+				}
+			}
+			kbLabels := map[string]string{
+				config.KubeBurnerLabelUUID:         ex.uuid,
+				config.KubeBurnerLabelJob:          ex.Name,
+				config.KubeBurnerLabelIndex:        strconv.Itoa(objectIndex),
+				config.KubeBurnerLabelRunID:        ex.runid,
+				config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
+			}
+			ex.objects[objectIndex].LabelSelector = kbLabels
+			if obj.RunOnce {
+				if i == 0 {
+					// this executes only once during the first iteration of an object
+					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
+					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
+				}
+			} else {
+				ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
+			}
 		}
 		if !ex.WaitWhenFinished && ex.PodWait {
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				ex.waitForObjects(ns)
+				if errs := ex.waitForObjects(ns); errs != nil {
+					waitErrors = append(waitErrors, errs...)
+				}
 				namespacesWaited[ns] = true
 			}
 		}
@@ -161,77 +177,46 @@ func (ex *Executor) RunCreateJob(iterationStart, iterationEnd int, waitListNames
 	// Wait for all replicas to be created
 	wg.Wait()
 	if ex.WaitWhenFinished {
-		log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
-		// This semaphore is used to limit the maximum number of concurrent goroutines
-		sem := make(chan int, int(ClientSet.RESTClient().GetRateLimiter().QPS())*2)
-		for i := iterationStart; i < iterationEnd; i++ {
-			if ex.NamespacedIterations {
-				ns = ex.generateNamespace(i)
-				if namespacesWaited[ns] {
-					continue
-				} else {
-					namespacesWaited[ns] = true
-				}
-			}
-			sem <- 1
-			wg.Add(1)
-			go func(ns string) {
-				ex.waitForObjects(ns)
-				<-sem
-				wg.Done()
-			}(ns)
-			// Wait for all namespaces to be ready
-			if !ex.NamespacedIterations {
-				break
-			}
+		if errs := ex.waitForCompletion(iterationStart, iterationEnd, ns, namespacesWaited); len(errs) > 0 {
+			waitErrors = append(waitErrors, errs...)
 		}
-		wg.Wait()
 	}
+	return waitErrors
 }
 
 // Simple integer division on the iteration allows us to batch iterations into
 // namespaces. Division means namespaces are populated to their desired number
 // of iterations before the next namespace is created.
-func (ex *Executor) generateNamespace(iteration int) string {
+func (ex *JobExecutor) generateNamespace(iteration int) string {
 	nsIndex := iteration / ex.IterationsPerNamespace
 	return fmt.Sprintf("%s-%d", ex.Namespace, nsIndex)
 }
 
-func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, iteration int, replicaWg *sync.WaitGroup) {
+func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]string, obj *object, ns string, iteration int, replicaWg *sync.WaitGroup) {
 	var wg sync.WaitGroup
+
 	for r := 1; r <= obj.Replicas; r++ {
+		if ctx.Err() != nil {
+			return
+		}
+		// make a copy of the labels map for each goroutine to prevent panic from concurrent read and write
+		copiedLabels := make(map[string]string)
+		maps.Copy(copiedLabels, labels)
+		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
+
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
 			var newObject = new(unstructured.Unstructured)
-			labels := map[string]string{
-				"kube-burner-uuid":  ex.uuid,
-				"kube-burner-job":   ex.Name,
-				"kube-burner-index": strconv.Itoa(objectIndex),
-				"kube-burner-runid": ex.runid,
-			}
-			templateData := map[string]interface{}{
-				jobName:      ex.Name,
-				jobIteration: iteration,
-				jobUUID:      ex.uuid,
-				replica:      r,
-			}
-			for k, v := range obj.InputVars {
-				templateData[k] = v
-			}
 			ex.limiter.Wait(context.TODO())
-			renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, util.MissingKeyError)
-			if err != nil {
-				log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
-			}
+			renderedObj := ex.renderTemplateForObject(obj, iteration, r, false)
 			// Re-decode rendered object
-			yamlToUnstructured(renderedObj, newObject)
-			for k, v := range newObject.GetLabels() {
-				labels[k] = v
-			}
-			newObject.SetLabels(labels)
-			setMetadataLabels(newObject, labels)
-			json.Marshal(newObject.Object)
+			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
+
+			maps.Copy(copiedLabels, newObject.GetLabels())
+			newObject.SetLabels(copiedLabels)
+			updateChildLabels(newObject, copiedLabels)
+
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
 			// wait for ready, etc. Without this wait group, running for example,
@@ -239,10 +224,10 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 			// hasn't been created yet
 			replicaWg.Add(1)
 			go func(n string) {
-				if !obj.Namespaced {
+				if !obj.namespaced {
 					n = ""
 				}
-				createRequest(obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
 				replicaWg.Done()
 			}(ns)
 		}(r)
@@ -250,28 +235,97 @@ func (ex *Executor) replicaHandler(objectIndex int, obj object, ns string, itera
 	wg.Wait()
 }
 
-func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
+// waitForCompletion waits for objects to be ready across the relevant namespaces
+func (ex *JobExecutor) waitForCompletion(iterationStart, iterationEnd int, ns string, namespacesWaited map[string]bool) []error {
+	log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
+	// This semaphore limits the maximum number of concurrent goroutines
+	sem := make(chan int, int(ex.restConfig.QPS))
+	errChan := make(chan []error, 1)
+	var wg sync.WaitGroup
+	for i := iterationStart; i < iterationEnd; i++ {
+		if ex.nsRequired && ex.NamespacedIterations {
+			ns = ex.generateNamespace(i)
+			if namespacesWaited[ns] {
+				continue
+			}
+			namespacesWaited[ns] = true
+		}
+		sem <- 1
+		wg.Add(1)
+		go func(namespace string) {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+			if err := ex.waitForObjects(namespace); err != nil {
+				select {
+				case errChan <- err:
+				default:
+				}
+			}
+		}(ns)
+		// Wait for all namespaces to be ready
+		if !ex.NamespacedIterations {
+			break
+		}
+	}
+	wg.Wait()
+	close(errChan)
+
+	select {
+	case err := <-errChan:
+		return err
+	default:
+		return nil
+	}
+}
+
+func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
-	RetryWithExponentialBackOff(func() (bool, error) {
+	if log.GetLevel() == log.TraceLevel {
+		out, _ := yaml.Marshal(obj)
+		log.Trace(string(out))
+	}
+	util.RetryWithExponentialBackOff(func() (bool, error) {
+		if ctx.Err() != nil {
+			return true, err
+		}
+		// When the object has a namespace already specified, use it
+		if objNs := obj.GetNamespace(); objNs != "" {
+			ns = objNs
+		}
 		if ns != "" {
-			uns, err = DynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
+			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
 		} else {
-			uns, err = DynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			if !ex.nsChurning {
+				uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			}
 		}
 		if err != nil {
 			if kerrors.IsUnauthorized(err) {
 				log.Fatalf("Authorization error creating %s/%s: %s", obj.GetKind(), obj.GetName(), err)
 				return true, err
 			} else if kerrors.IsAlreadyExists(err) {
-				log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
+				if ns != "" {
+					log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
+				} else {
+					log.Errorf("%s/%s already exists", obj.GetKind(), obj.GetName())
+				}
 				return true, nil
-			} else if err != nil {
+			} else if kerrors.IsNotFound(err) {
+				log.Errorf("Error creating object %s/%s: %v", obj.GetKind(), obj.GetName(), err.Error())
+				return true, nil
+			}
+			if ns != "" {
 				log.Errorf("Error creating object %s/%s in namespace %s: %s", obj.GetKind(), obj.GetName(), ns, err)
+			} else {
+				log.Errorf("Error creating object %s/%s: %s", obj.GetKind(), obj.GetName(), err)
 			}
 			log.Error("Retrying object creation")
 			return false, nil
 		}
+		atomic.AddInt32(&ex.objectOperations, 1)
 		if ns != "" {
 			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		} else {
@@ -281,55 +335,213 @@ func createRequest(gvr schema.GroupVersionResource, ns string, obj *unstructured
 	}, 1*time.Second, 3, 0, timeout)
 }
 
-// RunCreateJobWithChurn executes a churn creation job
-func (ex *Executor) RunCreateJobWithChurn() {
-	var err error
-	// Determine the number of job iterations to churn (min 1)
-	numToChurn := int(math.Max(float64(ex.ChurnPercent*ex.JobIterations/100), 1))
-	now := time.Now().UTC()
-	rand.Seed(now.UnixNano())
-	// Create timer for the churn duration
-	timer := time.After(ex.ChurnDuration)
-	// Patch to label namespaces for deletion
-	delPatch := []byte(`[{"op":"add","path":"/metadata/labels/churndelete","value": "delete"}]`)
-	for {
-		select {
-		case <-timer:
-			log.Info("Churn job complete")
-			return
-		default:
-			log.Debugf("Next churn loop, workload churning started %v ago", time.Since(now))
-		}
-		// Max amount of churn is 100% of namespaces
-		randStart := 1
-		if ex.JobIterations-numToChurn+1 > 0 {
-			randStart = rand.Intn(ex.JobIterations - numToChurn + 1)
-		} else {
-			numToChurn = ex.JobIterations
-		}
-		var namespacesPatched = make(map[string]bool)
-		// delete numToChurn namespaces starting at randStart
-		for i := randStart; i < numToChurn+randStart; i++ {
-			ns := ex.generateNamespace(i)
-			if namespacesPatched[ns] {
-				continue
-			}
-			// Label namespaces to be deleted
-			_, err = ClientSet.CoreV1().Namespaces().Patch(context.TODO(), ns, types.JSONPatchType, delPatch, metav1.PatchOptions{})
-			if err != nil {
-				log.Errorf("Error patching namespace %s. Error: %v", ns, err)
-			}
-			namespacesPatched[ns] = true
-		}
-		// 1 hour timeout to delete namespaces
-		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-		defer cancel()
-		// Delete namespaces based on the label we added
-		CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "churndelete=delete"}, true)
-		log.Info("Re-creating deleted objects")
-		// Re-create objects that were deleted
-		ex.RunCreateJob(randStart, numToChurn+randStart, &[]string{})
-		log.Infof("Sleeping for %v", ex.ChurnDelay)
-		time.Sleep(ex.ChurnDelay)
+func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[string]string) string {
+	if ex.createdNamespaces[ns] {
+		return ns
 	}
+	if err := util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
+		log.Error(err.Error())
+	}
+	ex.createdNamespaces[ns] = true
+	return ns
+}
+
+// RunCreateJobWithChurn executes a churn creation job
+func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
+	// Cleanup namespaces based on the labels we added to the objects
+	log.Infof("Churning mode: %s", ex.ChurnConfig.Mode)
+	switch ex.ChurnConfig.Mode {
+	case config.ChurnNamespaces:
+		ex.nsChurning = true // Enable namespace churning flag to prevent non namespaced objects to be churned
+		if !ex.nsRequired {
+			log.Info("No namespaces were created in this job, skipping churning stage")
+			return nil
+		}
+		return ex.churnNamespaces(ctx)
+	case config.ChurnObjects:
+		ex.churnObjects(ctx)
+	}
+	return nil
+}
+
+func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
+	var errs []error
+	delPatch := fmt.Sprintf(`{"metadata": {"labels": {"%s": ""}}}`, config.KubeBurnerLabelChurnDelete)
+	cyclesCount := 0
+	now := time.Now().UTC()
+	// Create timer for the churn duration
+	timer := time.After(ex.ChurnConfig.Duration)
+	nsLabels := labels.Set{
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelUUID:  ex.uuid,
+		config.KubeBurnerLabelRunID: ex.runid,
+	}
+	// List namespace to churn
+	jobNamespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(nsLabels).String()})
+	if err != nil {
+		return []error{fmt.Errorf("unable to list namespaces: %w", err)}
+	}
+	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
+
+	for {
+		if ex.ChurnConfig.Duration > 0 {
+			select {
+			case <-timer:
+				log.Info("Churn job complete")
+				return errs
+			default:
+				log.Debugf("Next churn iteration, workload churning started %v ago", time.Since(now))
+			}
+		}
+		// Exit if churn cycles are completed
+		if ex.ChurnConfig.Cycles > 0 && cyclesCount >= ex.ChurnConfig.Cycles {
+			log.Infof("Reached specified number of churn cycles (%d)", ex.ChurnConfig.Cycles)
+			return errs
+		}
+
+		// Max amount of churn is 100% of namespaces
+		var randStart int
+		if len(jobNamespaces.Items)-numToChurn+1 > 0 {
+			randStart = rand.Intn(len(jobNamespaces.Items) - numToChurn + 1)
+		}
+		// delete numToChurn namespaces starting at randStart
+		namespacesToDelete := jobNamespaces.Items[randStart : numToChurn+randStart]
+		for _, ns := range namespacesToDelete {
+			_, err = ex.clientSet.CoreV1().Namespaces().
+				Patch(ctx, ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
+			if err != nil {
+				log.Errorf("Error applying label to namespace %s: %v", ns.Name, err)
+				errs = append(errs, err)
+			}
+			ex.createdNamespaces[ns.Name] = false
+		}
+		// 1 hour timeout to delete namespace
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
+		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
+		// Re-create objects that were deleted
+		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
+			errs = append(errs, jobErrs...)
+		}
+		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
+		time.Sleep(ex.ChurnConfig.Delay)
+		cyclesCount++
+		cancel()
+	}
+}
+
+func (ex *JobExecutor) churnObjects(ctx context.Context) {
+	cyclesCount := 0
+	timer := time.After(ex.ChurnConfig.Duration)
+	now := time.Now().UTC()
+	var objectList *unstructured.UnstructuredList
+	var err error
+	for {
+		deletedObjects := []churnDeletedObject{}
+		if ex.ChurnConfig.Duration > 0 {
+			select {
+			case <-timer:
+				log.Info("Churn job complete")
+				return
+			default:
+				log.Debugf("Next churn iteration, workload churning started %v ago", time.Since(now))
+			}
+		}
+		// Exit if churn cycles are completed
+		if ex.ChurnConfig.Cycles > 0 && cyclesCount >= ex.ChurnConfig.Cycles {
+			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnConfig.Cycles)
+			return
+		}
+		log.Infof("Deleting objects")
+		for _, obj := range ex.objects {
+			// if churning is enabled in the object
+			if obj.Churn {
+				labelSelector := obj.LabelSelector
+				// Remove these labels to list all objects
+				delete(labelSelector, config.KubeBurnerLabelJobIteration)
+				delete(labelSelector, config.KubeBurnerLabelReplica)
+				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
+					LabelSelector: labels.FormatLabels(labelSelector),
+				})
+				if err != nil {
+					log.Errorf("Error listing objects: %v", err)
+					continue
+				}
+				numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
+				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
+				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
+				for _, objToDelete := range objectsToDelete {
+					log.Debugf("Deleting %s/%s", objToDelete.GetKind(), objToDelete.GetName())
+					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
+						PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
+					})
+					if err != nil {
+						log.Errorf("Error deleting object %s/%s: %v", objToDelete.GetKind(), objToDelete.GetName(), err)
+					}
+					trimObject(&objToDelete)
+					// Store the deleted objects to re-create them later
+					deletedObjects = append(deletedObjects, churnDeletedObject{
+						object: &objToDelete,
+						gvr:    obj.gvr,
+					})
+				}
+			}
+		}
+		ex.verifyDelete(deletedObjects)
+		ex.reCreateDeletedObjects(ctx, deletedObjects)
+		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
+		time.Sleep(ex.ChurnConfig.Delay)
+		cyclesCount++
+	}
+}
+
+// reCreateDeletedObjects re-creates the deleted objects
+func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObjects []churnDeletedObject) {
+	var affectedNamespaces = make(map[string]bool)
+	log.Infof("Re-creating %d deleted objects", len(deletedObjects))
+	var wg sync.WaitGroup
+	for _, objectToCreate := range deletedObjects {
+		if objectToCreate.object.GetNamespace() != "" {
+			affectedNamespaces[objectToCreate.object.GetNamespace()] = true
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ex.limiter.Wait(context.TODO())
+			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout)
+		}()
+	}
+	wg.Wait()
+	for namespace := range affectedNamespaces {
+		ex.waitForObjects(namespace)
+	}
+}
+
+// verifyDelete verifies if the object has been deleted
+func (ex *JobExecutor) verifyDelete(deletedObjects []churnDeletedObject) {
+	for _, obj := range deletedObjects {
+		wait.PollUntilContextCancel(context.TODO(), time.Second, true, func(ctx context.Context) (done bool, err error) {
+			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(context.TODO(), obj.object.GetName(), metav1.GetOptions{})
+			if kerrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, nil
+		})
+	}
+}
+
+// trimObject trims the object to remove the fields that conflict with the object recreation
+func trimObject(obj *unstructured.Unstructured) {
+	obj.SetResourceVersion("")
+	obj.SetUID("")
+	obj.SetSelfLink("")
+	obj.SetGeneration(0)
+	obj.SetDeletionTimestamp(nil)
+	obj.SetDeletionGracePeriodSeconds(nil)
+	obj.SetFinalizers(nil)
+	obj.SetOwnerReferences(nil)
+	obj.SetManagedFields(nil)
+	unstructured.RemoveNestedField(obj.Object, "spec", "template", "template", "labels", "controller-uid")
+	unstructured.RemoveNestedField(obj.Object, "spec", "selector", "matchLabels", "batch.kubernetes.io/controller-uid")
+	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "batch.kubernetes.io/controller-uid")
+	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "controller-uid")
 }

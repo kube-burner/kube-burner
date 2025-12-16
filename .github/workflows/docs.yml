@@ -6,12 +6,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: 3.x
 
@@ -25,6 +25,22 @@ jobs:
 
       - name: Deploy docs
         run: mike deploy --push -m "Update docs to version ${{ github.ref_name  }}" --update-aliases ${{ github.ref_name }} latest
+
+      - name: Delete docs for older tags
+        run: |
+          echo "Keeping documentation for latest tags"
+          all_tags=$(git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags)
+          tags_to_keep=$(echo "$all_tags" | head -n 3)
+          for tag in $all_tags; do
+            if [[ $tags_to_keep != *"$tag"* ]]; then
+              if mike list | grep -q "^$tag$"; then
+                echo "Deleting documentation for tag: $tag"
+                mike delete "$tag" || echo "Failed to delete documentation for tag: $tag"
+              else
+                echo "Documentation for tag $tag not found. Skipping deletion."
+              fi
+            fi
+          done
 
       - name: Set latest as default doc branch
         run: mike set-default --push latest

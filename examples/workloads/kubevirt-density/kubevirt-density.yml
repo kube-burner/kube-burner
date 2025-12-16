@@ -1,14 +1,15 @@
+metricsEndpoints:
+  - indexer:
+      # save metrics to database (e.g., elasticsearch)
+      esServers: [http://localhost:9200]
+      insecureSkipVerify: true
+      defaultIndex: kube-burner
+      type: elastic
 global:
   # collect metrics from Prometheus and dump to files
   measurements:
   - name: vmiLatency
 
-  # save metrics to database (e.g., elasticsearch)
-  indexerConfig:
-    esServers: [http://localhost:9200]
-    insecureSkipVerify: true
-    defaultIndex: kube-burner
-    type: elastic
 
 jobs:
   # wait 5 minutes before creating objs to collect prometheus metrics from idle times
@@ -22,19 +23,19 @@ jobs:
     objects:
 
     - kind: VirtualMachine
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: kubevirt.io/v1
 
     - kind: VirtualMachineInstance
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: kubevirt.io/v1
 
     - kind: Pod
-      labelSelector: {kubevirt.io: virt-launcher}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: v1
 
     - kind: Namespace
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
 
   # create the VMs
   - name: kubevirt-density
@@ -61,7 +62,7 @@ jobs:
     objects:
 
     - objectTemplate: templates/vm-ephemeral.yml
-      replicas: {{ .OBJ_REPLICAS }}
+      replicas: 1
       inputVars:
         name: kubevirt-density
         image: quay.io/kubevirt/fedora-with-test-tooling-container-disk:v0.48.1
@@ -80,16 +81,16 @@ jobs:
     objects:
 
     - kind: VirtualMachine
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: kubevirt.io/v1
 
     - kind: VirtualMachineInstance
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: kubevirt.io/v1
 
     - kind: Pod
-      labelSelector: {kubevirt.io: virt-launcher}
+      labelSelector: {kube-burner.io/job: kubevirt-density}
       apiVersion: v1
 
     - kind: Namespace
-      labelSelector: {kube-burner-job: kubevirt-density}
+      labelSelector: {kube-burner.io/job: kubevirt-density}

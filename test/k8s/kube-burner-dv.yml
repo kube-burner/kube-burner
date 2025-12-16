@@ -1,0 +1,124 @@
+{{- $diskVolumeName := "base-vm-rootdisk" -}}
+{{- $testNameSpace := "datavolume-latency" -}}
+{{- $cloneDataVolumeName := "cloned-volume" -}}
+{{- $osImage := "docker://quay.io/kubevirt/cirros-container-disk-demo:v1.6.3" -}}
+{{- $osImageSize := "1Gi" -}}
+---
+global:
+  measurements:
+  - name: dataVolumeLatency
+  - name: pvcLatency
+  - name: volumeSnapshotLatency
+
+metricsEndpoints:
+- indexer:
+    type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+
+jobs:
+
+- name: create-vm
+  jobType: create
+  jobIterations: 1
+  qps: 20
+  burst: 20
+  namespacedIterations: false
+  namespace: {{ $testNameSpace }}
+  # verify object count after running each job
+  verifyObjects: true
+  errorOnVerify: true
+  # timeout time after waiting for all object creation
+  maxWaitTimeout: 1h
+  jobPause: 10s
+  # cleanup cleans previous execution (not deleted or failed)
+  cleanup: true
+  # Set missing key as empty to allow using default values
+  defaultMissingKeysWithZero: true
+  objects:
+
+  - objectTemplate: ./objectTemplates/vm-datavolume.yml
+    replicas: 1
+    inputVars:
+      vmName: base-vm
+      rootDiskVolumeName: {{ $diskVolumeName }}
+      storageClassName: {{ .STORAGE_CLASS_NAME }}
+      osImage: {{ $osImage }}
+      osImageSize: {{ $osImageSize }}
+
+- name: stop-vm
+  jobType: kubevirt
+  qps: 20
+  burst: 20
+  jobIterations: 1
+  maxWaitTimeout: 1h
+  skipIndexing: true
+  objects:
+  - kubeVirtOp: stop
+    labelSelector:
+      kube-burner.io/job: create-vm
+
+# Create the DV in a separate job to make sure it is ready before continuing
+- name: create-base-image-dv
+  jobType: create
+  jobIterations: 1
+  qps: 20
+  burst: 20
+  namespacedIterations: false
+  namespace: {{ $testNameSpace }}
+  # verify object count after running each job
+  verifyObjects: true
+  errorOnVerify: true
+  # wait all VMI be in the Ready Condition
+  waitWhenFinished: false
+  podWait: true
+  # timeout time after waiting for all object creation
+  maxWaitTimeout: 10m
+  # wait before job completes to allow metrics collection
+  jobPause: 15s
+  # Do not clean the namespaces
+  cleanup: false
+  # Set missing key as empty to allow using default values
+  defaultMissingKeysWithZero: true
+  objects:
+  - objectTemplate: ./objectTemplates/datavolume-clone.yml
+    replicas: 1
+    inputVars:
+      cloneDataVolumeName: {{ $cloneDataVolumeName }}
+      storageClassName: {{ .STORAGE_CLASS_NAME }}
+      sourceNamespace: {{ $testNameSpace }}
+      sourcePVCName: {{ $diskVolumeName }}
+      osImageSize: {{ $osImageSize }}
+
+    waitOptions:
+      labelSelector:
+        kube-burner.io/job: create-base-image-dv
+
+- name: create-snapshot
+  jobType: create
+  jobIterations: 1
+  qps: 20
+  burst: 20
+  namespacedIterations: false
+  namespace: {{ $testNameSpace }}
+  # verify object count after running each job
+  verifyObjects: true
+  errorOnVerify: true
+  # wait all VMI be in the Ready Condition
+  waitWhenFinished: false
+  podWait: true
+  # timeout time after waiting for all object creation
+  maxWaitTimeout: 15m
+  # wait before job completes to allow metrics collection
+  jobPause: 15s
+  # Do not clean the namespaces
+  cleanup: false
+  # Set missing key as empty to allow using default values
+  defaultMissingKeysWithZero: true
+  objects:
+  - objectTemplate: objectTemplates/dv-test-snapshot.yml
+    replicas: 1
+    inputVars:
+      cloneVolumeSnapshotName: clone-volume-snapshot
+      volumeSnapshotClassName: {{ .VOLUME_SNAPSHOT_CLASS_NAME }}
+      cloneVolumeSnapshotPVCName: {{ $cloneDataVolumeName }}
+...

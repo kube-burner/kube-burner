@@ -25,14 +25,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	log "github.com/sirupsen/logrus"
 )
 
 func CreateTarball(indexerConfig indexers.IndexerConfig) error {
-	tarball, err := os.Create(fmt.Sprintf(indexerConfig.TarballName))
+	tarball, err := os.Create(indexerConfig.TarballName)
 	if err != nil {
-		return fmt.Errorf("Could not create tarball file: %v", err)
+		return fmt.Errorf("could not create tarball file: %v", err)
 	}
 	gzipWriter := gzip.NewWriter(tarball)
 	tarWriter := tar.NewWriter(gzipWriter)
@@ -50,13 +50,13 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 		hdr, _ := tar.FileInfoHeader(info, info.Name())
 		err = tarWriter.WriteHeader(hdr)
 		if err != nil {
-			return fmt.Errorf("Could not write file header into tarball: %v", err)
+			return fmt.Errorf("could not write file header into tarball: %v", err)
 		}
 		m, _ := os.Open(path)
 		defer m.Close()
 		_, err = io.Copy(tarWriter, m)
 		if err != nil {
-			return fmt.Errorf("Could not write file into tarball: %v", err)
+			return fmt.Errorf("could not write file into tarball: %v", err)
 		}
 		return nil
 	})
@@ -67,21 +67,21 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 	return nil
 }
 
-func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string) error {
-	log.Infof("Importing tarball %v", tarball)
+func ImportTarball(tarball string, indexer *indexers.Indexer) error {
+	log.Infof("Importing tarball: %v", tarball)
 	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)
 	if err != nil {
-		return fmt.Errorf("Could not open tarball file: %v", err)
+		return fmt.Errorf("could not open tarball file: %v", err)
 	}
 	defer tarballFile.Close()
 	gzipReader, err := gzip.NewReader(tarballFile)
 	if err != nil {
-		return fmt.Errorf("Could not create gzip reader: %v", err)
+		return fmt.Errorf("could not create gzip reader: %v", err)
 	}
 	tr := tar.NewReader(gzipReader)
 	for {
-		var metrics []interface{}
+		var metrics []any
 		hdr, err := tr.Next()
 		// io.EOF returned at the end of file
 		if err == io.EOF {
@@ -91,14 +91,14 @@ func ImportTarball(tarball string, indexer *indexers.Indexer, metricsDir string)
 		json.Unmarshal(rawData.Bytes(), &metrics)
 		rawData.Reset()
 		if err != nil {
-			return fmt.Errorf("Tarball read error: %v", err)
+			return fmt.Errorf("tarball read error: %v", err)
 		}
-		log.Infof("Importing metrics from %s", hdr.Name)
-		log.Infof("Writing metric to: %s", metricsDir)
-		_, err = (*indexer).Index(metrics, indexers.IndexingOpts{})
+		log.Infof("Reading metrics from %s", hdr.Name)
+		resp, err := (*indexer).Index(metrics, indexers.IndexingOpts{})
 		if err != nil {
 			return err
 		}
+		log.Info(resp)
 	}
 	return nil
 }

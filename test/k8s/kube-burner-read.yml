@@ -1,0 +1,28 @@
+---
+metricsEndpoints:
+{{ if .ES_INDEXING }}
+  - endpoint: http://localhost:9090
+    indexer: 
+      type: opensearch
+      esServers: ["{{ .ES_SERVER }}"]
+      defaultIndex: {{ .ES_INDEX }}
+    metrics: [metrics-profile.yaml]
+{{ end }}
+{{ if .LOCAL_INDEXING }}
+  - endpoint: http://localhost:9090
+    indexer: 
+      type: local
+      metricsDirectory: {{ .METRICS_FOLDER }}
+    metrics: [metrics-profile.yaml]
+{{ end }}
+
+jobs:
+  - name: read-job
+    jobType: read
+    jobIterations: 20
+    qps: 5
+    burst: 10
+    jobPause: 5s
+    objects:
+    - kind: Namespace
+      labelSelector: {kubernetes.io/metadata.name: default}

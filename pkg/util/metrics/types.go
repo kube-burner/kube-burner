@@ -15,37 +15,30 @@
 package metrics
 
 import (
-	"time"
-
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
+	"github.com/kube-burner/kube-burner/v2/pkg/alerting"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 )
 
 // ScraperConfig holds data related to scraper and target indexer
 type ScraperConfig struct {
-	ConfigSpec      config.Spec
-	Password        string
-	PrometheusStep  time.Duration
+	ConfigSpec      *config.Spec
 	MetricsEndpoint string
+	UserMetaData    string
+	SummaryMetadata map[string]any
+	MetricsMetadata map[string]any
 	MetricsProfile  string
 	AlertProfile    string
-	SkipTLSVerify   bool
-	URL             string
-	Token           string
-	Username        string
-	StartTime       int64
-	EndTime         int64
-	JobName         string
-	ActionIndex     bool
-	UserMetaData    string
+	EmbedCfg        *fileutils.EmbedConfiguration
 }
 
 // ScraperResponse holds parsed data related to scraper and target indexer
 type Scraper struct {
-	PrometheusClients   []*prometheus.Prometheus
-	AlertMs             []*alerting.AlertManager
-	Indexer             *indexers.Indexer
-	UserMetadataContent map[string]interface{}
+	PrometheusClients []*prometheus.Prometheus
+	AlertMs           []*alerting.AlertManager
+	IndexerList       map[string]indexers.Indexer
+	SummaryMetadata   map[string]any
+	MetricsMetadata   map[string]any
 }

@@ -1,0 +1,34 @@
+---
+global:
+  gc: true
+  measurements:
+    - name: pprof
+      pprofInterval: 60s
+      pprofDirectory: pprof-data
+      nodeAffinity:
+        node-role.kubernetes.io/worker: ""
+      pprofTargets:
+        # Kubelet via HTTPS
+        - name: kubelet-heap
+          url: https://localhost:10250/debug/pprof/heap
+
+        # CRI-O via unix socket
+        - name: crio-heap
+          url: http://localhost/debug/pprof/heap 
+          unixSocketPath: /var/run/crio/crio.sock
+
+jobs:
+  - name: kubelet-density
+    jobIterations: 300
+    qps: 2
+    burst: 2
+    preLoadImages: false
+    namespacedIterations: false
+    namespace: kubelet-density
+    waitWhenFinished: true
+    podWait: false
+    objects:
+      - objectTemplate: templates/pod.yml
+        replicas: 1
+        inputVars:
+          containerImage: registry.k8s.io/pause:3.1

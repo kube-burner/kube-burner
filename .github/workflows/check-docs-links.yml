@@ -1,0 +1,37 @@
+name: Check Documentation Links
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  check-links:
+    name: Check docs for broken links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.x
+
+      - name: Install mkdocs dependencies
+        run: pip install mkdocs-material mkdocs-include-markdown-plugin
+
+      - name: Build docs
+        run: mkdocs build
+
+      - name: Link Checker
+        uses: lycheeverse/lychee-action@v2.7.0
+        with:
+          lycheeVersion: v0.20.1
+          args: --verbose --no-progress --exclude-loopback './docs/**/*.md'
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

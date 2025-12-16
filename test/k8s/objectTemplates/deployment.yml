@@ -18,11 +18,7 @@ spec:
         - sleep
         - infinity
         image: {{.containerImage}}
+        imagePullPolicy: IfNotPresent
         name: ci-app
-        readinessProbe:
-        exec:
-          command:
-          - cat
-          - /etc/hosts
-        initialDelaySeconds: 3
-        periodSeconds: 5
+        env: 
+        {{- template "env_func" (dict "envName" .envName "envVar" .envVar "n" 4 "indent" 8) }}

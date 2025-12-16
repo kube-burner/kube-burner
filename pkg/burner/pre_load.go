@@ -19,14 +19,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"maps"
+
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
 const preLoadNs = "preload-kube-burner"
@@ -41,7 +45,31 @@ type NestedPod struct {
 	} `json:"spec"`
 }
 
-func preLoadImages(job Executor) error {
+type VMI struct {
+	Spec struct {
+		Volumes []struct {
+			ContainerDisk struct {
+				Image string `yaml:"image"`
+			} `yaml:"containerDisk"`
+		} `yaml:"volumes"`
+	} `yaml:"spec"`
+}
+
+type NestedVM struct {
+	Spec struct {
+		Template struct {
+			Spec struct {
+				Volumes []struct {
+					ContainerDisk struct {
+						Image string `yaml:"image"`
+					} `yaml:"containerDisk"`
+				} `yaml:"volumes"`
+			} `yaml:"spec"`
+		} `yaml:"template"`
+	} `yaml:"spec"`
+}
+
+func preLoadImages(job JobExecutor, clientSet kubernetes.Interface) error {
 	log.Info("Pre-load: images from job ", job.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
@@ -51,37 +79,36 @@ func preLoadImages(job Executor) error {
 		log.Infof("No images found to pre-load, continuing")
 		return nil
 	}
-	err = createDSs(imageList, job.NamespaceLabels, job.PreLoadNodeLabels)
+	err = createDSs(clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
 	log.Infof("Pre-load: Sleeping for %v", job.PreLoadPeriod)
 	time.Sleep(job.PreLoadPeriod)
-	log.Infof("Pre-load: Deleting namespace %s", preLoadNs)
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	CleanupNamespaces(ctx, metav1.ListOptions{LabelSelector: "kube-burner-preload=true"}, true)
+	util.CleanupNamespacesByLabel(ctx, clientSet, "kube-burner-preload=true")
 	return nil
 }
 
-func getJobImages(job Executor) ([]string, error) {
+func getJobImages(job JobExecutor) ([]string, error) {
 	var imageList []string
 	var unstructuredObject unstructured.Unstructured
 	for _, object := range job.objects {
-		renderedObj, err := util.RenderTemplate(object.objectSpec, object.InputVars, util.MissingKeyZero)
+		renderedObj, err := util.RenderTemplate(object.objectSpec, object.InputVars, util.MissingKeyZero, job.functionTemplates)
 		if err != nil {
 			return imageList, err
 		}
-		yamlToUnstructured(renderedObj, &unstructuredObject)
+		yamlToUnstructured(object.ObjectTemplate, renderedObj, &unstructuredObject)
 		switch unstructuredObject.GetKind() {
-		case "Deployment", "DaemonSet", "ReplicaSet", "Job":
+		case Deployment, DaemonSet, ReplicaSet, Job, StatefulSet:
 			var pod NestedPod
 			runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObject.UnstructuredContent(), &pod)
 			for _, i := range pod.Spec.Template.Containers {
 				imageList = append(imageList, i.Image)
 			}
-		case "Pod":
+		case Pod:
 			var pod corev1.Pod
 			runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObject.UnstructuredContent(), &pod)
 			for _, i := range pod.Spec.Containers {
@@ -89,25 +116,41 @@ func getJobImages(job Executor) ([]string, error) {
 					imageList = append(imageList, i.Image)
 				}
 			}
+		case VirtualMachineInstance:
+			var vmi VMI
+			yaml.Unmarshal(renderedObj, &vmi)
+			for _, volume := range vmi.Spec.Volumes {
+				if volume.ContainerDisk.Image != "" {
+					imageList = append(imageList, volume.ContainerDisk.Image)
+				}
+			}
+		case VirtualMachine, VirtualMachineInstanceReplicaSet:
+			var nestedVM NestedVM
+			yaml.Unmarshal(renderedObj, &nestedVM)
+			for _, volume := range nestedVM.Spec.Template.Spec.Volumes {
+				if volume.ContainerDisk.Image != "" {
+					imageList = append(imageList, volume.ContainerDisk.Image)
+				}
+			}
 		}
 	}
 	return imageList, nil
 }
 
-func createDSs(imageList []string, namespaceLabels map[string]string, nodeSelectorLabels map[string]string) error {
+func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
 	nsLabels := map[string]string{
 		"kube-burner-preload": "true",
 	}
-	for label, value := range namespaceLabels {
-		nsLabels[label] = value
-	}
-	if err := createNamespace(preLoadNs, nsLabels); err != nil {
+	nsAnnotations := make(map[string]string)
+	maps.Copy(nsLabels, namespaceLabels)
+	maps.Copy(nsAnnotations, namespaceAnnotations)
+	if err := util.CreateNamespace(clientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
 		log.Fatal(err)
 	}
 	dsName := "preload"
 	ds := appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "DaemonSet",
+			Kind:       string(DaemonSet),
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,13 +165,13 @@ func createDSs(imageList []string, namespaceLabels map[string]string, nodeSelect
 					Labels: map[string]string{"app": dsName},
 				},
 				Spec: corev1.PodSpec{
-					TerminationGracePeriodSeconds: pointer.Int64(0),
+					TerminationGracePeriodSeconds: ptr.To[int64](0),
 					InitContainers:                []corev1.Container{},
 					// Only Always restart policy is supported
 					Containers: []corev1.Container{
 						{
 							Name:            "sleep",
-							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							Image:           "registry.k8s.io/pause:3.1",
 							ImagePullPolicy: corev1.PullAlways,
 						},
 					},
@@ -150,7 +193,7 @@ func createDSs(imageList []string, namespaceLabels map[string]string, nodeSelect
 	}
 
 	log.Infof("Pre-load: Creating DaemonSet using images %v in namespace %s", imageList, preLoadNs)
-	_, err := ClientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
+	_, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}

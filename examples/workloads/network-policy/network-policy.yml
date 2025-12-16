@@ -1,0 +1,74 @@
+---
+global:
+  gc: true
+  gcMetrics: false
+  measurements:
+    - name: netpolLatency
+      thresholds:
+        - conditionType: Ready
+          metric: P99
+          threshold: 10s
+metricsEndpoints:
+  - indexer:
+      metricsDirectory: kube-burner
+      type: local
+
+jobs:
+  - name: network-policy-perf-pods
+    namespace: network-policy-perf
+    jobIterations: 9
+    qps: 20
+    burst: 20
+    namespacedIterations: true
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: false
+    preLoadPeriod: 1s
+    skipIndexing: true
+    namespaceLabels:
+      kube-burner.io/skip-networkpolicy-latency: true
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+      - objectTemplate: templates/pod.yml
+        replicas: 2
+
+      - objectTemplate: templates/np-deny-all.yml
+        replicas: 1
+
+      - objectTemplate: templates/np-allow-from-proxy.yml
+        replicas: 1
+
+  - name: network-policy-perf
+    namespace: network-policy-perf
+    jobIterations: 9
+    qps: 20
+    burst: 20
+    namespacedIterations: true
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: false
+    preLoadPeriod: 15s
+    jobPause: 15s
+    cleanup: false
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+      - objectTemplate: templates/ingress-np.yml
+        replicas: 1
+        inputVars:
+          namespaces: 9
+          pods_per_namespace: 2
+          netpols_per_namespace: 1
+          local_pods: 1
+          pod_selectors: 1
+          single_ports: 1
+          port_ranges: 1
+          peer_namespaces: 2
+          peer_pods: 2
+          cidr_rules: 1

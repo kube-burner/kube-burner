@@ -1,34 +1,80 @@
 ---
 
 global:
+  gc: {{env "GC"}}
+  functionTemplates:
+    - objectTemplates/envs.tpl
   measurements:
   - name: podLatency
-
-  indexerConfig:
-    type: {{ .INDEXING_TYPE }}
-    metricsDirectory: {{ .TEMP_FOLDER }}
+{{ if .TIMESERIES_INDEXER }}
+    timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
+{{ end }}
+  - name: nodeLatency
+{{ if .TIMESERIES_INDEXER }}
+    timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
+{{ end }}
+{{ if .SVC_LATENCY }}
+  - name: serviceLatency
+    svcTimeout: 5s
+{{ end }}
+  - name: jobLatency
+metricsEndpoints:
+{{ if .ES_INDEXING }}
+  - endpoint: http://localhost:9090
+    indexer:
+      type: opensearch
+      esServers: ["{{ .ES_SERVER }}"]
+      defaultIndex: {{ .ES_INDEX }}
+    metrics: [metrics-profile.yaml]
+{{ if .ALERTING }}
+    alerts: [alerts.yml]
+{{ end }}
+{{ end }}
+{{ if .LOCAL_INDEXING }}
+  - endpoint: http://localhost:9090
+    indexer:
+      type: local
+      metricsDirectory: {{ .METRICS_FOLDER }}
+    metrics: [metrics-profile.yaml]
+{{ if .ALERTING }}
+    alerts: [alerts.yml]
+{{ end }}
+{{ end }}
 
 jobs:
-  - name: namespaced
+  - name: {{ .JOB_NAME }}
     jobType: create
     jobIterations: {{ add .JOB_ITERATIONS 1 }}
     qps: {{ .QPS }}
     burst: {{ .BURST }}
+    watchers:
+    - kind: Deployment
+      apiVersion: apps/v1
+      labelSelector: {foo: bar}
+    - kind: Pod
+      apiVersion: v1
+      labelSelector: {foo: bar}
+      replicas: 2
+    - kind: StorageClass
+      apiVersion: storage.k8s.io/v1
+      replicas: 1
     namespacedIterations: true
-    preLoadImages: true
-    preLoadPeriod: 5s
+    preLoadImages: {{ .PRELOAD_IMAGES }}
+    preLoadPeriod: 2s
     cleanup: true
-    namespace: namespaced
+    namespace: {{ .JOB_NAME }}
     podWait: false
     waitWhenFinished: true
     verifyObjects: true
     errorOnVerify: true
-    jobIterationDelay: 5s
+    jobIterationDelay: 1s
     maxWaitTimeout: 2m
-    churn: true
-    churnPercent: 20
-    churnDuration: 1m
-    churnDelay: 5s
+    churnConfig:
+      cycles: {{ .CHURN_CYCLES }}
+      percent: 20
+      delay: 2s
+      mode: {{ .CHURN_MODE }}
+    gc: {{env "JOBGC" }}
     namespaceLabels:
       foo: bar
       complex.label/test: true
@@ -37,4 +83,53 @@ jobs:
     - objectTemplate: objectTemplates/deployment.yml
       replicas: 1
       inputVars:
-        containerImage: gcr.io/google_containers/pause-amd64:3.0
+        envName: deployment-pod
+        containerImage: quay.io/cloud-bulldozer/sampleapp:latest
+        envVar: 55d897a9c68ea8a48e59f5ec9cf40aa7ffbdfd33e40bf71ee0ffdba1611518586015791965693165b030b20af4d0979a83d098fcf289e9e9fcbb170df5b144314f3d8d5c0755e0415ed5f8ec53a20f0ac8344e719e0993b3ddecd1d6e7b5f9a4b4cf78c9b9a6f328d754d955d897a9c68ea8a48e59f5ec9cf40aa7ffbdfd33e40bf71ee0ffdba1611518586015791965693165b030b20af4d0979a83d098fcf289e9e9fcbb170df5b144314f3d8d5c0755e0415ed5f8ec53a20f0ac8344e719e0993b3ddecd1d6e7b5f9a4b4cf78c9b9a6f328d754d92857528fe63427c66d5427cc3b61a10a86d5970c4315ced8f0584e1aabc9a696b2414df6268413cb0cdf8828d4fdd2504121e66309b19544325466a8cb2c599307f4ff76eeb64254b81c3fe4969759ff8fd811851d2ff4784c4959eb9af44eda26feb7ede29029c675c317fcc68fc900b52ba28b6e7af3e1d5523e0070776e406371ff6ca1b2437f9e0629b691234edbbeffbabfc305
+      {{- if env "WAIT_FOR_CONDITION" }}
+      waitOptions:
+        customStatusPaths:
+        - key: '{{ env `WAIT_CUSTOM_STATUS_PATH` }}'
+          value: '{{ env `WAIT_FOR_CONDITION` }}'
+      {{- end }}
+
+    - objectTemplate: objectTemplates/pod.yml
+
+    - objectTemplate: objectTemplates/job.yml
+      replicas: 1
+
+    - objectTemplate: objectTemplates/service.yml
+      replicas: 1
+      churn: false
+
+    - objectTemplate: objectTemplates/secret.yml
+      replicas: 1
+      runOnce: true
+
+{{ if .CRD }}
+  - name: crd
+    jobType: create
+    jobIterations: 1
+    namespacedIterations: false
+    cleanup: false
+    podWait: false
+    qps: 10
+    burst: 10
+    jobPause: 10s
+    objects:
+    - objectTemplate: objectTemplates/crd.yml
+      replicas: 1
+
+  - name: cr-crd
+    namespace: cr-crd
+    jobType: create
+    jobIterations: 1
+    namespacedIterations: false
+    cleanup: false
+    podWait: false
+    qps: 10
+    burst: 10
+    objects:
+    - objectTemplate: objectTemplates/cr.yml
+      replicas: 5
+{{ end }}

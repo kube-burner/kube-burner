@@ -1,0 +1,43 @@
+---
+global:
+  gc: true
+  measurements:
+    - name: pprof
+      pprofInterval: 30m
+      pprofDirectory: /var/tmp/pprof-data
+      nodeAffinity:
+        kubernetes.io/hostname: "debian-worker"
+      pprofTargets:
+        # Kubelet via HTTPS
+        - name: kubelet-heap
+          url: https://localhost:10250/debug/pprof/heap
+
+        # CRI-O via HTTP
+        # Port 6060 is the default pprof port
+        - name: crio-heap
+          url: http://localhost:6060/debug/pprof/heap
+
+        - name: crio-goroutine
+          url: http://localhost:6060/debug/pprof/goroutine
+
+        - name: crio-block
+          url: http://localhost:6060/debug/pprof/block
+
+        - name: crio-allocs
+          url: http://localhost:6060/debug/pprof/allocs
+
+jobs:
+  - name: kubelet-density
+    jobIterations: 25
+    qps: 2
+    burst: 2
+    preLoadImages: false
+    namespacedIterations: false
+    namespace: kubelet-density
+    waitWhenFinished: true
+    podWait: false
+    objects:
+      - objectTemplate: ./examples/workloads/kubelet-density/templates/pod.yml
+        replicas: 1
+        inputVars:
+          containerImage: registry.k8s.io/pause:3.1

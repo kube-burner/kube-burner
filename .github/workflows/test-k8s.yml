@@ -1,97 +1,73 @@
 # test-k8s.yml
 name: Execute tests on k8s and OCP
 on:
+  workflow_dispatch:
   workflow_call:
-    secrets:
-      OPENSHIFT_SERVER:
-        required: true
-      OPENSHIFT_USER:
-        required: true
-      OPENSHIFT_PASSWORD:
-        required: true
 jobs:
+  fetch-latest-kind-node-tags:
+    runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.fetch-versions.outputs.tags }}
+    steps:
+      - name: Fetch latest patch version for the latest 3 minor versions of kindest/node
+        id: fetch-versions
+        run: |
+          # Fetch tags from Docker Hub API
+          all_tags=$(curl -s "https://hub.docker.com/v2/repositories/kindest/node/tags/?page_size=100" | jq -r '.results[].name')
+
+          # Filter semantic versioning tags
+          semver_tags=$(echo "$all_tags" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$')
+
+          # Get the latest patch versions of the latest 3 minor versions
+          latest_three=$(echo "$semver_tags" | sort -V | awk -F. '{print $1"."$2}' | uniq | tail -n 3 | while read minor; do
+            echo "$semver_tags" | grep "^$minor" | sort -V | tail -n 1
+          done)
+
+          echo "Latest patch versions of the latest 3 minor versions:"
+          echo "$latest_three"
+
+          # Convert the output to a JSON array for use in other steps
+          tags_json=$(echo "$latest_three" | jq -c -R -s 'split("\n") | map(select(length > 0))')
+          echo "tags=$tags_json" >> "$GITHUB_OUTPUT"
+
   test-k8s:
+    needs: fetch-latest-kind-node-tags
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        k8s-version:
-        - v1.25.0
-        - v1.26.0
-        - v1.27.0
+        k8s-version: ${{ fromJson(needs.fetch-latest-kind-node-tags.outputs.tags) }}
     steps:
 
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v6
       with:
         fetch-depth: 1
         ref: ${{ github.event.pull_request.head.sha }}
         persist-credentials: false
 
     - name: Download kube-burner binary
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v6
       with:
         name: kube-burner
         path: /tmp/
 
     - name: Install bats
-      uses: mig4/setup-bats@v1
+      uses: bats-core/bats-action@3.0.1
       with:
-        bats-version: 1.9.0
+        bats-version: 1.10.0
+        support-install: false
+        assert-install: false
+        detik-install: false
+        file-install: false
 
     - name: Execute Tests
-      working-directory: test
       run: |
-        export PATH=${PATH}:/tmp/
         chmod +x /tmp/kube-burner
-        bats -F pretty -T --report-formatter junit --print-output-on-failure test-k8s.bats
+        make test-k8s
       env:
         TERM: linux
+        GH_TOKEN: ${{ github.token }}
         KIND_VERSION: v0.19.0
         K8S_VERSION: ${{matrix.k8s-version}}
-
-  ocp-wrapper:
-    runs-on: ubuntu-latest
-    concurrency:
-      group: ocp-e2e-ci
-    steps:
-
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 1
-        ref: ${{ github.event.pull_request.head.sha }}
-        persist-credentials: false
-
-    - name: Download kube-burner binary
-      uses: actions/download-artifact@v3
-      with:
-        name: kube-burner
-        path: /tmp/
-
-    - name: Install bats
-      uses: mig4/setup-bats@v1
-      with:
-        bats-version: 1.9.0
-
-    - name: Install oc
-      uses: redhat-actions/oc-installer@v1
-
-    - name: Authenticate against OCP cluster
-      run: oc login -u ${OPENSHIFT_USER} -p ${OPENSHIFT_PASSWORD} ${OPENSHIFT_SERVER} --insecure-skip-tls-verify=true
-      env:
-        OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
-        OPENSHIFT_USER: ${{ secrets.OPENSHIFT_USER }}
-        OPENSHIFT_PASSWORD: ${{ secrets.OPENSHIFT_PASSWORD }}
-
-    - name: Execute Tests
-      working-directory: test
-      run: |
-        export PATH=${PATH}:/tmp/
-        chmod +x /tmp/kube-burner
-        bats -F pretty -T --report-formatter junit --print-output-on-failure test-ocp.bats
-      env:
-        TERM: linux
-        OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
-        OPENSHIFT_USER: ${{ secrets.OPENSHIFT_USER }}
-        OPENSHIFT_PASSWORD: ${{ secrets.OPENSHIFT_PASSWORD }}
-
+        PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
+        TEST_BINARY: /tmp/kube-burner

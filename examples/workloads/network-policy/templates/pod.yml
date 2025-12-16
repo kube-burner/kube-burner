@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod-{{.Replica}}
+  labels:
+    num: "{{.Replica}}"
+spec:
+  containers:
+  - name: webserver
+    image: quay.io/cloud-bulldozer/sampleapp:latest
+    resources:
+      requests:
+        memory: "10Mi"
+        cpu: "10m"
+    imagePullPolicy: Always
+    ports:
+     - containerPort: 8080
+       protocol: TCP
+    securityContext:
+       privileged: false
+  - name: curlapp 
+    image: quay.io/cloud-bulldozer/netpolvalidator:latest
+    resources:
+      requests:
+        memory: "10Mi"
+        cpu: "10m"
+    imagePullPolicy: Always
+    ports:
+     - containerPort: 9001
+       protocol: TCP
+    securityContext:
+       privileged: false

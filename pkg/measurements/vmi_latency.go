@@ -16,20 +16,18 @@ package measurements
 
 import (
 	"fmt"
-	"math"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/metrics"
-	"github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	kvv1 "kubevirt.io/api/core/v1"
@@ -40,463 +38,394 @@ const (
 	vmiLatencyQuantilesMeasurement = "vmiLatencyQuantilesMeasurement"
 )
 
+var (
+	supportedVMIConditions map[string]struct{} = map[string]struct{}{
+		"VMI" + string(kvv1.Pending):    {},
+		"VMI" + string(kvv1.Scheduling): {},
+		"VMI" + string(kvv1.Scheduled):  {},
+		"VMI" + string(kvv1.Running):    {},
+	}
+	supportedVMILatencyJobTypes = map[config.JobType]struct{}{
+		config.CreationJob: {},
+		config.KubeVirtJob: {},
+		config.DeletionJob: {},
+	}
+)
+
 // vmiMetric holds both pod and vmi metrics
 type vmiMetric struct {
 	// Timestamp filed is very important the the elasticsearch indexing and represents the first creation time that we track (i.e., vm or vmi)
 	Timestamp time.Time `json:"timestamp"`
 
 	podCreated                time.Time
-	PodCreatedLatency         int `json:"podCreatedLatency"`
+	PodCreatedLatency         int64 `json:"podCreatedLatency"`
 	podScheduled              time.Time
-	PodScheduledLatency       int `json:"podScheduledLatency"`
+	PodScheduledLatency       int64 `json:"podScheduledLatency"`
 	podInitialized            time.Time
-	PodInitializedLatency     int `json:"podInitializedLatency"`
+	PodInitializedLatency     int64 `json:"podInitializedLatency"`
 	podContainersReady        time.Time
-	PodContainersReadyLatency int `json:"podContainersReadyLatency"`
+	PodContainersReadyLatency int64 `json:"podContainersReadyLatency"`
 	podReady                  time.Time
-	PodReadyLatency           int `json:"podReadyLatency"`
-
-	vmiCreated           time.Time
-	VMICreatedLatency    int `json:"vmiCreatedLatency"`
-	vmiPending           time.Time
-	VMIPendingLatency    int `json:"vmiPendingLatency"`
-	vmiScheduling        time.Time
-	VMISchedulingLatency int `json:"vmiSchedulingLatency"`
-	vmiScheduled         time.Time
-	VMIScheduledLatency  int `json:"vmiScheduledLatency"`
-	vmiRunning           time.Time
-	VMIRunningLatency    int `json:"vmiRunningLatency"`
-	vmiReady             time.Time
-	VMIReadyLatency      int `json:"vmiReadyLatency"`
-
-	vmReady        time.Time
-	VMReadyLatency int `json:"vmReadyLatency"`
-
-	MetricName string      `json:"metricName"`
-	JobName    string      `json:"jobName"`
-	JobConfig  config.Job  `json:"jobConfig"`
-	Metadata   interface{} `json:"metadata,omitempty"`
-	UUID       string      `json:"uuid"`
-	Namespace  string      `json:"namespace"`
-	Name       string      `json:"podName"`
-	NodeName   string      `json:"nodeName"`
+	PodReadyLatency           int64 `json:"podReadyLatency"`
+	vmiCreated                time.Time
+	VMICreatedLatency         int64 `json:"vmiCreatedLatency"`
+	vmiPending                time.Time
+	VMIPendingLatency         int64 `json:"vmiPendingLatency"`
+	vmiScheduling             time.Time
+	VMISchedulingLatency      int64 `json:"vmiSchedulingLatency"`
+	vmiScheduled              time.Time
+	VMIScheduledLatency       int64 `json:"vmiScheduledLatency"`
+	vmiRunning                time.Time
+	VMIRunningLatency         int64 `json:"vmiRunningLatency"`
+	vmReady                   time.Time
+	VMReadyLatency            int64  `json:"vmReadyLatency"`
+	MetricName                string `json:"metricName"`
+	UUID                      string `json:"uuid"`
+	Namespace                 string `json:"namespace"`
+	PodName                   string `json:"podName,omitempty"`
+	VMName                    string `json:"vmName,omitempty"`
+	VMIName                   string `json:"vmiName,omitempty"`
+	NodeName                  string `json:"nodeName"`
+	JobName                   string `json:"jobName,omitempty"`
+	Metadata                  any    `json:"metadata,omitempty"`
+	JobIteration              int    `json:"jobIteration"`
+	Replica                   int    `json:"replica"`
 }
 
 type vmiLatency struct {
-	config           types.Measurement
-	vmWatcher        *metrics.Watcher
-	vmiWatcher       *metrics.Watcher
-	vmiPodWatcher    *metrics.Watcher
-	metrics          map[string]*vmiMetric
-	latencyQuantiles []interface{}
-	normLatencies    []interface{}
-	mu               sync.Mutex
+	BaseMeasurement
 }
 
-func init() {
-	measurementMap["vmiLatency"] = &vmiLatency{}
+type vmiLatencyMeasurementFactory struct {
+	BaseMeasurementFactory
 }
 
-func (p *vmiLatency) handleCreateVM(obj interface{}) {
-	vm := obj.(*kvv1.VirtualMachine)
-	vmID := vm.Labels["kubevirt-vm"]
-	p.mu.Lock()
-	if _, exists := p.metrics[vmID]; !exists {
-		if strings.Contains(vm.Namespace, factory.jobConfig.Namespace) {
-			p.metrics[vmID] = &vmiMetric{
-				Timestamp:  time.Now().UTC(),
-				Namespace:  vm.Namespace,
-				Name:       vm.Name,
-				MetricName: vmiLatencyMeasurement,
-				UUID:       globalCfg.UUID,
-				JobName:    factory.jobConfig.Name,
-				JobConfig:  *factory.jobConfig,
-				Metadata:   factory.metadata,
-			}
-		}
+func newVmiLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+	if err := verifyMeasurementConfig(measurement, supportedVMIConditions); err != nil {
+		return nil, err
 	}
-	p.mu.Unlock()
+	return vmiLatencyMeasurementFactory{
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+	}, nil
 }
 
-func (p *vmiLatency) handleUpdateVM(obj interface{}) {
-	vm := obj.(*kvv1.VirtualMachine)
-	vmID := vm.Labels["kubevirt-vm"]
-	p.mu.Lock()
-	if vmM, exists := p.metrics[vmID]; exists && vmM.vmReady.IsZero() {
-		for _, c := range vm.Status.Conditions {
-			if c.Status == corev1.ConditionTrue {
-				if c.Type == kvv1.VirtualMachineReady {
-					vmM.vmReady = time.Now().UTC()
-				}
-			}
-		}
-	}
-	p.mu.Unlock()
-}
-
-func (p *vmiLatency) handleCreateVMI(obj interface{}) {
-	var vmID string
-	vmi := obj.(*kvv1.VirtualMachineInstance)
-	// in case the parent is a VM object
-	if id, exists := vmi.Labels["kubevirt-vm"]; exists {
-		vmID = id
-	}
-	// in case there is no parent
-	if vmID == "" {
-		vmID = string(vmi.UID)
-	}
-	p.mu.Lock()
-	if _, exists := p.metrics[vmID]; !exists {
-		if strings.Contains(vmi.Namespace, factory.jobConfig.Namespace) {
-			p.metrics[vmID] = &vmiMetric{
-				Timestamp:  time.Now().UTC(),
-				Namespace:  vmi.Namespace,
-				Name:       vmi.Name,
-				MetricName: vmiLatencyMeasurement,
-				UUID:       globalCfg.UUID,
-				JobName:    factory.jobConfig.Name,
-			}
-		}
-	}
-	if vmiM, exists := p.metrics[vmID]; exists {
-		if vmiM.vmiCreated.IsZero() {
-			vmiM.vmiCreated = time.Now().UTC()
-		}
-	}
-	p.mu.Unlock()
-}
-
-func (p *vmiLatency) handleUpdateVMI(obj interface{}) {
-	var vmID string
-	vmi := obj.(*kvv1.VirtualMachineInstance)
-	// in case the parent is a VM object
-	if id, exists := vmi.Labels["kubevirt-vm"]; exists {
-		vmID = id
-	}
-	// in case the parent is a VMI object
-	if vmID == "" {
-		vmID = string(vmi.UID)
-	}
-	p.mu.Lock()
-	if vmiM, exists := p.metrics[vmID]; exists && vmiM.vmReady.IsZero() {
-		for _, c := range vmi.Status.Conditions {
-			if c.Status == corev1.ConditionTrue {
-				if c.Type == kvv1.VirtualMachineInstanceReady {
-					vmiM.vmiReady = time.Now().UTC()
-					log.Debugf("VMI %s is Ready", vmi.Name)
-				}
-			}
-		}
-		// Although the pattern of using phase is deprecated, kubevirt still strongly relies on it.
-		switch vmi.Status.Phase {
-		case kvv1.Pending:
-			if vmiM.vmiPending.IsZero() {
-				vmiM.vmiPending = time.Now().UTC()
-			}
-		case kvv1.Scheduling:
-			if vmiM.vmiScheduling.IsZero() {
-				vmiM.vmiScheduling = time.Now().UTC()
-			}
-		case kvv1.Scheduled:
-			if vmiM.vmiScheduled.IsZero() {
-				vmiM.vmiScheduled = time.Now().UTC()
-			}
-		case kvv1.Running:
-			if vmiM.vmiRunning.IsZero() {
-				vmiM.vmiRunning = time.Now().UTC()
-			}
-		}
-	}
-	p.mu.Unlock()
-}
-
-func (p *vmiLatency) handleCreateVMIPod(obj interface{}) {
-	var vmID string
-	pod := obj.(*corev1.Pod)
-	// in case the parent is a VM object
-	if id, exists := pod.Labels["kubevirt-vm"]; exists {
-		vmID = id
-	}
-	// in case the parent is a VMI object
-	if id, exists := pod.Labels["kubevirt.io/created-by"]; exists && vmID == "" {
-		vmID = id
-	}
-	// only get data from a pod that is owned by a VMI
-	if vmID == "" {
-		return
-	}
-	p.mu.Lock()
-	if vmiM, exists := p.metrics[vmID]; exists {
-		if vmiM.podCreated.IsZero() {
-			vmiM.podCreated = time.Now().UTC()
-		}
-	}
-	p.mu.Unlock()
-}
-
-func (p *vmiLatency) handleUpdateVMIPod(obj interface{}) {
-	var vmID string
-	pod := obj.(*corev1.Pod)
-	// in case the parent is a VM object
-	if id, exists := pod.Labels["kubevirt-vm"]; exists {
-		vmID = id
-	}
-	// in case the parent is a VMI object
-	if id, exists := pod.Labels["kubevirt.io/created-by"]; exists && vmID == "" {
-		vmID = id
-	}
-	// only get data from a pod that is owned by a VMI
-	if vmID == "" {
-		return
-	}
-	p.mu.Lock()
-	if vmiM, exists := p.metrics[vmID]; exists && vmiM.podReady.IsZero() {
-		for _, c := range pod.Status.Conditions {
-			if c.Status == corev1.ConditionTrue {
-				switch c.Type {
-				case corev1.PodScheduled:
-					if vmiM.podScheduled.IsZero() {
-						vmiM.podScheduled = time.Now().UTC()
-						vmiM.NodeName = pod.Spec.NodeName
-					}
-				case corev1.PodInitialized:
-					if vmiM.podInitialized.IsZero() {
-						vmiM.podInitialized = time.Now().UTC()
-					}
-				case corev1.ContainersReady:
-					if vmiM.podContainersReady.IsZero() {
-						vmiM.podContainersReady = time.Now().UTC()
-					}
-				case corev1.PodReady:
-					vmiM.podReady = time.Now().UTC()
-				}
-			}
-		}
-	}
-	p.mu.Unlock()
-}
-
-func (p *vmiLatency) setConfig(cfg types.Measurement) error {
-	p.config = cfg
-	if err := p.validateConfig(); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Start starts vmiLatency measurement
-func (p *vmiLatency) start(measurementWg *sync.WaitGroup) {
-	defer measurementWg.Done()
-	p.metrics = make(map[string]*vmiMetric)
-
-	log.Infof("Creating VM latency watcher for %s", factory.jobConfig.Name)
-	restClient := newRESTClientWithRegisteredKubevirtResource()
-	p.vmWatcher = metrics.NewWatcher(
-		restClient,
-		"vmWatcher",
-		"virtualmachines",
-		corev1.NamespaceAll,
-	)
-	p.vmWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: p.handleCreateVM,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			p.handleUpdateVM(newObj)
-		},
-	})
-	if err := p.vmWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("VMI Latency measurement error: %s", err)
-	}
-
-	log.Infof("Creating VMI latency watcher for %s", factory.jobConfig.Name)
-	p.vmiWatcher = metrics.NewWatcher(
-		restClient,
-		"vmiWatcher",
-		"virtualmachineinstances",
-		corev1.NamespaceAll,
-	)
-	p.vmiWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: p.handleCreateVMI,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			p.handleUpdateVMI(newObj)
-		},
-	})
-	if err := p.vmiWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("VMI Latency measurement error: %s", err)
-	}
-
-	log.Infof("Creating VMI Pod latency watcher for %s", factory.jobConfig.Name)
-	p.vmiPodWatcher = metrics.NewWatcher(
-		factory.clientSet.CoreV1().RESTClient().(*rest.RESTClient),
-		"podWatcher",
-		"pods",
-		corev1.NamespaceAll,
-	)
-	p.vmiPodWatcher.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: p.handleCreateVMIPod,
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			p.handleUpdateVMIPod(newObj)
-		},
-	})
-	if err := p.vmiPodWatcher.StartAndCacheSync(); err != nil {
-		log.Errorf("VMI Pod Latency measurement error: %s", err)
+func (vmilmf vmiLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, clientSet kubernetes.Interface, restConfig *rest.Config, embedCfg *fileutils.EmbedConfiguration) Measurement {
+	return &vmiLatency{
+		BaseMeasurement: vmilmf.NewBaseLatency(jobConfig, clientSet, restConfig, vmiLatencyMeasurement, vmiLatencyQuantilesMeasurement, embedCfg),
 	}
 }
 
-func newRESTClientWithRegisteredKubevirtResource() *rest.RESTClient {
-	shallowCopy := factory.restConfig
-	setConfigDefaults(shallowCopy)
-	restClient, err := rest.RESTClientFor(shallowCopy)
+func (vmi *vmiLatency) handleCreateVM(obj any) {
+	vm, err := util.ConvertAnyToTyped[kvv1.VirtualMachine](obj)
 	if err != nil {
-		log.Errorf("Error creating custom rest client: %s", err)
-		panic(err)
+		log.Errorf("failed to convert to VirtualMachine: %v", err)
+		return
 	}
-	return restClient
+	vmLabels := vm.GetLabels()
+	vmi.Metrics.LoadOrStore(string(vm.UID), vmiMetric{
+		Namespace:    vm.Namespace,
+		MetricName:   vmiLatencyMeasurement,
+		VMName:       vm.Name,
+		JobIteration: getIntFromLabels(vmLabels, config.KubeBurnerLabelJobIteration),
+		Replica:      getIntFromLabels(vmLabels, config.KubeBurnerLabelReplica),
+		Timestamp:    vm.CreationTimestamp.UTC(),
+	})
 }
 
-func setConfigDefaults(config *rest.Config) {
-	gv := kvv1.SchemeGroupVersion
-	config.GroupVersion = &gv
-	config.APIPath = "/apis"
-	scheme := runtime.NewScheme()
-	SchemeBuilder := runtime.NewSchemeBuilder(kvv1.AddKnownTypesGenerator(kvv1.GroupVersions))
-	AddToScheme := SchemeBuilder.AddToScheme
-	codecs := serializer.NewCodecFactory(scheme)
-	AddToScheme(scheme)
-	config.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: codecs}
-}
-
-// Stop stops vmiLatency measurement
-func (p *vmiLatency) stop() error {
-	p.vmWatcher.StopWatcher()
-	p.vmiWatcher.StopWatcher()
-	p.vmiPodWatcher.StopWatcher()
-	p.normalizeMetrics()
-	p.calcQuantiles()
-	err := metrics.CheckThreshold(p.config.LatencyThresholds, p.latencyQuantiles)
-	if globalCfg.IndexerConfig.Type != "" {
-		p.index()
+func (vmi *vmiLatency) handleUpdateVM(obj any) {
+	vm, err := util.ConvertAnyToTyped[kvv1.VirtualMachine](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachine: %v", err)
+		return
 	}
-	// Reset latency slices, required in multi-job benchmarks
-	p.latencyQuantiles, p.normLatencies = nil, nil
-	return err
-}
-
-// index sends metrics to the configured indexer
-func (p *vmiLatency) index() {
-	metricMap := map[string][]interface{}{
-		podLatencyMeasurement:          p.normLatencies,
-		podLatencyQuantilesMeasurement: p.latencyQuantiles,
-	}
-	if p.config.PodLatencyMetrics == types.Quantiles {
-		delete(metricMap, podLatencyMeasurement)
-	}
-	for metricName, data := range metricMap {
-		indexingOpts := indexers.IndexingOpts{
-			MetricName: fmt.Sprintf("%s-%s", metricName, factory.jobConfig.Name),
-		}
-		log.Debugf("Indexing [%d] documents", len(data))
-		resp, err := (*factory.indexer).Index(data, indexingOpts)
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			log.Info(resp)
-		}
-	}
-}
-
-func (p *vmiLatency) normalizeMetrics() {
-	for _, m := range p.metrics {
-		// If a does not reach the Ready state (this timestamp wasn't set), we skip that vmi
-		if m.vmiReady.IsZero() {
-			continue
-		}
-		m.VMReadyLatency = int(m.vmReady.Sub(m.Timestamp).Milliseconds())
-
-		m.VMICreatedLatency = int(m.vmiCreated.Sub(m.Timestamp).Milliseconds())
-		m.VMIPendingLatency = int(m.vmiPending.Sub(m.Timestamp).Milliseconds())
-		m.VMISchedulingLatency = int(m.vmiScheduling.Sub(m.Timestamp).Milliseconds())
-		m.VMIScheduledLatency = int(m.vmiScheduled.Sub(m.Timestamp).Milliseconds())
-		m.VMIReadyLatency = int(m.vmiReady.Sub(m.Timestamp).Milliseconds())
-		m.VMIRunningLatency = int(m.vmiRunning.Sub(m.Timestamp).Milliseconds())
-
-		m.PodCreatedLatency = int(m.podCreated.Sub(m.Timestamp).Milliseconds())
-		m.PodScheduledLatency = int(m.podScheduled.Sub(m.Timestamp).Milliseconds())
-		m.PodInitializedLatency = int(m.podInitialized.Sub(m.Timestamp).Milliseconds())
-		m.PodContainersReadyLatency = int(m.podContainersReady.Sub(m.Timestamp).Milliseconds())
-		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
-
-		p.normLatencies = append(p.normLatencies, m)
-	}
-}
-
-func (p *vmiLatency) calcQuantiles() {
-	quantiles := []float64{0.5, 0.95, 0.99}
-	quantileMap := map[string][]int{}
-	for _, normLatency := range p.normLatencies {
-		if !normLatency.(*vmiMetric).vmReady.IsZero() {
-			quantileMap["VM"+string(kvv1.VirtualMachineReady)] = append(quantileMap["VM"+string(kvv1.VirtualMachineReady)], normLatency.(*vmiMetric).VMReadyLatency)
-			quantileMap["VMICreated"] = append(quantileMap["VMICreated"], normLatency.(*vmiMetric).VMICreatedLatency)
-		}
-
-		quantileMap["VMI"+string(kvv1.Pending)] = append(quantileMap["VMI"+string(kvv1.Pending)], normLatency.(*vmiMetric).VMIPendingLatency)
-		quantileMap["VMI"+string(kvv1.Scheduling)] = append(quantileMap["VMI"+string(kvv1.Scheduling)], normLatency.(*vmiMetric).VMISchedulingLatency)
-		quantileMap["VMI"+string(kvv1.Scheduled)] = append(quantileMap["VMI"+string(kvv1.Scheduled)], normLatency.(*vmiMetric).VMIScheduledLatency)
-		quantileMap["VMI"+string(kvv1.VirtualMachineInstanceReady)] = append(quantileMap["VMI"+string(kvv1.VirtualMachineInstanceReady)], normLatency.(*vmiMetric).VMIReadyLatency)
-
-		quantileMap["PodCreated"] = append(quantileMap["PodCreated"], normLatency.(*vmiMetric).PodCreatedLatency)
-		quantileMap[string(corev1.PodScheduled)] = append(quantileMap[string(corev1.PodScheduled)], normLatency.(*vmiMetric).PodScheduledLatency)
-		quantileMap["Pod"+string(corev1.PodInitialized)] = append(quantileMap["Pod"+string(corev1.PodInitialized)], normLatency.(*vmiMetric).PodInitializedLatency)
-		quantileMap["Pod"+string(corev1.ContainersReady)] = append(quantileMap["Pod"+string(corev1.ContainersReady)], normLatency.(*vmiMetric).PodContainersReadyLatency)
-		quantileMap["Pod"+string(corev1.PodReady)] = append(quantileMap["Pod"+string(corev1.PodReady)], normLatency.(*vmiMetric).PodReadyLatency)
-	}
-	for quantileName, v := range quantileMap {
-		quantile := metrics.LatencyQuantiles{
-			QuantileName: quantileName,
-			UUID:         globalCfg.UUID,
-			Timestamp:    time.Now().UTC(),
-			JobName:      factory.jobConfig.Name,
-			MetricName:   vmiLatencyQuantilesMeasurement,
-		}
-		sort.Ints(v)
-		length := len(v)
-		if length > 1 {
-			for _, q := range quantiles {
-				qValue := v[int(math.Ceil(float64(length)*q))-1]
-				quantile.SetQuantile(q, qValue)
-			}
-			quantile.Max = v[length-1]
-		}
-		sum := 0
-		for _, n := range v {
-			sum += n
-		}
-		quantile.Avg = int(math.Round(float64(sum) / float64(length)))
-		p.latencyQuantiles = append(p.latencyQuantiles, quantile)
-	}
-}
-
-func (p *vmiLatency) validateConfig() error {
-	var metricFound bool
-	var latencyMetrics = []string{"P99", "P95", "P50", "Avg", "Max"}
-	for _, th := range p.config.LatencyThresholds {
-		if th.ConditionType == string(kvv1.Pending) ||
-			th.ConditionType == string(kvv1.Scheduling) ||
-			th.ConditionType == string(kvv1.Scheduled) ||
-			th.ConditionType == string(kvv1.Running) ||
-			th.ConditionType == string(kvv1.VirtualMachineInstanceReady) ||
-			th.ConditionType == string(kvv1.Succeeded) {
-			for _, lm := range latencyMetrics {
-				if th.Metric == lm {
-					metricFound = true
+	if vmM, ok := vmi.Metrics.Load(string(vm.UID)); ok {
+		vmMetric := vmM.(vmiMetric)
+		if vmMetric.vmReady.IsZero() {
+			for _, c := range vm.Status.Conditions {
+				if c.Status == corev1.ConditionTrue && c.Type == kvv1.VirtualMachineReady {
+					vmMetric.vmReady = time.Now().UTC()
+					log.Debugf("VM %s is ready", vm.Name)
 					break
 				}
 			}
-			if !metricFound {
-				return fmt.Errorf("unsupported metric %s in vmLatency measurement, supported are: %s", th.Metric, strings.Join(latencyMetrics, ", "))
+		}
+		vmi.Metrics.Store(string(vm.UID), vmMetric)
+	}
+}
+
+func (vmi *vmiLatency) handleCreateVMI(obj any) {
+	vmiObj, err := util.ConvertAnyToTyped[kvv1.VirtualMachineInstance](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachineInstance: %v", err)
+		return
+	}
+	now := vmiObj.CreationTimestamp.UTC()
+	parentVMID := getParentVMMapID(vmiObj)
+	// in case there's a parent vm
+	if parentVMID != "" {
+		if vmiM, ok := vmi.Metrics.Load(parentVMID); ok {
+			vmiMetric := vmiM.(vmiMetric)
+			if vmiMetric.vmiCreated.IsZero() {
+				vmiMetric.vmiCreated = now
+				vmiMetric.VMIName = vmiObj.Name
+				vmi.Metrics.Store(parentVMID, vmiMetric)
 			}
-		} else {
-			return fmt.Errorf("unsupported vm condition type in vmLatency measurement: %s", th.ConditionType)
+		}
+	} else {
+		vmiLabels := vmiObj.GetLabels()
+		vmi.Metrics.Store(string(vmiObj.UID), vmiMetric{
+			vmiCreated:   now,
+			VMIName:      vmiObj.Name,
+			JobIteration: getIntFromLabels(vmiLabels, config.KubeBurnerLabelJobIteration),
+			Replica:      getIntFromLabels(vmiLabels, config.KubeBurnerLabelReplica),
+			Timestamp:    now, // Timestamp only needs to be set when there's not a parent VM
+		})
+	}
+}
+
+func (vmi *vmiLatency) handleUpdateVMI(obj any) {
+	vmiObj, err := util.ConvertAnyToTyped[kvv1.VirtualMachineInstance](obj)
+	if err != nil {
+		log.Errorf("failed to convert to VirtualMachineInstance: %v", err)
+		return
+	}
+	// in case the parent is a VM object
+	mapID := getParentVMMapID(vmiObj)
+	// otherwise use VMI UID
+	if mapID == "" {
+		mapID = string(vmiObj.UID)
+	}
+	if vmiM, ok := vmi.Metrics.Load(mapID); ok {
+		vmiMetric := vmiM.(vmiMetric)
+		if vmiMetric.vmiRunning.IsZero() {
+			switch vmiObj.Status.Phase {
+			case kvv1.Pending:
+				if vmiMetric.vmiPending.IsZero() {
+					vmiMetric.vmiPending = time.Now().UTC()
+				}
+			case kvv1.Scheduling:
+				if vmiMetric.vmiScheduling.IsZero() {
+					vmiMetric.vmiScheduling = time.Now().UTC()
+				}
+			case kvv1.Scheduled:
+				if vmiMetric.vmiScheduled.IsZero() {
+					vmiMetric.vmiScheduled = time.Now().UTC()
+				}
+			case kvv1.Running:
+				log.Debugf("VMI %s is running", vmiObj.Name)
+				vmiMetric.vmiRunning = time.Now().UTC()
+			}
+			vmi.Metrics.Store(mapID, vmiMetric)
 		}
 	}
+}
+
+func (vmi *vmiLatency) handleCreateVMIPod(obj any) {
+	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Pod: %v", err)
+		return
+	}
+	vmiName, err := getParentVMIName(pod)
+	if err != nil {
+		log.Warn(err.Error())
+		return
+	}
+	// Iterate over all vmi metrics to get the one with the same VMI name
+	vmi.Metrics.Range(func(k, v any) bool {
+		vmiMetric := v.(vmiMetric)
+		if vmiMetric.VMIName == vmiName {
+			vmiMetric.PodName = pod.Name
+			vmiMetric.podCreated = time.Now().UTC()
+			vmi.Metrics.Store(k, vmiMetric)
+		}
+		return true
+	})
+}
+
+func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
+	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
+	if err != nil {
+		log.Errorf("failed to convert to Pod: %v", err)
+		return
+	}
+	vmiName, err := getParentVMIName(pod)
+	if err != nil {
+		log.Warn(err.Error())
+		return
+	}
+	// Iterate over all vmi metrics to get the one with the same VMI name
+	vmi.Metrics.Range(func(k, v any) bool {
+		vmiMetric := v.(vmiMetric)
+		if vmiMetric.VMIName == vmiName {
+			if vmiMetric.podReady.IsZero() {
+				for _, c := range pod.Status.Conditions {
+					if c.Status == corev1.ConditionTrue {
+						switch c.Type {
+						case corev1.PodScheduled:
+							if vmiMetric.podScheduled.IsZero() {
+								vmiMetric.podScheduled = time.Now().UTC()
+								vmiMetric.NodeName = pod.Spec.NodeName
+							}
+						case corev1.PodInitialized:
+							if vmiMetric.podInitialized.IsZero() {
+								vmiMetric.podInitialized = time.Now().UTC()
+							}
+						case corev1.ContainersReady:
+							if vmiMetric.podContainersReady.IsZero() {
+								vmiMetric.podContainersReady = time.Now().UTC()
+							}
+						case corev1.PodReady:
+							log.Debugf("VMI pod %s is running", pod.Name)
+							vmiMetric.podReady = time.Now().UTC()
+						}
+					}
+				}
+			}
+			vmi.Metrics.Store(k, vmiMetric)
+		}
+		return true
+	})
+}
+
+// Start starts vmiLatency measurement
+func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
+	defer measurementWg.Done()
+	vmgvr, err := util.ResourceToGVR(vmi.RestConfig, "VirtualMachine", "kubevirt.io/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "VirtualMachine", err)
+	}
+	vmigvr, err := util.ResourceToGVR(vmi.RestConfig, "VirtualMachineInstance", "kubevirt.io/v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "VirtualMachineInstance", err)
+	}
+	pgvr, err := util.ResourceToGVR(vmi.RestConfig, "Pod", "v1")
+	if err != nil {
+		return fmt.Errorf("error getting GVR for %s: %w", "Pod", err)
+	}
+	vmi.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
+				name:          "vmWatcher",
+				resource:      vmgvr,
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmi.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: vmi.handleCreateVM,
+					UpdateFunc: func(oldObj, newObj any) {
+						vmi.handleUpdateVM(newObj)
+					},
+				},
+			},
+			{
+				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
+				name:          "vmiWatcher",
+				resource:      vmigvr,
+				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmi.Runid),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: vmi.handleCreateVMI,
+					UpdateFunc: func(oldObj, newObj any) {
+						vmi.handleUpdateVMI(newObj)
+					},
+				},
+			},
+			{
+				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
+				name:          "podWatcher",
+				resource:      pgvr,
+				labelSelector: labels.Set{
+					"kubevirt.io":               "virt-launcher",
+					config.KubeBurnerLabelRunID: vmi.Runid,
+				}.String(),
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: vmi.handleCreateVMIPod,
+					UpdateFunc: func(oldObj, newObj any) {
+						vmi.handleUpdateVMIPod(newObj)
+					},
+				},
+			},
+		},
+	)
 	return nil
+}
+
+func (vmi *vmiLatency) Collect(measurementWg *sync.WaitGroup) {
+	defer measurementWg.Done()
+}
+
+// Stop stops vmiLatency measurement
+func (vmi *vmiLatency) Stop() error {
+	return vmi.StopMeasurement(vmi.normalizeMetrics, vmi.getLatency)
+}
+
+func (vmi *vmiLatency) normalizeMetrics() float64 {
+	vmi.Metrics.Range(func(key, value any) bool {
+		m := value.(vmiMetric)
+		if m.vmiRunning.IsZero() {
+			log.Tracef("VMI %v latency ignored as it did not reach Running state", m.VMIName)
+			return true
+		}
+		m.VMReadyLatency = m.vmReady.Sub(m.Timestamp).Milliseconds()
+		m.VMICreatedLatency = m.vmiCreated.Sub(m.Timestamp).Milliseconds()
+		m.VMIPendingLatency = m.vmiPending.Sub(m.Timestamp).Milliseconds()
+		m.VMISchedulingLatency = m.vmiScheduling.Sub(m.Timestamp).Milliseconds()
+		m.VMIScheduledLatency = m.vmiScheduled.Sub(m.Timestamp).Milliseconds()
+		m.VMIRunningLatency = m.vmiRunning.Sub(m.Timestamp).Milliseconds()
+		m.PodCreatedLatency = m.podCreated.Sub(m.Timestamp).Milliseconds()
+		m.PodScheduledLatency = m.podScheduled.Sub(m.Timestamp).Milliseconds()
+		m.PodInitializedLatency = m.podInitialized.Sub(m.Timestamp).Milliseconds()
+		m.PodContainersReadyLatency = m.podContainersReady.Sub(m.Timestamp).Milliseconds()
+		m.PodReadyLatency = m.podReady.Sub(m.Timestamp).Milliseconds()
+		m.UUID = vmi.Uuid
+		m.JobName = vmi.JobConfig.Name
+		m.Metadata = vmi.Metadata
+		vmi.NormLatencies = append(vmi.NormLatencies, m)
+		return true
+	})
+	return 0
+}
+
+func (vmi *vmiLatency) getLatency(normLatency any) map[string]float64 {
+	vmiMetric := normLatency.(vmiMetric)
+	return map[string]float64{
+		"VM" + string(kvv1.VirtualMachineReady): float64(vmiMetric.VMReadyLatency),
+		"VMICreated":                            float64(vmiMetric.VMICreatedLatency),
+		"VMI" + string(kvv1.Pending):            float64(vmiMetric.VMIPendingLatency),
+		"VMI" + string(kvv1.Scheduling):         float64(vmiMetric.VMISchedulingLatency),
+		"VMI" + string(kvv1.Scheduled):          float64(vmiMetric.VMIScheduledLatency),
+		"VMI" + string(kvv1.Running):            float64(vmiMetric.VMIRunningLatency),
+		"PodCreated":                            float64(vmiMetric.PodCreatedLatency),
+		"Pod" + string(corev1.PodScheduled):     float64(vmiMetric.PodScheduledLatency),
+		"Pod" + string(corev1.PodInitialized):   float64(vmiMetric.PodInitializedLatency),
+		"Pod" + string(corev1.ContainersReady):  float64(vmiMetric.PodContainersReadyLatency),
+	}
+}
+
+// Returns the parent VM UID if there is one
+// otherwise returns an empty string
+func getParentVMMapID(vmiObj *kvv1.VirtualMachineInstance) string {
+	for _, or := range vmiObj.OwnerReferences {
+		// Check if kind is VirtualMachine
+		if or.Kind == kvv1.VirtualMachineGroupVersionKind.Kind {
+			return string(or.UID)
+		}
+	}
+	return ""
+}
+
+// Returns the parent VMI UID if there is one
+// otherwise returns an empty string
+func getParentVMIName(podObj *corev1.Pod) (string, error) {
+	for _, or := range podObj.OwnerReferences {
+		// Check if kind is VirtualMachineInstance
+		if or.Kind == kvv1.VirtualMachineInstanceGroupVersionKind.Kind {
+			return or.Name, nil
+		}
+	}
+	return "", fmt.Errorf("no parent VMI found for pod %s", podObj.Name)
+}
+
+func (vmi *vmiLatency) IsCompatible() bool {
+	_, exists := supportedVMILatencyJobTypes[vmi.JobConfig.JobType]
+	return exists
 }

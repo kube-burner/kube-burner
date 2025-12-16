@@ -15,11 +15,11 @@
 package config
 
 import (
-	"embed"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	mtypes "github.com/cloud-bulldozer/kube-burner/pkg/measurements/types"
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
+	mtypes "github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
+	"k8s.io/client-go/rest"
 )
 
 // JobType type of job
@@ -32,18 +32,47 @@ const (
 	DeletionJob JobType = "delete"
 	// PatchJob used to patch objects
 	PatchJob JobType = "patch"
+	// ReadJob used to read objects
+	ReadJob JobType = "read"
+	// KubeVirtJob used to send command to the KubeVirt service
+	KubeVirtJob JobType = "kubevirt"
+)
+
+type KubeVirtOpType string
+
+const (
+	KubeVirtOpStart        KubeVirtOpType = "start"
+	KubeVirtOpStop         KubeVirtOpType = "stop"
+	KubeVirtOpRestart      KubeVirtOpType = "restart"
+	KubeVirtOpPause        KubeVirtOpType = "pause"
+	KubeVirtOpUnpause      KubeVirtOpType = "unpause"
+	KubeVirtOpMigrate      KubeVirtOpType = "migrate"
+	KubeVirtOpAddVolume    KubeVirtOpType = "add-volume"
+	KubeVirtOpRemoveVolume KubeVirtOpType = "remove-volume"
 )
 
 // Spec configuration root
 type Spec struct {
+	// List of kube-burner indexers
+	MetricsEndpoints []MetricsEndpoint `yaml:"metricsEndpoints"`
 	// GlobalConfig defines global configuration parameters
 	GlobalConfig GlobalConfig `yaml:"global"`
 	// Jobs list of kube-burner jobs
 	Jobs []Job `yaml:"jobs"`
-	// EmbedFS embed filesystem instance
-	EmbedFS embed.FS
-	// EmbedFSDir Directory in which the configuration files are in the embed filesystem
-	EmbedFSDir string
+}
+
+// metricEndpoint describes prometheus endpoint to scrape
+type MetricsEndpoint struct {
+	indexers.IndexerConfig `yaml:"indexer"`
+	Metrics                []string      `yaml:"metrics"`
+	Alerts                 []string      `yaml:"alerts"`
+	Endpoint               string        `yaml:"endpoint"`
+	Step                   time.Duration `yaml:"step"`
+	SkipTLSVerify          bool          `yaml:"skipTLSVerify"`
+	Token                  string        `yaml:"token"`
+	Username               string        `yaml:"username"`
+	Password               string        `yaml:"password"`
+	Alias                  string        `yaml:"alias"`
 }
 
 // GlobalConfig holds the global configuration
@@ -52,29 +81,25 @@ type GlobalConfig struct {
 	UUID string
 	// Benchmark RUNID
 	RUNID string
-	// IndexerConfig contains a IndexerConfig definition
-	IndexerConfig indexers.IndexerConfig `yaml:"indexerConfig"`
 	// Measurements describes a list of measurements kube-burner
 	// will take along with job
 	Measurements []mtypes.Measurement `yaml:"measurements"`
 	// RequestTimeout of restclient
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
-	// PrometheusURL to interact with
-	PrometheusURL string `yaml:"prometheusURL"`
-	// BearerToken used to access prometheus
-	BearerToken string `yaml:"bearerToken"`
-	// MetricsProfile is the path to the metrics profile configuration
-	MetricsProfile string `yaml:"metricsProfile"`
-	// MetricsEndpoint is path to the metrics endpoint configuration YAML
-	MetricsEndpoint string `yaml:"metricsEndpoint"`
-	// AlertProfile is path to the alert profile
-	AlertProfile string `yaml:"alertProfile"`
 	// GC garbage collect created namespaces
 	GC bool `yaml:"gc" json:"gc"`
 	// WaitWhenFinished Wait for pods to be running when all the jobs are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
-	// GCTimeout garbage collection timeout
-	GCTimeout time.Duration `yaml:"gcTimeout"`
+	// Boolean flag to collect metrics during garbage collection
+	GCMetrics bool `yaml:"gcMetrics"`
+	// Boolean flag to check for cluster-health
+	ClusterHealth bool `yaml:"clusterHealth"`
+	// Global Benchmark timeout
+	Timeout time.Duration `yaml:"timeout"`
+	// Function templates to render at runtime
+	FunctionTemplates []string `yaml:"functionTemplates"`
+	// DeletionStrategy global deletion strategy for all created objects
+	DeletionStrategy string `yaml:"deletionStrategy" json:"deletionStrategy,omitempty"`
 }
 
 // Object defines an object that kube-burner will create
@@ -85,7 +110,7 @@ type Object struct {
 	Replicas int `yaml:"replicas" json:"replicas,omitempty"`
 	// InputVars contains a map of arbitrary input variables
 	// that can be introduced by users
-	InputVars map[string]interface{} `yaml:"inputVars" json:"inputVars,omitempty"`
+	InputVars map[string]any `yaml:"inputVars" json:"inputVars,omitempty"`
 	// Kind object kind to delete
 	Kind string `yaml:"kind" json:"kind,omitempty"`
 	// The type of patch mode
@@ -94,12 +119,16 @@ type Object struct {
 	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
 	// LabelSelector objects with this labels will be removed
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
-	// Namespaced this object is namespaced
-	Namespaced bool `yaml:"-" json:"-"`
 	// Wait for resource to be ready, it doesn't apply to all resources
 	Wait bool `yaml:"wait" json:"wait"`
 	// WaitOptions define custom behaviors when waiting for objects creation
-	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions,omitempty"`
+	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions"`
+	// Run Once to create the object only once incase of multiple iterative jobs
+	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
+	// KubeVirt Operation
+	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
+	// Churn object
+	Churn bool `yaml:"churn" json:"churn,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -110,10 +139,14 @@ type Job struct {
 	JobIterationDelay time.Duration `yaml:"jobIterationDelay" json:"jobIterationDelay,omitempty"`
 	// JobPause how much time to pause after finishing the job
 	JobPause time.Duration `yaml:"jobPause" json:"jobPause,omitempty"`
+	// BeforeCleanup allows to run a bash script before the workload is deleted.
+	BeforeCleanup string `yaml:"beforeCleanup" json:"beforeCleanup,omitempty"`
 	// Name job name
 	Name string `yaml:"name" json:"name,omitempty"`
 	// Objects list of objects
 	Objects []Object `yaml:"objects" json:"-"`
+	// Watchers list of watchers
+	Watchers []Watcher `yaml:"watchers" json:"-"`
 	// JobType type of job
 	JobType JobType `yaml:"jobType" json:"jobType,omitempty"`
 	// Max number of queries per second
@@ -126,7 +159,7 @@ type Job struct {
 	MaxWaitTimeout time.Duration `yaml:"maxWaitTimeout" json:"maxWaitTimeout,omitempty"`
 	// WaitForDeletion wait for objects to be definitively deleted
 	WaitForDeletion bool `yaml:"waitForDeletion" json:"waitForDeletion,omitempty"`
-	// PodWait wait for all pods to be running before moving forward to the next iteration
+	//  wait for all pods to be running before moving forward to the next iteration
 	PodWait bool `yaml:"podWait" json:"podWait,omitempty"`
 	// WaitWhenFinished Wait for pods to be running when all job iterations are completed
 	WaitWhenFinished bool `yaml:"waitWhenFinished" json:"waitWhenFinished,omitempty"`
@@ -148,17 +181,111 @@ type Job struct {
 	PreLoadNodeLabels map[string]string `yaml:"preLoadNodeLabels" json:"-"`
 	// NamespaceLabels add custom labels to namespaces created by kube-burner
 	NamespaceLabels map[string]string `yaml:"namespaceLabels" json:"-"`
-	// Churn workload
-	Churn bool `yaml:"churn" json:"churn,omitempty"`
-	// Churn percentage
-	ChurnPercent int `yaml:"churnPercent" json:"churnPercent,omitempty"`
-	// Churn duration
-	ChurnDuration time.Duration `yaml:"churnDuration" json:"churnDuration,omitempty"`
-	// Churn delay between sets
-	ChurnDelay time.Duration `yaml:"churnDelay" json:"churnDelay,omitempty"`
+	// NamespaceAnnotations add custom annotations to namespaces created by kube-burner
+	NamespaceAnnotations map[string]string `yaml:"namespaceAnnotations" json:"-"`
+	// ChurnConfig options
+	ChurnConfig ChurnConfig `yaml:"churnConfig" json:"churnConfig,omitempty"`
+	// Skip this job from indexing
+	SkipIndexing               bool `yaml:"skipIndexing" json:"skipIndexing,omitempty"`
+	DefaultMissingKeysWithZero bool `yaml:"defaultMissingKeysWithZero" json:"defaultMissingKeysWithZero,omitempty"`
+	// Execute objects in a job either parallel or sequential. Default: parallel
+	ExecutionMode ExecutionMode `yaml:"executionMode" json:"executionMode,omitempty"`
+	// ObjectDelay how much time to wait between objects processing in patch jobs
+	ObjectDelay time.Duration `yaml:"objectDelay" json:"objectDelay,omitempty"`
+	// ObjectWait wait for each object to complete before processing the next one
+	ObjectWait bool `yaml:"objectWait" json:"objectWait,omitempty"`
+	// MetricsAggregate aggregate the metrics of this job with the next one
+	MetricsAggregate bool `yaml:"metricsAggregate" json:"metricsAggregate,omitempty"`
+	// MetricsClosing defines when to stop metrics collection
+	MetricsClosing MetricsClosing `yaml:"metricsClosing" json:"metricsClosing,omitempty"`
+	// Enables job's garbage collection
+	GC bool `yaml:"gc" json:"gc"`
+	// Measurements job-specific measurements to enable
+	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
 }
 
 type WaitOptions struct {
-	// ForCondition wait for this condition to become true
-	ForCondition string `yaml:"forCondition" json:"forCondition,omitempty"`
+	// APIVersion apiVersion to consider for wait
+	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
+	// Kind object kind to consider for wait
+	Kind string `yaml:"kind" json:"kind,omitempty"`
+	// LabelSelector objects with these labels will be considered
+	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
+	// CustomStatusPaths defines the list of jq path specific status fields to check (e.g., [{"key":".[]conditions.type","value":"Available"}]).
+	CustomStatusPaths []StatusPath `yaml:"customStatusPaths" json:"customStatusPaths,omitempty"`
 }
+
+type Watcher struct {
+	// Kind object kind to consider for watch
+	Kind string `yaml:"kind" json:"kind,omitempty"`
+	// APIVersion object apiVersion to consider for watch
+	APIVersion string `yaml:"apiVersion" json:"apiVersion,omitempty"`
+	// LabelSelector objects with these labels will be considered
+	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
+	// Replicas number of replicas to create of the given object
+	Replicas int `yaml:"replicas" json:"replicas,omitempty"`
+}
+
+// StatusPath defines the structure for each key-value pair in CustomStatusPath.
+type StatusPath struct {
+	Key   string `yaml:"key" json:"key"`
+	Value string `yaml:"value" json:"value"`
+}
+
+// Churn options
+type ChurnConfig struct {
+	// number of churn loop iterations
+	Cycles int `yaml:"cycles" json:"cycles,omitempty"`
+	// percentage of objects to churn
+	Percent int `yaml:"percent" json:"percent,omitempty"`
+	// duration of the churn stage
+	Duration time.Duration `yaml:"duration" json:"duration,omitempty"`
+	// Delay between sets
+	Delay time.Duration `yaml:"delay" json:"delay,omitempty"`
+	// Churning mode
+	Mode ChurnMode `yaml:"mode" json:"mode,omitempty"`
+}
+
+type KubeClientProvider struct {
+	restConfig *rest.Config
+}
+
+// Execution mode for Patch jobs
+type ExecutionMode string
+
+const (
+	ExecutionModeParallel   ExecutionMode = "parallel"
+	ExecutionModeSequential ExecutionMode = "sequential"
+)
+
+const (
+	KubeBurnerLabelJob          = "kube-burner.io/job"
+	KubeBurnerLabelUUID         = "kube-burner.io/uuid"
+	KubeBurnerLabelRunID        = "kube-burner.io/runid"
+	KubeBurnerLabelIndex        = "kube-burner.io/index"
+	KubeBurnerLabelJobIteration = "kube-burner.io/job-iteration"
+	KubeBurnerLabelReplica      = "kube-burner.io/replica"
+	KubeBurnerLabelChurnDelete  = "kube-burner.io/churn-delete"
+)
+
+// MetricsCLosing strategy
+type MetricsClosing string
+
+const (
+	AfterJobPause     MetricsClosing = "afterJobPause"
+	AfterMeasurements MetricsClosing = "afterMeasurements"
+	AfterJob          MetricsClosing = "afterJob"
+)
+
+var metricsClosing = map[MetricsClosing]struct{}{
+	AfterJobPause:     {},
+	AfterMeasurements: {},
+	AfterJob:          {},
+}
+
+type ChurnMode string
+
+const (
+	ChurnNamespaces ChurnMode = "namespaces"
+	ChurnObjects    ChurnMode = "objects"
+)

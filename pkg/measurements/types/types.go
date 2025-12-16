@@ -18,20 +18,16 @@ import (
 	"time"
 )
 
-type latencyMetric string
-
 const (
-	All            latencyMetric = "all"       // Both quantiles and per pod documents
-	Quantiles      latencyMetric = "quantiles" // Single quantile document
-	pprofDirectory string        = "pprof"
+	pprofDirectory string = "pprof"
 )
 
 // UnmarshalYAML implements Unmarshaller to customize object defaults
-func (m *Measurement) UnmarshalMeasurement(unmarshal func(interface{}) error) error {
+func (m *Measurement) UnmarshalMeasurement(unmarshal func(any) error) error {
 	type rawMeasurement Measurement
 	measurement := rawMeasurement{
-		PProfDirectory:    pprofDirectory,
-		PodLatencyMetrics: All,
+		PProfDirectory: pprofDirectory,
+		ServiceTimeout: 5 * time.Second,
 	}
 	if err := unmarshal(&measurement); err != nil {
 		return err
@@ -52,8 +48,14 @@ type Measurement struct {
 	PProfInterval time.Duration `yaml:"pprofInterval"`
 	// PProfDirectory output directory
 	PProfDirectory string `yaml:"pprofDirectory"`
-	// Pod latency metrics to index
-	PodLatencyMetrics latencyMetric `yaml:"podLatencyMetrics"`
+	// NodeAffinity node affinity configuration
+	NodeAffinity map[string]string `yaml:"nodeAffinity"`
+	// Service latency endpoint timeout
+	ServiceTimeout time.Duration `yaml:"svcTimeout"`
+	// Defines the indexer for quantile metrics
+	QuantilesIndexer string `yaml:"quantilesIndexer"`
+	// Defines the indexer for timeseries
+	TimeseriesIndexer string `yaml:"timeseriesIndexer"`
 }
 
 // LatencyThreshold holds the thresholds configuration
@@ -86,4 +88,19 @@ type PProftarget struct {
 	Cert string `yaml:"cert"`
 	// Key Private key content
 	Key string `yaml:"key"`
+	// UnixSocketPath Unix socket path
+	UnixSocketPath string `yaml:"unixSocketPath"`
 }
+
+const (
+	SvcLatencyNs          = "kube-burner-service-latency"
+	SvcLatencyCheckerName = "svc-checker"
+)
+
+const (
+	PprofNamespace   = "kube-burner-pprof-collector"
+	PprofDaemonSet   = "kube-burner-pprof-collector"
+	PprofSA          = "kube-burner-pprof-collector"
+	PprofRole        = "kube-burner-pprof-collector"
+	PprofRoleBinding = "kube-burner-pprof-collector"
+)

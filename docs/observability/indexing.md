@@ -1,27 +1,68 @@
 # Indexing
 
-Kube-burner can index the collected metrics into a given indexer.
+Kube-burner can collect metrics and alerts from prometheus and from measurements and send them to the configured indexers.
+
+## Metrics endpoints
+
+The logic to configure metric collection and indexing is established by the `metricsEndpoints` field of the configuration file, this field is a list of objects with the following structure:
+
+| Field     | Description     | Example   |
+| --------- | --------------- | --------- |
+| `endpoint` | Define the prometheus endpoint to scrape | `https://prom.my-domain.com` |
+| `username` | Prometheus username (Basic auth) | `username` |
+| `password` | Prometheus password (Basic auth) | `topSecret` |
+| `token` | Prometheus bearer token (Bearer auth) | `yourTokenDefinition` |
+| `step` | Prometheus step size, used when scraping it, by default `30s` | `1m` |
+| `skipTLSVerify` | Skip TLS certificate verification, `true` by default | `true` |
+| `metrics` | List of metrics files | `[metrics.yml, more-metrics.yml]` |
+| `alerts` | List of alerts files | `[alerts.yml, more-alerts.yml]` |
+| `indexer` | Indexer configuration | [indexers](#indexers) |
+| `alias`   | Indexer alias, an arbitrary string required to send measurement results to an specific indexer  | `my-indexer` |
+
+!!! Note
+    Info about how to configure [metrics-profiles](metrics.md) and [alerts-profiles](alerting.md)
 
 ## Indexers
 
-Configured in the `indexerConfig` object, they can be tweaked by the following parameters:
+Configured by the `indexer` field, it defines an indexer for the Prometheus endpoint, making all collected metrics to be indexed in it.
+Depending on the indexer, different configuration parameters need to be specified. The type of indexer is configured by the field `type`
 
-| Option    | Description     | Type    | Default |
-| --------- | --------------- | ------- | ------- |
-| `type`    | Type of indexer | String  | ""      |
+| Option    | Description     | Supported values   |
+| --------- | --------------- | ------- |
+| `type`    | Type of indexer | `elastic`, `opensearch`, `local`|
 
-!!! Note
-    Currently, `elastic`, `opensearch` and `local` are the only supported indexers
+## Example
+
+An example of how the `metricsEndpoints` section would look like in the configuration is:
+
+```yaml
+metricsEndpoints:
+  - endpoint: http://localhost:9090
+    alias: os-indexing
+    alerts:
+    - alert-profile.yaml
+  - endpoint: https://remote-endpoint:9090
+    metrics:
+    - metrics-profile.yaml
+    indexer:
+      type: local
+      metricsDirectory: my-metrics
+```
+
+In the example above, two endpoints are defined, the first will be used to scrape for the alerts defined in the file `alert-profile.yaml` and the second one will be used to scrape the metrics defined in `metrics-profile.yaml`, these metrics will be indexed by the configured indexer.
+
+!!! info
+    Configuring an indexer in an endpoint is only required when any metrics profile is configured
 
 ### Elastic/OpenSearch
 
-This indexer send collected documents to Elasticsearch 7 instances or OpenSearch instances.
+Send collected documents to Elasticsearch7 or OpenSearch instances.
 
 The `elastic` or `opensearch` indexer can be configured by the parameters below:
 
 | Option               | Description                                       | Type    | Default |
 | -------------------- | ------------------------------------------------- | ------- | ------- |
-| `esServers`          | List of Elasticsearch or OpenSearch instances     | List    | ""      |
+| `esServers`          | List of Elasticsearch or OpenSearch URLs          | List    | []      |
 | `defaultIndex`       | Default index to send the Prometheus metrics into | String  | ""      |
 | `insecureSkipVerify` | TLS certificate verification                      | Boolean | false   |
 
@@ -44,46 +85,50 @@ The `local` indexer can be configured by the parameters below:
 
 ## Job Summary
 
-When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with.
+When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. It also contains the timestamps of the execution phase (`timestamp` and `endTimestamp`) as well as the cleanup phase (`cleanupTimestamp` and `cleanupEndTimestamp`).
 
 This document looks like:
 
 ```json
 {
-  "timestamp": "2020-11-13T13:55:31.654185032+01:00",
-  "uuid": "bdb7584a-d2cd-4185-8bfa-1387cc31f99e",
+  "timestamp": "2023-08-29T00:17:27.942960538Z",
+  "endTimestamp": "2023-08-29T00:18:15.817272025Z",
+  "uuid": "83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16",
+  "elapsedTime": 48,
+  "achievedQps": 0.333,
+  "cleanupTimestamp": "2023-08-29T00:18:18.015107794Z",
+  "cleanupEndTimestamp": "2023-08-29T00:18:49.014541929Z",
   "metricName": "jobSummary",
   "elapsedTime": 8.768932955,
-  "jobConfig": {
-    "jobIterations": 10,
-    "jobIterationDelay": 0,
-    "jobPause": 0,
-    "name": "kubelet-density",
-    "objects": [
-      {
-        "objectTemplate": "templates/pod.yml",
-        "replicas": 1,
-        "inputVars": {
-          "containerImage": "gcr.io/google_containers/pause-amd64:3.0"
-        }
-      }
-    ],
-    "jobType": "create",
-    "qps": 5,
-    "burst": 5,
-    "namespace": "kubelet-density",
-    "waitFor": null,
-    "maxWaitTimeout": 43200000000000,
+  "version": "v1.10.0",
+  "passed": true,
+  "executionErrors": "this is an example",
+  "jobConfig": {                          
+    "jobIterations": 1,                                                                                              
+    "name": "cluster-density-v2",                                                                                    
+    "jobType": "create",                                                                                             
+    "qps": 20,                                                                                                       
+    "burst": 20,
+    "namespace": "cluster-density-v2",
+    "maxWaitTimeout": 14400000000000,
     "waitForDeletion": true,
-    "podWait": false,
     "waitWhenFinished": true,
     "cleanup": true,
-    "namespacedIterations": false,
+    "namespacedIterations": true,
+    "iterationsPerNamespace": 1,
     "verifyObjects": true,
-    "errorOnVerify": false
+    "errorOnVerify": true,
+    "preLoadImages": true,
+    "preLoadPeriod": 15000000000,
+    "churnPercent": 10,
+    "churnDuration": 3600000000000,
+    "churnDelay": 120000000000
   }
 }
 ```
+
+!!! Note
+    It's possible that some of the fields from the document above don't get indexed when it has no value
 
 ## Metric exporting & importing
 
@@ -109,12 +154,13 @@ A valid file provided to the `--metrics-endpoint` looks like this:
 ```yaml
 - endpoint: http://localhost:9090 # This is one of the Prometheus endpoints
   token: <token> # Authentication token
-  profile: metrics.yaml # Metrics profile to use in this target
-  alertProfile: alerts.yaml # Alert profile, optional
+  metrics: [metrics.yaml] # Metrics profiles to use for this endpoint
+  indexer:
+    - type: local
 - endpoint: http://remotehost:9090 # Another Prometheus endpoint
   token: <token>
-  profile: metrics.yaml
+  alerts: [alerts.yaml] # Alert profile, when metrics is not defined, defining an indexer is optional
 ```
 
 !!! Note
-    The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file. The `profile` and `alertProfile` parameters are optional. If not provided, they will be taken from the CLI flags.
+    The configuration provided by the `--metrics-endpoint` flag has precedence over the parameters specified in the config file.

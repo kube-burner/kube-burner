@@ -1,36 +1,42 @@
 docs_dir: docs/
-repo_url: https://github.com/cloud-bulldozer/kube-burner
+repo_url: https://github.com/kube-burner/kube-burner
 nav:
 - Home: index.md
-- Command line: cli.md
+- Command line: cli/index.md
 - Reference: reference/configuration.md
-- Measurements: measurements.md
+- Measurements: measurements/index.md
 - Observability & Alerting: 
   - observability/index.md
   - Overview: observability/index.md
   - Collecting metrics: observability/metrics.md
   - Indexing: observability/indexing.md
   - Alerting: observability/alerting.md
-- OpenShift Wrapper: ocp.md
 - Contributing:
   - contributing/index.md
-  - Contributing: contributing/index.md
   - GitHub Workflows:
     - contributing/pullrequest.md
     - contributing/release.md
   - Tests: contributing/tests.md
+- Wrappers: wrappers/wrappers.md
 site_name: Kube-burner
 plugins:
   - search
   - include-markdown
 extra:
+  social:
+    - icon: fontawesome/brands/slack
+      link: https://slack.cncf.io
+    - icon: fontawesome/brands/github
+      link: https://github.com/kube-burner
   version:
     provider: mike
+    limit: 3
 extra_css:
   - css/extra.css
 theme:
   version: latest
   name: material
+  custom_dir: docs/overrides
   font:
     text: Roboto
     code: Roboto Mono
@@ -49,8 +55,8 @@ theme:
       toggle:
         icon: material/weather-sunny
 
-  logo: media/logo/kube-burner-logo-mini.png
-  favicon: media/logo/kube-burner-logo-mini.png
+  logo: media/logos/kube-burner-logo-mini.png
+  favicon: media/logos/kube-burner-logo-mini.png
   features:
     - navigation.instant
     - navigation.tracking
@@ -83,8 +89,8 @@ markdown_extensions:
   - pymdownx.caret
   - pymdownx.details
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight
   - pymdownx.inlinehilite
   - pymdownx.keys
@@ -100,3 +106,4 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+copyright: Copyright © 2024 The kube-burner Authors</br></br>

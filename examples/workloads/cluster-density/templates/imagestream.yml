@@ -1,9 +1,0 @@
----
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  name: {{.prefix}}-{{.Replica}}
-spec:
-{{ if index . "image" }}
-  dockerImageRepository: {{.image}}
-{{ end }}

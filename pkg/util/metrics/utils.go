@@ -17,59 +17,33 @@ package metrics
 import (
 	"bytes"
 	"io"
-	"time"
 
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
-// Updates parameter in place with new value if its is empty
-func updateParamIfEmpty(oldValue *string, newValue string) {
-	if *oldValue == "" {
-		*oldValue = newValue
-	}
-}
-
-// Performs the validity check of metrics endpoint and prometheus url
-func validateMetricsEndpoint(metricsEndpoint string, prometheusURL string) {
-	if (metricsEndpoint != "" && prometheusURL != "") || (metricsEndpoint == "" && prometheusURL == "") {
-		log.Fatal("Please use either of --metrics-endpoint or --prometheus-url flags to fetch metrics or alerts")
-	}
-}
-
 // Decodes metrics endpoint yaml file
-func DecodeMetricsEndpoint(metricsEndpoint string, metricsEndpoints *[]prometheus.MetricEndpoint) {
-	f, err := util.ReadConfig(metricsEndpoint)
+func DecodeMetricsEndpoint(metricsEndpointPath string) []config.MetricsEndpoint {
+	var metricsEndpoints []config.MetricsEndpoint
+	f, err := fileutils.GetMetricsReader(metricsEndpointPath, nil)
 	if err != nil {
-		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpoint, err)
+		log.Fatalf("Error reading metricsEndpoint %s: %s", metricsEndpointPath, err)
 	}
 	cfg, err := io.ReadAll(f)
 	if err != nil {
-		log.Fatalf("Error reading configuration file %s: %s", metricsEndpoint, err)
+		log.Fatalf("Error reading configuration file %s: %s", metricsEndpointPath, err)
 	}
-	renderedME, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError)
+	renderedME, err := util.RenderTemplate(cfg, util.EnvToMap(), util.MissingKeyError, []string{})
 	if err != nil {
-		log.Fatalf("Template error in %s: %s", metricsEndpoint, err)
+		log.Fatalf("Template error in %s: %s", metricsEndpointPath, err)
 	}
 	yamlDec := yaml.NewDecoder(bytes.NewReader(renderedME))
 	yamlDec.KnownFields(true)
 	if err := yamlDec.Decode(&metricsEndpoints); err != nil {
-		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpoint, err)
+		log.Fatalf("Error decoding metricsEndpoint %s: %s", metricsEndpointPath, err)
 	}
-}
-
-// Scrapes prometheus metrics
-func ScrapeMetrics(p *prometheus.Prometheus, indexer *indexers.Indexer) {
-	log.Infof("Scraping %v Profile: %v Start: %v End: %v",
-		p.Endpoint,
-		p.ConfigSpec.GlobalConfig.MetricsProfile,
-		p.JobList[0].Start.Format(time.RFC3339),
-		p.JobList[len(p.JobList)-1].End.Format(time.RFC3339))
-	log.Infof("Indexing metrics with UUID %s", p.UUID)
-	if err := p.ScrapeJobsMetrics(indexer); err != nil {
-		log.Error(err)
-	}
+	return metricsEndpoints
 }

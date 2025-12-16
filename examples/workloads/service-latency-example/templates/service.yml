@@ -1,0 +1,15 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{.JobName}}-{{.Replica}}
+spec:
+  selector:
+    app: {{.JobName}}-{{.Replica}}
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
+
+ 

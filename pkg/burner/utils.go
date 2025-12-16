@@ -16,83 +16,138 @@ package burner
 
 import (
 	"context"
-	"fmt"
 	"math"
-	"regexp"
-	"strings"
+	"strconv"
+	"sync"
 	"time"
 
-	"github.com/openshift/client-go/config/clientset/versioned"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
+
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
 )
 
 const (
 	objectLimit = 500
 )
 
-func prepareTemplate(original []byte) ([]byte, error) {
-	// Removing all placeholders from template.
-	// This needs to be done due to placeholders not being valid yaml
-	if isEmpty(original) {
-		return nil, fmt.Errorf("template is empty")
+var (
+	commonUnderlyingObjectLabelsPath = []string{"spec", "template", "metadata", "labels"}
+
+	kindToLabelPaths = map[string][][]string{
+		DaemonSet:      {commonUnderlyingObjectLabelsPath},
+		Deployment:     {commonUnderlyingObjectLabelsPath},
+		ReplicaSet:     {commonUnderlyingObjectLabelsPath},
+		StatefulSet:    {commonUnderlyingObjectLabelsPath, []string{"spec", "selector", "matchLabels"}},
+		VirtualMachine: {commonUnderlyingObjectLabelsPath},
 	}
-	r, err := regexp.Compile(`\{\{.*\}\}`)
-	if err != nil {
-		return nil, fmt.Errorf("regexp creation error: %v", err)
+
+	kindToLabelPathsInArray = map[string][][][]string{
+		VirtualMachine: {[][]string{
+			{"spec", "dataVolumeTemplates"}, {"metadata", "labels"}},
+		},
 	}
-	original = r.ReplaceAll(original, []byte{})
-	return original, nil
+)
+
+// updates the labels in the object
+func updateLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
+	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
+	if !found {
+		labelMap = make(map[string]any, len(labels))
+	}
+	for k, v := range labels {
+		labelMap[k] = v
+	}
+	unstructured.SetNestedMap(obj.Object, labelMap, templatePath...)
 }
 
-// Helps to set metadata labels
-func setMetadataLabels(obj *unstructured.Unstructured, labels map[string]string) {
-	// Will be useful for the resources like Deployments and Replicasets. Because
-	// object.SetLabels(labels) doesn't actually set labels for the underlying
-	// objects (i.e Pods under deployment/replicastes). So this function should help
-	// us achieve that without breaking any of our labeling functionality.
-	templatePath := []string{"spec", "template", "metadata", "labels"}
-	metadata, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
+func setLabelsInArray(obj *unstructured.Unstructured, labels map[string]string, arrayPath []string, templatePath []string) {
+	array, found, _ := unstructured.NestedSlice(obj.Object, arrayPath...)
 	if !found {
 		return
 	}
-	for k, v := range labels {
-		metadata[k] = v
+
+	for _, a := range array {
+		innerObj := unstructured.Unstructured{}
+		innerObj.SetUnstructuredContent(a.(map[string]any))
+
+		updateLabels(&innerObj, labels, templatePath)
 	}
-	unstructured.SetNestedMap(obj.Object, metadata, templatePath...)
+	unstructured.SetNestedSlice(obj.Object, array, arrayPath...)
 }
 
-func yamlToUnstructured(y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
+// updates the labels in the child resources
+// labeling these resources is required for some measurements to work properly
+// as they rely on those labels to watch the objects
+func updateChildLabels(obj *unstructured.Unstructured, labels map[string]string) {
+	paths := kindToLabelPaths[obj.GetKind()]
+	for _, path := range paths {
+		updateLabels(obj, labels, path)
+	}
+
+	// Do the same for elements stored in array (e.g. dataVolumeTemplates in VirtualMachine)
+	arrays := kindToLabelPathsInArray[obj.GetKind()]
+	for _, array := range arrays {
+		setLabelsInArray(obj, labels, array[0], array[1])
+	}
+}
+
+func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
 	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
 	if err != nil {
-		log.Fatalf("Error decoding YAML: %s", err)
+		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
 	}
 	return o, gvk
 }
 
+// resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements
+func (ex *JobExecutor) resolveObjectMapping(obj *object) {
+	ex.mapper.Reset()
+	mapping, err := ex.mapper.RESTMapping(obj.gvk.GroupKind())
+	if err != nil {
+		log.Fatal(err)
+	}
+	obj.gvr = mapping.Resource
+	obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+	obj.Kind = obj.gvk.Kind
+	if obj.namespaced && obj.namespace == "" {
+		ex.nsRequired = true
+	}
+}
+
 // Verify verifies the number of created objects
-func (ex *Executor) Verify() bool {
+func (ex *JobExecutor) Verify() bool {
 	var objList *unstructured.UnstructuredList
 	var replicas int
 	success := true
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
+		selector := labels.Set{
+			config.KubeBurnerLabelUUID:  ex.uuid,
+			config.KubeBurnerLabelRunID: ex.runid,
+			config.KubeBurnerLabelJob:   ex.Name,
+			config.KubeBurnerLabelIndex: strconv.Itoa(objectIndex),
+		}
 		listOptions := metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("kube-burner-uuid=%s,kube-burner-job=%s,kube-burner-index=%d", ex.uuid, ex.Name, objectIndex),
+			LabelSelector: selector.String(),
 			Limit:         objectLimit,
 		}
-		err := RetryWithExponentialBackOff(func() (done bool, err error) {
+		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
 			replicas = 0
 			for {
-				objList, err = DynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
+				objList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
 				if err != nil {
 					log.Errorf("Error verifying object: %s", err)
 					return false, nil
@@ -111,54 +166,20 @@ func (ex *Executor) Verify() bool {
 			success = false
 			continue
 		}
-		objectsExpected := ex.JobIterations * obj.Replicas
+		var objectsExpected int
+		if obj.RunOnce {
+			objectsExpected = obj.Replicas
+		} else {
+			objectsExpected = obj.Replicas * ex.JobIterations
+		}
 		if replicas != objectsExpected {
 			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 			success = false
 		} else {
-			log.Infof("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
+			log.Debugf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
 		}
 	}
 	return success
-}
-
-// Verifies container registry and reports its status
-func VerifyContainerRegistry(restConfig *rest.Config) bool {
-	// Create an OpenShift client using the default configuration
-	client, err := versioned.NewForConfig(restConfig)
-	if err != nil {
-		log.Error("Error connecting to the openshift cluster", err)
-		return false
-	}
-
-	// Get the image registry object
-	imageRegistry, err := client.ConfigV1().ClusterOperators().Get(context.TODO(), "image-registry", metav1.GetOptions{})
-	if err != nil {
-		log.Error("Error getting image registry object:", err)
-		return false
-	}
-
-	// Check the status conditions
-	logMessage := ""
-	readyFlag := false
-	for _, condition := range imageRegistry.Status.Conditions {
-		if condition.Type == "Available" && condition.Status == "True" {
-			readyFlag = true
-			logMessage += " up and running"
-		}
-		if condition.Type == "Progressing" && condition.Status == "False" && condition.Reason == "Ready" {
-			logMessage += " ready to use"
-		}
-		if condition.Type == "Degraded" && condition.Status == "False" && condition.Reason == "AsExpected" {
-			logMessage += " with a healthy state"
-		}
-	}
-	if readyFlag {
-		log.Infof("Cluster image registry is%s", logMessage)
-	} else {
-		log.Info("Cluster image registry is not up and running")
-	}
-	return readyFlag
 }
 
 // RetryWithExponentialBackOff a utility for retrying the given function with exponential backoff.
@@ -173,15 +194,125 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-func isEmpty(raw []byte) bool {
-	return strings.TrimSpace(string(raw)) == ""
+// newMapper returns a discovery RESTMapper
+func newRESTMapper(config *rest.Config) *restmapper.DeferredDiscoveryRESTMapper {
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+	cachedDiscovery := memory.NewMemCacheClient(discoveryClient)
+	return restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
 }
 
-// newMapper returns a discovery RESTMapper
-func newRESTMapper() meta.RESTMapper {
-	apiGroupResouces, err := restmapper.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		log.Fatal(err)
+func (ex *JobExecutor) Run(ctx context.Context) []error {
+	var errs []error
+	switch ex.ExecutionMode {
+	case config.ExecutionModeParallel:
+		errs = ex.runParallel(ctx)
+	case config.ExecutionModeSequential:
+		errs = ex.runSequential(ctx)
 	}
-	return restmapper.NewDiscoveryRESTMapper(apiGroupResouces)
+	return errs
+}
+
+func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
+	var itemList *unstructured.UnstructuredList
+	labelSelector := labels.Set(obj.LabelSelector).String()
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelSelector,
+	}
+
+	// Try to find the list of resources by GroupVersionResource.
+	err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
+		itemList, err = ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+		if err != nil {
+			log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
+			return false, nil
+		}
+		log.Infof("Found %d %s with selector %s; patching them", len(itemList.Items), obj.gvr.Resource, labelSelector)
+		return true, nil
+	}, 1*time.Second, 3, 0, ex.MaxWaitTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return itemList, nil
+}
+
+func (ex *JobExecutor) runSequential(ctx context.Context) []error {
+	var errs []error
+	for i := range ex.JobIterations {
+		for _, obj := range ex.objects {
+			if ctx.Err() != nil {
+				return []error{ctx.Err()}
+			}
+			itemList, err := ex.getItemListForObject(obj)
+			if err != nil {
+				continue
+			}
+			var wg sync.WaitGroup
+			objectTimeUTC := time.Now().UTC().Unix()
+			for _, item := range itemList.Items {
+				wg.Add(1)
+				go ex.itemHandler(ex, obj, item, i, objectTimeUTC, &wg)
+			}
+			// Wait for all items in the object
+			wg.Wait()
+
+			// If requested, wait for the completion of the specific object
+			if ex.ObjectWait {
+				if err := ex.waitForObject("", obj); err != nil {
+					if errs == nil {
+						errs = append(errs, err)
+					}
+				}
+			}
+
+			if ex.objectFinalizer != nil {
+				ex.objectFinalizer(ex, obj)
+			}
+			// Wait between object
+			if ex.ObjectDelay > 0 {
+				log.Infof("Sleeping between objects for %v", ex.ObjectDelay)
+				time.Sleep(ex.ObjectDelay)
+			}
+		}
+		if ex.WaitWhenFinished {
+			if err := ex.waitForObjects(""); err != nil {
+				errs = append(errs, err...)
+			}
+		}
+		// Wait between job iterations
+		if ex.JobIterationDelay > 0 {
+			log.Infof("Sleeping between job iterations for %v", ex.JobIterationDelay)
+			time.Sleep(ex.JobIterationDelay)
+		}
+		// Print progress every 10 iterations
+		if i%10 == 0 {
+			// Skip the first print
+			if i > 0 {
+				log.Infof("%v/%v iterations completed", i, ex.JobIterations)
+			}
+		}
+	}
+	return errs
+}
+
+// runParallel executes all objects for all jobs in parallel
+func (ex *JobExecutor) runParallel(ctx context.Context) []error {
+	var wg sync.WaitGroup
+	for _, obj := range ex.objects {
+		if ctx.Err() != nil {
+			return []error{ctx.Err()}
+		}
+		itemList, err := ex.getItemListForObject(obj)
+		if err != nil {
+			continue
+		}
+		for j := range ex.JobIterations {
+			objectTimeUTC := time.Now().UTC().Unix()
+			for _, item := range itemList.Items {
+				wg.Add(1)
+				go ex.itemHandler(ex, obj, item, j, objectTimeUTC, &wg)
+			}
+		}
+	}
+	wg.Wait()
+	return ex.waitForObjects("")
 }

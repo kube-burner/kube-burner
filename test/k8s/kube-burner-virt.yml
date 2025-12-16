@@ -1,0 +1,64 @@
+---
+
+global:
+  gc: {{env "GC"}}
+  measurements:
+  - name: vmiLatency
+{{ if .TIMESERIES_INDEXER }}
+    timeseriesIndexer: {{env "TIMESERIES_INDEXER"}}
+    thresholds:
+        - conditionType: VMIRunning
+          metric: P99
+          threshold: 10s
+{{ end }}
+metricsEndpoints:
+{{ if .ES_INDEXING }}
+  - endpoint: http://localhost:9090
+    indexer:
+      type: opensearch
+      esServers: ["{{ .ES_SERVER }}"]
+      defaultIndex: {{ .ES_INDEX }}
+    metrics: [metrics-profile.yaml]
+{{ if .ALERTING }}
+    alerts: [alerts.yml]
+{{ end }}
+{{ end }}
+{{ if .LOCAL_INDEXING }}
+  - endpoint: http://localhost:9090
+    indexer: 
+      type: local
+      metricsDirectory: {{ .METRICS_FOLDER }}
+    metrics: [metrics-profile.yaml]
+{{ if .ALERTING }}
+    alerts: [alerts.yml]
+{{ end }}
+{{ end }}
+
+
+jobs:
+  # create the VMs
+  - name: {{ .JOB_NAME }}
+    jobType: create
+    qps: 20
+    burst: 20
+    namespacedIterations: false
+    namespace: {{ .JOB_NAME }}
+    verifyObjects: true
+    errorOnVerify: true
+    jobIterationDelay: 1s
+    waitWhenFinished: true
+    podWait: false
+    maxWaitTimeout: 1h   
+    cleanup: true
+    preLoadImages: true
+    preLoadPeriod: 2s
+    objects:
+
+    - objectTemplate: objectTemplates/vm-ephemeral.yml
+      replicas: 1
+      inputVars:
+        name: kubevirt-density
+        image: quay.io/kubevirt/fedora-with-test-tooling-container-disk:v0.48.1
+        OS: fedora27
+        memory: 64M
+        createVMI: true

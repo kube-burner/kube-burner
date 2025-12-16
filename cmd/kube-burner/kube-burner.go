@@ -17,28 +17,27 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"path"
 	"path/filepath"
-	"runtime"
+	"strings"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
+	uid "github.com/google/uuid"
+	"github.com/kube-burner/kube-burner/v2/pkg/alerting"
+	"github.com/kube-burner/kube-burner/v2/pkg/burner"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
+	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/cloud-bulldozer/go-commons/version"
-	"github.com/cloud-bulldozer/kube-burner/pkg/alerting"
-	"github.com/cloud-bulldozer/kube-burner/pkg/burner"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util"
-	"github.com/cloud-bulldozer/kube-burner/pkg/util/metrics"
-
-	"github.com/cloud-bulldozer/go-commons/indexers"
-	"github.com/cloud-bulldozer/kube-burner/pkg/prometheus"
-
-	uid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/dynamic"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -51,18 +50,8 @@ var rootCmd = &cobra.Command{
 	Long: `Kube-burner 🔥
 
 Tool aimed at stressing a kubernetes cluster by creating or deleting lots of objects.`,
-}
-
-// versionCmd represents the version command
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the version number of kube-burner",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Version:", version.Version)
-		fmt.Println("Git Commit:", version.GitCommit)
-		fmt.Println("Build Date:", version.BuildDate)
-		fmt.Println("Go Version:", version.GoVersion)
-		fmt.Println("OS/Arch:", version.OsArch)
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		util.ConfigureLogging(cmd)
 	},
 }
 
@@ -84,13 +73,16 @@ To configure your bash shell to load completions for each session execute:
 
 func initCmd() *cobra.Command {
 	var err error
-	var url, metricsEndpoint, metricsProfile, alertProfile, configFile string
-	var username, password, uuid, token, configMap, namespace, userMetadata string
-	var skipTLSVerify bool
-	var prometheusStep time.Duration
+	var clientSet kubernetes.Interface
+	var kubeConfig, kubeContext string
+	var metricsEndpoint, configFile, configMap, metricsProfile, alertProfile string
+	var uuid, userMetadata, namespace string
+	var skipTLSVerify, skipLogFile bool
 	var timeout time.Duration
+	var userDataFile string
+	var allowMissingKeys bool
 	var rc int
-	var metricsScraper metrics.Scraper
+	var setValues []string
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -99,6 +91,11 @@ func initCmd() *cobra.Command {
 			os.Exit(rc)
 		},
 		Args: cobra.NoArgs,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if configMap != "" {
 				metricsProfile, alertProfile, err = config.FetchConfigMap(configMap, namespace)
@@ -108,85 +105,230 @@ func initCmd() *cobra.Command {
 				// We assume configFile is config.yml
 				configFile = "config.yml"
 			}
-			f, err := util.ReadConfig(configFile)
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
+			setVars, err := config.ParseSetValues(setValues)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			clientSet, _ = kubeClientProvider.DefaultClientSet()
+			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(uuid, f)
-			if err != nil {
-				log.Fatalf("Config error: %s", err.Error())
+			var userDataFileReader io.Reader
+			if userDataFile != "" {
+				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
+				if err != nil {
+					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
+				}
 			}
-			if configSpec.GlobalConfig.IndexerConfig.Type != "" || alertProfile != "" {
-				metricsScraper = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-					ConfigSpec:      configSpec,
-					Password:        password,
-					PrometheusStep:  prometheusStep,
-					MetricsEndpoint: metricsEndpoint,
-					MetricsProfile:  metricsProfile,
-					AlertProfile:    alertProfile,
-					SkipTLSVerify:   skipTLSVerify,
-					URL:             url,
-					Token:           token,
-					Username:        username,
-					UserMetaData:    userMetadata,
-				})
-			}
-			rc, err = burner.Run(configSpec, metricsScraper.PrometheusClients, metricsScraper.AlertMs, metricsScraper.Indexer, timeout, metricsScraper.UserMetadataContent)
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil, setVars)
 			if err != nil {
-				log.Errorf(err.Error())
+				log.Error("Config error")
+				fmt.Printf("%s", err.Error())
+				os.Exit(1)
+			}
+			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+				ConfigSpec:      &configSpec,
+				MetricsEndpoint: metricsEndpoint,
+				UserMetaData:    userMetadata,
+				AlertProfile:    alertProfile,
+				MetricsProfile:  metricsProfile,
+			})
+			if configSpec.GlobalConfig.ClusterHealth {
+				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
+				util.ClusterHealthCheck(clientSet)
+			}
+
+			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil, nil)
+			if err != nil {
+				log.Error(err.Error())
 				os.Exit(rc)
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
-	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
-	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
-	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
-	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
-	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "", "Metrics profile file or URL")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
-	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "", "Alert profile file or URL")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
-	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Benchmark timeout")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
 	cmd.Flags().StringVarP(&configMap, "configmap", "", "", "Configmap holding all the configuration: config.yml, metrics.yml and alerts.yml. metrics and alerts are optional")
 	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Namespace where the configmap is")
-	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
+	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
+	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
+	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
+	cmd.Flags().StringSliceVar(&setValues, "set", []string{}, "Set arbitrary key=value pairs to override values in the config file")
 	cmd.Flags().SortFlags = false
+	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd
 }
 
-func destroyCmd() *cobra.Command {
-	var uuid string
-	var timeout time.Duration
+func healthCheck() *cobra.Command {
+	var kubeConfig, kubeContext string
+	var skipLogFile bool
 	var rc int
 	cmd := &cobra.Command{
-		Use:   "destroy",
-		Short: "Destroy old namespaces labeled with the given UUID.",
+		Use:   "health-check",
+		Short: "Check for Health Status of the cluster",
 		PostRun: func(cmd *cobra.Command, args []string) {
-			log.Info("👋 Exiting kube-burner ", uuid)
+			log.Info("👋 Exiting kube-burner ")
 			os.Exit(rc)
 		},
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("kube-burner-uuid=%s", uuid)}
-			clientSet, restConfig, err := config.GetClientSet(0, 0)
-			if err != nil {
-				log.Fatalf("Error creating clientSet: %s", err)
+			var uuid = uid.NewString()
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
 			}
-			burner.ClientSet = clientSet
-			burner.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
+			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
+			util.ClusterHealthCheck(clientSet)
+		},
+	}
+	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
+	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
+	return cmd
+}
+
+func destroyCmd() *cobra.Command {
+	var timeout time.Duration
+	var kubeConfig, kubeContext, configFile string
+	var skipLogFile bool
+	var userDataFile string
+	uuid := uid.NewString()
+	cmd := &cobra.Command{
+		Use:   "destroy",
+		Short: "Destroy benchmark assets",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
+			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			burner.CleanupNamespaces(ctx, listOptions, true)
-			burner.CleanupNonNamespacedResources(ctx, listOptions, true)
+			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
+			if err != nil {
+				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
+			}
+			var userDataFileReader io.Reader
+			if userDataFile != "" {
+				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
+				if err != nil {
+					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
+				}
+			}
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, true, nil, nil)
+			if err != nil {
+				log.Error("Config error")
+				fmt.Printf("%s", err.Error())
+				os.Exit(1)
+			}
+			if err := burner.Destroy(ctx, configSpec, kubeClientProvider); err != nil {
+				log.Fatal(err.Error())
+			}
+		},
+	}
+	cmd.Flags().StringVar(&userDataFile, "user-data", "", "User provided data file for rendering the configuration file, in JSON or YAML format")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
+	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
+	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "Config file path or URL")
+	cmd.MarkFlagRequired("config")
+	return cmd
+}
+
+func measureCmd() *cobra.Command {
+	var uuid string
+	var rawNamespaces string
+	var selector string
+	var configFile string
+	var jobName string
+	var userMetadata string
+	var kubeConfig, kubeContext string
+	var skipLogFile bool
+	indexerList := make(map[string]indexers.Indexer)
+	metadata := make(map[string]any)
+	cmd := &cobra.Command{
+		Use:   "measure",
+		Short: "Take measurements for a given set of resources without running workload",
+		PostRun: func(cmd *cobra.Command, args []string) {
+			log.Info("👋 Exiting kube-burner ", uuid)
+		},
+		Args: cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
+			f, err := fileutils.GetWorkloadReader(configFile, nil)
+			if err != nil {
+				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
+			}
+			configSpec, err := config.Parse(configFile, time.Hour, f)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+			if len(configSpec.Jobs) > 0 {
+				log.Fatal("No jobs are allowed in a measure subcommand config file")
+			}
+			for pos, indexer := range configSpec.MetricsEndpoints {
+				log.Infof("📁 Creating indexer: %s", indexer.Type)
+				idx, err := indexers.NewIndexer(indexer.IndexerConfig)
+				if err != nil {
+					log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
+				}
+				indexerList[indexer.Alias] = *idx
+			}
+			if userMetadata != "" {
+				metadata, err = util.ReadUserMetadata(userMetadata)
+				if err != nil {
+					log.Fatalf("Error reading provided user metadata: %v", err)
+				}
+			}
+			labelSelector, err := labels.Parse(selector)
+			if err != nil {
+				log.Fatalf("Invalid selector: %v", err)
+			}
+			namespaceLabels := make(map[string]string)
+			namespaceAnnotations := make(map[string]string)
+			labelRequirements, _ := labelSelector.Requirements()
+			for _, req := range labelRequirements {
+				namespaceLabels[req.Key()] = req.Values().List()[0]
+			}
+			log.Infof("%v", namespaceLabels)
+			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
+				&config.Job{
+					Name:                 jobName,
+					Namespace:            rawNamespaces,
+					NamespaceLabels:      namespaceLabels,
+					NamespaceAnnotations: namespaceAnnotations,
+				},
+				config.NewKubeClientProvider(kubeConfig, kubeContext),
+				nil,
+			)
+			measurementsInstance.Collect()
+			if err = measurementsInstance.Stop(); err != nil {
+				log.Error(err.Error())
+			}
+			measurementsInstance.Index(jobName, indexerList)
 		},
 	}
 	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
-	cmd.Flags().DurationVarP(&timeout, "timeout", "", 4*time.Hour, "Deletion timeout")
-	cmd.MarkFlagRequired("uuid")
+	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "config.yml", "Config file path or URL")
+	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-measure", "Measure job name")
+	cmd.Flags().StringVarP(&rawNamespaces, "namespaces", "n", corev1.NamespaceAll, "comma-separated list of namespaces")
+	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
+	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	return cmd
 }
 
@@ -196,8 +338,10 @@ func indexCmd() *cobra.Command {
 	var username, password, uuid, token, userMetadata string
 	var esServer, esIndex, metricsDirectory string
 	var configSpec config.Spec
-	var skipTLSVerify bool
+	var skipTLSVerify, skipLogFile bool
 	var prometheusStep time.Duration
+	var tarballName string
+	var indexer config.MetricsEndpoint
 	cmd := &cobra.Command{
 		Use:   "index",
 		Short: "Index kube-burner metrics",
@@ -206,44 +350,72 @@ func indexCmd() *cobra.Command {
 		PostRun: func(cmd *cobra.Command, args []string) {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
+			if !skipLogFile {
+				util.SetupFileLogging(uuid)
+			}
 			configSpec.GlobalConfig.UUID = uuid
+			metricsProfiles := strings.FieldsFunc(metricsProfile, func(r rune) bool {
+				return r == ',' || r == ' '
+			})
+			indexer = config.MetricsEndpoint{
+				Username:      username,
+				Password:      password,
+				Token:         token,
+				Step:          prometheusStep,
+				Endpoint:      url,
+				Metrics:       metricsProfiles,
+				SkipTLSVerify: skipTLSVerify,
+			}
 			if esServer != "" && esIndex != "" {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexer.IndexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
 					Servers: []string{esServer},
 					Index:   esIndex,
 				}
 			} else {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexer.IndexerConfig = indexers.IndexerConfig{
 					Type:             indexers.LocalIndexer,
 					MetricsDirectory: metricsDirectory,
+					TarballName:      tarballName,
 				}
 			}
-			_ = metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-				ConfigSpec:      configSpec,
-				Password:        password,
-				PrometheusStep:  prometheusStep,
+			configSpec.MetricsEndpoints = append(configSpec.MetricsEndpoints, indexer)
+			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,
-				MetricsProfile:  metricsProfile,
-				SkipTLSVerify:   skipTLSVerify,
-				URL:             url,
-				Token:           token,
-				Username:        username,
-				StartTime:       start,
-				EndTime:         end,
-				JobName:         jobName,
-				ActionIndex:     true,
 				UserMetaData:    userMetadata,
 			})
+			for _, prometheusClient := range metricsScraper.PrometheusClients {
+				prometheusJob := prometheus.Job{
+					Start: time.Unix(start, 0),
+					End:   time.Unix(end, 0),
+					JobConfig: config.Job{
+						Name: jobName,
+					},
+				}
+				if err := prometheusClient.ScrapeJobsMetrics(prometheusJob); err != nil {
+					log.Fatal(err)
+				}
+			}
+			if configSpec.MetricsEndpoints[0].Type == indexers.LocalIndexer && tarballName != "" {
+				if err := metrics.CreateTarball(configSpec.MetricsEndpoints[0].IndexerConfig); err != nil {
+					log.Fatal(err)
+				}
+			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
-	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "Metrics profile file")
+	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "comma-separated list of metric profiles")
 	cmd.Flags().StringVarP(&metricsEndpoint, "metrics-endpoint", "e", "", "YAML file with a list of metric endpoints")
 	cmd.Flags().BoolVar(&skipTLSVerify, "skip-tls-verify", true, "Verify prometheus TLS certificate")
 	cmd.Flags().DurationVarP(&prometheusStep, "step", "s", 30*time.Second, "Prometheus step size")
@@ -254,6 +426,8 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVar(&metricsDirectory, "metrics-directory", "collected-metrics", "Directory to dump the metrics files in, when using default local indexing")
 	cmd.Flags().StringVar(&esServer, "es-server", "", "Elastic Search endpoint")
 	cmd.Flags().StringVar(&esIndex, "es-index", "", "Elastic Search index")
+	cmd.Flags().StringVar(&tarballName, "tarball-name", "", "Dump collected metrics into a tarball with the given name, requires local indexing")
+	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.Flags().SortFlags = false
 	return cmd
 }
@@ -261,30 +435,29 @@ func indexCmd() *cobra.Command {
 func importCmd() *cobra.Command {
 	var tarball string
 	var esServer, esIndex, metricsDirectory string
-	var configSpec config.Spec
+	var indexerConfig indexers.IndexerConfig
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "Import metrics tarball",
 		Run: func(cmd *cobra.Command, args []string) {
 			if esServer != "" && esIndex != "" {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
 					Servers: []string{esServer},
 					Index:   esIndex,
 				}
 			} else {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexerConfig = indexers.IndexerConfig{
 					Type:             indexers.LocalIndexer,
 					MetricsDirectory: metricsDirectory,
 				}
 			}
-			indexerConfig := configSpec.GlobalConfig.IndexerConfig
 			log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 			indexer, err := indexers.NewIndexer(indexerConfig)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			err = metrics.ImportTarball(tarball, indexer, indexerConfig.MetricsDirectory)
+			err = metrics.ImportTarball(tarball, indexer)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -308,26 +481,31 @@ func alertCmd() *cobra.Command {
 	var alertM *alerting.AlertManager
 	var prometheusStep time.Duration
 	var indexer *indexers.Indexer
+	var indexerConfig indexers.IndexerConfig
 	cmd := &cobra.Command{
 		Use:   "check-alerts",
 		Short: "Evaluate alerts for the given time range",
 		Args:  cobra.NoArgs,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			configSpec.GlobalConfig.UUID = uuid
 			if esServer != "" && esIndex != "" {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexerConfig = indexers.IndexerConfig{
 					Type:    indexers.ElasticIndexer,
 					Servers: []string{esServer},
 					Index:   esIndex,
 				}
 			} else if metricsDirectory != "" {
-				configSpec.GlobalConfig.IndexerConfig = indexers.IndexerConfig{
+				indexerConfig = indexers.IndexerConfig{
 					Type:             indexers.LocalIndexer,
 					MetricsDirectory: metricsDirectory,
 				}
 			}
-			if configSpec.GlobalConfig.IndexerConfig.Type != "" {
-				indexerConfig := configSpec.GlobalConfig.IndexerConfig
+			if indexerConfig.Type != "" {
 				log.Infof("📁 Creating indexer: %s", indexerConfig.Type)
 				indexer, err = indexers.NewIndexer(indexerConfig)
 				if err != nil {
@@ -340,24 +518,25 @@ func alertCmd() *cobra.Command {
 				Token:         token,
 				SkipTLSVerify: skipTLSVerify,
 			}
-			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, map[string]interface{}{}, false)
+			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, indexer)
 			if err != nil {
 				log.Fatal(err)
 			}
-			startTime := time.Unix(start, 0)
-			endTime := time.Unix(end, 0)
-			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, indexer, p, false); err != nil {
+			job := prometheus.Job{
+				Start: time.Unix(start, 0),
+				End:   time.Unix(end, 0),
+			}
+			if alertM, err = alerting.NewAlertManager(alertProfile, uuid, p, indexer, nil, nil); err != nil {
 				log.Fatalf("Error creating alert manager: %s", err)
 			}
-
-			err = alertM.Evaluate(startTime, endTime)
+			err = alertM.Evaluate(job)
 			log.Info("👋 Exiting kube-burner ", uuid)
 			if err != nil {
 				os.Exit(1)
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", uid.NewV4().String(), "Benchmark UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
@@ -378,34 +557,17 @@ func alertCmd() *cobra.Command {
 
 // executes rootCmd
 func main() {
+	util.SetupCmd(rootCmd)
 	rootCmd.AddCommand(
-		versionCmd,
 		initCmd(),
+		measureCmd(),
 		destroyCmd(),
+		healthCheck(),
 		indexCmd(),
 		alertCmd(),
 		importCmd(),
-		openShiftCmd(),
+		completionCmd,
 	)
-	logLevel := rootCmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		log.SetReportCaller(true)
-		formatter := &log.TextFormatter{
-			TimestampFormat: "2006-01-02 15:04:05",
-			FullTimestamp:   true,
-			DisableColors:   true,
-			CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
-				return "", fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
-			},
-		}
-		log.SetFormatter(formatter)
-		lvl, err := log.ParseLevel(*logLevel)
-		if err != nil {
-			log.Fatalf("Unknown log level %s", *logLevel)
-		}
-		log.SetLevel(lvl)
-	}
-	rootCmd.AddCommand(completionCmd)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

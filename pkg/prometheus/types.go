@@ -17,8 +17,9 @@ package prometheus
 import (
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/prometheus"
-	"github.com/cloud-bulldozer/kube-burner/pkg/config"
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
+	"github.com/cloud-bulldozer/go-commons/v2/prometheus"
+	"github.com/kube-burner/kube-burner/v2/pkg/config"
 )
 
 type Auth struct {
@@ -30,45 +31,47 @@ type Auth struct {
 
 // Prometheus describes the prometheus connection
 type Prometheus struct {
-	Client        *prometheus.Prometheus
-	Endpoint      string
-	MetricProfile []metricDefinition
-	Step          time.Duration
-	UUID          string
-	ConfigSpec    config.Spec
-	JobList       []Job
-	metadata      map[string]interface{}
+	Client         *prometheus.Prometheus
+	Endpoint       string
+	profileName    string
+	MetricProfiles []metricProfile
+	Step           time.Duration
+	UUID           string
+	ConfigSpec     config.Spec
+	metadata       map[string]any
+	indexer        *indexers.Indexer
 }
 
 type Job struct {
-	Start     time.Time
-	End       time.Time
-	Name      string
-	JobConfig config.Job
+	Start            time.Time
+	End              time.Time
+	ChurnStart       *time.Time // A pointer to time.Time is required to skip this field when nil
+	ChurnEnd         *time.Time
+	JobConfig        config.Job
+	ObjectOperations int32
+}
+
+type metricProfile struct {
+	name    string
+	metrics []metricDefinition
 }
 
 // metricDefinition describes what metrics kube-burner collects
 type metricDefinition struct {
-	Query      string `yaml:"query"`
-	MetricName string `yaml:"metricName"`
-	Instant    bool   `yaml:"instant"`
-}
-
-// MetricEndpoint describes prometheus endpoint to scrape
-type MetricEndpoint struct {
-	Endpoint     string `yaml:"endpoint"`
-	Token        string `yaml:"token"`
-	Profile      string `yaml:"profile"`
-	AlertProfile string `yaml:"alertProfile"`
+	Query        string `yaml:"query"`
+	MetricName   string `yaml:"metricName"`
+	Instant      bool   `yaml:"instant"`
+	CaptureStart bool   `yaml:"captureStart"`
 }
 
 type metric struct {
-	Timestamp  time.Time         `json:"timestamp"`
-	Labels     map[string]string `json:"labels,omitempty"`
-	Value      float64           `json:"value"`
-	UUID       string            `json:"uuid"`
-	Query      string            `json:"query"`
-	MetricName string            `json:"metricName,omitempty"`
-	JobConfig  config.Job        `json:"jobConfig,omitempty"`
-	Metadata   interface{}       `json:"metadata,omitempty"`
+	Timestamp   time.Time         `json:"timestamp"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Value       float64           `json:"value"`
+	UUID        string            `json:"uuid"`
+	Query       string            `json:"query"`
+	ChurnMetric bool              `json:"churnMetric,omitempty"`
+	MetricName  string            `json:"metricName,omitempty"`
+	JobName     string            `json:"jobName,omitempty"`
+	Metadata    any               `json:"metadata,omitempty"`
 }

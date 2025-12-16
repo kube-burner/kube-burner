@@ -31,7 +31,5 @@ spec:
   selector:
     matchLabels:
       name: postgres-{{.Replica}}-{{.Iteration}}
-  triggers:
-  - type: ConfigChange
   strategy:
     type: RollingUpdate
