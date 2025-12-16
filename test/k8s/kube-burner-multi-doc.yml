@@ -1,6 +1,6 @@
 ---
 global:
-  gc: true
+  gc: {{env "GC"}}
   measurements:
     - name: podLatency
 

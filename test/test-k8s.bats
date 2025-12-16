@@ -254,10 +254,12 @@ teardown_file() {
 }
 
 @test "kube-burner-multi-doc.yml: multi-document YAML templates" {
+  export GC=false
   run_cmd ${KUBE_BURNER} init -c kube-burner-multi-doc.yml --uuid=${UUID} --log-level=debug
   # 3 iterations * 2 replicas * 2 pods per template = 12 pods total
   # 6 frontend + 6 backend
   verify_object_count pod 6 "" app=frontend,kube-burner.io/uuid=${UUID}
   verify_object_count pod 6 "" app=backend,kube-burner.io/uuid=${UUID}
+  ${KUBE_BURNER} destroy --uuid ${UUID}
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
 }
