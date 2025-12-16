@@ -68,7 +68,7 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner.yml: preload=true; set-churn-mode=objects,set-gc=false" {
+@test "kube-burner.yml: preload=true; set-churn-mode=namespaces,set-gc=false" {
   export CRD=true
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=namespaces,jobs.0.preLoadImages=true,jobs.0.churnConfig.cycles=2 --log-level=debug
