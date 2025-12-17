@@ -23,8 +23,10 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
+
 	"k8s.io/client-go/rest"
 )
 
@@ -40,7 +42,7 @@ type Measurements struct {
 type MeasurementFactory interface {
 	NewMeasurement(*config.Job, kubernetes.Interface, *rest.Config, *fileutils.EmbedConfiguration) Measurement
 }
-type NewMeasurementFactory func(config.Spec, types.Measurement, map[string]any) (MeasurementFactory, error)
+type NewMeasurementFactory func(config.Spec, types.Measurement, map[string]any, string) (MeasurementFactory, error)
 
 type Measurement interface {
 	Start(*sync.WaitGroup) error
@@ -91,9 +93,12 @@ func NewMeasurementsFactory(configSpec config.Spec, metadata map[string]any, add
 	}
 }
 
-func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration) *Measurements {
+func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration, labelSelector string) *Measurements {
 	ms := Measurements{
 		MeasurementsMap: make(map[string]Measurement),
+	}
+	if _, err := metav1.ParseToLabelSelector(labelSelector); err != nil {
+		log.Fatalf("Invalid selector: %v", err)
 	}
 	clientSet, restConfig := kubeClientProvider.ClientSet(jobConfig.QPS, jobConfig.Burst)
 	log.Infof("Initializing measurements for job: %s", jobConfig.Name)
@@ -121,7 +126,7 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 			log.Warnf("Measurement [%s] is not supported", name)
 			continue
 		}
-		mf, err := newMeasurementFactoryFunc(msf.ConfigSpec, measurement, msf.Metadata)
+		mf, err := newMeasurementFactoryFunc(msf.ConfigSpec, measurement, msf.Metadata, labelSelector)
 		if err != nil {
 			log.Fatalf("Failed to create measurement [%s]: %v", name, err)
 		}

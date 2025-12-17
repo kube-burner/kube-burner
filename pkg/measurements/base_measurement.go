@@ -16,6 +16,7 @@ package measurements
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
@@ -49,6 +50,7 @@ type BaseMeasurement struct {
 	LatencyQuantiles         []any
 	QuantilesMeasurementName string
 	NormLatencies            []any
+	LabelSelector            string
 }
 
 type MeasurementWatcher struct {
@@ -66,16 +68,18 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 
 	bm.watchers = make([]*watchers.Watcher, len(measurementWatchers))
 	for i, measurementWatcher := range measurementWatchers {
-		log.Infof("Creating %v latency watcher for %s", measurementWatcher.resource, bm.JobConfig.Name)
+		log.Infof("Creating %v latency watcher for %s using selector %s", measurementWatcher.resource, bm.JobConfig.Name, bm.LabelSelector)
 		bm.watchers[i] = watchers.NewWatcher(
 			measurementWatcher.dynamicClient,
 			measurementWatcher.name,
 			measurementWatcher.resource,
 			corev1.NamespaceAll,
 			func(options *metav1.ListOptions) {
-				if measurementWatcher.labelSelector != "" {
-					options.LabelSelector = measurementWatcher.labelSelector
+				selectors := []string{bm.LabelSelector}
+				if options.LabelSelector != "" {
+					selectors = append(selectors, options.LabelSelector)
 				}
+				options.LabelSelector = strings.Join(selectors, ",")
 			},
 			nil,
 		)

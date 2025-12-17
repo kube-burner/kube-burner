@@ -109,7 +109,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			errs = append(errs, watcherStartErrors...)
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
-				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg)
+				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg, fmt.Sprintf("%s=%s", config.KubeBurnerLabelRunID, globalConfig.RUNID))
 				measurementsInstance.Start()
 			}
 			log.Infof("Triggering job: %s", jobExecutor.Name)

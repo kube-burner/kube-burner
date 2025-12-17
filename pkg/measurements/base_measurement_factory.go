@@ -37,18 +37,20 @@ var (
 )
 
 type BaseMeasurementFactory struct {
-	Config   types.Measurement
-	Uuid     string
-	Runid    string
-	Metadata map[string]any
+	Config        types.Measurement
+	Uuid          string
+	Runid         string
+	Metadata      map[string]any
+	LabelSelector string
 }
 
-func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) BaseMeasurementFactory {
+func NewBaseMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) BaseMeasurementFactory {
 	return BaseMeasurementFactory{
-		Config:   measurement,
-		Uuid:     configSpec.GlobalConfig.UUID,
-		Runid:    configSpec.GlobalConfig.RUNID,
-		Metadata: metadata,
+		Config:        measurement,
+		Uuid:          configSpec.GlobalConfig.UUID,
+		Runid:         configSpec.GlobalConfig.RUNID,
+		Metadata:      metadata,
+		LabelSelector: labelSelector,
 	}
 }
 
@@ -71,6 +73,7 @@ func (bmf BaseMeasurementFactory) NewBaseLatency(
 		MeasurementName:          measurementName,
 		QuantilesMeasurementName: quantilesMeasurementName,
 		EmbedCfg:                 embedCfg,
+		LabelSelector:            bmf.LabelSelector,
 	}
 }
 

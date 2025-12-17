@@ -73,12 +73,12 @@ type nodeLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newNodeLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedNodeConditions); err != nil {
 		return nil, err
 	}
 	return nodeLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -156,7 +156,6 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(n.RestConfig),
 				name:          "nodeWatcher",
 				resource:      gvr,
-				labelSelector: "",
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNode,
 					UpdateFunc: func(oldObj, newObj any) {

@@ -51,7 +51,7 @@ type pprofLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	for _, target := range measurement.PProfTargets {
 		if target.BearerToken != "" && (target.CertFile != "" || target.Cert != "") {
 			return nil, fmt.Errorf("bearerToken and cert auth methods cannot be specified together in the same target")
@@ -59,7 +59,7 @@ func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types
 	}
 
 	return pprofLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
