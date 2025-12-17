@@ -394,7 +394,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		if ex.JobIterations-numToChurn+1 > 0 {
 			randStart = rand.Intn(ex.JobIterations - numToChurn + 1)
 		}
-		// delete numToChurn namespaces starting at randStart
+		// patch namespaces for deletion
 		for i := randStart; i < numToChurn+randStart; i++ {
 			ns := ex.generateNamespace(i)
 			if !ex.createdNamespaces[ns] {
