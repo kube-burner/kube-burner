@@ -74,13 +74,13 @@ type serviceLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	if measurement.ServiceTimeout == 0 {
 		return nil, fmt.Errorf("svcTimeout cannot be 0")
 	}
 
 	return serviceLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -201,7 +201,6 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
 			name:          "svcWatcher",
 			resource:      sgvr,
-			labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, s.Runid),
 			handlers: &cache.ResourceEventHandlerFuncs{
 				AddFunc: s.handleCreateSvc,
 			},
