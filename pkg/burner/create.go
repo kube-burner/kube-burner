@@ -415,8 +415,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 			return numI < numJ
 		})
 		// delete numToChurn namespaces starting at randStart
-		namespacesToDelete := nsList[randStart : numToChurn+randStart]
-		for _, ns := range namespacesToDelete {
+		for _, ns := range nsList[randStart : numToChurn+randStart] {
 			_, err = ex.clientSet.CoreV1().Namespaces().
 				Patch(ctx, ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
 			if err != nil {
@@ -429,6 +428,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		// Re-create objects that were deleted
+		log.Infof("Re-creating %d deleted namespaces", numToChurn)
 		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
 			errs = append(errs, jobErrs...)
 		}
