@@ -8,8 +8,8 @@ setup_file() {
   cd k8s
   export BATS_TEST_TIMEOUT=1800
   export JOB_ITERATIONS=4
-  export QPS=3
-  export BURST=3
+  export QPS=5
+  export BURST=5
   export TEST_KUBECONFIG; TEST_KUBECONFIG=$(mktemp -d)/kubeconfig
   export TEST_KUBECONTEXT=test-context
   export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
@@ -68,15 +68,16 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner.yml: preload=true; set-churn-mode=objects,set-gc=false" {
+@test "kube-burner.yml: preload=true; set-churn-mode=namespaces,set-gc=false" {
   export CRD=true
+  export JOB_ITERATIONS=11
   cp kube-burner.yml /tmp/kube-burner.yml
   run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=namespaces,jobs.0.preLoadImages=true,jobs.0.churnConfig.cycles=2 --log-level=debug
   verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
-  verify_object_count namespace 5 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
-  verify_object_count pod 10 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
-  verify_object_count pod 5 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count namespace 12 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
+  verify_object_count pod 24 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count pod 12 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
   ${KUBE_BURNER} destroy -c /tmp/kube-burner.yml
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
   verify_object_count pod 0 "" kube-burner.io/uuid=${UUID}
