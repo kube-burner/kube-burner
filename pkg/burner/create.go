@@ -20,7 +20,9 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -371,7 +373,18 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 	now := time.Now().UTC()
 	// Create timer for the churn duration
 	timer := time.After(ex.ChurnConfig.Duration)
-	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*ex.JobIterations/100), 1))
+	nsLabels := labels.Set{
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelUUID:  ex.uuid,
+		config.KubeBurnerLabelRunID: ex.runid,
+	}
+	// List namespace to churn
+	jobNamespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(nsLabels).String()})
+	nsList := jobNamespaces.Items
+	if err != nil {
+		return []error{fmt.Errorf("unable to list namespaces: %w", err)}
+	}
+	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 
 	for {
 		var randStart int
@@ -391,21 +404,26 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		}
 
 		// Max amount of churn is 100% of namespaces
-		if ex.JobIterations-numToChurn+1 > 0 {
-			randStart = rand.Intn(ex.JobIterations - numToChurn + 1)
+		if len(nsList)-numToChurn+1 > 0 {
+			randStart = rand.Intn(len(nsList) - numToChurn + 1)
 		}
-		// patch namespaces for deletion
-		for i := randStart; i < numToChurn+randStart; i++ {
-			ns := ex.generateNamespace(i)
-			if !ex.createdNamespaces[ns] {
-				continue
-			}
-			ex.createdNamespaces[ns] = false
-			_, err := ex.clientSet.CoreV1().Namespaces().Patch(ctx, ns, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
+		// We need to perform a natural sort
+		sort.Slice(nsList, func(i, j int) bool {
+			// Get the number after the last '-'
+			numI, _ := strconv.Atoi(nsList[i].Name[strings.LastIndex(nsList[i].Name, "-")+1:])
+			numJ, _ := strconv.Atoi(nsList[j].Name[strings.LastIndex(nsList[j].Name, "-")+1:])
+			return numI < numJ
+		})
+		// delete numToChurn namespaces starting at randStart
+		namespacesToDelete := nsList[randStart : numToChurn+randStart]
+		for _, ns := range namespacesToDelete {
+			_, err = ex.clientSet.CoreV1().Namespaces().
+				Patch(ctx, ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
 			if err != nil {
-				log.Errorf("Error applying label to namespace %s: %v", ns, err)
+				log.Errorf("Error applying label to namespace %s: %v", ns.Name, err)
 				errs = append(errs, err)
 			}
+			ex.createdNamespaces[ns.Name] = false
 		}
 		// 1 hour timeout to delete namespace
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
