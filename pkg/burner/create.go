@@ -414,7 +414,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 			numJ, _ := strconv.Atoi(nsList[j].Name[strings.LastIndex(nsList[j].Name, "-")+1:])
 			return numI < numJ
 		})
-		// delete numToChurn namespaces starting at randStart
+		// Add label to namespaces to use label selector for deletion
 		for _, ns := range nsList[randStart : numToChurn+randStart] {
 			_, err = ex.clientSet.CoreV1().Namespaces().
 				Patch(ctx, ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
