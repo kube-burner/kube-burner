@@ -68,32 +68,39 @@ func (ex *JobExecutor) setupCreateJob() {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
 		// Deserialize YAML
-		uns := &unstructured.Unstructured{}
 		cleanTemplate, err := util.CleanupTemplate(t)
 		if err != nil {
 			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
-		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
-		mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
-		obj := &object{
-			objectSpec: t,
-			Object:     o,
-			namespace:  uns.GetNamespace(),
+		unsList, gvks := yamlToUnstructuredMultiple(o.ObjectTemplate, cleanTemplate)
+
+		// Get GVK for this specific object and Process if multi yaml document
+		for i, gvk := range gvks {
+			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			// Set Kind on the embedded Object before creating the object struct
+			o.Kind = gvk.Kind
+			obj := &object{
+				objectSpec:    t,
+				Object:        o,
+				namespace:     unsList[i].GetNamespace(),
+				gvk:           gvk,
+				documentIndex: i,
+			}
+			if err == nil {
+				obj.gvr = mapping.Resource
+				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+			} else {
+				obj.gvr = schema.GroupVersionResource{}
+			}
+			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
+			if obj.namespaced && obj.namespace == "" {
+				ex.nsRequired = true
+			}
+			log.Debugf("Job %s: %d iterations with %d %s replicas (object %d/%d from template)",
+				ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind, i+1, len(gvks))
+			ex.objects = append(ex.objects, obj)
+
 		}
-		if err == nil {
-			obj.gvr = mapping.Resource
-			obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-		} else {
-			obj.gvr = schema.GroupVersionResource{}
-			obj.gvk = gvk
-		}
-		obj.Kind = gvk.Kind
-		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
-		if obj.namespaced && obj.namespace == "" {
-			ex.nsRequired = true
-		}
-		log.Debugf("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
-		ex.objects = append(ex.objects, obj)
 	}
 }
 
@@ -207,16 +214,27 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
-			var newObject = new(unstructured.Unstructured)
 			ex.limiter.Wait(context.TODO())
-			renderedObj := ex.renderTemplateForObject(obj, iteration, r, false)
-			// Re-decode rendered object
-			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
+			newObjects, gvks := ex.renderTemplateForObjectMultiple(obj, iteration, r)
+			newObject := newObjects[obj.documentIndex]
+			gvk := gvks[obj.documentIndex]
 
-			maps.Copy(copiedLabels, newObject.GetLabels())
-			newObject.SetLabels(copiedLabels)
-			updateChildLabels(newObject, copiedLabels)
+			objectLabels := make(map[string]string)
+			maps.Copy(objectLabels, copiedLabels)
+			maps.Copy(objectLabels, newObject.GetLabels())
+			newObject.SetLabels(objectLabels)
+			updateChildLabels(newObject, objectLabels)
 
+			// Before attempting to create an object, this error check confirms the REST mapping exists.
+			// If the mapping fails, the function returns early, preventing a futile create attempt.
+			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
+			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
+			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
+
+			if err != nil {
+				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
+				return
+			}
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
 			// wait for ready, etc. Without this wait group, running for example,
@@ -224,11 +242,11 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			// hasn't been created yet
 			replicaWg.Add(1)
 			go func(n string) {
+				defer replicaWg.Done()
 				if !obj.namespaced {
 					n = ""
 				}
 				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
-				replicaWg.Done()
 			}(ns)
 		}(r)
 	}
