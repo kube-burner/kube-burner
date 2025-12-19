@@ -32,6 +32,7 @@ MANIFEST_ARCHS ?= amd64 arm64 ppc64le s390x
 
 # Bats
 JOBS ?= $(shell nproc)
+FILTER_TAGS = $(shell hack/get_changed_labels.py hack/bats_test_mappings.yml)
 
 all: lint build images push
 
@@ -122,4 +123,4 @@ manifest-build:
 test: lint test-k8s
 
 test-k8s:
-	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats -j $(JOBS)
+	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats -j $(JOBS) $(FILTER_TAGS)
