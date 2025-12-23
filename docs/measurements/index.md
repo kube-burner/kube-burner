@@ -1070,20 +1070,33 @@ The measure subcommand observes the cluster in real-time using Kubernetes inform
 Example usage with relevant options:
 
 ```shell
-kube-burner measure -c measurements-config.yml --uuid=vchalla --selector=kube-burner.io/job=cluster-density-v2 --duration=30m
-time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
-time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
-time="2023-11-19 17:46:06" level=info msg="Stopping measurement: podLatency" file="factory.go:118"
-time="2023-11-19 17:46:06" level=info msg="Evaluating latency thresholds" file="metrics.go:60"
-time="2023-11-19 17:46:06" level=info msg="Indexing pod latency data for job: kube-burner-measure" file="pod_latency.go:245"
-time="2023-11-19 17:46:07" level=info msg="Indexing finished in 417ms: created=4" file="pod_latency.go:262"
-time="2023-11-19 17:46:08" level=info msg="Indexing finished in 1.32s: created=50" file="pod_latency.go:262"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: PodScheduled 50th: 0 99th: 0 max: 0 avg: 0" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: ContainersReady 50th: 9000 99th: 18000 max: 18000 avg: 10680" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Initialized 50th: 0 99th: 0 max: 0 avg: 0" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Ready 50th: 9000 99th: 18000 max: 18000 avg: 10680" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="Pod latencies error rate was: 0.00" file="pod_latency.go:236"
-time="2023-11-19 17:46:08" level=info msg="👋 Exiting kube-burner vchalla" file="kube-burner.go:209"
+kube-burner measure -c kube-burner-measure.yml --duration=30s --selector=app=kube-burner-measure 
+time="2025-12-23 11:00:14" level=info msg="📁 Creating indexer: local" file="kube-burner.go:283"
+time="2025-12-23 11:00:15" level=info msg="Initializing measurements for job: kube-burner-measure" file="factory.go:104"
+time="2025-12-23 11:00:15" level=info msg="Registered measurement: podLatency" file="factory.go:139"
+time="2025-12-23 11:00:15" level=info msg="Registered measurement: pprof" file="factory.go:139"
+time="2025-12-23 11:00:15" level=info msg="pprof-collector: DaemonSet kube-burner-pprof-collector deployed in namespace kube-burner-pprof-collector" file="pprof_ds.go:127"
+time="2025-12-23 11:00:15" level=info msg="Waiting for DaemonSet kube-burner-pprof-collector pods to be ready" file="pprof_ds.go:24"
+time="2025-12-23 11:00:15" level=info msg="Creating /v1, Resource=pods latency watcher for kube-burner-measure using selector [app=kube-burner-measure]" file="base_measurement.go:78"
+time="2025-12-23 11:00:18" level=info msg="Collecting kubelet-heap pprof" file="pprof.go:135"
+time="2025-12-23 11:00:18" level=info msg="Collecting crio-heap pprof" file="pprof.go:135"
+time="2025-12-23 11:00:21" level=info msg="Running measurements for 30s" file="kube-burner.go:306"
+time="2025-12-23 11:00:31" level=info msg="Collecting kubelet-heap pprof" file="pprof.go:135"
+time="2025-12-23 11:00:32" level=info msg="Collecting crio-heap pprof" file="pprof.go:135"
+time="2025-12-23 11:00:41" level=info msg="Collecting kubelet-heap pprof" file="pprof.go:135"
+time="2025-12-23 11:00:42" level=info msg="Collecting crio-heap pprof" file="pprof.go:135"
+time="2025-12-23 11:00:51" level=info msg="Collecting kubelet-heap pprof" file="pprof.go:135"
+time="2025-12-23 11:00:51" level=info msg="Stopping measurement: podLatency" file="factory.go:168"
+time="2025-12-23 11:00:51" level=info msg="Stopping measurement: pprof" file="factory.go:168"
+time="2025-12-23 11:00:52" level=info msg="Collecting crio-heap pprof" file="pprof.go:135"
+time="2025-12-23 11:00:55" level=info msg="Deleting 1 namespaces with label: kubernetes.io/metadata.name=kube-burner-pprof-collector" file="namespaces.go:65"
+time="2025-12-23 11:01:39" level=info msg="Indexing collected data from measurement: pprof" file="factory.go:180"
+time="2025-12-23 11:01:39" level=info msg="Indexing collected data from measurement: podLatency" file="factory.go:180"
+time="2025-12-23 11:01:39" level=info msg="Indexing metric podLatencyMeasurement" file="base_measurement.go:143"
+time="2025-12-23 11:01:39" level=error msg="Empty document list in podLatencyMeasurement-kube-burner-measure" file="base_measurement.go:150"
+time="2025-12-23 11:01:39" level=info msg="Indexing metric podLatencyQuantilesMeasurement" file="base_measurement.go:143"
+time="2025-12-23 11:01:39" level=error msg="Empty document list in podLatencyQuantilesMeasurement-kube-burner-measure" file="base_measurement.go:150"
+time="2025-12-23 11:01:39" level=info msg="👋 Exiting kube-burner 4b2efcf8-7ebb-41ba-95db-3a62a0c2b754" file="kube-burner.go:267"
 ```
 
 ## Indexing in different places
