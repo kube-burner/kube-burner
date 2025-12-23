@@ -21,6 +21,7 @@ func (p *pprof) needsDaemonSet() bool {
 }
 
 func (p *pprof) waitForDaemonSetReady() error {
+	time.Sleep(time.Second) // There's a small time window where the desired number of pods is 0
 	log.Infof("Waiting for DaemonSet %s pods to be ready", types.PprofDaemonSet)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
