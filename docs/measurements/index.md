@@ -1065,10 +1065,12 @@ Find below a configuration snippet to collect pprof HEAP profiling data from kub
 
 ## Measure subcommand CLI
 
-Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
+The measure subcommand observes the cluster in real-time using Kubernetes informers to collect measurements for resources that match the specified criteria. It watches resources as they are created, updated, or deleted during the measurement duration.
+
+Example usage with relevant options:
 
 ```shell
-kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner.io/job=cluster-density-v2
+kube-burner measure -c measurements-config.yml --uuid=vchalla --selector=kube-burner.io/job=cluster-density-v2 --duration=30m
 time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
 time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
 time="2023-11-19 17:46:06" level=info msg="Stopping measurement: podLatency" file="factory.go:118"
