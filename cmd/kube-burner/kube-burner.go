@@ -35,7 +35,6 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -259,6 +258,11 @@ func measureCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "measure",
 		Short: "Take measurements for a given set of resources without running workload",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
 		PostRun: func(cmd *cobra.Command, args []string) {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
@@ -296,7 +300,7 @@ func measureCmd() *cobra.Command {
 				},
 				config.NewKubeClientProvider(kubeConfig, kubeContext),
 				nil,
-				"",
+				selector,
 			)
 			measurementsInstance.Start()
 			log.Infof("Running measurements for %s", duration)
@@ -304,16 +308,16 @@ func measureCmd() *cobra.Command {
 			if err = measurementsInstance.Stop(); err != nil {
 				log.Error(err.Error())
 			}
-			if indexerList == nil {
+			if indexerList != nil {
 				measurementsInstance.Index(jobName, indexerList)
 			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID (generated automatically if not provided)")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "config.yml", "Config file path or URL")
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-measure", "Measure job name")
-	cmd.Flags().StringVarP(&selector, "selector", "l", metav1.NamespaceAll, "namespace label selector. (e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(&selector, "selector", "l", "", "label selector.(e.g. selects objects labeled with key1=value1)")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")

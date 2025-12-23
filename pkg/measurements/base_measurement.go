@@ -68,18 +68,23 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 
 	bm.watchers = make([]*watchers.Watcher, len(measurementWatchers))
 	for i, measurementWatcher := range measurementWatchers {
-		log.Infof("Creating %v latency watcher for %s using selector %s", measurementWatcher.resource, bm.JobConfig.Name, bm.LabelSelector)
+		var selectors []string
+		if bm.LabelSelector != "" {
+			selectors = []string{bm.LabelSelector}
+		}
+		if measurementWatcher.labelSelector != "" {
+			selectors = append(selectors, measurementWatcher.labelSelector)
+		}
+		log.Infof("Creating %v latency watcher for %s using selector %s", measurementWatcher.resource, bm.JobConfig.Name, selectors)
 		bm.watchers[i] = watchers.NewWatcher(
 			measurementWatcher.dynamicClient,
 			measurementWatcher.name,
 			measurementWatcher.resource,
 			corev1.NamespaceAll,
 			func(options *metav1.ListOptions) {
-				selectors := []string{bm.LabelSelector}
-				if options.LabelSelector != "" {
-					selectors = append(selectors, options.LabelSelector)
+				if len(selectors) > 0 {
+					options.LabelSelector = strings.Join(selectors, ",")
 				}
-				options.LabelSelector = strings.Join(selectors, ",")
 			},
 			nil,
 		)
