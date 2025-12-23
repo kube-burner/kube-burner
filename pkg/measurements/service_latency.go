@@ -196,16 +196,6 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 		return fmt.Errorf("error getting GVR for %s: %w", "Service", err)
 	}
 
-	s.startMeasurement([]MeasurementWatcher{
-		{
-			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
-			name:          "svcWatcher",
-			resource:      sgvr,
-			handlers: &cache.ResourceEventHandlerFuncs{
-				AddFunc: s.handleCreateSvc,
-			},
-		},
-	})
 	// Create shared informer factory for typed clients
 	clientset := kubernetes.NewForConfigOrDie(s.RestConfig)
 	factory := informers.NewSharedInformerFactory(clientset, 0)
@@ -226,6 +216,16 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	if !cache.WaitForCacheSync(s.stopInformerCh, svcInformer.HasSynced) {
 		return fmt.Errorf("failed to sync service informer cache")
 	}
+	s.startMeasurement([]MeasurementWatcher{
+		{
+			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
+			name:          "svcWatcher",
+			resource:      sgvr,
+			handlers: &cache.ResourceEventHandlerFuncs{
+				AddFunc: s.handleCreateSvc,
+			},
+		},
+	})
 	return nil
 }
 
