@@ -258,7 +258,12 @@ func (p *pprof) Stop() error {
 		defer cancel()
 		err := p.ClientSet.RbacV1().ClusterRoles().Delete(ctx, types.PprofRole, metav1.DeleteOptions{})
 		if err != nil {
-			log.Errorf("Error deleting cluster role %s: %s", types.PprofRole, err)
+			log.Errorf("Error deleting ClusterRole %s: %s", types.PprofRole, err)
+			return err
+		}
+		err = p.ClientSet.RbacV1().ClusterRoleBindings().Delete(ctx, types.PprofRoleBinding, metav1.DeleteOptions{})
+		if err != nil {
+			log.Errorf("Error deleting ClusterRoleBinding %s: %s", types.PprofRoleBinding, err)
 			return err
 		}
 		err = util.CleanupNamespacesByLabel(ctx, p.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.PprofNamespace))
