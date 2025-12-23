@@ -1,0 +1,18 @@
+metricsEndpoints:
+  - indexer:
+      metricsDirectory: {{ .METRICS_FOLDER }}
+      type: local
+global:
+  measurements:
+   - name: podLatency
+   - name: pprof
+     pprofInterval: 10s
+     pprofDirectory: {{ .METRICS_FOLDER }}/pprof
+     nodeAffinity:
+       node-role.kubernetes.io/worker: ""
+     pprofTargets:
+       - name: kubelet-heap
+         url: https://localhost:10250/debug/pprof/heap
+       - name: crio-heap
+         url: http://localhost/debug/pprof/heap 
+         unixSocketPath: /var/run/crio/crio.sock

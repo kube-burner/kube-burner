@@ -264,3 +264,10 @@ teardown_file() {
   ${KUBE_BURNER} destroy -c kube-burner-multi-doc.yml
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
 }
+
+@test "kube-burner-measurements.yml: measure command" {
+  run_cmd ${KUBE_BURNER} measure -c kube-burner-measure.yml --uuid=${UUID} --log-level=debug --duration=1m --selector=app=kube-burner-measure &
+  kubectl create deployment kube-burner-measure --image=gcr.io/k8s-staging-perf-tests/sleep:v0.1.0 --replicas=4
+  check_file_exists ${METRICS_FOLDER}/pprof/*.pprof
+  check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-kube-burner-measure.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-kube-burner-measure.json
+}
