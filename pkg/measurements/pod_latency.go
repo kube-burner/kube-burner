@@ -265,11 +265,13 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 	}
 	p.Metrics = sync.Map{}
 	for _, pod := range pods {
-		var scheduled, initialized, containersReady, podReady time.Time
+		var scheduled, initialized, containersReady, podReady, readyToStartContainers time.Time
 		for _, c := range pod.Status.Conditions {
 			switch c.Type {
 			case corev1.PodScheduled:
 				scheduled = c.LastTransitionTime.UTC()
+			case corev1.PodReadyToStartContainers:
+				readyToStartContainers = c.LastTransitionTime.UTC()
 			case corev1.PodInitialized:
 				initialized = c.LastTransitionTime.UTC()
 			case corev1.ContainersReady:
@@ -279,17 +281,18 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 			}
 		}
 		p.Metrics.Store(string(pod.UID), podMetric{
-			Timestamp:       pod.Status.StartTime.UTC(),
-			Namespace:       pod.Namespace,
-			Name:            pod.Name,
-			MetricName:      podLatencyMeasurement,
-			NodeName:        pod.Spec.NodeName,
-			UUID:            p.Uuid,
-			scheduled:       scheduled,
-			initialized:     initialized,
-			containersReady: containersReady,
-			podReady:        podReady,
-			JobName:         p.JobConfig.Name,
+			Timestamp:              pod.CreationTimestamp.UTC(),
+			Namespace:              pod.Namespace,
+			Name:                   pod.Name,
+			MetricName:             podLatencyMeasurement,
+			NodeName:               pod.Spec.NodeName,
+			UUID:                   p.Uuid,
+			scheduled:              scheduled,
+			readyToStartContainers: readyToStartContainers,
+			initialized:            initialized,
+			containersReady:        containersReady,
+			podReady:               podReady,
+			JobName:                p.JobConfig.Name,
 		})
 	}
 }
@@ -326,6 +329,13 @@ func (p *podLatency) normalizeMetrics() float64 {
 			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.SchedulingLatency = 0
+		}
+
+		m.ReadyToStartContainersLatency = int(m.readyToStartContainers.Sub(m.Timestamp).Milliseconds())
+		if m.ReadyToStartContainersLatency < 0 {
+			log.Tracef("ReadyToStartContainersLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+			errorFlag = 1
+			m.ReadyToStartContainersLatency = 0
 		}
 
 		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
