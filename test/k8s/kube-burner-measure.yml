@@ -9,10 +9,7 @@ global:
      pprofInterval: 10s
      pprofDirectory: {{ .METRICS_FOLDER }}/pprof
      nodeAffinity:
-       node-role.kubernetes.io/worker: ""
+       node-role.kubernetes.io/control-plane: ""
      pprofTargets:
        - name: kubelet-heap
          url: https://localhost:10250/debug/pprof/heap
-       - name: crio-heap
-         url: http://localhost/debug/pprof/heap 
-         unixSocketPath: /var/run/crio/crio.sock
