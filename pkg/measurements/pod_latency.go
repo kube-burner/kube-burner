@@ -92,12 +92,12 @@ type podLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedPodConditions); err != nil {
 		return nil, err
 	}
 	return podLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -213,22 +213,6 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err != nil {
 		return fmt.Errorf("error getting GVR for %s: %w", "Pod", err)
 	}
-	p.startMeasurement(
-		[]MeasurementWatcher{
-			{
-				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
-				name:          "podWatcher",
-				resource:      gvr,
-				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, p.Runid),
-				handlers: &cache.ResourceEventHandlerFuncs{
-					AddFunc: p.handleCreatePod,
-					UpdateFunc: func(oldObj, newObj any) {
-						p.handleUpdatePod(newObj)
-					},
-				},
-			},
-		},
-	)
 	clientset := kubernetes.NewForConfigOrDie(p.RestConfig)
 	lw := cache.NewFilteredListWatchFromClient(
 		clientset.CoreV1().RESTClient(),
@@ -245,6 +229,21 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 		return fmt.Errorf("failed to sync event informer cache")
 	}
 	p.eventLister = lcorev1.NewEventLister(eventInformer.GetIndexer())
+	p.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
+				name:          "podWatcher",
+				resource:      gvr,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: p.handleCreatePod,
+					UpdateFunc: func(oldObj, newObj any) {
+						p.handleUpdatePod(newObj)
+					},
+				},
+			},
+		},
+	)
 	return nil
 }
 
