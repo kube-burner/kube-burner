@@ -1,0 +1,75 @@
+---
+global:
+  measurements:
+    - name: podLatency
+    - name: pprof
+      pprofInterval: 2m
+      pprofDirectory: pprof-data
+      pprofTargets:
+      - name: ovnkube-controller
+        namespace: "openshift-ovn-kubernetes"
+        labelSelector: {app: ovnkube-node}
+        url: http://localhost:29103/debug/pprof/profile?seconds=30
+      - name: ovnk-control-plane
+        namespace: "openshift-ovn-kubernetes"
+        labelSelector: {app: ovnkube-control-plane}
+        url: http://localhost:29108/debug/pprof/profile?seconds=30
+metricsEndpoints:
+{{ if .ES_SERVER }}
+  - metrics: [{{.METRICS}}]
+    alerts: [{{.ALERTS}}]
+    indexer:
+      esServers: ["{{.ES_SERVER}}"]
+      insecureSkipVerify: true
+      defaultIndex: {{.ES_INDEX}}
+      type: opensearch
+{{ end }}
+{{ if .LOCAL_INDEXING }}
+  - metrics: [{{.METRICS}}]
+    alerts: [{{.ALERTS}}]
+    indexer:
+      type: local
+      metricsDirectory: collected-metrics-{{.UUID}}
+{{ end }}
+
+jobs:
+  - name: udn-density-l3-pods
+    namespace: udn-density-l3-pods
+    jobIterations: {{.JOB_ITERATIONS}}
+    qps: {{.QPS}}
+    burst: {{.BURST}}
+    namespacedIterations: true
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: false
+    preLoadPeriod: 15s
+    jobPause: 5m
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+      k8s.ovn.org/primary-user-defined-network: ""
+    objects:
+
+      - objectTemplate: udn_l3.yml
+        replicas: 1
+
+      - objectTemplate: np-deny-all.yml
+        replicas: 1
+
+      - objectTemplate: np-allow-from-clients.yml
+        replicas: 1
+
+      - objectTemplate: service.yml
+        replicas: 5
+
+      - objectTemplate: deployment-server.yml
+        replicas: 3
+        inputVars:
+          podReplicas: 2
+
+      - objectTemplate: deployment-client.yml
+        replicas: 2
+        inputVars:
+          podReplicas: 2
