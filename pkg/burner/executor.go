@@ -58,6 +58,7 @@ type JobExecutor struct {
 	deletionStrategy  string
 	objectOperations  int32
 	nsChurning        bool
+	backgroundHooks   []*hookProcess
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
@@ -72,6 +73,12 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		embedCfg:          embedCfg,
 		deletionStrategy:  configSpec.GlobalConfig.DeletionStrategy,
 		objectOperations:  0,
+		backgroundHooks:   make([]*hookProcess, 0),
+	}
+
+	// Validate hooks
+	if err := validateHooks(job.Hooks); err != nil {
+		log.Fatalf("Invalid hook configuration for job %s: %v", job.Name, err)
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)

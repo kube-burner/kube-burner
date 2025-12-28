@@ -116,7 +116,15 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if jobExecutor.JobType == config.CreationJob {
 				if jobExecutor.Cleanup {
 					log.Info("Cleaning up previous runs")
+					// Before GC
+					if err := jobExecutor.executeHooks(HookBeforeGC); err != nil {
+						log.Errorf("Hook execution failed: %v", err)
+					}
 					jobExecutor.gc(ctx, nil)
+					// After GC
+					if err := jobExecutor.executeHooks(HookAfterGC); err != nil {
+						log.Errorf("Hook execution failed: %v", err)
+					}
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					log.Info("Churning enabled")
@@ -160,6 +168,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 			}
 			if jobExecutor.BeforeCleanup != "" {
+				// Execute beforeCleanup hooks first
+				if err := jobExecutor.executeHooks(HookBeforeCleanup); err != nil {
+					log.Errorf("Hook execution failed: %v", err)
+				}
+
 				log.Infof("Waiting for beforeCleanup command %s to finish", jobExecutor.BeforeCleanup)
 				stdOut, stdErr, err := util.RunShellCmd(jobExecutor.BeforeCleanup, jobExecutor.embedCfg)
 				if err != nil {
@@ -220,6 +233,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		if globalConfig.GC {
 			//nolint:govet
 			for _, jobExecutor := range jobExecutors {
+				jobExecutor.cleanupBackgroundHooks()
 				gcWg.Add(1)
 				go jobExecutor.gc(ctx, &gcWg)
 			}

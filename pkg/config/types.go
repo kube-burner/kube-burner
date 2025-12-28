@@ -202,6 +202,17 @@ type Job struct {
 	GC bool `yaml:"gc" json:"gc"`
 	// Measurements job-specific measurements to enable
 	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
+	// Hooks to execute at different stages of the job
+	Hooks []Hook `yaml:"hooks" json:"hooks,omitempty"`
+}
+
+type Hook struct {
+	// CMD command to execute
+	CMD []string `yaml:"cmd" json:"cmd,omitempty"`
+	// When specifies when to execute the command
+	When string `yaml:"when" json:"when,omitempty"`
+	// Background indicates whether to run the command in background
+	Background bool `yaml:"background" json:"background,omitempty"`
 }
 
 type WaitOptions struct {

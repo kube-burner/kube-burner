@@ -126,7 +126,15 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
+
+	if err := ex.executeHooks(HookAfterDeployment); err != nil {
+		log.Errorf("Error executing hooks for %s: %v", HookAfterDeployment, err)
+	}
 	for i := iterationStart; i < iterationEnd; i++ {
+		// Execute onEachIteration hooks
+		if err := ex.executeHooks(HookOnEachIteration); err != nil {
+			log.Errorf("Error executing hooks for %s: %v", HookOnEachIteration, err)
+		}
 		if ctx.Err() != nil {
 			return []error{ctx.Err()}
 		}
@@ -189,6 +197,9 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		if errs := ex.waitForCompletion(iterationStart, iterationEnd, ns, namespacesWaited); len(errs) > 0 {
 			waitErrors = append(waitErrors, errs...)
 		}
+	}
+	if err := ex.executeHooks(HookAfterDeployment); err != nil {
+		log.Errorf("Error executing hooks for %s: %v", HookAfterDeployment, err)
 	}
 	return waitErrors
 }
@@ -370,6 +381,10 @@ func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[st
 func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	// Cleanup namespaces based on the labels we added to the objects
 	log.Infof("Churning mode: %s", ex.ChurnConfig.Mode)
+	// Execute beforeChurn hooks
+	if err := ex.executeHooks(HookBeforeChurn); err != nil {
+		log.Errorf("Error executing hooks for %s: %v", HookBeforeChurn, err)
+	}
 	switch ex.ChurnConfig.Mode {
 	case config.ChurnNamespaces:
 		ex.nsChurning = true // Enable namespace churning flag to prevent non namespaced objects to be churned
@@ -380,6 +395,10 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 		return ex.churnNamespaces(ctx)
 	case config.ChurnObjects:
 		ex.churnObjects(ctx)
+	}
+	// Execute afterChurn hooks
+	if err := ex.executeHooks(HookAfterChurn); err != nil {
+		log.Errorf("Error executing hooks for %s: %v", HookAfterChurn, err)
 	}
 	return nil
 }
