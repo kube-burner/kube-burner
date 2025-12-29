@@ -127,8 +127,8 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
 
-	if err := ex.executeHooks(HookAfterDeployment); err != nil {
-		log.Errorf("Error executing hooks for %s: %v", HookAfterDeployment, err)
+	if err := ex.executeHooks(HookBeforeDeployment); err != nil {
+		log.Errorf("Error executing hooks for %s: %v", HookBeforeDeployment, err)
 	}
 	for i := iterationStart; i < iterationEnd; i++ {
 		// Execute onEachIteration hooks
