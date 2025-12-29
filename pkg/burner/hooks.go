@@ -69,6 +69,7 @@ type HookManager struct {
 	resultChan      chan hookResult
 }
 
+// NewHookManager creates a new HookManager
 func NewHookManager(ctx context.Context) *HookManager {
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -113,11 +114,6 @@ func (ex JobExecutor) executeHooks(when string) error {
 				return err
 			}
 		} else {
-			// Execute and wait
-			// if err := ex.executeForegroundHook(hook, when); err != nil {
-			// 	log.Errorf("Error executing hook for %s: %v", when, err)
-			// 	return err
-			// }
 			foregroundWg.Add(1)
 			go func(h config.Hook) {
 				defer foregroundWg.Done()
@@ -218,19 +214,19 @@ func (ex *JobExecutor) monitorBackgroundHook(hp *hookProcess) {
 		}
 
 		if err != nil {
-			log.Errorf("❌ Background hook at '%s' failed after %v: %v", hp.when, duration, err)
+			log.Errorf("Background hook at '%s' failed after %v: %v", hp.when, duration, err)
 			if result.stderr != "" {
 				log.Errorf("Hook stderr: %s", result.stderr)
 			}
 		} else {
-			log.Infof("✅ Background hook at '%s' completed successfully in %v", hp.when, duration)
+			log.Infof("Background hook at '%s' completed successfully in %v", hp.when, duration)
 			if result.stdout != "" {
 				log.Debugf("Hook stdout: %s", result.stdout)
 			}
 		}
 
 	case <-ex.hookManager.ctx.Done():
-		log.Warnf("⚠️  Hook monitor cancel for '%s'", hp.when)
+		log.Warnf("Hook monitor cancel for '%s'", hp.when)
 	}
 }
 
@@ -283,7 +279,7 @@ func (ex *JobExecutor) WaitForBackgroundHooks(timeout time.Duration) error {
 		return nil
 	}
 
-	log.Infof("⏳ Waiting for %d background hooks to complete (timeout: %v)...", count, timeout)
+	log.Infof("Waiting for %d background hooks to complete (timeout: %v)...", count, timeout)
 
 	// Wait with timeout
 	done := make(chan struct{})
@@ -294,93 +290,12 @@ func (ex *JobExecutor) WaitForBackgroundHooks(timeout time.Duration) error {
 
 	select {
 	case <-done:
-		log.Infof("✅ All background hooks completed")
+		log.Infof("All background hooks completed")
 		return nil
 	case <-time.After(timeout):
 		return fmt.Errorf("timeout waiting for background hooks after %v", timeout)
 	}
 }
-
-// cleanupBackgroundHooks terminates all running background hooks gracefully
-// func (ex *JobExecutor) cleanupBackgroundHooks() {
-// 	if ex.hookManager == nil {
-// 		return
-// 	}
-
-// 	ex.hookManager.mu.Lock()
-// 	defer ex.hookManager.mu.Unlock()
-
-// 	if len(ex.hookManager.backgroundHooks) == 0 {
-// 		return
-// 	}
-
-// 	log.Infof("🧹 Cleaning up %d background hooks...", len(ex.hookManager.backgroundHooks))
-
-// 	// Cancel context to signal all monitors
-// 	ex.hookManager.cancel()
-
-// 	var cleanupWg sync.WaitGroup
-// 	for _, hp := range ex.hookManager.backgroundHooks {
-// 		cleanupWg.Add(1)
-// 		go func(p *hookProcess) {
-// 			defer cleanupWg.Done()
-// 			ex.terminateHookProcess(p)
-// 		}(hp)
-// 	}
-
-// 	// Wait for all cleanup goroutines with timeout
-// 	cleanupDone := make(chan struct{})
-// 	go func() {
-// 		cleanupWg.Wait()
-// 		close(cleanupDone)
-// 	}()
-
-// 	select {
-// 	case <-cleanupDone:
-// 		log.Info("✅ All background hooks cleaned up")
-// 	case <-time.After(10 * time.Second):
-// 		log.Warn("⚠️  Cleanup timeout, some hooks may still be running")
-// 	}
-
-// 	// Clear the slice
-// 	ex.hookManager.backgroundHooks = ex.hookManager.backgroundHooks[:0]
-// }
-
-// func (ex *JobExecutor) terminateHookProcess(hp *hookProcess) {
-// 	hp.mu.Lock()
-// 	defer hp.mu.Unlock()
-
-// 	if hp.cmd == nil || hp.cmd.Process == nil {
-// 		return
-// 	}
-
-// 	pid := hp.cmd.Process.Pid
-// 	log.Infof("Terminating hook process (PID: %d) for '%s'", pid, hp.when)
-
-// 	// Try graceful shutdown first (SIGTERM)
-// 	if err := hp.cmd.Process.Signal(syscall.SIGTERM); err != nil {
-// 		log.Warnf("Failed to send SIGTERM to PID %d: %v", pid, err)
-// 	}
-
-// 	// Wait for graceful shutdown with timeout
-// 	gracefulDone := make(chan struct{})
-// 	go func() {
-// 		select {
-// 		case <-hp.done:
-// 			close(gracefulDone)
-// 		case <-time.After(5 * time.Second):
-// 			// Force kill if graceful shutdown fails
-// 			log.Warnf("Graceful shutdown timeout, force killing PID %d", pid)
-// 			if killErr := hp.cmd.Process.Kill(); killErr != nil {
-// 				log.Errorf("Failed to kill PID %d: %v", pid, killErr)
-// 			}
-// 			close(gracefulDone)
-// 		}
-// 	}()
-
-// 	<-gracefulDone
-// 	log.Debugf("Process %d terminated", pid)
-// }
 
 // GetBackgroundHookResults returns results from background hooks (non-blocking)
 func (ex *JobExecutor) GetBackgroundHookResults() []hookResult {
@@ -424,6 +339,7 @@ func validateHooks(hooks []config.Hook) error {
 
 	return nil
 }
+
 func getValidWhenValues() []string {
 	return []string{
 		HookBeforeDeployment,
