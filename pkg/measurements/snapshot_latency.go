@@ -80,12 +80,12 @@ type volumeSnapshotLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newvolumeSnapshotLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedVolumeSnapshotConditions); err != nil {
 		return nil, err
 	}
 	return volumeSnapshotLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -145,7 +145,6 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vsl.RestConfig),
 				name:          "vsWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vsl.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vsl.handleCreateVolumeSnapshot,
 					UpdateFunc: func(oldObj, newObj any) {
