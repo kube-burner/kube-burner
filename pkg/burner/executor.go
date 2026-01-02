@@ -15,6 +15,7 @@
 package burner
 
 import (
+	"context"
 	"sync"
 
 	"maps"
@@ -58,6 +59,9 @@ type JobExecutor struct {
 	deletionStrategy  string
 	objectOperations  int32
 	nsChurning        bool
+	backgroundHooks   []*hookProcess
+	Hooks             []config.Hook
+	hookManager       *HookManager
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
@@ -72,6 +76,14 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		embedCfg:          embedCfg,
 		deletionStrategy:  configSpec.GlobalConfig.DeletionStrategy,
 		objectOperations:  0,
+		backgroundHooks:   make([]*hookProcess, 0),
+		Hooks:             job.Hooks,
+		hookManager:       NewHookManager(context.Background()),
+	}
+
+	// Validate hooks
+	if err := validateHooks(job.Hooks); err != nil {
+		log.Fatalf("Invalid hook configuration for job %s: %v", job.Name, err)
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
