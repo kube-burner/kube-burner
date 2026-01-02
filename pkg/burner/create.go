@@ -331,6 +331,10 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		} else {
 			if !ex.nsChurning {
 				uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			} else {
+				// Skip non-namespaced objects during namespace churning - they won't be deleted with the namespace
+				log.Debugf("Skipping non-namespaced object %s/%s during namespace churning", obj.GetKind(), obj.GetName())
+				return true, nil
 			}
 		}
 		if err != nil {
