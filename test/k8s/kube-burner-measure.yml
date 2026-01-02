@@ -9,7 +9,7 @@ global:
      pprofInterval: 10s
      pprofDirectory: {{ .METRICS_FOLDER }}/pprof
      nodeAffinity:
-       node-role.kubernetes.io/control-plane: ""
+       kubernetes.io/os: linux
      pprofTargets:
        - name: kubelet-heap
          url: https://localhost:10250/debug/pprof/heap

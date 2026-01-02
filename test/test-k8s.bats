@@ -265,7 +265,7 @@ teardown_file() {
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
 }
 
-@test "kube-burner-measurements.yml: measure command" {
+@test "kube-burner-measure.yml: measure command" {
   run_cmd ${KUBE_BURNER} measure -c kube-burner-measure.yml --uuid=${UUID} --log-level=debug --duration=1m --selector=app=kube-burner-measure &
   sleep 40s
   kubectl create deployment kube-burner-measure --image=gcr.io/google_containers/pause:3.2 --replicas=2 -n kube-burner-pprof-collector

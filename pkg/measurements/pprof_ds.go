@@ -22,7 +22,7 @@ func (p *pprof) needsDaemonSet() bool {
 
 func (p *pprof) waitForDaemonSetReady() error {
 	time.Sleep(time.Second) // There's a small time window where the desired number of pods is 0
-	log.Infof("Waiting for DaemonSet %s pods to be ready", types.PprofDaemonSet)
+	log.Infof("Waiting for DaemonSet/%s to be ready", types.PprofDaemonSet)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
@@ -33,6 +33,7 @@ func (p *pprof) waitForDaemonSetReady() error {
 		if ds.Status.DesiredNumberScheduled != ds.Status.NumberReady {
 			return false, nil
 		}
+		log.Debugf("%d pod replicas of DaemonSet/%s ready", ds.Status.NumberReady, ds.Name)
 		return true, nil
 	})
 	if err != nil {
