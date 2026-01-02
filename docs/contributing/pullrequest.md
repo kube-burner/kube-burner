@@ -18,7 +18,7 @@ This job performs the following steps:
 Linters can be executed locally with just `make lint`
 
 !!! info
-    Main purpose for pre-commit is to allow developers to pass the Lint Checks before commiting the code. Same checks will be executed on all the commits once they are pushed to GitHub
+    Main purpose for pre-commit is to allow developers to pass the Lint Checks before committing the code. Same checks will be executed on all the commits once they are pushed to GitHub
 
 Requirements:
 
