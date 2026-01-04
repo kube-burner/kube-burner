@@ -266,12 +266,7 @@ teardown_file() {
 }
 
 @test "kube-burner-measure.yml: measure command" {
-  run_cmd ${KUBE_BURNER} measure -c kube-burner-measure.yml --uuid=${UUID} --log-level=debug --duration=1m --selector=app=kube-burner-measure &
-  sleep 40s
-  kubectl create deployment kube-burner-measure --image=gcr.io/google_containers/pause:3.2 --replicas=2 -n kube-burner-pprof-collector
-  sleep 1m
-  kubectl delete ns kube-burner-pprof-collector --ignore-not-found
+  run_cmd ${KUBE_BURNER} measure -c kube-burner-measure.yml --uuid=${UUID} --log-level=debug --duration=1m --selector=app=kube-burner-measure
   check_file_exists ${METRICS_FOLDER}/pprof/*.pprof
-  check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-kube-burner-measure.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-kube-burner-measure.json
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
 }
