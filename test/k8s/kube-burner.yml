@@ -71,7 +71,7 @@ jobs:
     maxWaitTimeout: 2m
     churnConfig:
       cycles: {{ .CHURN_CYCLES }}
-      percent: 20
+      percent: 50
       delay: 2s
       mode: {{ .CHURN_MODE }}
     gc: {{env "JOBGC" }}
@@ -129,7 +129,6 @@ jobs:
     podWait: false
     qps: 10
     burst: 10
-    jobPause: 10s
     objects:
     - objectTemplate: objectTemplates/cr.yml
       replicas: 5

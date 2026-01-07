@@ -15,6 +15,7 @@
 package burner
 
 import (
+	"bytes"
 	"context"
 	"math"
 	"strconv"
@@ -34,6 +35,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
+
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
@@ -62,7 +65,7 @@ var (
 )
 
 // updates the labels in the object
-func udpateLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
+func updateLabels(obj *unstructured.Unstructured, labels map[string]string, templatePath []string) {
 	labelMap, found, _ := unstructured.NestedMap(obj.Object, templatePath...)
 	if !found {
 		labelMap = make(map[string]any, len(labels))
@@ -83,7 +86,7 @@ func setLabelsInArray(obj *unstructured.Unstructured, labels map[string]string, 
 		innerObj := unstructured.Unstructured{}
 		innerObj.SetUnstructuredContent(a.(map[string]any))
 
-		udpateLabels(&innerObj, labels, templatePath)
+		updateLabels(&innerObj, labels, templatePath)
 	}
 	unstructured.SetNestedSlice(obj.Object, array, arrayPath...)
 }
@@ -94,7 +97,7 @@ func setLabelsInArray(obj *unstructured.Unstructured, labels map[string]string, 
 func updateChildLabels(obj *unstructured.Unstructured, labels map[string]string) {
 	paths := kindToLabelPaths[obj.GetKind()]
 	for _, path := range paths {
-		udpateLabels(obj, labels, path)
+		updateLabels(obj, labels, path)
 	}
 
 	// Do the same for elements stored in array (e.g. dataVolumeTemplates in VirtualMachine)
@@ -110,6 +113,29 @@ func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructure
 		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
 	}
 	return o, gvk
+}
+
+func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unstructured, []*schema.GroupVersionKind) {
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(y), 4096)
+	var gvks []*schema.GroupVersionKind
+	var objects []*unstructured.Unstructured
+	for {
+		uns := &unstructured.Unstructured{}
+		err := decoder.Decode(uns)
+		if err != nil {
+			break
+		}
+		if len(uns.Object) == 0 {
+			break
+		}
+		gvk := uns.GroupVersionKind()
+		objects = append(objects, uns)
+		gvks = append(gvks, &gvk)
+	}
+	if len(objects) == 0 {
+		log.Fatalf("Error decoding YAML (%s): no objects found", fileName)
+	}
+	return objects, gvks
 }
 
 // resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements
@@ -201,13 +227,15 @@ func newRESTMapper(config *rest.Config) *restmapper.DeferredDiscoveryRESTMapper 
 	return restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
 }
 
-func (ex *JobExecutor) Run(ctx context.Context) {
+func (ex *JobExecutor) Run(ctx context.Context) []error {
+	var errs []error
 	switch ex.ExecutionMode {
 	case config.ExecutionModeParallel:
-		ex.runParallel(ctx)
+		errs = ex.runParallel(ctx)
 	case config.ExecutionModeSequential:
-		ex.runSequential(ctx)
+		errs = ex.runSequential(ctx)
 	}
+	return errs
 }
 
 func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
@@ -233,11 +261,12 @@ func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.Unstruct
 	return itemList, nil
 }
 
-func (ex *JobExecutor) runSequential(ctx context.Context) {
+func (ex *JobExecutor) runSequential(ctx context.Context) []error {
+	var errs []error
 	for i := range ex.JobIterations {
 		for _, obj := range ex.objects {
 			if ctx.Err() != nil {
-				return
+				return []error{ctx.Err()}
 			}
 			itemList, err := ex.getItemListForObject(obj)
 			if err != nil {
@@ -254,7 +283,11 @@ func (ex *JobExecutor) runSequential(ctx context.Context) {
 
 			// If requested, wait for the completion of the specific object
 			if ex.ObjectWait {
-				ex.waitForObject("", obj)
+				if err := ex.waitForObject("", obj); err != nil {
+					if errs == nil {
+						errs = append(errs, err)
+					}
+				}
 			}
 
 			if ex.objectFinalizer != nil {
@@ -267,7 +300,9 @@ func (ex *JobExecutor) runSequential(ctx context.Context) {
 			}
 		}
 		if ex.WaitWhenFinished {
-			ex.waitForObjects("")
+			if err := ex.waitForObjects(""); err != nil {
+				errs = append(errs, err...)
+			}
 		}
 		// Wait between job iterations
 		if ex.JobIterationDelay > 0 {
@@ -282,14 +317,15 @@ func (ex *JobExecutor) runSequential(ctx context.Context) {
 			}
 		}
 	}
+	return errs
 }
 
 // runParallel executes all objects for all jobs in parallel
-func (ex *JobExecutor) runParallel(ctx context.Context) {
+func (ex *JobExecutor) runParallel(ctx context.Context) []error {
 	var wg sync.WaitGroup
 	for _, obj := range ex.objects {
 		if ctx.Err() != nil {
-			return
+			return []error{ctx.Err()}
 		}
 		itemList, err := ex.getItemListForObject(obj)
 		if err != nil {
@@ -304,5 +340,5 @@ func (ex *JobExecutor) runParallel(ctx context.Context) {
 		}
 	}
 	wg.Wait()
-	ex.waitForObjects("")
+	return ex.waitForObjects("")
 }

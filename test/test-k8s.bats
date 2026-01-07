@@ -8,8 +8,8 @@ setup_file() {
   cd k8s
   export BATS_TEST_TIMEOUT=1800
   export JOB_ITERATIONS=4
-  export QPS=3
-  export BURST=3
+  export QPS=5
+  export BURST=5
   export TEST_KUBECONFIG; TEST_KUBECONFIG=$(mktemp -d)/kubeconfig
   export TEST_KUBECONTEXT=test-context
   export ES_SERVER=${PERFSCALE_PROD_ES_SERVER:-"http://localhost:9200"}
@@ -68,24 +68,20 @@ teardown_file() {
   fi
 }
 
-@test "kube-burner.yml: gc=false; preload=true; churn-mode=objects" {
-  export CHURN_CYCLES=2
-  export GC=false
+@test "kube-burner.yml: preload=true; set-churn-mode=namespaces,set-gc=false" {
   export CRD=true
-  export PRELOAD_IMAGES=true
-  export CHURN_MODE=namespaces
+  export JOB_ITERATIONS=11
   cp kube-burner.yml /tmp/kube-burner.yml
-  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --set global.gc=false,jobs.0.churnConfig.mode=namespaces,jobs.0.preLoadImages=true,jobs.0.churnConfig.cycles=2 --log-level=debug
   verify_object_count TestCR 5 cr-crd kube-burner.io/uuid=${UUID}
   check_file_exists "kube-burner-${UUID}.log"
-  kubectl delete -f objectTemplates/crd.yml
-  verify_object_count namespace 5 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
-  verify_object_count pod 10 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
-  verify_object_count pod 5 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
-  ${KUBE_BURNER} destroy --uuid ${UUID}
-  kubectl delete pod -l kube-burner.io/uuid=${UUID} -n default
+  verify_object_count namespace 12 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
+  verify_object_count pod 24 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  verify_object_count pod 12 default kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID} status.phase==Running
+  ${KUBE_BURNER} destroy -c /tmp/kube-burner.yml
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
-  verify_object_count pod 0 default kube-burner.io/uuid=${UUID}
+  verify_object_count pod 0 "" kube-burner.io/uuid=${UUID}
+  verify_object_count TestCR 0 cr-crd kube-burner.io/uuid=${UUID}
 }
 
 @test "kube-burner.yml: churn-mode=objects, local-indexing=true; os-indexing=true" {
@@ -102,9 +98,8 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
-@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true" {
-  export PRELOAD_IMAGES=true  # VM image preload
-  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --log-level=debug
+@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true;set-preload=true" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
   verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
@@ -149,9 +144,9 @@ teardown_file() {
   export GC=false
   export WAIT_FOR_CONDITION="True"
   export WAIT_CUSTOM_STATUS_PATH='(.conditions.[] | select(.type == "Available")).status'
-  run_cmd ${KUBE_BURNER} init -c  kube-burner.yml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug
   check_custom_status_path kube-burner.io/uuid=${UUID} "{.items[*].status.conditions[].type}" Available
-  ${KUBE_BURNER} destroy --uuid ${UUID}
+  ${KUBE_BURNER} destroy -c kube-burner.yml
 }
 
 @test "kube-burner-sequential-patch.yml: sequential patch" {
@@ -257,4 +252,15 @@ teardown_file() {
 
   # Verify all expected metric files were created
   check_file_list ${METRICS_FOLDER}/podLatencyMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-precedence-measurements.json ${METRICS_FOLDER}/podLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyMeasurement-merge-measurements.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-merge-measurements.json
+}
+
+@test "kube-burner-multi-doc.yml: multi-document YAML templates" {
+  export GC=false
+  run_cmd ${KUBE_BURNER} init -c kube-burner-multi-doc.yml --uuid=${UUID} --log-level=debug
+  # 3 iterations * 2 replicas * 2 pods per template = 12 pods total
+  # 6 frontend + 6 backend
+  verify_object_count pod 6 "" app=frontend,kube-burner.io/uuid=${UUID}
+  verify_object_count pod 6 "" app=backend,kube-burner.io/uuid=${UUID}
+  ${KUBE_BURNER} destroy -c kube-burner-multi-doc.yml
+  verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
 }

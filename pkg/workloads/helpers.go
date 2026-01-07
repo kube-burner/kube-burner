@@ -56,32 +56,27 @@ func NewWorkloadHelper(config Config, embedFS *embed.FS, workloadDir, metricsDir
 	return wh
 }
 
-// Run executes the workload based on the provided configuration file.
-//
+// Add additional variables to the configuration file,
 // Parameters:
-//   - configFile: The path to the configuration file to be used for the workload.
-//
-// Returns:
-//   - An integer representing the result of the workload execution.
-func (wh *WorkloadHelper) Run(configFile string) int {
-	return wh.RunWithAdditionalVars(configFile, nil, nil)
+//   - additionalVars: A map of additional variables to be used for variable substitution in the configuration file.
+//   - setVars: A map using the same configuration schema to set values for variables in the configuration file.
+func (wh *WorkloadHelper) SetVariables(additionalVars map[string]any, setVars map[string]any) {
+	wh.additionalVars = additionalVars
+	wh.setVars = setVars
 }
 
-// RunWithAdditionalVars executes the workload based on the provided configuration file.
-//
-// Parameters:
-//   - configFile: The path to the configuration file to be used for the workload.
-//   - additionalVars: A map of additional variables to be used for variable substitution in the configuration file.
-//   - additionalMeasurementFactoryMap: A map of additional measurement factories to be used for measurements.
-//
-// Returns:
-//   - An integer representing the result of the workload execution.
-func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVars map[string]any, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) int {
+// Add additional measurements to the benchmark
+func (wh *WorkloadHelper) SetMeasurements(additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory) {
+	wh.additionalMeasurementFactoryMap = additionalMeasurementFactoryMap
+}
+
+// - An integer representing the result of the workload execution.
+func (wh *WorkloadHelper) Run(configFile string) int {
 	f, err := fileutils.GetWorkloadReader(configFile, wh.embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading configuration file: %v", err.Error())
 	}
-	ConfigSpec, err = config.ParseWithUserdata(wh.UUID, wh.Timeout, f, nil, false, additionalVars)
+	ConfigSpec, err = config.ParseWithUserdata(wh.UUID, wh.Timeout, f, nil, false, wh.additionalVars, wh.setVars)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,7 +93,7 @@ func (wh *WorkloadHelper) RunWithAdditionalVars(configFile string, additionalVar
 		UserMetaData:    wh.UserMetadata,
 		EmbedCfg:        wh.embedCfg,
 	})
-	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, additionalMeasurementFactoryMap, wh.embedCfg)
+	rc, err := burner.Run(ConfigSpec, wh.kubeClientProvider, metricsScraper, wh.additionalMeasurementFactoryMap, wh.embedCfg)
 	if err != nil {
 		log.Error(err.Error())
 	}

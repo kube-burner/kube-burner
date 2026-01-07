@@ -1002,7 +1002,7 @@ And the quantiles document has the structure:
 
 ## pprof collection
 
-This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory` which by default is `pprof`.
+This measurement can be used to collect Golang profiling information from processes running in pods from the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data. pprof files are collected in a regular basis configured by the parameter `pprofInterval`, the collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory`, by default is `pprof`.
 
 As some components require authentication to get profiling information, `kube-burner` provides two different modalities to address it:
 
@@ -1041,7 +1041,29 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 !!! warning
     As mentioned before, this measurement requires the `curl` command to be available in the target pods.
 
-## Measure subcommand CLI example
+### Node pprof collection
+
+Golang profiling information from node processes such as kubelet or crio can be collected as well. To do so, you need to set the `nodeAffinity` parameter to the desired node labels.
+When running, Kube-burner will create a DaemonSet with the configured node affinity, and a series of host path volumes and serviceaccount permissions (including a custom cluster role and cluster role binding), required to pull pprof data from these processes and store it in the local directory configured by the parameter `pprofDirectory`.
+
+Find below a configuration snippet to collect pprof HEAP profiling data from kubelet and cri-o from worker nodes:
+
+```yaml
+  measurements:
+  - name: pprof
+    pprofInterval: 30m
+    pprofDirectory: pprof-data
+    nodeAffinity:
+      node-role.kubernetes.io/worker: ""
+    pprofTargets:
+    - name: kubelet-heap
+      url: https://localhost:10250/debug/pprof/heap
+    - name: crio-heap
+      url: http://localhost/debug/pprof/heap
+      unixSocketPath: /var/run/crio/crio.sock
+```
+
+## Measure subcommand CLI
 
 Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
 

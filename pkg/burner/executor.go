@@ -25,6 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -56,6 +57,7 @@ type JobExecutor struct {
 	mapper            *restmapper.DeferredDiscoveryRESTMapper
 	deletionStrategy  string
 	objectOperations  int32
+	nsChurning        bool
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
@@ -128,4 +130,29 @@ func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIn
 	}
 
 	return renderedObj
+}
+
+func (ex *JobExecutor) renderTemplateForObjectMultiple(obj *object, iteration, replicaIndex int) ([]*unstructured.Unstructured, []*schema.GroupVersionKind) {
+	// Processing template
+	templateData := map[string]any{
+		jobName:      ex.Name,
+		jobIteration: iteration,
+		jobUUID:      ex.uuid,
+		jobRunId:     ex.runid,
+		replica:      replicaIndex,
+	}
+	maps.Copy(templateData, obj.InputVars)
+
+	templateOption := util.MissingKeyError
+	if ex.DefaultMissingKeysWithZero {
+		templateOption = util.MissingKeyZero
+	}
+
+	renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption, ex.functionTemplates)
+	if err != nil {
+		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
+	}
+
+	objects, gvks := yamlToUnstructuredMultiple(obj.ObjectTemplate, renderedObj)
+	return objects, gvks
 }
