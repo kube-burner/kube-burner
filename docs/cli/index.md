@@ -148,7 +148,7 @@ kube-burner measure -c kube-burner-measurements.yml --duration=30m --selector=ap
 ```
 
 !!! Note "Measurement types"
-    Find extended information about the different measurement types available in kube-burner [here](docs/measurements/index.md)
+    Find extended information about the different measurement types available in kube-burner [here](../measurements/index.md)
 
 ## Check alerts
 
