@@ -1063,27 +1063,6 @@ Find below a configuration snippet to collect pprof HEAP profiling data from kub
       unixSocketPath: /var/run/crio/crio.sock
 ```
 
-## Measure subcommand CLI
-
-Measure subcommand example with relevant options. It is used to fetch measurements on top of resources that were a part of workload ran in past.
-
-```shell
-kube-burner measure --uuid=vchalla --namespaces=cluster-density-v2-0,cluster-density-v2-1,cluster-density-v2-2,cluster-density-v2-3,cluster-density-v2-4 --selector=kube-burner.io/job=cluster-density-v2
-time="2023-11-19 17:46:05" level=info msg="📁 Creating indexer: elastic" file="kube-burner.go:226"
-time="2023-11-19 17:46:05" level=info msg="📈 Registered measurement: podLatency" file="factory.go:85"
-time="2023-11-19 17:46:06" level=info msg="Stopping measurement: podLatency" file="factory.go:118"
-time="2023-11-19 17:46:06" level=info msg="Evaluating latency thresholds" file="metrics.go:60"
-time="2023-11-19 17:46:06" level=info msg="Indexing pod latency data for job: kube-burner-measure" file="pod_latency.go:245"
-time="2023-11-19 17:46:07" level=info msg="Indexing finished in 417ms: created=4" file="pod_latency.go:262"
-time="2023-11-19 17:46:08" level=info msg="Indexing finished in 1.32s: created=50" file="pod_latency.go:262"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: PodScheduled 50th: 0 99th: 0 max: 0 avg: 0" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: ContainersReady 50th: 9000 99th: 18000 max: 18000 avg: 10680" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Initialized 50th: 0 99th: 0 max: 0 avg: 0" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="kube-burner-measure: Ready 50th: 9000 99th: 18000 max: 18000 avg: 10680" file="pod_latency.go:233"
-time="2023-11-19 17:46:08" level=info msg="Pod latencies error rate was: 0.00" file="pod_latency.go:236"
-time="2023-11-19 17:46:08" level=info msg="👋 Exiting kube-burner vchalla" file="kube-burner.go:209"
-```
-
 ## Indexing in different places
 
 The pod/vmi and service latency measurements send their metrics by default to all the indexers configured in the `metricsEndpoints` list, but it's possible to configure a different indexer for the quantile and the timeseries metrics by using the fields `quantilesIndexer` and `timeseriesIndexer`.

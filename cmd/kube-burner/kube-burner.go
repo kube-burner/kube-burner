@@ -35,9 +35,8 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
@@ -247,18 +246,23 @@ func destroyCmd() *cobra.Command {
 
 func measureCmd() *cobra.Command {
 	var uuid string
-	var rawNamespaces string
 	var selector string
 	var configFile string
 	var jobName string
 	var userMetadata string
 	var kubeConfig, kubeContext string
 	var skipLogFile bool
+	var duration time.Duration
 	indexerList := make(map[string]indexers.Indexer)
 	metadata := make(map[string]any)
 	cmd := &cobra.Command{
 		Use:   "measure",
 		Short: "Take measurements for a given set of resources without running workload",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if uuid == "" {
+				uuid = uid.NewString()
+			}
+		},
 		PostRun: func(cmd *cobra.Command, args []string) {
 			log.Info("👋 Exiting kube-burner ", uuid)
 		},
@@ -275,9 +279,6 @@ func measureCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			if len(configSpec.Jobs) > 0 {
-				log.Fatal("No jobs are allowed in a measure subcommand config file")
-			}
 			for pos, indexer := range configSpec.MetricsEndpoints {
 				log.Infof("📁 Creating indexer: %s", indexer.Type)
 				idx, err := indexers.NewIndexer(indexer.IndexerConfig)
@@ -292,43 +293,35 @@ func measureCmd() *cobra.Command {
 					log.Fatalf("Error reading provided user metadata: %v", err)
 				}
 			}
-			labelSelector, err := labels.Parse(selector)
-			if err != nil {
-				log.Fatalf("Invalid selector: %v", err)
-			}
-			namespaceLabels := make(map[string]string)
-			namespaceAnnotations := make(map[string]string)
-			labelRequirements, _ := labelSelector.Requirements()
-			for _, req := range labelRequirements {
-				namespaceLabels[req.Key()] = req.Values().List()[0]
-			}
-			log.Infof("%v", namespaceLabels)
 			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
 				&config.Job{
-					Name:                 jobName,
-					Namespace:            rawNamespaces,
-					NamespaceLabels:      namespaceLabels,
-					NamespaceAnnotations: namespaceAnnotations,
+					Name:    jobName,
+					JobType: config.CreationJob,
 				},
 				config.NewKubeClientProvider(kubeConfig, kubeContext),
 				nil,
+				selector,
 			)
-			measurementsInstance.Collect()
+			measurementsInstance.Start()
+			log.Infof("Running measurements for %s", duration)
+			time.Sleep(duration)
 			if err = measurementsInstance.Stop(); err != nil {
 				log.Error(err.Error())
 			}
-			measurementsInstance.Index(jobName, indexerList)
+			if indexerList != nil {
+				measurementsInstance.Index(jobName, indexerList)
+			}
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "UUID (generated automatically if not provided)")
 	cmd.Flags().StringVar(&userMetadata, "user-metadata", "", "User provided metadata file, in YAML format")
 	cmd.Flags().StringVarP(&configFile, "config", "c", "config.yml", "Config file path or URL")
 	cmd.Flags().StringVarP(&jobName, "job-name", "j", "kube-burner-measure", "Measure job name")
-	cmd.Flags().StringVarP(&rawNamespaces, "namespaces", "n", corev1.NamespaceAll, "comma-separated list of namespaces")
-	cmd.Flags().StringVarP(&selector, "selector", "l", "", "namespace label selector. (e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(&selector, "selector", "l", "", "label selector.(e.g. selects objects labeled with key1=value1)")
 	cmd.Flags().StringVar(&kubeConfig, "kubeconfig", "", "Path to the kubeconfig file")
 	cmd.Flags().StringVar(&kubeContext, "kube-context", "", "The name of the kubeconfig context to use")
 	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
+	cmd.Flags().DurationVar(&duration, "duration", 10*time.Minute, "Run measurements for the specified duration")
 	return cmd
 }
 

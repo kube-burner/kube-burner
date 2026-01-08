@@ -51,7 +51,7 @@ type pprofLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	for _, target := range measurement.PProfTargets {
 		if target.BearerToken != "" && (target.CertFile != "" || target.Cert != "") {
 			return nil, fmt.Errorf("bearerToken and cert auth methods cannot be specified together in the same target")
@@ -59,7 +59,7 @@ func newPprofLatencyMeasurementFactory(configSpec config.Spec, measurement types
 	}
 
 	return pprofLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -256,13 +256,15 @@ func (p *pprof) Stop() error {
 	if p.needsDaemonSet() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
-		err := p.ClientSet.RbacV1().ClusterRoles().Delete(ctx, types.PprofRole, metav1.DeleteOptions{})
-		if err != nil {
-			log.Errorf("Error deleting cluster role %s: %s", types.PprofRole, err)
+		if err := p.ClientSet.RbacV1().ClusterRoleBindings().Delete(ctx, types.PprofRoleBinding, metav1.DeleteOptions{}); err != nil {
+			log.Errorf("Error deleting ClusterRoleBinding %s: %s", types.PprofRoleBinding, err)
 			return err
 		}
-		err = util.CleanupNamespacesByLabel(ctx, p.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.PprofNamespace))
-		if err != nil {
+		if err := p.ClientSet.RbacV1().ClusterRoles().Delete(ctx, types.PprofRole, metav1.DeleteOptions{}); err != nil {
+			log.Errorf("Error deleting ClusterRole %s: %s", types.PprofRole, err)
+			return err
+		}
+		if err := util.CleanupNamespacesByLabel(ctx, p.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.PprofNamespace)); err != nil {
 			log.Errorf("Error cleaning up namespaces %s: %s", types.PprofNamespace, err)
 			return err
 		}
