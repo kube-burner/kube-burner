@@ -144,8 +144,11 @@ global:
 Example usage:
 
 ```console
-kube-burner measure -c kube-burner-measurements.yml --uuid=${UUID} --duration=30m --selector=app=myapp
+kube-burner measure -c kube-burner-measurements.yml --duration=30m --selector=app=myapp
 ```
+
+!!! Note "Measurement types"
+    Find extended information about the different measurement types available in kube-burner [here](docs/measurements/index.md)
 
 ## Check alerts
 

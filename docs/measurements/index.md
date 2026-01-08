@@ -1063,42 +1063,6 @@ Find below a configuration snippet to collect pprof HEAP profiling data from kub
       unixSocketPath: /var/run/crio/crio.sock
 ```
 
-## Measure subcommand CLI
-
-The measure subcommand observes the cluster in real-time using Kubernetes informers to collect measurements for resources that match the specified criteria. It watches resources as they are created, updated, or deleted during the measurement duration.
-
-Example usage with relevant options:
-
-```shell
-kube-burner measure -c kube-burner-measure.yml --duration=30s --selector=app=kube-burner-measure 
-time="2025-12-23 11:00:14" level=info msg="📁 Creating indexer: local" file="kube-burner.go:283"
-time="2025-12-23 11:00:15" level=info msg="Initializing measurements for job: kube-burner-measure" file="factory.go:104"
-time="2025-12-23 11:00:15" level=info msg="Registered measurement: podLatency" file="factory.go:139"
-time="2025-12-23 11:00:15" level=info msg="Registered measurement: pprof" file="factory.go:139"
-time="2025-12-23 11:00:15" level=info msg="pprof-collector: DaemonSet kube-burner-pprof-collector deployed in namespace kube-burner-pprof-collector" file="pprof_ds.go:127"
-time="2025-12-23 11:00:15" level=info msg="Waiting for DaemonSet kube-burner-pprof-collector pods to be ready" file="pprof_ds.go:24"
-time="2025-12-23 11:00:15" level=info msg="Creating /v1, Resource=pods latency watcher for kube-burner-measure using selector [app=kube-burner-measure]" file="base_measurement.go:78"
-time="2025-12-23 11:00:18" level=info msg="Collecting kubelet-heap pprof" file="pprof.go:135"
-time="2025-12-23 11:00:18" level=info msg="Collecting crio-heap pprof" file="pprof.go:135"
-time="2025-12-23 11:00:21" level=info msg="Running measurements for 30s" file="kube-burner.go:306"
-time="2025-12-23 11:00:31" level=info msg="Collecting kubelet-heap pprof" file="pprof.go:135"
-time="2025-12-23 11:00:32" level=info msg="Collecting crio-heap pprof" file="pprof.go:135"
-time="2025-12-23 11:00:41" level=info msg="Collecting kubelet-heap pprof" file="pprof.go:135"
-time="2025-12-23 11:00:42" level=info msg="Collecting crio-heap pprof" file="pprof.go:135"
-time="2025-12-23 11:00:51" level=info msg="Collecting kubelet-heap pprof" file="pprof.go:135"
-time="2025-12-23 11:00:51" level=info msg="Stopping measurement: podLatency" file="factory.go:168"
-time="2025-12-23 11:00:51" level=info msg="Stopping measurement: pprof" file="factory.go:168"
-time="2025-12-23 11:00:52" level=info msg="Collecting crio-heap pprof" file="pprof.go:135"
-time="2025-12-23 11:00:55" level=info msg="Deleting 1 namespaces with label: kubernetes.io/metadata.name=kube-burner-pprof-collector" file="namespaces.go:65"
-time="2025-12-23 11:01:39" level=info msg="Indexing collected data from measurement: pprof" file="factory.go:180"
-time="2025-12-23 11:01:39" level=info msg="Indexing collected data from measurement: podLatency" file="factory.go:180"
-time="2025-12-23 11:01:39" level=info msg="Indexing metric podLatencyMeasurement" file="base_measurement.go:143"
-time="2025-12-23 11:01:39" level=error msg="Empty document list in podLatencyMeasurement-kube-burner-measure" file="base_measurement.go:150"
-time="2025-12-23 11:01:39" level=info msg="Indexing metric podLatencyQuantilesMeasurement" file="base_measurement.go:143"
-time="2025-12-23 11:01:39" level=error msg="Empty document list in podLatencyQuantilesMeasurement-kube-burner-measure" file="base_measurement.go:150"
-time="2025-12-23 11:01:39" level=info msg="👋 Exiting kube-burner 4b2efcf8-7ebb-41ba-95db-3a62a0c2b754" file="kube-burner.go:267"
-```
-
 ## Indexing in different places
 
 The pod/vmi and service latency measurements send their metrics by default to all the indexers configured in the `metricsEndpoints` list, but it's possible to configure a different indexer for the quantile and the timeseries metrics by using the fields `quantilesIndexer` and `timeseriesIndexer`.
