@@ -77,12 +77,12 @@ type pvcLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newPvcLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedPvcConditions); err != nil {
 		return nil, err
 	}
 	return pvcLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -170,7 +170,6 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
 				name:          "pvcWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, p.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: p.handleCreatePVC,
 					UpdateFunc: func(oldObj, newObj any) {

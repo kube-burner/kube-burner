@@ -74,13 +74,13 @@ type serviceLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newServiceLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	if measurement.ServiceTimeout == 0 {
 		return nil, fmt.Errorf("svcTimeout cannot be 0")
 	}
 
 	return serviceLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -196,17 +196,6 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 		return fmt.Errorf("error getting GVR for %s: %w", "Service", err)
 	}
 
-	s.startMeasurement([]MeasurementWatcher{
-		{
-			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
-			name:          "svcWatcher",
-			resource:      sgvr,
-			labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, s.Runid),
-			handlers: &cache.ResourceEventHandlerFuncs{
-				AddFunc: s.handleCreateSvc,
-			},
-		},
-	})
 	// Create shared informer factory for typed clients
 	clientset := kubernetes.NewForConfigOrDie(s.RestConfig)
 	factory := informers.NewSharedInformerFactory(clientset, 0)
@@ -227,6 +216,16 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	if !cache.WaitForCacheSync(s.stopInformerCh, svcInformer.HasSynced) {
 		return fmt.Errorf("failed to sync service informer cache")
 	}
+	s.startMeasurement([]MeasurementWatcher{
+		{
+			dynamicClient: dynamic.NewForConfigOrDie(s.RestConfig),
+			name:          "svcWatcher",
+			resource:      sgvr,
+			handlers: &cache.ResourceEventHandlerFuncs{
+				AddFunc: s.handleCreateSvc,
+			},
+		},
+	})
 	return nil
 }
 
