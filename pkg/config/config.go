@@ -296,6 +296,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
+	if err := validateHooks(); err != nil {
+		return configSpec, err
+	}
 	for i, job := range configSpec.Jobs {
 		if len(job.Namespace) > 62 {
 			log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
@@ -421,6 +424,47 @@ func jobIsDuped() error {
 		}
 	}
 	return nil
+}
+
+func validateHooks() error {
+	hooks := configSpec.Jobs[0].Hooks
+	validWhen := map[JobHook]bool{
+		HookBeforeDeployment: true,
+		HookAfterDeployment:  true,
+		HookBeforeChurn:      true,
+		HookAfterChurn:       true,
+		HookBeforeCleanup:    true,
+		HookAfterCleanup:     true,
+		HookBeforeGC:         true,
+		HookAfterGC:          true,
+		HookOnEachIteration:  true,
+	}
+
+	for i, hook := range hooks {
+		if !validWhen[hook.When] {
+			return fmt.Errorf("hook %d has invalid 'when' value: %s (valid: %v)",
+				i, hook.When, getValidWhenValues())
+		}
+		if len(hook.CMD) == 0 {
+			return fmt.Errorf("hook %d has empty command", i)
+		}
+	}
+
+	return nil
+}
+
+func getValidWhenValues() []JobHook {
+	return []JobHook{
+		HookBeforeDeployment,
+		HookAfterDeployment,
+		HookBeforeChurn,
+		HookAfterChurn,
+		HookBeforeCleanup,
+		HookAfterCleanup,
+		HookBeforeGC,
+		HookAfterGC,
+		HookOnEachIteration,
+	}
 }
 
 // validateGC checks if GC and global waitWhenFinished are enabled at the same time

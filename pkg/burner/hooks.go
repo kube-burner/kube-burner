@@ -1,4 +1,4 @@
-// Copyright 2024 The Kube-burner Authors.
+// Copyright 2026 The Kube-burner Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,21 +28,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	HookBeforeDeployment = "beforeDeployment"
-	HookAfterDeployment  = "afterDeployment"
-	HookBeforeChurn      = "beforeChurn"
-	HookAfterChurn       = "afterChurn"
-	HookBeforeCleanup    = "beforeCleanup"
-	HookAfterCleanup     = "afterCleanup"
-	HookBeforeGC         = "beforeGC"
-	HookAfterGC          = "afterGC"
-	HookOnEachIteration  = "onEachIteration"
-)
-
 type hookResult struct {
 	hook     config.Hook
-	when     string
+	when     config.JobHook
 	err      error
 	duration time.Duration
 	stdout   string
@@ -52,7 +40,7 @@ type hookResult struct {
 type hookProcess struct {
 	cmd       *exec.Cmd
 	hook      config.Hook
-	when      string
+	when      config.JobHook
 	stdout    *bytes.Buffer
 	stderr    *bytes.Buffer
 	startTime time.Time
@@ -81,7 +69,7 @@ func NewHookManager(ctx context.Context) *HookManager {
 	}
 }
 
-func (ex JobExecutor) executeHooks(when string) error {
+func (ex JobExecutor) executeHooks(when config.JobHook) error {
 	if len(ex.Hooks) == 0 {
 		return nil
 	}
@@ -101,17 +89,13 @@ func (ex JobExecutor) executeHooks(when string) error {
 		}
 
 		if len(hook.CMD) == 0 {
-			log.Warnf("Hook for %s has been empty command, skipping", when)
+			log.Warnf("Empty command for hook %s, skipping it", when)
 			continue
 		}
 		if hook.Background {
-			// Start in background , store process
+			// Start in background, store process
 			if err := ex.executeBackgroundHook(hook, when); err != nil {
-				// log.Errorf("Error executing background hook for %s: %v", when, err)
-				errorsMu.Lock()
-				_ = append(errorInternal, fmt.Errorf("failed to start background hook at '%s': %w", when, err))
-				errorsMu.Unlock()
-				return err
+				return fmt.Errorf("failed to start background hook at '%s': %w", when, err)
 			}
 		} else {
 			foregroundWg.Add(1)
@@ -145,7 +129,7 @@ func (ex JobExecutor) executeHooks(when string) error {
 	return nil
 }
 
-func (ex *JobExecutor) executeBackgroundHook(hook config.Hook, when string) error {
+func (ex *JobExecutor) executeBackgroundHook(hook config.Hook, when config.JobHook) error {
 	log.Infof("Starting Background hook at %s , %v", when, hook.CMD)
 	cmd := exec.CommandContext(ex.hookManager.ctx, hook.CMD[0], hook.CMD[1:]...)
 
@@ -230,7 +214,7 @@ func (ex *JobExecutor) monitorBackgroundHook(hp *hookProcess) {
 	}
 }
 
-func (ex *JobExecutor) executeForegroundHook(hook config.Hook, when string) error {
+func (ex *JobExecutor) executeForegroundHook(hook config.Hook, when config.JobHook) error {
 	log.Infof("Executing foreground hook at '%s': %v", when, hook.CMD)
 	timeout := 5 * time.Minute
 	ctx, cancel := context.WithTimeout(ex.hookManager.ctx, timeout)
@@ -311,45 +295,5 @@ func (ex *JobExecutor) GetBackgroundHookResults() []hookResult {
 		default:
 			return results
 		}
-	}
-}
-
-func validateHooks(hooks []config.Hook) error {
-	validWhen := map[string]bool{
-		HookBeforeDeployment: true,
-		HookAfterDeployment:  true,
-		HookBeforeChurn:      true,
-		HookAfterChurn:       true,
-		HookBeforeCleanup:    true,
-		HookAfterCleanup:     true,
-		HookBeforeGC:         true,
-		HookAfterGC:          true,
-		HookOnEachIteration:  true,
-	}
-
-	for i, hook := range hooks {
-		if !validWhen[hook.When] {
-			return fmt.Errorf("hook %d has invalid 'when' value: %s (valid: %v)",
-				i, hook.When, getValidWhenValues())
-		}
-		if len(hook.CMD) == 0 {
-			return fmt.Errorf("hook %d has empty command", i)
-		}
-	}
-
-	return nil
-}
-
-func getValidWhenValues() []string {
-	return []string{
-		HookBeforeDeployment,
-		HookAfterDeployment,
-		HookBeforeChurn,
-		HookAfterChurn,
-		HookBeforeCleanup,
-		HookAfterCleanup,
-		HookBeforeGC,
-		HookAfterGC,
-		HookOnEachIteration,
 	}
 }

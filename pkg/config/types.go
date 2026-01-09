@@ -22,6 +22,21 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// JobHook type of hook command
+type JobHook string
+
+const (
+	HookBeforeDeployment JobHook = "beforeDeployment"
+	HookAfterDeployment  JobHook = "afterDeployment"
+	HookBeforeChurn      JobHook = "beforeChurn"
+	HookAfterChurn       JobHook = "afterChurn"
+	HookBeforeCleanup    JobHook = "beforeCleanup"
+	HookAfterCleanup     JobHook = "afterCleanup"
+	HookBeforeGC         JobHook = "beforeGC"
+	HookAfterGC          JobHook = "afterGC"
+	HookOnEachIteration  JobHook = "onEachIteration"
+)
+
 // JobType type of job
 type JobType string
 
@@ -210,7 +225,7 @@ type Hook struct {
 	// CMD command to execute
 	CMD []string `yaml:"cmd" json:"cmd,omitempty"`
 	// When specifies when to execute the command
-	When string `yaml:"when" json:"when,omitempty"`
+	When JobHook `yaml:"when" json:"when,omitempty"`
 	// Background indicates whether to run the command in background
 	Background bool `yaml:"background" json:"background,omitempty"`
 }

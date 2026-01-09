@@ -81,11 +81,6 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		hookManager:       NewHookManager(context.Background()),
 	}
 
-	// Validate hooks
-	if err := validateHooks(job.Hooks); err != nil {
-		log.Fatalf("Invalid hook configuration for job %s: %v", job.Name, err)
-	}
-
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
 	ex.clientSet = clientSet
 	ex.restConfig = runtimeRestConfig
