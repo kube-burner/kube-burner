@@ -20,7 +20,9 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -68,32 +70,39 @@ func (ex *JobExecutor) setupCreateJob() {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
 		// Deserialize YAML
-		uns := &unstructured.Unstructured{}
 		cleanTemplate, err := util.CleanupTemplate(t)
 		if err != nil {
 			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
-		_, gvk := yamlToUnstructured(o.ObjectTemplate, cleanTemplate, uns)
-		mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
-		obj := &object{
-			objectSpec: t,
-			Object:     o,
-			namespace:  uns.GetNamespace(),
+		unsList, gvks := yamlToUnstructuredMultiple(o.ObjectTemplate, cleanTemplate)
+
+		// Get GVK for this specific object and Process if multi yaml document
+		for i, gvk := range gvks {
+			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			// Set Kind on the embedded Object before creating the object struct
+			o.Kind = gvk.Kind
+			obj := &object{
+				objectSpec:    t,
+				Object:        o,
+				namespace:     unsList[i].GetNamespace(),
+				gvk:           gvk,
+				documentIndex: i,
+			}
+			if err == nil {
+				obj.gvr = mapping.Resource
+				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+			} else {
+				obj.gvr = schema.GroupVersionResource{}
+			}
+			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
+			if obj.namespaced && obj.namespace == "" {
+				ex.nsRequired = true
+			}
+			log.Debugf("Job %s: %d iterations with %d %s replicas (object %d/%d from template)",
+				ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind, i+1, len(gvks))
+			ex.objects = append(ex.objects, obj)
+
 		}
-		if err == nil {
-			obj.gvr = mapping.Resource
-			obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-		} else {
-			obj.gvr = schema.GroupVersionResource{}
-			obj.gvk = gvk
-		}
-		obj.Kind = gvk.Kind
-		// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
-		if obj.namespaced && obj.namespace == "" {
-			ex.nsRequired = true
-		}
-		log.Debugf("Job %s: %d iterations with %d %s replicas", ex.Name, ex.JobIterations, obj.Replicas, gvk.Kind)
-		ex.objects = append(ex.objects, obj)
 	}
 }
 
@@ -217,16 +226,27 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
-			var newObject = new(unstructured.Unstructured)
 			ex.limiter.Wait(context.TODO())
-			renderedObj := ex.renderTemplateForObject(obj, iteration, r, false)
-			// Re-decode rendered object
-			yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
+			newObjects, gvks := ex.renderTemplateForObjectMultiple(obj, iteration, r)
+			newObject := newObjects[obj.documentIndex]
+			gvk := gvks[obj.documentIndex]
 
-			maps.Copy(copiedLabels, newObject.GetLabels())
-			newObject.SetLabels(copiedLabels)
-			updateChildLabels(newObject, copiedLabels)
+			objectLabels := make(map[string]string)
+			maps.Copy(objectLabels, copiedLabels)
+			maps.Copy(objectLabels, newObject.GetLabels())
+			newObject.SetLabels(objectLabels)
+			updateChildLabels(newObject, objectLabels)
 
+			// Before attempting to create an object, this error check confirms the REST mapping exists.
+			// If the mapping fails, the function returns early, preventing a futile create attempt.
+			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
+			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
+			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
+
+			if err != nil {
+				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
+				return
+			}
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
 			// wait for ready, etc. Without this wait group, running for example,
@@ -234,11 +254,11 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			// hasn't been created yet
 			replicaWg.Add(1)
 			go func(n string) {
+				defer replicaWg.Done()
 				if !obj.namespaced {
 					n = ""
 				}
 				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
-				replicaWg.Done()
 			}(ns)
 		}(r)
 	}
@@ -310,6 +330,10 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		} else {
 			if !ex.nsChurning {
 				uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+			} else {
+				// Skip non-namespaced objects during namespace churning - they won't be deleted with the namespace
+				log.Debugf("Skipping non-namespaced object %s/%s during namespace churning", obj.GetKind(), obj.GetName())
+				return true, nil
 			}
 		}
 		if err != nil {
@@ -388,12 +412,14 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 	}
 	// List namespace to churn
 	jobNamespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labels.SelectorFromSet(nsLabels).String()})
+	nsList := jobNamespaces.Items
 	if err != nil {
 		return []error{fmt.Errorf("unable to list namespaces: %w", err)}
 	}
 	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 
 	for {
+		var randStart int
 		if ex.ChurnConfig.Duration > 0 {
 			select {
 			case <-timer:
@@ -410,13 +436,18 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		}
 
 		// Max amount of churn is 100% of namespaces
-		var randStart int
-		if len(jobNamespaces.Items)-numToChurn+1 > 0 {
-			randStart = rand.Intn(len(jobNamespaces.Items) - numToChurn + 1)
+		if len(nsList)-numToChurn+1 > 0 {
+			randStart = rand.Intn(len(nsList) - numToChurn + 1)
 		}
-		// delete numToChurn namespaces starting at randStart
-		namespacesToDelete := jobNamespaces.Items[randStart : numToChurn+randStart]
-		for _, ns := range namespacesToDelete {
+		// We need to perform a natural sort
+		sort.Slice(nsList, func(i, j int) bool {
+			// Get the number after the last '-'
+			numI, _ := strconv.Atoi(nsList[i].Name[strings.LastIndex(nsList[i].Name, "-")+1:])
+			numJ, _ := strconv.Atoi(nsList[j].Name[strings.LastIndex(nsList[j].Name, "-")+1:])
+			return numI < numJ
+		})
+		// Add label to namespaces to use label selector for deletion
+		for _, ns := range nsList[randStart : numToChurn+randStart] {
 			_, err = ex.clientSet.CoreV1().Namespaces().
 				Patch(ctx, ns.Name, types.StrategicMergePatchType, []byte(delPatch), metav1.PatchOptions{})
 			if err != nil {
@@ -429,6 +460,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		// Re-create objects that were deleted
+		log.Infof("Re-creating %d deleted namespaces", numToChurn)
 		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
 			errs = append(errs, jobErrs...)
 		}

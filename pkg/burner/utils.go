@@ -15,6 +15,7 @@
 package burner
 
 import (
+	"bytes"
 	"context"
 	"math"
 	"strconv"
@@ -34,6 +35,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubectl/pkg/scheme"
+
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
@@ -110,6 +113,29 @@ func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructure
 		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
 	}
 	return o, gvk
+}
+
+func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unstructured, []*schema.GroupVersionKind) {
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(y), 4096)
+	var gvks []*schema.GroupVersionKind
+	var objects []*unstructured.Unstructured
+	for {
+		uns := &unstructured.Unstructured{}
+		err := decoder.Decode(uns)
+		if err != nil {
+			break
+		}
+		if len(uns.Object) == 0 {
+			break
+		}
+		gvk := uns.GroupVersionKind()
+		objects = append(objects, uns)
+		gvks = append(gvks, &gvk)
+	}
+	if len(objects) == 0 {
+		log.Fatalf("Error decoding YAML (%s): no objects found", fileName)
+	}
+	return objects, gvks
 }
 
 // resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements

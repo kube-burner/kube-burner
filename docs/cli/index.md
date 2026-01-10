@@ -114,14 +114,41 @@ This subcommand can be used to collect and index the metrics from a given time r
 
 ## Measure
 
-This subcommand can be used to collect measurements for a given set of resources which were part of a workload ran in past and are still present on the cluster (i.e only supports podLatency as of today).
-We can specify a list of namespaces and selector labels as input.
+This subcommand can be used to collect measurements for resources in the cluster by observing them in real-time using Kubernetes informers and watchers. Unlike the `init` command, this subcommand does not run any workload, only observes existing resources and collects measurements as they change.
 
-- `namespaces`: comma-separated list of namespaces provided as a string input. This is optional, by default all namespaces are considered.
-- `selector`: comma-separated list of selector labels in the format key1=value1,key2=value2. This is optional, by default no labels will be used for filtering.
+The measure command uses Kubernetes informers to watch the cluster and collect measurements for resources that match the specified criteria. It supports all measurement types available in kube-burner (podLatency, serviceLatency, jobLatency, pprof, etc.) as configured in the measurements section of the configuration file.
 
-!!! Note
-    This subcommand should only be used to fetch measurements of a workload ran in the past. Also those resources should be active on the cluster. For present cases, please refer to the alternate options in this tool.
+It requires a configuration file with the measurements to collect. The configuration file should include the `measurements` section defining which measurements to collect. For example:
+
+```yaml
+metricsEndpoints:
+  - indexer:
+      metricsDirectory: /tmp/kube-burner
+      type: local
+global:
+  measurements:
+   - name: podLatency
+   - name: pprof
+     pprofInterval: 60s
+     pprofDirectory: pprof-data
+     nodeAffinity:
+       node-role.kubernetes.io/worker: ""
+     pprofTargets:
+       - name: kubelet-heap
+         url: https://localhost:10250/debug/pprof/heap
+       - name: crio-heap
+         url: http://localhost/debug/pprof/heap 
+         unixSocketPath: /var/run/crio/crio.sock
+```
+
+Example usage:
+
+```console
+kube-burner measure -c kube-burner-measurements.yml --duration=30m --selector=app=myapp
+```
+
+!!! Note "Measurement types"
+    Find extended information about the different measurement types available in kube-burner [here](../measurements/index.md)
 
 ## Check alerts
 

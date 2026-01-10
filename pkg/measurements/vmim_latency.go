@@ -97,12 +97,12 @@ type vmimLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newVmimLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newVmimLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedVMIMConditions); err != nil {
 		return nil, err
 	}
 	return vmimLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -191,7 +191,6 @@ func (vmiml *vmimLatency) Start(measurementWg *sync.WaitGroup) error {
 				dynamicClient: dynamic.NewForConfigOrDie(vmiml.RestConfig),
 				name:          "vmimWatcher",
 				resource:      gvr,
-				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, vmiml.Runid),
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: vmiml.handleCreateVMIM,
 					UpdateFunc: func(oldObj, newObj any) {

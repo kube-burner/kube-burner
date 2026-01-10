@@ -34,7 +34,7 @@ jobs:
     - name: Install
       run: sudo make install
 
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v6
       with:
         name: kube-burner
         path: /usr/bin/kube-burner

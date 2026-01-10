@@ -1,0 +1,19 @@
+---
+global:
+  gc: {{env "GC"}}
+  measurements:
+    - name: podLatency
+
+jobs:
+  - name: multi-doc-test
+    jobType: create
+    jobIterations: 3
+    qps: 5
+    burst: 5
+    namespacedIterations: true
+    namespace: multi-doc-test
+    waitWhenFinished: true
+    verifyObjects: true
+    objects:
+      - objectTemplate: objectTemplates/multi-doc.yml
+        replicas: 2

@@ -92,12 +92,12 @@ type podLatencyMeasurementFactory struct {
 	BaseMeasurementFactory
 }
 
-func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any) (MeasurementFactory, error) {
+func newPodLatencyMeasurementFactory(configSpec config.Spec, measurement types.Measurement, metadata map[string]any, labelSelector string) (MeasurementFactory, error) {
 	if err := verifyMeasurementConfig(measurement, supportedPodConditions); err != nil {
 		return nil, err
 	}
 	return podLatencyMeasurementFactory{
-		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata),
+		BaseMeasurementFactory: NewBaseMeasurementFactory(configSpec, measurement, metadata, labelSelector),
 	}, nil
 }
 
@@ -213,22 +213,6 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err != nil {
 		return fmt.Errorf("error getting GVR for %s: %w", "Pod", err)
 	}
-	p.startMeasurement(
-		[]MeasurementWatcher{
-			{
-				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
-				name:          "podWatcher",
-				resource:      gvr,
-				labelSelector: fmt.Sprintf("%s=%v", config.KubeBurnerLabelRunID, p.Runid),
-				handlers: &cache.ResourceEventHandlerFuncs{
-					AddFunc: p.handleCreatePod,
-					UpdateFunc: func(oldObj, newObj any) {
-						p.handleUpdatePod(newObj)
-					},
-				},
-			},
-		},
-	)
 	clientset := kubernetes.NewForConfigOrDie(p.RestConfig)
 	lw := cache.NewFilteredListWatchFromClient(
 		clientset.CoreV1().RESTClient(),
@@ -245,6 +229,21 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 		return fmt.Errorf("failed to sync event informer cache")
 	}
 	p.eventLister = lcorev1.NewEventLister(eventInformer.GetIndexer())
+	p.startMeasurement(
+		[]MeasurementWatcher{
+			{
+				dynamicClient: dynamic.NewForConfigOrDie(p.RestConfig),
+				name:          "podWatcher",
+				resource:      gvr,
+				handlers: &cache.ResourceEventHandlerFuncs{
+					AddFunc: p.handleCreatePod,
+					UpdateFunc: func(oldObj, newObj any) {
+						p.handleUpdatePod(newObj)
+					},
+				},
+			},
+		},
+	)
 	return nil
 }
 
@@ -265,11 +264,13 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 	}
 	p.Metrics = sync.Map{}
 	for _, pod := range pods {
-		var scheduled, initialized, containersReady, podReady time.Time
+		var scheduled, initialized, containersReady, podReady, readyToStartContainers time.Time
 		for _, c := range pod.Status.Conditions {
 			switch c.Type {
 			case corev1.PodScheduled:
 				scheduled = c.LastTransitionTime.UTC()
+			case corev1.PodReadyToStartContainers:
+				readyToStartContainers = c.LastTransitionTime.UTC()
 			case corev1.PodInitialized:
 				initialized = c.LastTransitionTime.UTC()
 			case corev1.ContainersReady:
@@ -279,17 +280,18 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 			}
 		}
 		p.Metrics.Store(string(pod.UID), podMetric{
-			Timestamp:       pod.Status.StartTime.UTC(),
-			Namespace:       pod.Namespace,
-			Name:            pod.Name,
-			MetricName:      podLatencyMeasurement,
-			NodeName:        pod.Spec.NodeName,
-			UUID:            p.Uuid,
-			scheduled:       scheduled,
-			initialized:     initialized,
-			containersReady: containersReady,
-			podReady:        podReady,
-			JobName:         p.JobConfig.Name,
+			Timestamp:              pod.CreationTimestamp.UTC(),
+			Namespace:              pod.Namespace,
+			Name:                   pod.Name,
+			MetricName:             podLatencyMeasurement,
+			NodeName:               pod.Spec.NodeName,
+			UUID:                   p.Uuid,
+			scheduled:              scheduled,
+			readyToStartContainers: readyToStartContainers,
+			initialized:            initialized,
+			containersReady:        containersReady,
+			podReady:               podReady,
+			JobName:                p.JobConfig.Name,
 		})
 	}
 }
@@ -326,6 +328,13 @@ func (p *podLatency) normalizeMetrics() float64 {
 			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.SchedulingLatency = 0
+		}
+
+		m.ReadyToStartContainersLatency = int(m.readyToStartContainers.Sub(m.Timestamp).Milliseconds())
+		if m.ReadyToStartContainersLatency < 0 {
+			log.Tracef("ReadyToStartContainersLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+			errorFlag = 1
+			m.ReadyToStartContainersLatency = 0
 		}
 
 		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
