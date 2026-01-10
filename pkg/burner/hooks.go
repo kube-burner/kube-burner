@@ -243,38 +243,6 @@ func (ex *JobExecutor) executeForegroundHook(hook config.Hook, when config.JobHo
 	return nil
 }
 
-// WaitForBackgroundHooks waits for all background hooks to complete with timeout
-func (ex *JobExecutor) WaitForBackgroundHooks(timeout time.Duration) error {
-	if ex.hookManager == nil {
-		return nil
-	}
-
-	ex.hookManager.mu.RLock()
-	count := len(ex.hookManager.backgroundHooks)
-	ex.hookManager.mu.RUnlock()
-
-	if count == 0 {
-		return nil
-	}
-
-	log.Infof("Waiting for %d background hooks to complete (timeout: %v)...", count, timeout)
-
-	// Wait with timeout
-	done := make(chan struct{})
-	go func() {
-		ex.hookManager.wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		log.Infof("All background hooks completed")
-		return nil
-	case <-time.After(timeout):
-		return fmt.Errorf("timeout waiting for background hooks after %v", timeout)
-	}
-}
-
 // GetBackgroundHookResults returns results from background hooks (non-blocking)
 func (ex *JobExecutor) GetBackgroundHookResults() []hookResult {
 	if ex.hookManager == nil {
