@@ -26,8 +26,8 @@ import (
 type JobHook string
 
 const (
-	HookBeforeDeployment JobHook = "beforeDeployment"
-	HookAfterDeployment  JobHook = "afterDeployment"
+	HookBeforeDeployment JobHook = "beforeJobExecution"
+	HookAfterDeployment  JobHook = "afterJobExecution"
 	HookBeforeChurn      JobHook = "beforeChurn"
 	HookAfterChurn       JobHook = "afterChurn"
 	HookBeforeCleanup    JobHook = "beforeCleanup"
@@ -223,7 +223,7 @@ type Job struct {
 
 type Hook struct {
 	// CMD command to execute
-	CMD []string `yaml:"cmd" json:"cmd,omitempty"`
+	Cmd []string `yaml:"cmd" json:"cmd,omitempty"`
 	// When specifies when to execute the command
 	When JobHook `yaml:"when" json:"when,omitempty"`
 	// Background indicates whether to run the command in background

@@ -445,7 +445,7 @@ func validateHooks() error {
 			return fmt.Errorf("hook %d has invalid 'when' value: %s (valid: %v)",
 				i, hook.When, getValidWhenValues())
 		}
-		if len(hook.CMD) == 0 {
+		if len(hook.Cmd) == 0 {
 			return fmt.Errorf("hook %d has empty command", i)
 		}
 	}

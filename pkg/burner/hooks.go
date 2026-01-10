@@ -88,7 +88,7 @@ func (ex JobExecutor) executeHooks(when config.JobHook) error {
 			continue
 		}
 
-		if len(hook.CMD) == 0 {
+		if len(hook.Cmd) == 0 {
 			log.Warnf("Empty command for hook %s, skipping it", when)
 			continue
 		}
@@ -130,8 +130,8 @@ func (ex JobExecutor) executeHooks(when config.JobHook) error {
 }
 
 func (ex *JobExecutor) executeBackgroundHook(hook config.Hook, when config.JobHook) error {
-	log.Infof("Starting Background hook at %s , %v", when, hook.CMD)
-	cmd := exec.CommandContext(ex.hookManager.ctx, hook.CMD[0], hook.CMD[1:]...)
+	log.Infof("Starting Background hook at %s , %v", when, hook.Cmd)
+	cmd := exec.CommandContext(ex.hookManager.ctx, hook.Cmd[0], hook.Cmd[1:]...)
 
 	hp := &hookProcess{
 		cmd:       cmd,
@@ -143,7 +143,6 @@ func (ex *JobExecutor) executeBackgroundHook(hook config.Hook, when config.JobHo
 		done:      make(chan struct{}),
 	}
 	cmd.Stdout = hp.stdout
-	cmd.Stderr = hp.stderr
 	cmd.Stderr = hp.stderr
 
 	// Set process group for proper cleanup
@@ -215,12 +214,12 @@ func (ex *JobExecutor) monitorBackgroundHook(hp *hookProcess) {
 }
 
 func (ex *JobExecutor) executeForegroundHook(hook config.Hook, when config.JobHook) error {
-	log.Infof("Executing foreground hook at '%s': %v", when, hook.CMD)
+	log.Infof("Executing foreground hook at '%s': %v", when, hook.Cmd)
 	timeout := 5 * time.Minute
 	ctx, cancel := context.WithTimeout(ex.hookManager.ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, hook.CMD[0], hook.CMD[1:]...)
+	cmd := exec.CommandContext(ctx, hook.Cmd[0], hook.Cmd[1:]...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
