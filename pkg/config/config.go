@@ -427,11 +427,11 @@ func jobIsDuped() error {
 }
 
 func HookBeforeWorkload() error {
-	hooks := configSpec.Jobs[0].Hooks
-	// No hooks defined
-	if len(hooks) == 0 {
+	// No jobs/Hooks defined
+	if len(configSpec.Jobs) == 0 || len(configSpec.Jobs[0].Hooks) == 0 {
 		return nil
 	}
+	hooks := configSpec.Jobs[0].Hooks
 	validWhen := map[JobHook]bool{
 		HookBeforeDeployment: true,
 		HookAfterDeployment:  true,

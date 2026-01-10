@@ -62,7 +62,7 @@ func NewHookManager(ctx context.Context) *HookManager {
 		backgroundHooks: make([]*hookProcess, 0),
 		ctx:             ctx,
 		cancel:          cancel,
-		resultChan:      make(chan hookResult, 100), // Buffered channel to avoid blocking
+		resultChan:      make(chan hookResult),
 	}
 }
 
