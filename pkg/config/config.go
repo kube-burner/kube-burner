@@ -296,7 +296,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
-	if err := validateHooks(); err != nil {
+	if err := HookBeforeWorkload(); err != nil {
 		return configSpec, err
 	}
 	for i, job := range configSpec.Jobs {
@@ -426,8 +426,12 @@ func jobIsDuped() error {
 	return nil
 }
 
-func validateHooks() error {
+func HookBeforeWorkload() error {
 	hooks := configSpec.Jobs[0].Hooks
+	// No hooks defined
+	if len(hooks) == 0 {
+		return nil
+	}
 	validWhen := map[JobHook]bool{
 		HookBeforeDeployment: true,
 		HookAfterDeployment:  true,

@@ -39,13 +39,10 @@ type hookResult struct {
 
 type hookProcess struct {
 	cmd       *exec.Cmd
-	hook      config.Hook
-	when      config.JobHook
-	stdout    *bytes.Buffer
-	stderr    *bytes.Buffer
 	startTime time.Time
 	mu        sync.RWMutex
 	done      chan struct{}
+	result    hookResult
 }
 
 type HookManager struct {
@@ -133,17 +130,18 @@ func (ex *JobExecutor) executeBackgroundHook(hook config.Hook, when config.JobHo
 	log.Infof("Starting Background hook at %s , %v", when, hook.Cmd)
 	cmd := exec.CommandContext(ex.hookManager.ctx, hook.Cmd[0], hook.Cmd[1:]...)
 
+	var stdout, stderr bytes.Buffer
 	hp := &hookProcess{
 		cmd:       cmd,
-		hook:      hook,
-		when:      when,
-		stdout:    &bytes.Buffer{},
-		stderr:    &bytes.Buffer{},
 		startTime: time.Now(),
 		done:      make(chan struct{}),
+		result: hookResult{
+			hook: hook,
+			when: when,
+		},
 	}
-	cmd.Stdout = hp.stdout
-	cmd.Stderr = hp.stderr
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
 	// Set process group for proper cleanup
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -159,13 +157,13 @@ func (ex *JobExecutor) executeBackgroundHook(hook config.Hook, when config.JobHo
 	ex.hookManager.mu.Unlock()
 
 	ex.hookManager.wg.Add(1)
-	go ex.monitorBackgroundHook(hp)
+	go ex.monitorBackgroundHook(hp, &stdout, &stderr)
 
 	return nil
 }
 
 // monitorBackgroundHook monitors a background hook with proper error handling
-func (ex *JobExecutor) monitorBackgroundHook(hp *hookProcess) {
+func (ex *JobExecutor) monitorBackgroundHook(hp *hookProcess, stdout, stderr *bytes.Buffer) {
 	defer ex.hookManager.wg.Done()
 	defer close(hp.done)
 
@@ -178,15 +176,12 @@ func (ex *JobExecutor) monitorBackgroundHook(hp *hookProcess) {
 	select {
 	case err := <-errChan:
 		hp.mu.Lock()
-		duration := time.Since(hp.startTime)
+		hp.result.err = err
+		hp.result.duration = time.Since(hp.startTime)
+		hp.result.stdout = stdout.String()
+		hp.result.stderr = stderr.String()
+		result := hp.result
 
-		result := hookResult{
-			hook:     hp.hook,
-			when:     hp.when,
-			err:      err,
-			duration: duration,
-			stdout:   hp.stdout.String(),
-		}
 		hp.mu.Unlock()
 
 		// Send result to channel (non-blocking)
@@ -197,19 +192,19 @@ func (ex *JobExecutor) monitorBackgroundHook(hp *hookProcess) {
 		}
 
 		if err != nil {
-			log.Errorf("Background hook at '%s' failed after %v: %v", hp.when, duration, err)
+			log.Errorf("Background hook at '%s' failed after %v: %v", hp.result.when, hp.result.duration, err)
 			if result.stderr != "" {
 				log.Errorf("Hook stderr: %s", result.stderr)
 			}
 		} else {
-			log.Infof("Background hook at '%s' completed successfully in %v", hp.when, duration)
+			log.Infof("Background hook at '%s' completed successfully in %v", hp.result.when, hp.result.duration)
 			if result.stdout != "" {
 				log.Debugf("Hook stdout: %s", result.stdout)
 			}
 		}
 
 	case <-ex.hookManager.ctx.Done():
-		log.Warnf("Hook monitor cancel for '%s'", hp.when)
+		log.Warnf("Hook monitor cancel for '%s'", hp.result.when)
 	}
 }
 
