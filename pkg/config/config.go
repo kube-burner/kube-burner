@@ -428,10 +428,16 @@ func jobIsDuped() error {
 
 func HookBeforeWorkload() error {
 	// No jobs/Hooks defined
-	if len(configSpec.Jobs) == 0 || len(configSpec.Jobs[0].Hooks) == 0 {
+	numHooks := func() int {
+		j := 0
+		for i := 0; i < len(configSpec.Jobs); i++ {
+			j += len(configSpec.Jobs[i].Hooks)
+		}
+		return j
+	}
+	if len(configSpec.Jobs) == 0 || numHooks() == 0 {
 		return nil
 	}
-	hooks := configSpec.Jobs[0].Hooks
 
 	validWhen := map[JobHook]bool{
 		HookBeforeDeployment: true,
@@ -445,13 +451,15 @@ func HookBeforeWorkload() error {
 		HookOnEachIteration:  true,
 	}
 
-	for i, hook := range hooks {
-		if !validWhen[hook.When] {
-			return fmt.Errorf("hook %d has invalid 'when' value: %s (valid: %v)",
-				i, hook.When, maps.Keys(validWhen))
-		}
-		if len(hook.Cmd) == 0 {
-			return fmt.Errorf("hook %d has empty command", i)
+	for _, job := range configSpec.Jobs {
+		for i, hook := range job.Hooks {
+			if !validWhen[hook.When] {
+				return fmt.Errorf("hook %d has invalid 'when' value: %s (valid: %v)",
+					i, hook.When, maps.Keys(validWhen))
+			}
+			if len(hook.Cmd) == 0 {
+				return fmt.Errorf("hook %d has empty command", i)
+			}
 		}
 	}
 

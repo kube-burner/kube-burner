@@ -251,7 +251,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		if globalConfig.GC {
 			//nolint:govet
 			for _, jobExecutor := range jobExecutors {
-				// jobExecutor.cleanupBackgroundHooks()
 				gcWg.Add(1)
 				go jobExecutor.gc(ctx, &gcWg)
 			}
