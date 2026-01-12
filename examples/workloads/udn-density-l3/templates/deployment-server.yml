@@ -7,11 +7,11 @@ spec:
   replicas: {{.podReplicas}}
   selector:
     matchLabels:
-      name: cluster-density-{{.Replica}}
+      name: udn-density-{{.Replica}}
   template:
     metadata:
       labels:
-        name: cluster-density-{{.Replica}}
+        name: udn-density-{{.Replica}}
         app: nginx
     spec:
       topologySpreadConstraints:
@@ -47,7 +47,7 @@ spec:
           protocol: TCP
         - containerPort: 8443
           protocol: TCP
-        name: cluster-density
+        name: udn-density
       volumes:
       - name: podinfo
         downwardAPI:
