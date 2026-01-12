@@ -30,7 +30,6 @@ import (
 // Bootstraps kube-burner cmd with some common flags
 func SetupCmd(cmd *cobra.Command) {
 	cmd.PersistentFlags().String("log-level", "info", "Allowed values: debug, info, warn, error, fatal")
-	cmd.PersistentFlags().String("set", "", "Set values for template variables or override workflow file. Format: key1=val1,key2=val2")
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version number of kube-burner",
