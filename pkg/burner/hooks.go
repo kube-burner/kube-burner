@@ -55,17 +55,21 @@ type HookManager struct {
 }
 
 // NewHookManager creates a new HookManager
-func NewHookManager(ctx context.Context) *HookManager {
+func NewHookManager(ctx context.Context, configSpec config.Spec) *HookManager {
 	ctx, cancel := context.WithCancel(ctx)
-
+	channelSize := 0
+	if len(configSpec.Jobs) > 0 {
+		channelSize = len(configSpec.Jobs[0].Hooks)
+	}
 	return &HookManager{
 		backgroundHooks: make([]*hookProcess, 0),
 		ctx:             ctx,
 		cancel:          cancel,
-		resultChan:      make(chan hookResult),
+		resultChan:      make(chan hookResult, channelSize),
 	}
 }
 
+// executeHooks executes hooks based on the specified timing (when)
 func (ex JobExecutor) executeHooks(when config.JobHook) error {
 	if len(ex.Hooks) == 0 {
 		return nil

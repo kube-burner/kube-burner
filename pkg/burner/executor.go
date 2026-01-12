@@ -78,7 +78,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		objectOperations:  0,
 		backgroundHooks:   make([]*hookProcess, 0),
 		Hooks:             job.Hooks,
-		hookManager:       NewHookManager(context.Background()),
+		hookManager:       NewHookManager(context.Background(), configSpec),
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)

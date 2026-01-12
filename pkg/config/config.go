@@ -432,6 +432,7 @@ func HookBeforeWorkload() error {
 		return nil
 	}
 	hooks := configSpec.Jobs[0].Hooks
+
 	validWhen := map[JobHook]bool{
 		HookBeforeDeployment: true,
 		HookAfterDeployment:  true,
@@ -447,7 +448,7 @@ func HookBeforeWorkload() error {
 	for i, hook := range hooks {
 		if !validWhen[hook.When] {
 			return fmt.Errorf("hook %d has invalid 'when' value: %s (valid: %v)",
-				i, hook.When, getValidWhenValues())
+				i, hook.When, maps.Keys(validWhen))
 		}
 		if len(hook.Cmd) == 0 {
 			return fmt.Errorf("hook %d has empty command", i)
@@ -455,20 +456,6 @@ func HookBeforeWorkload() error {
 	}
 
 	return nil
-}
-
-func getValidWhenValues() []JobHook {
-	return []JobHook{
-		HookBeforeDeployment,
-		HookAfterDeployment,
-		HookBeforeChurn,
-		HookAfterChurn,
-		HookBeforeCleanup,
-		HookAfterCleanup,
-		HookBeforeGC,
-		HookAfterGC,
-		HookOnEachIteration,
-	}
 }
 
 // validateGC checks if GC and global waitWhenFinished are enabled at the same time
