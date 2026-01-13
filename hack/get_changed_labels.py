@@ -93,19 +93,17 @@ def main():
     # Process each label/paths entry
     labels_to_output = []
     for entry in data:
-        if "label" in entry and "paths" in entry:
-            if not isinstance(entry["paths"], list):
-                print(f"Invalid YAML structure, paths should be a list", file=sys.stderr)
-                sys.exit(1)
-            
-            label = entry["label"]
-            paths = entry["paths"]
-
-            if check_paths_changed(paths, changed_files):
-                labels_to_output.append(label)
-        else:
+        if "label" not in entry or "paths" not in entry:
             print(f"Invalid YAML structure, either label or paths are missing", file=sys.stderr)
             sys.exit(1)
+        if not isinstance(entry["paths"], list):
+            print(f"Invalid YAML structure, paths should be a list", file=sys.stderr)
+            sys.exit(1)
+        if check_paths_changed(entry["paths"], changed_files):
+            labels_to_output.append(entry["label"])
+        # If no paths match, exit loop and return empty list to run all tests
+        else:
+            sys.exit(0)
     
     # Output unique labels (one per line)
     if labels_to_output:

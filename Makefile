@@ -32,7 +32,7 @@ MANIFEST_ARCHS ?= amd64 arm64 ppc64le s390x
 
 # Bats
 JOBS ?= $(shell nproc)
-FILTER_TAGS = $(shell hack/get_changed_labels.py hack/bats_test_mappings.yml)
+FILTER_TAGS ?= $(shell hack/get_changed_labels.py hack/bats_test_mappings.yml)
 
 all: lint build images push
 
