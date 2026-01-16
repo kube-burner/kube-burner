@@ -59,7 +59,6 @@ type JobExecutor struct {
 	deletionStrategy  string
 	objectOperations  int32
 	nsChurning        bool
-	backgroundHooks   []*hookProcess
 	hookManager       *HookManager
 }
 
@@ -75,7 +74,6 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		embedCfg:          embedCfg,
 		deletionStrategy:  configSpec.GlobalConfig.DeletionStrategy,
 		objectOperations:  0,
-		backgroundHooks:   make([]*hookProcess, 0),
 		hookManager:       NewHookManager(context.Background(), configSpec),
 	}
 

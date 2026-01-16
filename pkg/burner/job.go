@@ -144,6 +144,20 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				if err := jobExecutor.executeHooks(config.HookAfterDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterDeployment, err)
 				}
+				// Collect background hook results
+				if len(jobExecutor.Hooks) > 0 && jobExecutor.hookManager != nil {
+					if backgroundResults := jobExecutor.hookManager.GetBackgroundHookResults(); len(backgroundResults) > 0 {
+						for _, result := range backgroundResults {
+							if result.err != nil {
+								log.Errorf("Background hook failed: %v (duration: %v)", result.err, result.duration)
+								errs = append(errs, result.err)
+								innerRC = 1
+							} else {
+								log.Infof("Background hook completed successfully (duration: %v)", result.duration)
+							}
+						}
+					}
+				}
 				if ctx.Err() != nil {
 					return
 				}
