@@ -296,6 +296,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
+	if err := HookBeforeWorkload(); err != nil {
+		return configSpec, err
+	}
 	for i, job := range configSpec.Jobs {
 		if len(job.Namespace) > 62 {
 			log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
@@ -420,6 +423,46 @@ func jobIsDuped() error {
 			return fmt.Errorf("Job names must be unique")
 		}
 	}
+	return nil
+}
+
+func HookBeforeWorkload() error {
+	// No jobs/Hooks defined
+	numHooks := func() int {
+		j := 0
+		for i := 0; i < len(configSpec.Jobs); i++ {
+			j += len(configSpec.Jobs[i].Hooks)
+		}
+		return j
+	}
+	if len(configSpec.Jobs) == 0 || numHooks() == 0 {
+		return nil
+	}
+
+	validWhen := map[JobHook]bool{
+		HookBeforeDeployment: true,
+		HookAfterDeployment:  true,
+		HookBeforeChurn:      true,
+		HookAfterChurn:       true,
+		HookBeforeCleanup:    true,
+		HookAfterCleanup:     true,
+		HookBeforeGC:         true,
+		HookAfterGC:          true,
+		HookOnEachIteration:  true,
+	}
+
+	for _, job := range configSpec.Jobs {
+		for i, hook := range job.Hooks {
+			if !validWhen[hook.When] {
+				return fmt.Errorf("hook %d has invalid 'when' value: %s (valid: %v)",
+					i, hook.When, maps.Keys(validWhen))
+			}
+			if len(hook.Cmd) == 0 {
+				return fmt.Errorf("hook %d has empty command", i)
+			}
+		}
+	}
+
 	return nil
 }
 
