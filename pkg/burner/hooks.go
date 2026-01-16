@@ -52,18 +52,12 @@ type HookManager struct {
 }
 
 // NewHookManager creates a new HookManager
-func NewHookManager(ctx context.Context, configSpec config.Spec) *HookManager {
+func NewHookManager(ctx context.Context, hookCount int) *HookManager {
 	ctx, cancel := context.WithCancel(ctx)
-	channelSize := 0
-	if len(configSpec.Jobs) > 0 {
-		for _, job := range configSpec.Jobs {
-			channelSize += len(job.Hooks)
-		}
-	}
 	return &HookManager{
 		ctx:        ctx,
 		cancel:     cancel,
-		resultChan: make(chan hookResult, channelSize),
+		resultChan: make(chan hookResult, hookCount),
 	}
 }
 
