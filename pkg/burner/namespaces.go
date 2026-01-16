@@ -29,7 +29,7 @@ import (
 )
 
 // Cleanup resources specific to kube-burner with in a given list of namespaces
-func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) {
+func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesToDelete []string) error {
 	labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelJob, ex.Name)
 	for _, namespace := range namespacesToDelete {
 		log.Infof("Deleting namespace %s using GVR", namespace)
@@ -38,8 +38,12 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 				CleanupNamespaceResourcesByLabel(ctx, ex, obj, namespace, labelSelector)
 			}
 		}
-		waitForDeleteNamespacedResources(ctx, ex, namespace, labelSelector)
+		err := waitForDeleteNamespacedResources(ctx, ex, namespace, labelSelector)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // Deletes resources with the give labelSelector within a namespace
@@ -76,33 +80,35 @@ func CleanupNonNamespacedResourcesByLabel(ctx context.Context, ex JobExecutor, o
 	}
 }
 
-func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, namespace string, labelSelector string) {
-	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
-		allDeleted := true
-		for _, obj := range ex.objects {
-			// If churning is enabled and object doesn't have churning enabled we skip that object from deletion wait
-			if config.IsChurnEnabled(ex.Job) && !obj.Churn {
-				continue
-			}
-			if obj.namespaced {
-				resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
-				objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-				if err != nil {
-					return false, err
-				}
-				if len(objList.Items) > 0 {
-					allDeleted = false
-					log.Debugf("Waiting for %d objects labeled with %s in %s to be deleted",
-						len(objList.Items), labelSelector, namespace)
-				}
+func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, namespace string, labelSelector string) error {
+	for _, obj := range ex.objects {
+		// If churning is enabled and object doesn't have churning enabled we skip that object from deletion
+		if config.IsChurnEnabled(ex.Job) && !obj.Churn {
+			continue
+		}
+		if obj.namespaced {
+			err := waitForDeleteResourceInNamespace(ctx, ex, obj, namespace, labelSelector)
+			if err != nil {
+				return fmt.Errorf("error waiting for %s to be deleted: %v", obj.Kind, err)
 			}
 		}
-		return allDeleted, nil
-	})
-	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			log.Fatalf("Timeout waiting for objects to be deleted: %v", err)
-		}
-		log.Errorf("Error waiting for objects to be deleted: %v", err)
 	}
+	return nil
+}
+
+func waitForDeleteResourceInNamespace(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) error {
+	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
+	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			log.Errorf("Error listing objects: %v", err)
+			return false, err
+		}
+		if len(objList.Items) > 0 {
+			log.Debugf("Waiting for %d %ss labeled with %s in %s to be deleted", len(objList.Items), obj.Kind, labelSelector, namespace)
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }

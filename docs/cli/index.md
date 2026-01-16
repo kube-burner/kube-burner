@@ -45,7 +45,7 @@ This is the main subcommand; it triggers a new kube-burner benchmark and it supp
 - `timeout`: Kube-burner benchmark global timeout. When timing out, return code is 2. The default is `4h`.
 - `kubeconfig`: Path to the kubeconfig file.
 - `kube-context`: The name of the kubeconfig context to use.
-- `user-metadata`: YAML file path containing custom user-metadata to be indexed along with the `jobSummary` document.
+- `user-metadata`: YAML file path containing custom user-metadata to be indexed along with the [`jobSummary`](../observability/indexing.md#job-summary) document.
 - `user-data`: YAML or JSON file path containing input variables for rendering the configuration file.
 - `allow-missing`: Allow missing keys in the config file. Needed when using the [`default`](https://masterminds.github.io/sprig/defaults.html) template function
 - `set`: Set arbitrary `key=value` pairs to override values in the configuration file. Similar to Helm's `--set` flag, this allows you to override base YAML values directly from the command line. Multiple values can be specified by separating them with commas or by using multiple `--set` flags. Nested keys are supported using dot notation, and array indices can be used with numeric keys (e.g., `jobs.0.name=test`).
