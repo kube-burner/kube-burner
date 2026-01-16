@@ -85,29 +85,47 @@ The `local` indexer can be configured by the parameters below:
 
 ## Job Summary
 
-When an indexer is configured, a document holding the job summary is indexed at the end of the job. This is useful to identify the parameters the job was executed with. It also contains the timestamps of the execution phase (`timestamp` and `endTimestamp`) as well as the cleanup phase (`cleanupTimestamp` and `cleanupEndTimestamp`).
+When an indexer is configured, a job summary document is indexed at the end of the job. It contains timestamps of the execution phase, performance metrics, and execution status.
 
-This document looks like:
+The job summary document includes the following fields:
+
+| Field                  | Description                                                                                          | Type             | Always Present |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- | ---------------- | -------------- |
+| `timestamp`            | Start timestamp of the job execution                                                                 | String (ISO 8601) | Yes            |
+| `endTimestamp`         | End timestamp of the job execution                                                                   | String (ISO 8601) | Yes            |
+| `churnStartTimestamp`  | Start timestamp of the churn phase (only present if churn is enabled)                               | String (ISO 8601) | No             |
+| `churnEndTimestamp`    | End timestamp of the churn phase (only present if churn is enabled)                                  | String (ISO 8601) | No             |
+| `elapsedTime`          | Total execution time in seconds                                                                      | Float            | Yes            |
+| `achievedQps`          | Achieved queries per second (calculated as object operations / elapsed time)                       | Float            | No             |
+| `uuid`                 | Unique identifier for this benchmark run                                                              | String           | Yes            |
+| `metricName`           | Always set to `"jobSummary"` for identification                                                     | String           | Yes            |
+| `version`               | kube-burner version and git commit in format `version@gitCommit`                                      | String           | No             |
+| `passed`                | Whether the job execution passed (true) or failed (false)                                            | Boolean          | Yes            |
+| `executionErrors`       | Error messages from job execution, if any                                                            | String           | No             |
+| `jobConfig`             | Complete job configuration object (see [configuration reference](../reference/configuration.md))     | Object           | Yes            |
+
+Additionally, any metadata provided via the `--user-metadata` flag or through the metrics scraper's summary metadata is merged into the job summary document.
+
+Example job summary document:
 
 ```json
 {
   "timestamp": "2023-08-29T00:17:27.942960538Z",
   "endTimestamp": "2023-08-29T00:18:15.817272025Z",
-  "uuid": "83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16",
-  "elapsedTime": 48,
+  "churnStartTimestamp": "2023-08-29T00:17:45.000000000Z",
+  "churnEndTimestamp": "2023-08-29T00:18:00.000000000Z",
+  "elapsedTime": 48.0,
   "achievedQps": 0.333,
-  "cleanupTimestamp": "2023-08-29T00:18:18.015107794Z",
-  "cleanupEndTimestamp": "2023-08-29T00:18:49.014541929Z",
+  "uuid": "83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16",
   "metricName": "jobSummary",
-  "elapsedTime": 8.768932955,
-  "version": "v1.10.0",
+  "version": "v1.10.0@4c9c3f43db83",
   "passed": true,
-  "executionErrors": "this is an example",
-  "jobConfig": {                          
-    "jobIterations": 1,                                                                                              
-    "name": "cluster-density-v2",                                                                                    
-    "jobType": "create",                                                                                             
-    "qps": 20,                                                                                                       
+  "executionErrors": "",
+  "jobConfig": {
+    "jobIterations": 1,
+    "name": "cluster-density-v2",
+    "jobType": "create",
+    "qps": 20,
     "burst": 20,
     "namespace": "cluster-density-v2",
     "maxWaitTimeout": 14400000000000,
@@ -128,7 +146,7 @@ This document looks like:
 ```
 
 !!! Note
-    It's possible that some of the fields from the document above don't get indexed when it has no value
+    Fields marked with `omitempty` in the JSON structure (such as `churnStartTimestamp`, `churnEndTimestamp`, `achievedQps`, `version`, and `executionErrors`) will not be present in the indexed document when they have no value or are not applicable.
 
 ## Metric exporting & importing
 
