@@ -117,12 +117,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				if jobExecutor.Cleanup {
 					log.Info("Cleaning up previous runs")
 					// Before GC
-					if err := jobExecutor.executeHooks(config.HookBeforeGC); err != nil {
+					if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeGC); err != nil {
 						log.Errorf("Hook execution failed: %v", err)
 					}
 					jobExecutor.gc(ctx, nil)
 					// After GC
-					if err := jobExecutor.executeHooks(config.HookAfterGC); err != nil {
+					if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterGC); err != nil {
 						log.Errorf("Hook execution failed: %v", err)
 					}
 				}
@@ -134,27 +134,26 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				if err := jobExecutor.executeHooks(config.HookBeforeDeployment); err != nil {
+				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookBeforeDeployment, err)
 				}
 				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations); jobErrs != nil {
 					errs = append(errs, jobErrs...)
 					innerRC = 1
 				}
-				if err := jobExecutor.executeHooks(config.HookAfterDeployment); err != nil {
+				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterDeployment, err)
 				}
 				// Collect background hook results
 				if len(jobExecutor.Hooks) > 0 && jobExecutor.hookManager != nil {
-					if backgroundResults := jobExecutor.hookManager.GetBackgroundHookResults(); len(backgroundResults) > 0 {
-						for _, result := range backgroundResults {
-							if result.err != nil {
-								log.Errorf("Background hook failed: %v (duration: %v)", result.err, result.duration)
-								errs = append(errs, result.err)
-								innerRC = 1
-							} else {
-								log.Infof("Background hook completed successfully (duration: %v)", result.duration)
-							}
+					backgroundResults := jobExecutor.hookManager.GetBackgroundHookResults()
+					for _, result := range backgroundResults {
+						if result.err != nil {
+							log.Errorf("Background hook failed: %v (duration: %v)", result.err, result.duration)
+							errs = append(errs, result.err)
+							innerRC = 1
+						} else {
+							log.Infof("Background hook completed successfully (duration: %v)", result.duration)
 						}
 					}
 				}
@@ -179,14 +178,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Error(err.Error())
 				}
 			} else {
-				if err := jobExecutor.executeHooks(config.HookBeforeDeployment); err != nil {
+				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookBeforeDeployment, err)
 				}
 				if jobErrs := jobExecutor.Run(ctx); len(jobErrs) > 0 {
 					errs = append(errs, jobErrs...)
 					innerRC = 1
 				}
-				if err := jobExecutor.executeHooks(config.HookAfterDeployment); err != nil {
+				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterDeployment, err)
 				}
 				if ctx.Err() != nil {
@@ -195,7 +194,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if jobExecutor.BeforeCleanup != "" || len(jobExecutor.Hooks) > 0 {
 				// Execute beforeCleanup hooks first
-				if err := jobExecutor.executeHooks(config.HookBeforeCleanup); err != nil {
+				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeCleanup); err != nil {
 					log.Errorf("Hook execution failed: %v", err)
 				}
 
@@ -253,7 +252,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			slices.Concat(errs, watcherStopErrs)
 			if jobExecutor.GC {
 				jobExecutor.gc(ctx, nil)
-				if err := jobExecutor.executeHooks(config.HookAfterCleanup); err != nil {
+				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterCleanup); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterCleanup, err)
 				}
 			}
@@ -274,7 +273,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				// If gcMetrics is enabled, garbage collection must be blocker
 				gcWg.Wait()
 				for _, jobExecutor := range jobExecutors {
-					if err := jobExecutor.executeHooks(config.HookAfterCleanup); err != nil {
+					if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterCleanup); err != nil {
 						log.Errorf("Error executing hooks for %s: %v", config.HookAfterCleanup, err)
 					}
 				}

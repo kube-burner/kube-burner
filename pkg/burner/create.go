@@ -129,7 +129,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 
 	for i := iterationStart; i < iterationEnd; i++ {
 		// Execute onEachIteration hooks
-		if err := ex.executeHooks(config.HookOnEachIteration); err != nil {
+		if err := ex.hookManager.executeHooks(ex.Hooks, config.HookOnEachIteration); err != nil {
 			log.Errorf("Error executing %s hooks: %v", config.HookOnEachIteration, err)
 		}
 		if ctx.Err() != nil {
@@ -391,7 +391,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 		ex.churnObjects(ctx)
 	}
 	// Execute afterChurn hooks
-	if err := ex.executeHooks(config.HookAfterChurn); err != nil {
+	if err := ex.hookManager.executeHooks(ex.Hooks, config.HookAfterChurn); err != nil {
 		log.Errorf("Error executing hooks for %s: %v", config.HookAfterChurn, err)
 	}
 	return nil
