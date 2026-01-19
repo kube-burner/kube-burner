@@ -8,3 +8,4 @@ This directory structure holds several working kube-burner worloads that can be 
 - kubelet-density-profiling: Similar to the previous one, but with the addition of pprof measurements.
 - kubelet-density-heavy: Similar to the previous one, with the difference that the pods it creates are actually a client/server application consisting of a basic application which performes queries in a pod running PostgreSQL and uses a k8s service to communicate with it.
 - deployment-pvc-move: This workload is meant to test the CSI's ability to move volumes between nodes by creating node bound deployments with volumes and moving the deployments between nodes. When running the workload set the `workerHostNames` according to your cluster. Adjust the `replica` and `jobIteration` values to your test
+- udn-density-l3: For User-Defined Network (UDN) L3 segmentation testing. It creates two deployments, a client/curl and a server/nginx.
