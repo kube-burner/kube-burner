@@ -65,7 +65,6 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 	// Channel to collect hook results
 	resultChan := make(chan hookResult, len(hooks))
 
-	// var backgroundProcesses []*hookProcess
 	for _, hook := range hooks {
 		if hook.When != when {
 			continue
@@ -125,13 +124,13 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 		return fmt.Errorf("failed to start background hook: %w", err)
 	}
 
-	go hm.monitorBackgroundHook(cmd, hook.When, time.Now(), &stdout, &stderr)
+	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr)
 
 	return nil
 }
 
 // monitorBackgroundHook monitors a background hook with proper error handling
-func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, when config.JobHook, startTime time.Time, stdout, stderr *bytes.Buffer) {
+func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer) {
 	// Wait for process with timeout context
 	errChan := make(chan error, 1)
 	go func() {
@@ -142,6 +141,7 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, when config.JobHook,
 	case err := <-errChan:
 		duration := time.Since(startTime)
 		result := hookResult{
+			hook:     hook,
 			err:      err,
 			duration: duration,
 			stdout:   stdout.String(),
@@ -151,24 +151,23 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, when config.JobHook,
 		// Send result to channel (non-blocking)
 		select {
 		case hm.resultChan <- result:
+			// Result sent successfully
 		default:
-			log.Warnf("Result channel full, logging directly")
-		}
-
-		if err != nil {
-			log.Errorf("Background hook at '%s' failed after %v: %v", when, duration, err)
-			if result.stderr != "" {
-				log.Errorf("Hook stderr: %s", result.stderr)
-			}
-		} else {
-			log.Infof("Background hook at '%s' completed successfully in %v", when, duration)
-			if result.stdout != "" {
-				log.Debugf("Hook stdout: %s", result.stdout)
+			if err != nil {
+				log.Errorf("Background hook at '%s' failed after %v: %v", hook.When, duration, err)
+				if result.stderr != "" {
+					log.Errorf("Hook stderr: %s", result.stderr)
+				}
+			} else {
+				log.Infof("Background hook at '%s' completed successfully in %v", hook.When, duration)
+				if result.stdout != "" {
+					log.Debugf("Hook stdout: %s", result.stdout)
+				}
 			}
 		}
 
 	case <-hm.ctx.Done():
-		log.Warnf("Hook monitor cancel for '%s'", when)
+		log.Warnf("Hook monitor cancel for '%s'", hook.When)
 	}
 }
 

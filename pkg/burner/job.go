@@ -145,7 +145,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterDeployment, err)
 				}
 				// Collect background hook results
-				if len(jobExecutor.Hooks) > 0 && jobExecutor.hookManager != nil {
+				if len(jobExecutor.Hooks) > 0 {
 					backgroundResults := jobExecutor.hookManager.GetBackgroundHookResults()
 					for _, result := range backgroundResults {
 						if result.err != nil {
