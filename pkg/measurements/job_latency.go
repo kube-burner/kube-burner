@@ -153,6 +153,7 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 						j.handleUpdateJob(newObj)
 					},
 				},
+				transform: JobTransformFunc(),
 			},
 		},
 	)

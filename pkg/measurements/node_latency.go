@@ -162,6 +162,7 @@ func (n *nodeLatency) Start(measurementWg *sync.WaitGroup) error {
 						n.handleUpdateNode(newObj)
 					},
 				},
+				transform: NodeTransformFunc(),
 			},
 		},
 	)
