@@ -442,11 +442,10 @@ func HookBeforeWorkload() error {
 	for _, job := range configSpec.Jobs {
 		for i, hook := range job.Hooks {
 			if !validWhen[hook.When] {
-				return fmt.Errorf("hook %d has invalid 'when' value: %s (valid: %v)",
-					i, hook.When, maps.Keys(validWhen))
+				return fmt.Errorf("unsupported when value in %s hook %d: %s, (supported: %v)", job.Name, i, hook.When, maps.Keys(validWhen))
 			}
 			if len(hook.Cmd) == 0 {
-				return fmt.Errorf("hook %d has empty command", i)
+				return fmt.Errorf("hook %d in job %s has empty command", i, job.Name)
 			}
 		}
 	}
