@@ -1,19 +1,17 @@
 # Labels for labeling issues and pull requests using GitHub prow action.
 
 area:
-  - 'area/performance'
-  - 'area/scalability'
-  - 'area/observability'
-  - 'area/ci'
-  - 'area/deployment'
-  - 'area/operator'
-  - 'area/networking'
-  - 'area/storage'
-  - 'area/tests'
-  - 'area/cleanup'
-  - 'area/docs'
-  - 'area/security'
-  - 'area/k8s'
+  - 'performance'
+  - 'scalability'
+  - 'observability'
+  - 'deployment'
+  - 'operator'
+  - 'networking'
+  - 'storage'
+  - 'cleanup'
+  - 'docs'
+  - 'security'
+  - 'k8s'
 
 kind:
   - 'bug'
@@ -23,9 +21,9 @@ kind:
   - 'cleanup'
   - 'test'
   - 'enhancement'
-  - 'infrastructure'
-  - 'performance'
   - 'ci'
+  - 'refactor'
+  - 'breaking'
 
 priority:
   - 'P0'
