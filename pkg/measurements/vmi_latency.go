@@ -315,6 +315,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 						vmi.handleUpdateVM(newObj)
 					},
 				},
+				transform: VirtualMachineTransformFunc(),
 			},
 			{
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
@@ -326,6 +327,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 						vmi.handleUpdateVMI(newObj)
 					},
 				},
+				transform: VirtualMachineInstanceTransformFunc(),
 			},
 			{
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
@@ -340,6 +342,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 						vmi.handleUpdateVMIPod(newObj)
 					},
 				},
+				transform: PodTransformFunc(),
 			},
 		},
 	)

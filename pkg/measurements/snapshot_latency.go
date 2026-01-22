@@ -151,6 +151,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 						vsl.handleUpdateVolumeSnapshot(newObj)
 					},
 				},
+				transform: VolumeSnapshotTransformFunc(),
 			},
 		},
 	)

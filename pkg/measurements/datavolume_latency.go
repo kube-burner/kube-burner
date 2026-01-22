@@ -187,6 +187,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 						dv.handleUpdateDV(newObj)
 					},
 				},
+				transform: DataVolumeTransformFunc(),
 			},
 		},
 	)

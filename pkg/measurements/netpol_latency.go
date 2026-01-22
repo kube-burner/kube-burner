@@ -559,6 +559,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNetpol,
 				},
+				transform: NetworkPolicyTransformFunc(),
 			},
 		},
 	)

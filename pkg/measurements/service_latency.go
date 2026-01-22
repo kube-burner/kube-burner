@@ -224,6 +224,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 			handlers: &cache.ResourceEventHandlerFuncs{
 				AddFunc: s.handleCreateSvc,
 			},
+			transform: ServiceTransformFunc(),
 		},
 	})
 	return nil

@@ -176,6 +176,7 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 						p.handleUpdatePVC(newObj)
 					},
 				},
+				transform: PVCTransformFunc(),
 			},
 		},
 	)

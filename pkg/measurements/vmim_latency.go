@@ -197,6 +197,7 @@ func (vmiml *vmimLatency) Start(measurementWg *sync.WaitGroup) error {
 						vmiml.handleUpdateVMIM(newObj)
 					},
 				},
+				transform: VirtualMachineInstanceMigrationTransformFunc(),
 			},
 		},
 	)
