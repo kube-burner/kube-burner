@@ -21,6 +21,49 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// metadataTransformOptions configures which metadata fields to include in the minimal object
+type metadataTransformOptions struct {
+	includeNamespace       bool
+	includeLabels          bool
+	includeOwnerReferences bool
+}
+
+// createMinimalUnstructured creates a minimal unstructured object with only metadata fields needed for latency measurements.
+// This is the common base used by all unstructured transform functions.
+func createMinimalUnstructured(u *unstructured.Unstructured, opts metadataTransformOptions) *unstructured.Unstructured {
+	metadata := map[string]interface{}{
+		"name":              u.GetName(),
+		"uid":               u.GetUID(),
+		"creationTimestamp": u.GetCreationTimestamp(),
+	}
+
+	if opts.includeNamespace {
+		metadata["namespace"] = u.GetNamespace()
+	}
+	if opts.includeLabels {
+		metadata["labels"] = u.GetLabels()
+	}
+	if opts.includeOwnerReferences {
+		metadata["ownerReferences"] = u.GetOwnerReferences()
+	}
+
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": u.GetAPIVersion(),
+			"kind":       u.GetKind(),
+			"metadata":   metadata,
+		},
+	}
+}
+
+// defaultMetadataTransformOpts returns the most common transform options (with namespace and labels)
+func defaultMetadataTransformOpts() metadataTransformOptions {
+	return metadataTransformOptions{
+		includeNamespace: true,
+		includeLabels:    true,
+	}
+}
+
 // EventTransformFunc preserves the following fields for latency measurements:
 // - metadata: name, namespace, uid
 // - involvedObject: uid
@@ -61,27 +104,11 @@ func PodTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		// Create minimal pod with only fields needed for latency measurement
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
-		// Preserve spec.nodeName (needed for NodeName in metrics)
 		if nodeName, found, _ := unstructured.NestedString(u.Object, "spec", "nodeName"); found && nodeName != "" {
 			_ = unstructured.SetNestedField(minimal.Object, nodeName, "spec", "nodeName")
 		}
-
-		// Preserve status.conditions (needed for latency calculations)
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
 		}
@@ -100,26 +127,11 @@ func JobTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
-		// Preserve status.conditions (needed for JobComplete detection)
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
 		}
-
-		// Preserve status.startTime (needed for StartTimeLatency)
 		if startTime, found, _ := unstructured.NestedString(u.Object, "status", "startTime"); found {
 			_ = unstructured.SetNestedField(minimal.Object, startTime, "status", "startTime")
 		}
@@ -138,20 +150,9 @@ func NodeTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		// Nodes don't have namespace
+		minimal := createMinimalUnstructured(u, metadataTransformOptions{includeLabels: true})
 
-		// Preserve status.conditions (needed for Ready, MemoryPressure, etc.)
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
 		}
@@ -171,19 +172,7 @@ func ServiceTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
 		// Preserve only kube-burner annotation if present
 		if annotations := u.GetAnnotations(); annotations != nil {
@@ -194,7 +183,6 @@ func ServiceTransformFunc() cache.TransformFunc {
 			}
 		}
 
-		// Preserve spec.type, spec.clusterIPs, spec.ports
 		if svcType, found, _ := unstructured.NestedString(u.Object, "spec", "type"); found {
 			_ = unstructured.SetNestedField(minimal.Object, svcType, "spec", "type")
 		}
@@ -208,8 +196,6 @@ func ServiceTransformFunc() cache.TransformFunc {
 		if ports, found, _ := unstructured.NestedSlice(u.Object, "spec", "ports"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, ports, "spec", "ports")
 		}
-
-		// Preserve status.loadBalancer.ingress
 		if ingress, found, _ := unstructured.NestedSlice(u.Object, "status", "loadBalancer", "ingress"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, ingress, "status", "loadBalancer", "ingress")
 		}
@@ -228,26 +214,11 @@ func PVCTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
-		// Preserve status.phase (needed for Bound detection)
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
 		}
-
-		// Preserve status.conditions
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
 		}
@@ -266,21 +237,8 @@ func DataVolumeTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
-		// Preserve status.conditions (needed for Bound, Running, Ready detection)
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
 		}
@@ -298,20 +256,7 @@ func NetworkPolicyTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-				},
-			},
-		}
-
-		return minimal, nil
+		return createMinimalUnstructured(u, metadataTransformOptions{includeNamespace: true}), nil
 	}
 }
 
@@ -325,26 +270,11 @@ func VolumeSnapshotTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
-		// Preserve status.readyToUse (needed for Ready detection)
 		if readyToUse, found, _ := unstructured.NestedBool(u.Object, "status", "readyToUse"); found {
 			_ = unstructured.SetNestedField(minimal.Object, readyToUse, "status", "readyToUse")
 		}
-
-		// Preserve status.creationTime
 		if creationTime, found, _ := unstructured.NestedFieldNoCopy(u.Object, "status", "creationTime"); found {
 			_ = unstructured.SetNestedField(minimal.Object, creationTime, "status", "creationTime")
 		}
@@ -363,21 +293,8 @@ func VirtualMachineTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
-		// Preserve status.conditions (needed for Ready detection)
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
 		}
@@ -396,22 +313,12 @@ func VirtualMachineInstanceTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-					"ownerReferences":   u.GetOwnerReferences(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, metadataTransformOptions{
+			includeNamespace:       true,
+			includeLabels:          true,
+			includeOwnerReferences: true,
+		})
 
-		// Preserve status.phase (needed for Pending, Scheduling, Scheduled, Running detection)
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
 		}
@@ -431,26 +338,11 @@ func VirtualMachineInstanceMigrationTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": u.GetAPIVersion(),
-				"kind":       u.GetKind(),
-				"metadata": map[string]interface{}{
-					"name":              u.GetName(),
-					"namespace":         u.GetNamespace(),
-					"uid":               u.GetUID(),
-					"creationTimestamp": u.GetCreationTimestamp(),
-					"labels":            u.GetLabels(),
-				},
-			},
-		}
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
-		// Preserve spec.vmiName
 		if vmiName, found, _ := unstructured.NestedString(u.Object, "spec", "vmiName"); found {
 			_ = unstructured.SetNestedField(minimal.Object, vmiName, "spec", "vmiName")
 		}
-
-		// Preserve status.phaseTransitionTimestamps (needed for all phase latencies)
 		if timestamps, found, _ := unstructured.NestedSlice(u.Object, "status", "phaseTransitionTimestamps"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, timestamps, "status", "phaseTransitionTimestamps")
 		}
