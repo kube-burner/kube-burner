@@ -29,11 +29,8 @@ import (
 )
 
 type hookResult struct {
-	hook     config.Hook
 	err      error
 	duration time.Duration
-	stdout   string
-	stderr   string
 }
 
 type HookManager struct {
@@ -85,8 +82,7 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 				defer foregroundWg.Done()
 				if err := hm.executeForegroundHook(h); err != nil {
 					resultChan <- hookResult{
-						hook: h,
-						err:  err,
+						err: err,
 					}
 				}
 			}(hook)
@@ -141,11 +137,8 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 	case err := <-errChan:
 		duration := time.Since(startTime)
 		result := hookResult{
-			hook:     hook,
 			err:      err,
 			duration: duration,
-			stdout:   stdout.String(),
-			stderr:   stderr.String(),
 		}
 
 		// Send result to channel (non-blocking)
@@ -155,13 +148,13 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 		default:
 			if err != nil {
 				log.Errorf("Background hook at '%s' failed after %v: %v", hook.When, duration, err)
-				if result.stderr != "" {
-					log.Errorf("Hook stderr: %s", result.stderr)
+				if stderr.String() != "" {
+					log.Errorf("Hook stderr: %s", stderr.String())
 				}
 			} else {
 				log.Infof("Background hook at '%s' completed successfully in %v", hook.When, duration)
-				if result.stdout != "" {
-					log.Debugf("Hook stdout: %s", result.stdout)
+				if stdout.String() != "" {
+					log.Debugf("Hook stdout: %s", stdout.String())
 				}
 			}
 		}
