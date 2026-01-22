@@ -69,8 +69,8 @@ func PodTransformFunc() cache.TransformFunc {
 				"metadata": map[string]interface{}{
 					"name":              u.GetName(),
 					"namespace":         u.GetNamespace(),
-					"uid":               string(u.GetUID()),
-					"creationTimestamp": u.GetCreationTimestamp().Format("2006-01-02T15:04:05Z"),
+					"uid":               u.GetUID(),
+					"creationTimestamp": u.GetCreationTimestamp(),
 					"labels":            u.GetLabels(),
 				},
 			},
@@ -107,8 +107,8 @@ func JobTransformFunc() cache.TransformFunc {
 				"metadata": map[string]interface{}{
 					"name":              u.GetName(),
 					"namespace":         u.GetNamespace(),
-					"uid":               string(u.GetUID()),
-					"creationTimestamp": u.GetCreationTimestamp().Format("2006-01-02T15:04:05Z"),
+					"uid":               u.GetUID(),
+					"creationTimestamp": u.GetCreationTimestamp(),
 					"labels":            u.GetLabels(),
 				},
 			},
@@ -144,8 +144,8 @@ func NodeTransformFunc() cache.TransformFunc {
 				"kind":       u.GetKind(),
 				"metadata": map[string]interface{}{
 					"name":              u.GetName(),
-					"uid":               string(u.GetUID()),
-					"creationTimestamp": u.GetCreationTimestamp().Format("2006-01-02T15:04:05Z"),
+					"uid":               u.GetUID(),
+					"creationTimestamp": u.GetCreationTimestamp(),
 					"labels":            u.GetLabels(),
 				},
 			},
