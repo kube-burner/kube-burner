@@ -31,6 +31,7 @@ jobs:
             /close
             /reopen
             /lock
+            /unlock
             /milestone
             /hold
             /cc
