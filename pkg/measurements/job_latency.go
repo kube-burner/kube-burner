@@ -29,6 +29,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -153,7 +154,7 @@ func (j *jobLatency) Start(measurementWg *sync.WaitGroup) error {
 						j.handleUpdateJob(newObj)
 					},
 				},
-				transform: JobTransformFunc(),
+				transform: jobTransformFunc(),
 			},
 		},
 	)
@@ -238,4 +239,27 @@ func (j *jobLatency) getLatency(normLatency any) map[string]float64 {
 func (j *jobLatency) IsCompatible() bool {
 	_, exists := supportedJobLatencyJobTypes[j.JobConfig.JobType]
 	return exists
+}
+
+// jobTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp, labels
+// - status: conditions, startTime
+func jobTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
+
+		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
+		}
+		if startTime, found, _ := unstructured.NestedString(u.Object, "status", "startTime"); found {
+			_ = unstructured.SetNestedField(minimal.Object, startTime, "status", "startTime")
+		}
+
+		return minimal, nil
+	}
 }

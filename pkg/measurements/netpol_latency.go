@@ -519,7 +519,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 	var err error
 	defer measurementWg.Done()
 	// Skip latency measurement for 1st job which creates only pods
-	if value, ok := n.JobConfig.NamespaceLabels["kube-burner.io/skip-networkpolicy-latency"]; ok {
+	if value, ok := n.JobConfig.NamespaceLabels[config.KubeBurnerLabelSkipNetworkPolicyLatency]; ok {
 		if value == "true" {
 			log.Debugf("Discarding network policy latency measurement for the job %v", n.JobConfig.Name)
 			return nil
@@ -559,7 +559,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 				handlers: &cache.ResourceEventHandlerFuncs{
 					AddFunc: n.handleCreateNetpol,
 				},
-				transform: NetworkPolicyTransformFunc(),
+				transform: networkPolicyTransformFunc(),
 			},
 		},
 	)
@@ -569,7 +569,7 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 
 func (n *netpolLatency) Stop() error {
 	// Skip latency measurement for 1st job which creates only pods
-	if value, ok := n.JobConfig.NamespaceLabels["kube-burner.io/skip-networkpolicy-latency"]; ok {
+	if value, ok := n.JobConfig.NamespaceLabels[config.KubeBurnerLabelSkipNetworkPolicyLatency]; ok {
 		if value == "true" {
 			return nil
 		}
@@ -628,4 +628,17 @@ func (n *netpolLatency) Collect(measurementWg *sync.WaitGroup) {
 func (n *netpolLatency) IsCompatible() bool {
 	_, exists := supportedNetpolLatencyJobTypes[n.JobConfig.JobType]
 	return exists
+}
+
+// networkPolicyTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp
+func networkPolicyTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		return createMinimalUnstructured(u, metadataTransformOptions{includeNamespace: true}), nil
+	}
 }

@@ -25,6 +25,7 @@ import (
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -151,7 +152,7 @@ func (vsl *volumeSnapshotLatency) Start(measurementWg *sync.WaitGroup) error {
 						vsl.handleUpdateVolumeSnapshot(newObj)
 					},
 				},
-				transform: VolumeSnapshotTransformFunc(),
+				transform: volumeSnapshotTransformFunc(),
 			},
 		},
 	)
@@ -240,4 +241,27 @@ func (vsl *volumeSnapshotLatency) getLatency(normLatency any) map[string]float64
 func (vsl *volumeSnapshotLatency) IsCompatible() bool {
 	_, exists := supportedVolumeSnapshotLatencyJobTypes[vsl.JobConfig.JobType]
 	return exists
+}
+
+// volumeSnapshotTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp, labels
+// - status: readyToUse, creationTime
+func volumeSnapshotTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
+
+		if readyToUse, found, _ := unstructured.NestedBool(u.Object, "status", "readyToUse"); found {
+			_ = unstructured.SetNestedField(minimal.Object, readyToUse, "status", "readyToUse")
+		}
+		if creationTime, found, _ := unstructured.NestedFieldNoCopy(u.Object, "status", "creationTime"); found {
+			_ = unstructured.SetNestedField(minimal.Object, creationTime, "status", "creationTime")
+		}
+
+		return minimal, nil
+	}
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -197,7 +198,7 @@ func (vmiml *vmimLatency) Start(measurementWg *sync.WaitGroup) error {
 						vmiml.handleUpdateVMIM(newObj)
 					},
 				},
-				transform: VirtualMachineInstanceMigrationTransformFunc(),
+				transform: vmimTransformFunc(),
 			},
 		},
 	)
@@ -361,4 +362,28 @@ func (vmiml *vmimLatency) getLatency(normLatency any) map[string]float64 {
 func (vmiml *vmimLatency) IsCompatible() bool {
 	_, exists := supportedVMIMLatencyJobTypes[vmiml.JobConfig.JobType]
 	return exists
+}
+
+// vmimTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp, labels
+// - spec: vmiName
+// - status: phaseTransitionTimestamps
+func vmimTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
+
+		if vmiName, found, _ := unstructured.NestedString(u.Object, "spec", "vmiName"); found {
+			_ = unstructured.SetNestedField(minimal.Object, vmiName, "spec", "vmiName")
+		}
+		if timestamps, found, _ := unstructured.NestedSlice(u.Object, "status", "phaseTransitionTimestamps"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, timestamps, "status", "phaseTransitionTimestamps")
+		}
+
+		return minimal, nil
+	}
 }

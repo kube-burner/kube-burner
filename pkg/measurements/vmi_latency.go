@@ -25,6 +25,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -315,7 +316,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 						vmi.handleUpdateVM(newObj)
 					},
 				},
-				transform: VirtualMachineTransformFunc(),
+				transform: virtualMachineTransformFunc(),
 			},
 			{
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
@@ -327,7 +328,7 @@ func (vmi *vmiLatency) Start(measurementWg *sync.WaitGroup) error {
 						vmi.handleUpdateVMI(newObj)
 					},
 				},
-				transform: VirtualMachineInstanceTransformFunc(),
+				transform: virtualMachineInstanceTransformFunc(),
 			},
 			{
 				dynamicClient: dynamic.NewForConfigOrDie(vmi.RestConfig),
@@ -428,4 +429,48 @@ func getParentVMIName(podObj *corev1.Pod) (string, error) {
 func (vmi *vmiLatency) IsCompatible() bool {
 	_, exists := supportedVMILatencyJobTypes[vmi.JobConfig.JobType]
 	return exists
+}
+
+// virtualMachineTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp, labels
+// - status: conditions
+func virtualMachineTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
+
+		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
+		}
+
+		return minimal, nil
+	}
+}
+
+// virtualMachineInstanceTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp, labels, ownerReferences
+// - status: phase
+func virtualMachineInstanceTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		minimal := createMinimalUnstructured(u, metadataTransformOptions{
+			includeNamespace:       true,
+			includeLabels:          true,
+			includeOwnerReferences: true,
+		})
+
+		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
+			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
+		}
+
+		return minimal, nil
+	}
 }

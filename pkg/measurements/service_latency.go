@@ -28,6 +28,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -96,7 +97,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		log.Errorf("failed to convert to Service: %v", err)
 		return
 	}
-	if annotation, ok := svc.Annotations["kube-burner.io/service-latency"]; ok {
+	if annotation, ok := svc.Annotations[config.KubeBurnerLabelServiceLatency]; ok {
 		if annotation == "false" {
 			log.Debugf("Annotation found, discarding service %v/%v", svc.Namespace, svc.Name)
 		}
@@ -224,7 +225,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 			handlers: &cache.ResourceEventHandlerFuncs{
 				AddFunc: s.handleCreateSvc,
 			},
-			transform: ServiceTransformFunc(),
+			transform: serviceTransformFunc(),
 		},
 	})
 	return nil
@@ -321,4 +322,46 @@ func (s *serviceLatency) Collect(measurementWg *sync.WaitGroup) {
 func (s *serviceLatency) IsCompatible() bool {
 	_, exists := supportedServiceLatencyJobTypes[s.JobConfig.JobType]
 	return exists
+}
+
+// serviceTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp, labels, annotations (config.KubeBurnerLabelServiceLatency only)
+// - spec: type, clusterIPs, ports
+// - status: loadBalancer.ingress
+func serviceTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
+
+		if annotations := u.GetAnnotations(); annotations != nil {
+			if val, exists := annotations[config.KubeBurnerLabelServiceLatency]; exists {
+				_ = unstructured.SetNestedField(minimal.Object, map[string]interface{}{
+					config.KubeBurnerLabelServiceLatency: val,
+				}, "metadata", "annotations")
+			}
+		}
+
+		if svcType, found, _ := unstructured.NestedString(u.Object, "spec", "type"); found {
+			_ = unstructured.SetNestedField(minimal.Object, svcType, "spec", "type")
+		}
+		if clusterIPs, found, _ := unstructured.NestedStringSlice(u.Object, "spec", "clusterIPs"); found {
+			ips := make([]interface{}, len(clusterIPs))
+			for i, ip := range clusterIPs {
+				ips[i] = ip
+			}
+			_ = unstructured.SetNestedSlice(minimal.Object, ips, "spec", "clusterIPs")
+		}
+		if ports, found, _ := unstructured.NestedSlice(u.Object, "spec", "ports"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, ports, "spec", "ports")
+		}
+		if ingress, found, _ := unstructured.NestedSlice(u.Object, "status", "loadBalancer", "ingress"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, ingress, "status", "loadBalancer", "ingress")
+		}
+
+		return minimal, nil
+	}
 }
