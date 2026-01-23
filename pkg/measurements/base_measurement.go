@@ -59,6 +59,7 @@ type MeasurementWatcher struct {
 	resource      schema.GroupVersionResource
 	labelSelector string
 	handlers      *cache.ResourceEventHandlerFuncs
+	transform     cache.TransformFunc
 }
 
 func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWatcher) {
@@ -88,6 +89,12 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 			},
 			nil,
 		)
+		// Apply transform function before starting the informer to reduce memory usage
+		if measurementWatcher.transform != nil {
+			if err := bm.watchers[i].Informer.SetTransform(measurementWatcher.transform); err != nil {
+				log.Warnf("failed to set transform for %s: %v", measurementWatcher.name, err)
+			}
+		}
 		if measurementWatcher.handlers != nil {
 			bm.watchers[i].Informer.AddEventHandler(measurementWatcher.handlers)
 		}

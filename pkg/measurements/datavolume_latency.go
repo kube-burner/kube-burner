@@ -35,6 +35,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -187,6 +188,7 @@ func (dv *dvLatency) Start(measurementWg *sync.WaitGroup) error {
 						dv.handleUpdateDV(newObj)
 					},
 				},
+				transform: dataVolumeTransformFunc(),
 			},
 		},
 	)
@@ -305,4 +307,24 @@ func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
 func (dv *dvLatency) IsCompatible() bool {
 	_, exists := supportedDvLatencyJobTypes[dv.JobConfig.JobType]
 	return exists
+}
+
+// dataVolumeTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp, labels
+// - status: conditions
+func dataVolumeTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
+
+		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
+		}
+
+		return minimal, nil
+	}
 }
