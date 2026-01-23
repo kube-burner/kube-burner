@@ -14,16 +14,15 @@ area:
   - 'k8s'
 
 kind:
-  - 'bug'
-  - 'security'
-  - 'feature'
-  - 'docs'
-  - 'cleanup'
-  - 'test'
-  - 'enhancement'
-  - 'ci'
-  - 'refactor'
-  - 'breaking'
+  - 'github_actions'
+  - 'good first issue'
+  - 'breaking/change'
+  - 'kind/bug'
+  - 'kind/dependencies'
+  - 'kind/documentation'
+  - 'kind/testing'
+  - 'stale'
+  - 'wontfix'
 
 priority:
   - 'P0'
