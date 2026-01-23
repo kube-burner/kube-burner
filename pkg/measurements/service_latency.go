@@ -202,19 +202,20 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	// Create shared informer factory for typed clients
 	clientset := kubernetes.NewForConfigOrDie(s.RestConfig)
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	// EndpointSlice/Service lister & informer from typed client
-	s.epsLister = factory.Discovery().V1().EndpointSlices().Lister()
-	s.svcLister = factory.Core().V1().Services().Lister()
-	epsInformer := factory.Discovery().V1().EndpointSlices().Informer()
-	svcInformer := factory.Core().V1().Services().Informer()
 
-	// Set transforms to reduce memory footprint
+	// EndpointSlice lister & informer from typed client
+	epsInformer := factory.Discovery().V1().EndpointSlices().Informer()
 	if err := epsInformer.SetTransform(endpointSliceTransformFunc()); err != nil {
 		log.Warnf("failed to set EndpointSlice transform: %v", err)
 	}
+	s.epsLister = ldiscoveryv1.NewEndpointSliceLister(epsInformer.GetIndexer())
+
+	//Service lister & informer from typed client
+	svcInformer := factory.Core().V1().Services().Informer()
 	if err := svcInformer.SetTransform(serviceTypedTransformFunc()); err != nil {
 		log.Warnf("failed to set Service transform: %v", err)
 	}
+	s.svcLister = lcorev1.NewServiceLister(svcInformer.GetIndexer())
 
 	// Start the informer
 	s.stopInformerCh = make(chan struct{})
