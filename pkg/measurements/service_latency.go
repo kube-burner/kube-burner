@@ -28,6 +28,8 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -206,6 +208,14 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	epsInformer := factory.Discovery().V1().EndpointSlices().Informer()
 	svcInformer := factory.Core().V1().Services().Informer()
 
+	// Set transforms to reduce memory footprint
+	if err := epsInformer.SetTransform(endpointSliceTransformFunc()); err != nil {
+		log.Warnf("failed to set EndpointSlice transform: %v", err)
+	}
+	if err := svcInformer.SetTransform(serviceTypedTransformFunc()); err != nil {
+		log.Warnf("failed to set Service transform: %v", err)
+	}
+
 	// Start the informer
 	s.stopInformerCh = make(chan struct{})
 	factory.Start(s.stopInformerCh)
@@ -363,5 +373,47 @@ func serviceTransformFunc() cache.TransformFunc {
 		}
 
 		return minimal, nil
+	}
+}
+
+// serviceTypedTransformFunc preserves the following fields for typed Service informer:
+// - metadata: name, namespace, uid
+// - status: loadBalancer (needed for waitForIngress)
+func serviceTypedTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		svc, ok := obj.(*corev1.Service)
+		if !ok {
+			return obj, nil
+		}
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      svc.Name,
+				Namespace: svc.Namespace,
+				UID:       svc.UID,
+			},
+			Status: corev1.ServiceStatus{
+				LoadBalancer: svc.Status.LoadBalancer,
+			},
+		}, nil
+	}
+}
+
+// endpointSliceTransformFunc preserves the following fields for typed EndpointSlice informer:
+// - metadata: name, namespace, labels (needed for label selector lookup)
+// - endpoints (needed to check addresses in waitForEndpointSlices)
+func endpointSliceTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		eps, ok := obj.(*discoveryv1.EndpointSlice)
+		if !ok {
+			return obj, nil
+		}
+		return &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      eps.Name,
+				Namespace: eps.Namespace,
+				Labels:    eps.Labels,
+			},
+			Endpoints: eps.Endpoints,
+		}, nil
 	}
 }

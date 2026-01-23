@@ -224,7 +224,7 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	)
 	eventInformer := cache.NewSharedIndexInformer(lw, &corev1.Event{}, 0, cache.Indexers{})
 	if err := eventInformer.SetTransform(eventTransformFunc()); err != nil {
-		log.Warnf("Failed to set event transform: %v", err)
+		log.Warnf("failed to set event transform: %v", err)
 	}
 	p.stopInformerCh = make(chan struct{})
 	go eventInformer.Run(p.stopInformerCh)

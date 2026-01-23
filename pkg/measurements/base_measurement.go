@@ -92,7 +92,7 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 		// Apply transform function before starting the informer to reduce memory usage
 		if measurementWatcher.transform != nil {
 			if err := bm.watchers[i].Informer.SetTransform(measurementWatcher.transform); err != nil {
-				log.Warnf("Failed to set transform for %s: %v", measurementWatcher.name, err)
+				log.Warnf("failed to set transform for %s: %v", measurementWatcher.name, err)
 			}
 		}
 		if measurementWatcher.handlers != nil {
