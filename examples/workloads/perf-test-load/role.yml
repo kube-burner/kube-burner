@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: access-token-role
+  labels:
+    kube-burner-job: access-tokens
+rules:
+- apiGroups: [""]
+  resources:
+    - pods
+    - services
+    - configmaps
+  verbs:
+    - get
+    - list
+    - watch

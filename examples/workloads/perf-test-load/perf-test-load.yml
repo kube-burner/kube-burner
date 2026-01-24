@@ -1,0 +1,77 @@
+---
+global:
+  gc: true
+  gcMetrics: false
+  deletionStrategy: default
+  measurements:
+    - name: podLatency
+      thresholds:
+        - conditionType: Ready
+          metric: P99
+          threshold: 10s
+{{ if .SVC_LATENCY }}
+    - name: serviceLatency
+      svcTimeout: 10s
+{{ end }}
+
+jobs:
+  - name: perf-test-load
+    namespace: perf-test-load
+    jobIterations: {{.JOB_ITERATIONS}}
+    qps: {{.QPS}}
+    burst: {{.BURST}}
+    namespacedIterations: true
+    podWait: false
+    waitWhenFinished: true
+    preLoadImages: true
+    preLoadPeriod: 15s
+    churnConfig:
+      cycles: {{.CHURN_CYCLES}}
+      duration: {{.CHURN_DURATION}}
+      percent: {{.CHURN_PERCENT}}
+      delay: {{.CHURN_DELAY}}
+      mode: {{.CHURN_MODE}}
+    namespaceLabels:
+      security.openshift.io/scc.podSecurityLabelSync: false
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+    objects:
+
+      - objectTemplate: role.yml
+        runOnce: true
+        replicas: 1
+
+      - objectTemplate: rolebinding.yml
+        replicas: 1
+
+      - objectTemplate: serviceaccount.yml
+        replicas: 1
+
+      - objectTemplate: service.yml
+        replicas: 5
+
+      - objectTemplate: secret.yml
+        replicas: 10
+
+      - objectTemplate: configmap.yml
+        replicas: 10
+
+      - objectTemplate: np-deny-all.yml
+        replicas: 1
+
+      - objectTemplate: np-allow-from-clients.yml
+        replicas: 1
+
+      - objectTemplate: np-allow-from-ingress.yml
+        replicas: 1
+
+      - objectTemplate: deployment-server.yml
+        replicas: 3
+        inputVars:
+          podReplicas: 2
+
+      - objectTemplate: deployment-client.yml
+        replicas: 2
+        inputVars:
+          podReplicas: 2
