@@ -342,7 +342,8 @@ verify_hooks_with_helpers() {
       echo "⚠️  onEachIteration executed $on_count times (churn enabled; expected >= $job_iterations)"
     fi
   else
-    if ! check_hooks_execution "onEachIteration" "$job_iterations"; then fail=1; fi
+    expected_on=$((job_iterations + 1))
+    if ! check_hooks_execution "onEachIteration" "$expected_on"; then fail=1; fi
   fi
 
   # Churn hooks

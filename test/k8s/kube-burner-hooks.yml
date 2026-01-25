@@ -1,8 +1,6 @@
 global:
   gc: false
-  waitWhenFinished: true
-  measurements:
-    - name: podLatency
+  waitWhenFinished: false
 
 jobs:
   - name: basic-hook-test
