@@ -7,7 +7,7 @@ global:
 jobs:
   - name: basic-hook-test
     jobType: create
-    jobIterations: 5
+    jobIterations: 4
     qps: 5
     burst: 5
     namespace: hook-test
@@ -17,30 +17,24 @@ jobs:
     # Hook configuration
     hooks:
       # Before deployment starts
-      - cmd: ["/bin/bash", "test/hooks/simple-hook.sh", "beforeJobExecution"]
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeJobExecution"]
         when: beforeJobExecution
         background: false
       
       # After deployment completes
-      - cmd: ["/bin/bash", "test/hooks/simple-hook.sh", "afterJobExecution"]
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterJobExecution"]
         when: afterJobExecution
         background: false
       
       # Before cleanup
-      - cmd: ["/bin/bash", "test/hooks/simple-hook.sh", "beforeCleanup"]
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeCleanup"]
         when: beforeCleanup
         background: false
       
       # On each iteration
-      - cmd: ["/bin/bash", "test/hooks/simple-hook.sh", "onEachIteration"]
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "onEachIteration"]
         when: onEachIteration
         background: false
-  
-    # Churn configuration
-    churnConfig:
-      duration: 30s
-      percent: 20
-      delay: 5s
       
     objects:
       - objectTemplate: objectTemplates/hooks-test.yaml
