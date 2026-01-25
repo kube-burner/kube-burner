@@ -302,3 +302,93 @@ check_metrics_not_created_for_job() {
     return 1
   fi
 }
+
+check_hooks_execution() {
+  local hook_name=$1
+  local expected_count=$2
+  local log_file="hook-${hook_name}.log"
+
+  if [ ! -f "$log_file" ]; then
+    echo "Hook log file not found: $log_file"
+    return 1
+  fi
+
+  actual_count=$(grep -c "Hook Execution:" "$log_file" 2>/dev/null || echo 0)
+
+  if [ "$actual_count" -ne "$expected_count" ]; then
+    echo "Hook $hook_name executed $actual_count times; expected $expected_count times"
+    return 1
+  else
+    echo "Hook $hook_name executed as expected: $actual_count times"
+    return 0
+  fi
+}
+
+# verify_hooks_with_helpers: high-level verifier compatible with check_hooks_execution
+# Usage: verify_hooks_with_helpers [config_file] [job_name]
+verify_hooks_with_helpers() {
+  local config_file="${1:-test/hooks/config-basic-hooks.yaml}"
+  local job_name="${2:-basic-hook-test}"
+  local job_iterations=5
+  local churn_enabled=0
+  local fail=0
+
+  # read jobIterations and churn settings from config if available
+  if [ -f "$config_file" ]; then
+    val=$(awk "/name: *${job_name}/{f=1} f && /jobIterations:/{print \$2; exit}" "$config_file" || echo "")
+    if [ -n "$val" ]; then
+      job_iterations="$val"
+    fi
+
+    churn_percent=$(awk "/name: *${job_name}/{f=1} f && /percent:/{print \$2; exit}" "$config_file" || echo 0)
+    churn_duration=$(awk "/name: *${job_name}/{f=1} f && /duration:/{print \$2; exit}" "$config_file" || echo 0)
+    if { [ -n "$churn_percent" ] && [ "$churn_percent" -gt 0 ] 2>/dev/null; } || { [ -n "$churn_duration" ] && [ "$churn_duration" != "0s" ]; }; then
+      churn_enabled=1
+    fi
+  fi
+
+  echo "Verifying hooks for job: $job_name (iterations=$job_iterations, churn=$churn_enabled)"
+
+  # Job-level hooks
+  if ! check_hooks_execution "beforeJobExecution" 1; then fail=1; fi
+  if ! check_hooks_execution "afterJobExecution" 1; then fail=1; fi
+  if ! check_hooks_execution "beforeCleanup" 1; then fail=1; fi
+
+  # Iteration-level hook: special handling when churn is enabled
+  on_count=$(grep -c "Hook Execution:" "hook-onEachIteration.log" 2>/dev/null || echo 0)
+  if [ "$churn_enabled" -eq 1 ]; then
+    if [ "$on_count" -lt "$job_iterations" ]; then
+      echo "❌ onEachIteration executed $on_count times; expected at least $job_iterations (churn enabled)"
+      fail=1
+    else
+      echo "⚠️  onEachIteration executed $on_count times (churn enabled; expected >= $job_iterations)"
+    fi
+  else
+    if ! check_hooks_execution "onEachIteration" "$job_iterations"; then fail=1; fi
+  fi
+
+  # Churn hooks
+  if [ "$churn_enabled" -eq 1 ]; then
+    # If churn enabled, at least one beforeChurn should be expected in some scenarios
+    churn_before_count=$(grep -c "Hook Execution:" "hook-beforeChurn.log" 2>/dev/null || echo 0)
+    churn_after_count=$(grep -c "Hook Execution:" "hook-afterChurn.log" 2>/dev/null || echo 0)
+    echo "Churn hooks counts: beforeChurn=$churn_before_count afterChurn=$churn_after_count"
+  else
+    if ! check_hooks_execution "beforeChurn" 0; then fail=1; fi
+    if ! check_hooks_execution "afterChurn" 0; then fail=1; fi
+  fi
+
+  # GC hooks
+  if ! check_hooks_execution "beforeGC" 0; then fail=1; fi
+  if ! check_hooks_execution "afterGC" 0; then fail=1; fi
+
+  if [ "$fail" -eq 0 ]; then
+    echo "✅ All hook checks passed"
+    return 0
+  else
+    echo "❌ Some hook checks failed"
+    return 1
+  fi
+}
+
+
