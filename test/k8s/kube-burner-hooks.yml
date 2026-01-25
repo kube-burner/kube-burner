@@ -43,7 +43,7 @@ jobs:
       delay: 5s
       
     objects:
-      - objectTemplate: test/hooks/pod-template.yaml
+      - objectTemplate: objectTemplates/hooks-test.yaml
         replicas: 2
         inputVars:
           containerImage: busybox:latest
