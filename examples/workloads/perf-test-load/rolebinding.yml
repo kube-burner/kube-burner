@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: access-token-rb-{{.Iteration}}
+  labels:
+    kube-burner-job: access-tokens
+subjects:
+- kind: ServiceAccount
+  name: sa-{{.Iteration}}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: access-token-role
