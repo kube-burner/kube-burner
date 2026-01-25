@@ -68,6 +68,18 @@ teardown_file() {
   fi
 }
 
+@test "kube-burner hooks execution verification" {
+  export JOB_NAME="basic-hook-test"
+  run_cmd ${KUBE_BURNER} init -c test/kube-burner-hooks.yaml --uuid=${UUID} --log-level=debug
+
+  echo "Running verify_hooks_with_helpers for ${JOB_NAME}"
+  if ! verify_hooks_with_helpers test/kube-burner-hooks.yaml "${JOB_NAME}"; then
+    echo "verify_hooks_with_helpers failed, dumping hook logs for debugging:"
+    sed -n '1,200p' hook-onEachIteration.log 2>/dev/null || true
+    fail "Hook verification failed"
+  fi
+}
+
 # bats test_tags=subsystem:preload,subsystem:indexing
 @test "kube-burner.yml: preload=true; set-churn-mode=namespaces; set-gc=false" {
   export CRD=true
@@ -286,14 +298,3 @@ teardown_file() {
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
 }
 
-@test "kube-burner hooks execution verification" {
-  export JOB_NAME="basic-hook-test"
-  run_cmd ${KUBE_BURNER} init -c test/kube-burner-hooks.yaml --uuid=${UUID} --log-level=debug
-
-  echo "Running verify_hooks_with_helpers for ${JOB_NAME}"
-  if ! verify_hooks_with_helpers test/kube-burner-hooks.yaml "${JOB_NAME}"; then
-    echo "verify_hooks_with_helpers failed, dumping hook logs for debugging:"
-    sed -n '1,200p' hook-onEachIteration.log 2>/dev/null || true
-    fail "Hook verification failed"
-  fi
-}
