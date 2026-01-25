@@ -1,1 +1,0 @@
-[{"quantileName":"Ready","uuid":"5bee422d-5def-43ed-90e5-f6876ddba97f","P99":896886877,"P95":896886877,"P50":771323551,"min":675248926,"max":897995387,"avg":788667689,"timestamp":"2026-01-15T21:00:54.075302191Z","metricName":"svcLatencyQuantilesMeasurement","jobName":"perf-test-load","metadata":null}]

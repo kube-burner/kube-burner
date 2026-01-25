@@ -155,6 +155,7 @@ func (ex *JobExecutor) defaultHealthCheck(ctx context.Context) error {
 	if len(problems) > 0 {
 		return fmt.Errorf("cluster health issues: %s", strings.Join(problems, "; "))
 	}
+	log.Info("Cluster health check passed, proceeding to next step")
 	return nil
 }
 

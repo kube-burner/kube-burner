@@ -25,6 +25,16 @@ jobs:
     waitWhenFinished: true
     preLoadImages: true
     preLoadPeriod: 15s
+    incrementalLoad:
+      minIterations: 5
+      maxIterations: 300
+      stepDelay: 2s
+      pattern:
+        type: exponential
+        exponential:
+          base: 2
+          warmupSteps: 3
+          maxIncrease: 64
     churnConfig:
       cycles: {{.CHURN_CYCLES}}
       duration: {{.CHURN_DURATION}}
@@ -45,33 +55,33 @@ jobs:
       - objectTemplate: rolebinding.yml
         replicas: 1
 
-      - objectTemplate: serviceaccount.yml
-        replicas: 1
+      # - objectTemplate: serviceaccount.yml
+      #   replicas: 1
 
-      - objectTemplate: service.yml
-        replicas: 5
+      # - objectTemplate: service.yml
+      #   replicas: 5
 
-      - objectTemplate: secret.yml
-        replicas: 10
+      # - objectTemplate: secret.yml
+      #   replicas: 10
 
-      - objectTemplate: configmap.yml
-        replicas: 10
+      # - objectTemplate: configmap.yml
+      #   replicas: 10
 
-      - objectTemplate: np-deny-all.yml
-        replicas: 1
+      # - objectTemplate: np-deny-all.yml
+      #   replicas: 1
 
-      - objectTemplate: np-allow-from-clients.yml
-        replicas: 1
+      # - objectTemplate: np-allow-from-clients.yml
+      #   replicas: 1
 
-      - objectTemplate: np-allow-from-ingress.yml
-        replicas: 1
+      # - objectTemplate: np-allow-from-ingress.yml
+      #   replicas: 1
 
-      - objectTemplate: deployment-server.yml
-        replicas: 3
-        inputVars:
-          podReplicas: 2
+      # - objectTemplate: deployment-server.yml
+      #   replicas: 3
+      #   inputVars:
+      #     podReplicas: 2
 
-      - objectTemplate: deployment-client.yml
-        replicas: 2
-        inputVars:
-          podReplicas: 2
+      # - objectTemplate: deployment-client.yml
+      #   replicas: 2
+      #   inputVars:
+      #     podReplicas: 2

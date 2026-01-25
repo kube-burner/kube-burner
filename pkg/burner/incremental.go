@@ -50,13 +50,14 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 		if cfg.Pattern.Linear != nil {
 			step = cfg.Pattern.Linear.StepSize
 		}
+		totalSteps := int(math.Ceil(float64(maxIt - minIt) / float64(step)))
 		// derive step from MinSteps if provided
-		if cfg.MinSteps > 0 && step < cfg.MinSteps {
+		if cfg.Pattern.Linear.MinSteps > 0 && totalSteps < cfg.Pattern.Linear.MinSteps {
 			remaining := maxIt - minIt
 			if remaining <= 0 {
 				step = maxIt
 			} else {
-				step = int(math.Ceil(float64(remaining) / float64(cfg.MinSteps)))
+				step = int(math.Ceil(float64(remaining) / float64(cfg.Pattern.Linear.MinSteps)))
 			}
 		}
 		if step <= 0 {
@@ -74,9 +75,9 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 	default:
 		// default to linear behaviour
 		step := 0
-		if cfg.MinSteps > 0 {
+		if cfg.Pattern.Linear.MinSteps > 0 {
 			remaining := maxIt - minIt
-			step = int(math.Ceil(float64(remaining) / float64(cfg.MinSteps)))
+			step = int(math.Ceil(float64(remaining) / float64(cfg.Pattern.Linear.MinSteps)))
 		} 
 		if step <= 0 {
 			step = 1
@@ -93,7 +94,7 @@ type linearCalculator struct {
 }
 
 func (l *linearCalculator) Next(current int) (start, end int, done bool) {
-	if l.max <= 0 {
+	if l.max <= 0 || current == l.max {
 		return 0, 0, true
 	}
 	// first step: create min iterations
@@ -122,7 +123,7 @@ type exponentialCalculator struct {
 }
 
 func (e *exponentialCalculator) Next(current int) (start, end int, done bool) {
-	if e.max <= 0 {
+	if e.max <= 0 || current == e.max {
 		return 0, 0, true
 	}
 	// first step

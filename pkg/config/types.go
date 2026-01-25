@@ -222,8 +222,6 @@ type IncrementalLoad struct {
 	MinIterations int `yaml:"minIterations" json:"minIterations,omitempty"`
 	// MaxIterations maximum number of iterations to go upto
 	MaxIterations int `yaml:"maxIterations" json:"maxIterations,omitempty"`
-	// MinSteps minimum number of steps in the load
-	MinSteps int `yaml:"minSteps" json:"minSteps,omitempty"`
 	// StepDelay time delay between each incremental step
 	StepDelay time.Duration `yaml:"stepDelay" json:"stepDelay,omitempty"`
 	// Pattern load patterns
@@ -249,6 +247,8 @@ const (
 )
 
 type LinearLoadConfig struct {
+	// MinSteps minimum number of steps in the load
+	MinSteps int `yaml:"minSteps" json:"minSteps,omitempty"`
 	// StepSize step size in terms of iterations
 	StepSize int `yaml:"stepSize" json:"stepSize,omitempty"`
 }
