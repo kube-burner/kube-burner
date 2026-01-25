@@ -303,29 +303,7 @@ check_metrics_not_created_for_job() {
   fi
 }
 
-check_hooks_execution() {
-  local hook_name=$1
-  local expected_count=$2
-  local log_file="hook-${hook_name}.log"
-
-  if [ ! -f "$log_file" ]; then
-    echo "Hook log file not found: $log_file"
-    return 1
-  fi
-
-  actual_count=$(grep -c "Hook Execution:" "$log_file" 2>/dev/null || echo 0)
-
-  if [ "$actual_count" -ne "$expected_count" ]; then
-    echo "Hook $hook_name executed $actual_count times; expected $expected_count times"
-    return 1
-  else
-    echo "Hook $hook_name executed as expected: $actual_count times"
-    return 0
-  fi
-}
-
 # verify_hooks_with_helpers: high-level verifier compatible with check_hooks_execution
-# Usage: verify_hooks_with_helpers [config_file] [job_name]
 verify_hooks_with_helpers() {
   local config_file="${1:-test/hooks/config-basic-hooks.yaml}"
   local job_name="${2:-basic-hook-test}"
