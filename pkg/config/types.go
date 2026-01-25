@@ -169,6 +169,8 @@ type Job struct {
 	NamespacedIterations bool `yaml:"namespacedIterations" json:"namespacedIterations,omitempty"`
 	// IterationsPerNamespace is the modulus to apply to job iterations to calculate . Default 1
 	IterationsPerNamespace int `yaml:"iterationsPerNamespace" json:"iterationsPerNamespace,omitempty"`
+	// NamespaceDelay adds a configurable delay between creation of namespaces when iterationsPerNamespace is used
+	NamespaceDelay time.Duration `yaml:"namespaceDelay" json:"namespaceDelay,omitempty"`
 	// VerifyObjects verify object count after running the job
 	VerifyObjects bool `yaml:"verifyObjects" json:"verifyObjects,omitempty"`
 	// ErrorOnVerify exit when verification fails
