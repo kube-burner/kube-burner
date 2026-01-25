@@ -1,5 +1,6 @@
 global:
-  gc: false
+  gc: true
+  gcMetrics: true
   waitWhenFinished: false
 
 jobs:
@@ -11,29 +12,52 @@ jobs:
     namespace: hook-test
     namespacedIterations: true
     verifyObjects: true
+    preLoadImages: false
+    cleanup: true
     
-    # Hook configuration
     hooks:
-      # Before deployment starts
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeJobExecution"]
         when: beforeJobExecution
         background: false
       
-      # After deployment completes
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterJobExecution"]
         when: afterJobExecution
         background: false
       
-      # Before cleanup
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "onEachIteration"]
+        when: onEachIteration
+        background: false
+
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeChurn"]
+        when: beforeChurn
+        background: false
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterChurn"]
+        when: afterChurn
+        background: false
+      
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeCleanup"]
         when: beforeCleanup
         background: false
       
-      # On each iteration
-      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "onEachIteration"]
-        when: onEachIteration
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterCleanup"]
+        when: afterCleanup
         background: false
       
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeGC"]
+        when: beforeGC
+        background: false
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterGC"]
+        when: afterGC
+        background: false
+    
+    churnConfig:
+      duration: 10s
+      percent: 25
+      delay: 2s
+      mode: namespaces
+    
     objects:
       - objectTemplate: objectTemplates/hooks-test.yaml
         replicas: 2
