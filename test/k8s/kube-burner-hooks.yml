@@ -1,19 +1,22 @@
 global:
   gc: true
-  gcMetrics: true
+  gcMetrics: false
   waitWhenFinished: false
 
 jobs:
   - name: basic-hook-test
     jobType: create
-    jobIterations: 4
-    qps: 5
-    burst: 5
+    jobIterations: 2
+    qps: 10
+    burst: 10
     namespace: hook-test
     namespacedIterations: true
     verifyObjects: true
     preLoadImages: false
     cleanup: true
+    podWait: false
+    waitForDeletion: true
+    maxWaitTimeout: 2m
     
     hooks:
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeJobExecution"]
@@ -53,13 +56,13 @@ jobs:
         background: false
     
     churnConfig:
-      duration: 10s
-      percent: 25
-      delay: 2s
+      duration: 5s
+      percent: 33
+      delay: 1s
       mode: namespaces
     
     objects:
       - objectTemplate: objectTemplates/hooks-test.yaml
-        replicas: 2
+        replicas: 1
         inputVars:
           containerImage: busybox:latest

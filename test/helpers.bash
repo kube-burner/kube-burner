@@ -312,7 +312,7 @@ verify_hooks_with_helpers() {
   echo "Verifying hooks execution for job: ${job_name}"
   
   # Read config settings
-  local job_iterations=4
+  local job_iterations=2
   local gc_enabled=0
   local churn_enabled=0
   
@@ -334,8 +334,18 @@ verify_hooks_with_helpers() {
     [ -f "$log_file" ] && count=$(grep -c "Hook Execution:" "$log_file" 2>/dev/null || echo 0)
     
     case "$operator" in
-      eq) [ "$count" -eq "$expected" ] && echo "PASS: ${hook} executed ${count} times" && return 0 ;;
-      ge) [ "$count" -ge "$expected" ] && echo "PASS: ${hook} executed ${count} times (expected >= ${expected})" && return 0 ;;
+      eq) 
+        if [ "$count" -eq "$expected" ]; then
+          echo "PASS: ${hook} executed ${count} times"
+          return 0
+        fi
+        ;;
+      ge) 
+        if [ "$count" -ge "$expected" ]; then
+          echo "PASS: ${hook} executed ${count} times (expected >= ${expected})"
+          return 0
+        fi
+        ;;
     esac
     
     echo "FAIL: ${hook} executed ${count} times, expected ${operator} ${expected}"

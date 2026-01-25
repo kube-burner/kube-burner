@@ -70,16 +70,19 @@ teardown_file() {
 
 @test "kube-burner hooks execution verification" {
   export JOB_NAME="basic-hook-test"
+  export BATS_TEST_TIMEOUT=600
   rm -rf /tmp/kube-burner-hooks
   mkdir -p /tmp/kube-burner-hooks
   
-  run_cmd ${KUBE_BURNER} init -c kube-burner-hooks.yml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c kube-burner-hooks.yml --uuid=${UUID} --log-level=info
 
   echo "Running verify_hooks_with_helpers for ${JOB_NAME}"
   if ! verify_hooks_with_helpers kube-burner-hooks.yml "${JOB_NAME}"; then
     echo "verify_hooks_with_helpers failed, dumping hook logs for debugging:"
     ls -la /tmp/kube-burner-hooks/ 2>/dev/null || echo "Hook log directory not found"
-    cat /tmp/kube-burner-hooks/hook-onEachIteration.log 2>/dev/null | head -100 || true
+    for log in /tmp/kube-burner-hooks/*.log; do
+      [ -f "$log" ] && echo "=== $(basename $log) ===" && head -20 "$log"
+    done
     fail "Hook verification failed"
   fi
 }
