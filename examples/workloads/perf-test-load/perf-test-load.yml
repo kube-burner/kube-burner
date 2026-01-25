@@ -27,14 +27,13 @@ jobs:
     preLoadPeriod: 15s
     incrementalLoad:
       minIterations: 5
-      maxIterations: 300
+      maxIterations: 20
       stepDelay: 2s
       pattern:
-        type: exponential
-        exponential:
-          base: 2
-          warmupSteps: 3
-          maxIncrease: 64
+        type: linear
+        linear:
+          minSteps: 4
+          stepSize: 5
     churnConfig:
       cycles: {{.CHURN_CYCLES}}
       duration: {{.CHURN_DURATION}}

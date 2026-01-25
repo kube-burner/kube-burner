@@ -62,8 +62,7 @@ type JobExecutor struct {
 	deletionStrategy  string
 	objectOperations  int32
 	nsChurning        bool
-	// HealthCheckFunc is called between incremental steps to validate cluster health
-	HealthCheckFunc func(context.Context) error
+	HealthCheckFunc   func(context.Context) error
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
@@ -102,7 +101,6 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}
-	// default health check uses cluster-native validations
 	ex.HealthCheckFunc = ex.defaultHealthCheck
 	return ex
 }

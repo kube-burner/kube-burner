@@ -16,11 +16,13 @@ package burner
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // IterationCalculator returns the next iteration window for incremental runs.
@@ -50,7 +52,7 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 		if cfg.Pattern.Linear != nil {
 			step = cfg.Pattern.Linear.StepSize
 		}
-		totalSteps := int(math.Ceil(float64(maxIt - minIt) / float64(step)))
+		totalSteps := int(math.Ceil(float64(maxIt-minIt) / float64(step)))
 		// derive step from MinSteps if provided
 		if cfg.Pattern.Linear.MinSteps > 0 && totalSteps < cfg.Pattern.Linear.MinSteps {
 			remaining := maxIt - minIt
@@ -78,7 +80,7 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 		if cfg.Pattern.Linear.MinSteps > 0 {
 			remaining := maxIt - minIt
 			step = int(math.Ceil(float64(remaining) / float64(cfg.Pattern.Linear.MinSteps)))
-		} 
+		}
 		if step <= 0 {
 			step = 1
 		}
@@ -188,8 +190,24 @@ func RunIncrementalCreateJob(
 			return allErrs
 		}
 
-		// run executor health check if provided
-		if ex.HealthCheckFunc != nil {
+		if script := ex.IncrementalLoad.HealthCheckScript; ex.IncrementalLoad != nil && script != "" {
+			out, errOut, err := util.RunShellCmd(script, ex.embedCfg)
+			if out != nil {
+				log.Debugf("Health check script stdout: %s", out.String())
+			}
+			if errOut != nil {
+				log.Debugf("Health check script stderr: %s", errOut.String())
+			}
+			if err != nil {
+				stderr := ""
+				if errOut != nil {
+					stderr = errOut.String()
+				}
+				allErrs = append(allErrs, fmt.Errorf("health check script failed: %v; stderr: %s", err, stderr))
+				return allErrs
+			}
+			log.Info("Cluster health check script succeeded, proceeding to next step")
+		} else {
 			if err := ex.HealthCheckFunc(ctx); err != nil {
 				allErrs = append(allErrs, err)
 				return allErrs

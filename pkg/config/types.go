@@ -226,14 +226,16 @@ type IncrementalLoad struct {
 	StepDelay time.Duration `yaml:"stepDelay" json:"stepDelay,omitempty"`
 	// Pattern load patterns
 	Pattern LoadPattern `yaml:"pattern" json:"pattern,omitempty"`
+	// HealthCheckScript optional shell script to run as a health check between steps
+	HealthCheckScript string `yaml:"healthCheckScript" json:"healthCheckScript,omitempty"`
 }
 
 type LoadPattern struct {
 	// Type types of load
-	Type        LoadPatternType      `yaml:"type" json:"type,omitempty"`
+	Type LoadPatternType `yaml:"type" json:"type,omitempty"`
 	// Linear equation
-	Linear      *LinearLoadConfig     `yaml:"linear,omitempty" json:"linear,omitempty"`
-	// Exponential equation 
+	Linear *LinearLoadConfig `yaml:"linear,omitempty" json:"linear,omitempty"`
+	// Exponential equation
 	Exponential *ExponentialLoadConfig `yaml:"exponential,omitempty" json:"exponential,omitempty"`
 }
 
@@ -255,11 +257,11 @@ type LinearLoadConfig struct {
 
 type ExponentialLoadConfig struct {
 	// Base base of the exponential equation
-	Base         float64 `yaml:"base" json:"base,omitempty"`
+	Base float64 `yaml:"base" json:"base,omitempty"`
 	// MaxIncrease maximum tolerable increase in an exponential bump
-	MaxIncrease  int     `yaml:"maxIncrease" json:"maxIncrease,omitempty"`
+	MaxIncrease int `yaml:"maxIncrease" json:"maxIncrease,omitempty"`
 	// WarmupSteps number of steps to warm up before exponential load
-	WarmupSteps  int     `yaml:"warmupSteps" json:"warmupSteps,omitempty"`
+	WarmupSteps int `yaml:"warmupSteps" json:"warmupSteps,omitempty"`
 }
 
 type Watcher struct {
