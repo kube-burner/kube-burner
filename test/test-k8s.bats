@@ -70,10 +70,10 @@ teardown_file() {
 
 @test "kube-burner hooks execution verification" {
   export JOB_NAME="basic-hook-test"
-  run_cmd ${KUBE_BURNER} init -c test/kube-burner-hooks.yaml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c test/kube-burner-hooks.yml --uuid=${UUID} --log-level=debug
 
   echo "Running verify_hooks_with_helpers for ${JOB_NAME}"
-  if ! verify_hooks_with_helpers test/kube-burner-hooks.yaml "${JOB_NAME}"; then
+  if ! verify_hooks_with_helpers test/kube-burner-hooks.yml "${JOB_NAME}"; then
     echo "verify_hooks_with_helpers failed, dumping hook logs for debugging:"
     sed -n '1,200p' hook-onEachIteration.log 2>/dev/null || true
     fail "Hook verification failed"
