@@ -126,8 +126,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations); jobErrs != nil {
-					errs = append(errs, jobErrs...)
+				if jobCreateErrs := runCreateOrIncremental(ctx, jobExecutor); jobCreateErrs != nil {
+					errs = append(errs, jobCreateErrs...)
 					innerRC = 1
 				}
 				if ctx.Err() != nil {
@@ -288,6 +288,15 @@ func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *co
 		jobExecutor.gc(ctx, nil)
 	}
 	return nil
+}
+
+// runCreateOrIncremental depending on the job configuration.
+func runCreateOrIncremental(ctx context.Context, jobExecutor JobExecutor) []error {
+	if jobExecutor.IncrementalLoad != nil {
+		calculator := NewIterationCalculator(jobExecutor)
+		return RunIncrementalCreateJob(ctx, jobExecutor, calculator, jobExecutor.IncrementalLoad.StepDelay)
+	}
+	return jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations)
 }
 
 // If requests, preload the images used in the test into the node
