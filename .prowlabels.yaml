@@ -12,9 +12,9 @@ area:
   - 'docs'
   - 'security'
   - 'k8s'
+  - 'github_actions'
 
 kind:
-  - 'github_actions'
   - 'good first issue'
   - 'breaking-change'
   - 'bug'
