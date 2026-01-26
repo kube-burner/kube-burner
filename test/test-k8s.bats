@@ -42,7 +42,7 @@ setup() {
   export CHURN_CYCLES=0
   export PRELOAD_IMAGES=false
   export GC=true
-  export INCREMENTAL_LOAD=false
+  export INCREMENTAL_LOAD=""
   export JOBGC=false
   export LOCAL_INDEXING=""
   export ALERTING=""

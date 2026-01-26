@@ -108,18 +108,15 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 // defaultHealthCheck performs Kubernetes-native health checks that should work across distributions.
 func (ex *JobExecutor) defaultHealthCheck(ctx context.Context) error {
 	// 1) Check API server healthz
-	if ex.clientSet != nil {
-		// Use discovery REST client to call /healthz (works with kubernetes.Interface)
-		if discovery := ex.clientSet.Discovery(); discovery != nil {
-			if rc := discovery.RESTClient(); rc != nil {
-				if data, err := rc.Get().AbsPath("/healthz").DoRaw(ctx); err != nil {
-					return err
-				} else {
-					// common healthy response contains "ok"
-					s := string(data)
-					if !strings.Contains(strings.ToLower(s), "ok") {
-						return fmt.Errorf("apiserver health check failed: %s", s)
-					}
+	if discovery := ex.clientSet.Discovery(); discovery != nil {
+		if rc := discovery.RESTClient(); rc != nil {
+			if data, err := rc.Get().AbsPath("/healthz").DoRaw(ctx); err != nil {
+				return err
+			} else {
+				// common healthy response contains "ok"
+				s := string(data)
+				if !strings.Contains(strings.ToLower(s), "ok") {
+					return fmt.Errorf("apiserver health check failed: %s", s)
 				}
 			}
 		}

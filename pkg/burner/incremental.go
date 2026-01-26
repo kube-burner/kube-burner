@@ -38,15 +38,22 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 		minIt = ex.JobIterations
 	}
 	maxIt := cfg.MaxIterations
-	if maxIt <= 0 {
+	if maxIt < minIt {
 		maxIt = minIt
 	}
 	if maxIt <= 0 {
 		return &linearCalculator{min: 0, max: 0, step: 0}
 	}
-	switch cfg.Pattern.Type {
-	case config.LinearPattern:
-		step := 0
+	if cfg.Pattern.Type == config.ExponentialPattern {
+		base := 2.0
+		maxInc := cfg.Pattern.Exponential.MaxIncrease
+		warmup := cfg.Pattern.Exponential.WarmupSteps
+		if cfg.Pattern.Exponential != nil && cfg.Pattern.Exponential.Base > 0 {
+			base = cfg.Pattern.Exponential.Base
+		}
+		return &exponentialCalculator{min: minIt, max: maxIt, base: base, maxIncrease: maxInc, warmup: warmup, stepNo: 0}
+	} else {
+		step := 1
 		if cfg.Pattern.Linear != nil {
 			step = cfg.Pattern.Linear.StepSize
 		}
@@ -58,25 +65,6 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 			} else {
 				step = int(math.Ceil(float64(remaining) / float64(cfg.Pattern.Linear.MinSteps)))
 			}
-		}
-		if step <= 0 {
-			step = 1
-		}
-		return &linearCalculator{min: minIt, max: maxIt, step: step}
-	case config.ExponentialPattern:
-		base := 2.0
-		maxInc := cfg.Pattern.Exponential.MaxIncrease
-		warmup := cfg.Pattern.Exponential.WarmupSteps
-		if cfg.Pattern.Exponential != nil && cfg.Pattern.Exponential.Base > 0 {
-			base = cfg.Pattern.Exponential.Base
-		}
-		return &exponentialCalculator{min: minIt, max: maxIt, base: base, maxIncrease: maxInc, warmup: warmup, stepNo: 0}
-	default:
-		// default to linear behavior
-		step := 0
-		if cfg.Pattern.Linear.MinSteps > 0 {
-			remaining := maxIt - minIt
-			step = int(math.Ceil(float64(remaining) / float64(cfg.Pattern.Linear.MinSteps)))
 		}
 		if step <= 0 {
 			step = 1
@@ -160,14 +148,13 @@ func (e *exponentialCalculator) Next(current int) (start, end int, done bool) {
 }
 
 // RunIncrementalCreateJob executes incremental steps using the provided calculator.
-func RunIncrementalCreateJob(
+func (ex *JobExecutor) RunIncrementalCreateJob(
 	ctx context.Context,
-	ex JobExecutor,
 	calculator IterationCalculator,
-	stepDelay time.Duration,
 ) []error {
 
 	current := 0
+	stepDelay := ex.IncrementalLoad.StepDelay
 	var allErrs []error
 
 	for {
