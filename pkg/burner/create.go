@@ -126,7 +126,12 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
+
 	for i := iterationStart; i < iterationEnd; i++ {
+		// Execute onEachIteration hooks
+		if err := ex.hookManager.executeHooks(ex.Hooks, config.HookOnEachIteration); err != nil {
+			log.Errorf("Error executing %s hooks: %v", config.HookOnEachIteration, err)
+		}
 		if ctx.Err() != nil {
 			return []error{ctx.Err()}
 		}
@@ -385,6 +390,10 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	case config.ChurnObjects:
 		ex.churnObjects(ctx)
 	}
+	// Execute afterChurn hooks
+	if err := ex.hookManager.executeHooks(ex.Hooks, config.HookAfterChurn); err != nil {
+		log.Errorf("Error executing hooks for %s: %v", config.HookAfterChurn, err)
+	}
 	return nil
 }
 
@@ -451,6 +460,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		// Re-create objects that were deleted
 		log.Infof("Re-creating %d deleted namespaces", numToChurn)
+		// TODO: add hook before deployment here
 		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
 			errs = append(errs, jobErrs...)
 		}
