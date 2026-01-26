@@ -49,6 +49,7 @@ setup() {
   export CRD=""
   export SVC_LATENCY=""
   export JOB_NAME=kube-burner-ci-${BATS_TEST_NUMBER}
+  export HOOKS_IMAGE=busybox:latest
 }
 
 teardown() {

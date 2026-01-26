@@ -48,4 +48,4 @@ jobs:
       - objectTemplate: objectTemplates/hooks-test.yaml
         replicas: 1
         inputVars:
-          containerImage: busybox:latest
+          containerImage: {{ .HOOKS_IMAGE }}
