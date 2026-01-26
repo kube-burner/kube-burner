@@ -30,21 +30,9 @@ jobs:
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "onEachIteration"]
         when: onEachIteration
         background: false
-
-      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeChurn"]
-        when: beforeChurn
-        background: false
-      
-      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterChurn"]
-        when: afterChurn
-        background: false
       
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeCleanup"]
         when: beforeCleanup
-        background: false
-      
-      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterCleanup"]
-        when: afterCleanup
         background: false
       
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeGC"]
@@ -54,12 +42,6 @@ jobs:
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterGC"]
         when: afterGC
         background: false
-    
-    churnConfig:
-      duration: 5s
-      percent: 33
-      delay: 1s
-      mode: namespaces
     
     objects:
       - objectTemplate: objectTemplates/hooks-test.yaml

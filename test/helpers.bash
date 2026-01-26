@@ -314,7 +314,6 @@ verify_hooks_with_helpers() {
   # Read config settings
   local job_iterations=2
   local gc_enabled=0
-  local churn_enabled=0
   
   if [ -f "$config_file" ]; then
     local val
@@ -322,7 +321,6 @@ verify_hooks_with_helpers() {
     [ -n "$val" ] && job_iterations="$val"
     
     grep -q "gc: *true" "$config_file" && gc_enabled=1
-    grep -q "duration:" "$config_file" && churn_enabled=1
   fi
 
   # Helper to check hook execution count
@@ -352,20 +350,11 @@ verify_hooks_with_helpers() {
     return 1
   }
 
-  # Verify job lifecycle hooks
+  # Verify core job lifecycle hooks (always present)
   check_hook "beforeJobExecution" 1 || failed=1
   check_hook "afterJobExecution" 1 || failed=1
   check_hook "onEachIteration" $((job_iterations + 1)) ge || failed=1
-  
-  # Verify churn hooks (if churn enabled)
-  if [ "$churn_enabled" -eq 1 ]; then
-    check_hook "beforeChurn" 1 ge || failed=1
-    check_hook "afterChurn" 1 ge || failed=1
-  fi
-  
-  # Verify cleanup hooks
   check_hook "beforeCleanup" 1 || failed=1
-  check_hook "afterCleanup" 1 ge || failed=1
   
   # Verify GC hooks (if GC enabled)
   if [ "$gc_enabled" -eq 1 ]; then

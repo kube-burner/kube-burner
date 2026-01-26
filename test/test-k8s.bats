@@ -83,7 +83,7 @@ teardown_file() {
     for log in /tmp/kube-burner-hooks/*.log; do
       [ -f "$log" ] && echo "=== $(basename $log) ===" && head -20 "$log"
     done
-    fail "Hook verification failed"
+    return 1
   fi
 }
 
