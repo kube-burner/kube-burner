@@ -10,6 +10,7 @@ spec:
   containers:
   - name: pause
     image: {{.containerImage}}
+    command: ["sh", "-c", "exit 0"]
     resources:
       requests:
         memory: "32Mi"

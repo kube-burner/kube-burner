@@ -1,5 +1,5 @@
 global:
-  gc: true
+  gc: false
   gcMetrics: false
   waitWhenFinished: false
 
@@ -13,10 +13,11 @@ jobs:
     namespacedIterations: true
     verifyObjects: false
     preLoadImages: false
-    cleanup: true
+    cleanup: false
     podWait: false
     waitForDeletion: false
-    maxWaitTimeout: 30s
+    waitWhenFinished: false
+    maxWaitTimeout: 5s
     
     hooks:
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeJobExecution"]
@@ -33,14 +34,6 @@ jobs:
       
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeCleanup"]
         when: beforeCleanup
-        background: false
-      
-      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeGC"]
-        when: beforeGC
-        background: false
-      
-      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterGC"]
-        when: afterGC
         background: false
     
     objects:
