@@ -28,6 +28,9 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -96,7 +99,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		log.Errorf("failed to convert to Service: %v", err)
 		return
 	}
-	if annotation, ok := svc.Annotations["kube-burner.io/service-latency"]; ok {
+	if annotation, ok := svc.Annotations[config.KubeBurnerLabelServiceLatency]; ok {
 		if annotation == "false" {
 			log.Debugf("Annotation found, discarding service %v/%v", svc.Namespace, svc.Name)
 		}
@@ -199,11 +202,20 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	// Create shared informer factory for typed clients
 	clientset := kubernetes.NewForConfigOrDie(s.RestConfig)
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	// EndpointSlice/Service lister & informer from typed client
-	s.epsLister = factory.Discovery().V1().EndpointSlices().Lister()
-	s.svcLister = factory.Core().V1().Services().Lister()
+
+	// EndpointSlice lister & informer from typed client
 	epsInformer := factory.Discovery().V1().EndpointSlices().Informer()
+	if err := epsInformer.SetTransform(endpointSliceTransformFunc()); err != nil {
+		log.Warnf("failed to set EndpointSlice transform: %v", err)
+	}
+	s.epsLister = ldiscoveryv1.NewEndpointSliceLister(epsInformer.GetIndexer())
+
+	//Service lister & informer from typed client
 	svcInformer := factory.Core().V1().Services().Informer()
+	if err := svcInformer.SetTransform(serviceTypedTransformFunc()); err != nil {
+		log.Warnf("failed to set Service transform: %v", err)
+	}
+	s.svcLister = lcorev1.NewServiceLister(svcInformer.GetIndexer())
 
 	// Start the informer
 	s.stopInformerCh = make(chan struct{})
@@ -224,6 +236,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 			handlers: &cache.ResourceEventHandlerFuncs{
 				AddFunc: s.handleCreateSvc,
 			},
+			transform: serviceTransformFunc(),
 		},
 	})
 	return nil
@@ -320,4 +333,88 @@ func (s *serviceLatency) Collect(measurementWg *sync.WaitGroup) {
 func (s *serviceLatency) IsCompatible() bool {
 	_, exists := supportedServiceLatencyJobTypes[s.JobConfig.JobType]
 	return exists
+}
+
+// serviceTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid, creationTimestamp, labels, annotations (config.KubeBurnerLabelServiceLatency only)
+// - spec: type, clusterIPs, ports
+// - status: loadBalancer.ingress
+func serviceTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return obj, nil
+		}
+
+		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
+
+		if annotations := u.GetAnnotations(); annotations != nil {
+			if val, exists := annotations[config.KubeBurnerLabelServiceLatency]; exists {
+				_ = unstructured.SetNestedField(minimal.Object, map[string]interface{}{
+					config.KubeBurnerLabelServiceLatency: val,
+				}, "metadata", "annotations")
+			}
+		}
+
+		if svcType, found, _ := unstructured.NestedString(u.Object, "spec", "type"); found {
+			_ = unstructured.SetNestedField(minimal.Object, svcType, "spec", "type")
+		}
+		if clusterIPs, found, _ := unstructured.NestedStringSlice(u.Object, "spec", "clusterIPs"); found {
+			ips := make([]interface{}, len(clusterIPs))
+			for i, ip := range clusterIPs {
+				ips[i] = ip
+			}
+			_ = unstructured.SetNestedSlice(minimal.Object, ips, "spec", "clusterIPs")
+		}
+		if ports, found, _ := unstructured.NestedSlice(u.Object, "spec", "ports"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, ports, "spec", "ports")
+		}
+		if ingress, found, _ := unstructured.NestedSlice(u.Object, "status", "loadBalancer", "ingress"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, ingress, "status", "loadBalancer", "ingress")
+		}
+
+		return minimal, nil
+	}
+}
+
+// serviceTypedTransformFunc preserves the following fields for typed Service informer:
+// - metadata: name, namespace, uid
+// - status: loadBalancer (needed for waitForIngress)
+func serviceTypedTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		svc, ok := obj.(*corev1.Service)
+		if !ok {
+			return obj, nil
+		}
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      svc.Name,
+				Namespace: svc.Namespace,
+				UID:       svc.UID,
+			},
+			Status: corev1.ServiceStatus{
+				LoadBalancer: svc.Status.LoadBalancer,
+			},
+		}, nil
+	}
+}
+
+// endpointSliceTransformFunc preserves the following fields for typed EndpointSlice informer:
+// - metadata: name, namespace, labels (needed for label selector lookup)
+// - endpoints (needed to check addresses in waitForEndpointSlices)
+func endpointSliceTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		eps, ok := obj.(*discoveryv1.EndpointSlice)
+		if !ok {
+			return obj, nil
+		}
+		return &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      eps.Name,
+				Namespace: eps.Namespace,
+				Labels:    eps.Labels,
+			},
+			Endpoints: eps.Endpoints,
+		}, nil
+	}
 }
