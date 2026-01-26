@@ -13,7 +13,7 @@ jobs:
     namespacedIterations: true
     verifyObjects: false
     preLoadImages: false
-    cleanup: false
+    cleanup: true
     podWait: false
     waitForDeletion: false
     waitWhenFinished: false
@@ -34,6 +34,14 @@ jobs:
       
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeCleanup"]
         when: beforeCleanup
+        background: false
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeGC"]
+        when: beforeGC
+        background: false
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterGC"]
+        when: afterGC
         background: false
     
     objects:
