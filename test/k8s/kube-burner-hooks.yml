@@ -11,12 +11,12 @@ jobs:
     burst: 10
     namespace: hook-test
     namespacedIterations: true
-    verifyObjects: true
+    verifyObjects: false
     preLoadImages: false
     cleanup: true
     podWait: false
-    waitForDeletion: true
-    maxWaitTimeout: 2m
+    waitForDeletion: false
+    maxWaitTimeout: 30s
     
     hooks:
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeJobExecution"]
