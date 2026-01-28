@@ -174,14 +174,15 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 		}
 
 		// Check if resize completed by comparing capacity
-		if pvc.Status.Capacity != nil && pm.Size != "" {
+		if pvc.Status.Capacity != nil {
 			currentCapacity := pvc.Status.Capacity.Storage().String()
-			// Resize considered complete only when capacity actually changed
-			if pm.resizeStarted > 0 && pm.ResizeLatency == 0 && currentCapacity != pm.Size {
-				pm.ResizeLatency = int(time.Now().UTC().UnixMilli() - pm.resizeStarted)
-				pm.ResizedCapacity = currentCapacity
-				log.Debugf("PVC %s resize completed: %s -> %s in %dms",
-					pvc.Name, pm.Size, currentCapacity, pm.ResizeLatency)
+			if currentCapacity != pm.Size {
+				if pm.resizeStarted > 0 && pm.ResizeLatency == 0 {
+					pm.ResizeLatency = int(time.Now().UTC().UnixMilli() - pm.resizeStarted)
+					pm.ResizedCapacity = currentCapacity
+					log.Debugf("PVC %s resize completed: %s -> %s in %dms",
+						pvc.Name, pm.Size, currentCapacity, pm.ResizeLatency)
+				}
 			}
 		}
 
@@ -192,7 +193,7 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 // start pvcLatency measurement
 func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	if p.JobConfig.JobType == config.ReadJob || p.JobConfig.JobType == config.DeletionJob {
+	if p.JobConfig.JobType == config.ReadJob {
 		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
 	}
 	gvr, err := util.ResourceToGVR(p.RestConfig, "PersistentVolumeClaim", "v1")
@@ -306,7 +307,8 @@ func (p *pvcLatency) IsCompatible() bool {
 
 // pvcTransformFunc preserves the following fields for latency measurements:
 // - metadata: name, namespace, uid, creationTimestamp, labels
-// - status: phase, conditions
+// - spec: resources, storageClassName
+// - status: phase, conditions ,capacity
 func pvcTransformFunc() cache.TransformFunc {
 	return func(obj interface{}) (interface{}, error) {
 		u, ok := obj.(*unstructured.Unstructured)
@@ -316,11 +318,23 @@ func pvcTransformFunc() cache.TransformFunc {
 
 		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
+		// Preserve spec fields
+		if resources, found, _ := unstructured.NestedMap(u.Object, "spec", "resources"); found {
+			_ = unstructured.SetNestedMap(minimal.Object, resources, "spec", "resources")
+		}
+		if storageClassName, found, _ := unstructured.NestedString(u.Object, "spec", "storageClassName"); found {
+			_ = unstructured.SetNestedField(minimal.Object, storageClassName, "spec", "storageClassName")
+		}
+
+		// Preserve status fields
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
 		}
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
+		}
+		if capacity, found, _ := unstructured.NestedMap(u.Object, "status", "capacity"); found {
+			_ = unstructured.SetNestedMap(minimal.Object, capacity, "status", "capacity")
 		}
 
 		return minimal, nil
