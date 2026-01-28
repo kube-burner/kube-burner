@@ -245,6 +245,12 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 
 	p.Metrics.Range(func(key, value any) bool {
 		m := value.(pvcMetric)
+
+		// Skip PVCs with incomplete resize (same pattern as job/volumeSnapshot/dataVolume)
+		if m.resizeStarted > 0 && m.ResizeLatency == 0 {
+			log.Warningf("PVC %v resize latency ignored as it did not complete", m.Name)
+			return true
+		}
 		// If a pvc does not reach the stable state, we skip that one
 		if m.bound == 0 && m.lost == 0 {
 			log.Tracef("PVC %v latency ignored as it did not reach a stable state", m.Name)
