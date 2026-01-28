@@ -259,13 +259,15 @@ const (
 )
 
 const (
-	KubeBurnerLabelJob          = "kube-burner.io/job"
-	KubeBurnerLabelUUID         = "kube-burner.io/uuid"
-	KubeBurnerLabelRunID        = "kube-burner.io/runid"
-	KubeBurnerLabelIndex        = "kube-burner.io/index"
-	KubeBurnerLabelJobIteration = "kube-burner.io/job-iteration"
-	KubeBurnerLabelReplica      = "kube-burner.io/replica"
-	KubeBurnerLabelChurnDelete  = "kube-burner.io/churn-delete"
+	KubeBurnerLabelJob                      = "kube-burner.io/job"
+	KubeBurnerLabelUUID                     = "kube-burner.io/uuid"
+	KubeBurnerLabelRunID                    = "kube-burner.io/runid"
+	KubeBurnerLabelIndex                    = "kube-burner.io/index"
+	KubeBurnerLabelJobIteration             = "kube-burner.io/job-iteration"
+	KubeBurnerLabelReplica                  = "kube-burner.io/replica"
+	KubeBurnerLabelChurnDelete              = "kube-burner.io/churn-delete"
+	KubeBurnerLabelServiceLatency           = "kube-burner.io/service-latency"
+	KubeBurnerLabelSkipNetworkPolicyLatency = "kube-burner.io/skip-networkpolicy-latency"
 )
 
 // MetricsCLosing strategy

@@ -306,8 +306,7 @@ func (p *pvcLatency) IsCompatible() bool {
 
 // pvcTransformFunc preserves the following fields for latency measurements:
 // - metadata: name, namespace, uid, creationTimestamp, labels
-// - spec: resources, storageClassName
-// - status: phase, conditions, capacity
+// - status: phase, conditions
 func pvcTransformFunc() cache.TransformFunc {
 	return func(obj interface{}) (interface{}, error) {
 		u, ok := obj.(*unstructured.Unstructured)
@@ -317,23 +316,11 @@ func pvcTransformFunc() cache.TransformFunc {
 
 		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
-		// Preserve spec fields
-		if resources, found, _ := unstructured.NestedMap(u.Object, "spec", "resources"); found {
-			_ = unstructured.SetNestedMap(minimal.Object, resources, "spec", "resources")
-		}
-		if storageClassName, found, _ := unstructured.NestedString(u.Object, "spec", "storageClassName"); found {
-			_ = unstructured.SetNestedField(minimal.Object, storageClassName, "spec", "storageClassName")
-		}
-
-		// Preserve status fields
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
 		}
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
-		}
-		if capacity, found, _ := unstructured.NestedMap(u.Object, "status", "capacity"); found {
-			_ = unstructured.SetNestedMap(minimal.Object, capacity, "status", "capacity")
 		}
 
 		return minimal, nil

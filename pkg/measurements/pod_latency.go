@@ -223,6 +223,9 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 		},
 	)
 	eventInformer := cache.NewSharedIndexInformer(lw, &corev1.Event{}, 0, cache.Indexers{})
+	if err := eventInformer.SetTransform(eventTransformFunc()); err != nil {
+		log.Warnf("failed to set event transform: %v", err)
+	}
 	p.stopInformerCh = make(chan struct{})
 	go eventInformer.Run(p.stopInformerCh)
 	if !cache.WaitForCacheSync(p.stopInformerCh, eventInformer.HasSynced) {
@@ -241,6 +244,7 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 						p.handleUpdatePod(newObj)
 					},
 				},
+				transform: PodTransformFunc(),
 			},
 		},
 	)
@@ -382,4 +386,33 @@ func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 func (p *podLatency) IsCompatible() bool {
 	_, exists := supportedPodLatencyJobTypes[p.JobConfig.JobType]
 	return exists
+}
+
+// eventTransformFunc preserves the following fields for latency measurements:
+// - metadata: name, namespace, uid
+// - involvedObject: uid
+// - reason, eventTime
+func eventTransformFunc() cache.TransformFunc {
+	return func(obj interface{}) (interface{}, error) {
+		event, ok := obj.(*corev1.Event)
+		if !ok {
+			return obj, nil
+		}
+
+		// Create minimal event with only fields needed for latency measurement
+		minimal := &corev1.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      event.Name,
+				Namespace: event.Namespace,
+				UID:       event.UID,
+			},
+			InvolvedObject: corev1.ObjectReference{
+				UID: event.InvolvedObject.UID,
+			},
+			Reason:    event.Reason,
+			EventTime: event.EventTime,
+		}
+
+		return minimal, nil
+	}
 }

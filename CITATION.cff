@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+title: "Into the Fire: Delving into Kubernetes Performance and Scale with Kube-burner"
+authors:
+  - family-names: "Malleni"
+    given-names: "Sai Sindhur"
+  - family-names: "Sevilla Canavate"
+    given-names: "Raul"
+  - family-names: "Challa"
+    given-names: "Vishnu"
+doi: "10.1145/3629527.3651405"
+url: "https://doi.org/10.1145/3629527.3651405"
+repository-code: "https://github.com/kube-burner/kube-burner"
+date-released: "2024"
+message: "If you use this repository or code associated with this work in your research, please cite the associated ACM ICPE 2024 paper."
