@@ -185,17 +185,25 @@ func (bm *BaseMeasurement) calculateQuantiles(getLatency func(any) map[string]fl
 			quantileMap[condition] = append(quantileMap[condition], latency)
 		}
 	}
-	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
-		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
+	calcSummary := func(name string, inputLatencies []float64) (metrics.LatencyQuantiles, error) {
+		latencySummary, err := metrics.NewLatencySummary(inputLatencies, name)
+		if err != nil {
+			return latencySummary, err
+		}
 		latencySummary.UUID = bm.Uuid
 		latencySummary.Metadata = bm.Metadata
 		latencySummary.MetricName = bm.QuantilesMeasurementName
 		latencySummary.JobName = bm.JobConfig.Name
-		return latencySummary
+		return latencySummary, nil
 	}
 
 	bm.LatencyQuantiles = make([]any, 0, len(quantileMap))
 	for condition, latencies := range quantileMap {
-		bm.LatencyQuantiles = append(bm.LatencyQuantiles, calcSummary(condition, latencies))
+		summary, err := calcSummary(condition, latencies)
+		if err != nil {
+			log.Warnf("Failed to calculate latency summary for %s: %v", condition, err)
+			continue
+		}
+		bm.LatencyQuantiles = append(bm.LatencyQuantiles, summary)
 	}
 }

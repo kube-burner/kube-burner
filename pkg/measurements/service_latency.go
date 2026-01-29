@@ -274,20 +274,31 @@ func (s *serviceLatency) normalizeMetrics() {
 		}
 		return true
 	})
-	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
-		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
+	calcSummary := func(name string, inputLatencies []float64) (metrics.LatencyQuantiles, error) {
+		latencySummary, err := metrics.NewLatencySummary(inputLatencies, name)
+		if err != nil {
+			return latencySummary, err
+		}
 		latencySummary.UUID = s.Uuid
 		latencySummary.Timestamp = time.Now().UTC()
 		latencySummary.Metadata = s.Metadata
 		latencySummary.MetricName = svcLatencyQuantilesMeasurement
 		latencySummary.JobName = s.JobConfig.Name
-		return latencySummary
+		return latencySummary, nil
 	}
 	if sLen > 0 {
-		s.LatencyQuantiles = append(s.LatencyQuantiles, calcSummary("Ready", latencies))
+		if summary, err := calcSummary("Ready", latencies); err != nil {
+			log.Warnf("Failed to calculate Ready latency summary: %v", err)
+		} else {
+			s.LatencyQuantiles = append(s.LatencyQuantiles, summary)
+		}
 	}
 	if len(ipAssignedLatencies) > 0 {
-		s.LatencyQuantiles = append(s.LatencyQuantiles, calcSummary("IPAssigned", ipAssignedLatencies))
+		if summary, err := calcSummary("IPAssigned", ipAssignedLatencies); err != nil {
+			log.Warnf("Failed to calculate IPAssigned latency summary: %v", err)
+		} else {
+			s.LatencyQuantiles = append(s.LatencyQuantiles, summary)
+		}
 	}
 }
 
