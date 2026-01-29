@@ -124,7 +124,7 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 	}
 	for _, q := range bm.LatencyQuantiles {
 		pq := q.(metrics.LatencyQuantiles)
-		log.Infof("%s: %v 99th: %vms max: %vms avg: %vms", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
+		log.Infof("%s: %v 99th: %v ms max: %v ms avg: %v ms", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 0 {
 		log.Infof("%v error rate was: %.2f", bm.MeasurementName, errorRate)
