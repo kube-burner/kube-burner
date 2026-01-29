@@ -16,10 +16,12 @@ package burner
 
 import (
 	"sync"
+	"time"
 
 	"maps"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/dashboard"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
@@ -55,23 +57,27 @@ type JobExecutor struct {
 	functionTemplates []string
 	embedCfg          *fileutils.EmbedConfiguration
 	mapper            *restmapper.DeferredDiscoveryRESTMapper
-	deletionStrategy  string
-	objectOperations  int32
-	nsChurning        bool
+	deletionStrategy   string
+	objectOperations   int32
+	nsChurning         bool
+	dashboardCollector *dashboard.Collector
+	startTime          time.Time
 }
 
-func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
+func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration, dashboardCollector *dashboard.Collector) JobExecutor {
 	ex := JobExecutor{
-		Job:               job,
-		createdNamespaces: make(map[string]bool),
-		limiter:           rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
-		uuid:              configSpec.GlobalConfig.UUID,
-		runid:             configSpec.GlobalConfig.RUNID,
-		waitLimiter:       rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
-		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
-		embedCfg:          embedCfg,
-		deletionStrategy:  configSpec.GlobalConfig.DeletionStrategy,
-		objectOperations:  0,
+		Job:                job,
+		createdNamespaces:  make(map[string]bool),
+		limiter:            rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		uuid:               configSpec.GlobalConfig.UUID,
+		runid:              configSpec.GlobalConfig.RUNID,
+		waitLimiter:        rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
+		functionTemplates:  configSpec.GlobalConfig.FunctionTemplates,
+		embedCfg:           embedCfg,
+		deletionStrategy:   configSpec.GlobalConfig.DeletionStrategy,
+		objectOperations:   0,
+		dashboardCollector: dashboardCollector,
+		startTime:          time.Now(),
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)

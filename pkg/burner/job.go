@@ -21,11 +21,13 @@ import (
 	"math"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/cloud-bulldozer/go-commons/v2/version"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/dashboard"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
 	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
@@ -85,11 +87,42 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
 	defer cancel()
+
+	// Initialize dashboard if enabled
+	var dashboardServer *dashboard.Server
+	var dashboardCollector *dashboard.Collector
+	if globalConfig.Dashboard.Enabled {
+		broadcaster := dashboard.NewBroadcaster()
+		dashboardCollector = dashboard.NewCollector(broadcaster, len(configSpec.Jobs))
+		dashboardCollector.SetRunInfo(uuid, globalConfig.RUNID)
+
+		dashboardServer = dashboard.NewServer(broadcaster, dashboardCollector, globalConfig.Dashboard.Address, globalConfig.Dashboard.Port)
+
+		// Start dashboard server in background
+		go func() {
+			if err := dashboardServer.Start(ctx); err != nil {
+				log.Warnf("Dashboard failed to start: %v", err)
+				log.Warn("Continuing without dashboard")
+			}
+		}()
+
+		// Ensure graceful shutdown of dashboard
+		defer func() {
+			if dashboardServer != nil {
+				shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer shutdownCancel()
+				if err := dashboardServer.Shutdown(shutdownCtx); err != nil {
+					log.Debugf("Dashboard shutdown error: %v", err)
+				}
+			}
+		}()
+	}
+
 	go func() {
 		var innerRC int
 		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
-		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
+		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg, dashboardCollector)
 		handlePreloadImages(jobExecutors, kubeClientProvider)
 		// Iterate job list
 		var measurementsInstance *measurements.Measurements
@@ -111,6 +144,15 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsJobName = jobExecutor.Name
 				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg, fmt.Sprintf("%s=%s", config.KubeBurnerLabelRunID, globalConfig.RUNID))
 				measurementsInstance.Start()
+
+				// Start dashboard measurement polling if enabled
+				if dashboardCollector != nil {
+					pollingInterval := 2 * time.Second
+					if globalConfig.Dashboard.UpdateInterval > 0 {
+						pollingInterval = globalConfig.Dashboard.UpdateInterval
+					}
+					go dashboardCollector.StartMeasurementPolling(ctx, measurementsInstance, pollingInterval)
+				}
 			}
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
@@ -186,6 +228,18 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := jobEnd.Sub(executedJobs[jobExecutorIdx].Start).Round(time.Second)
 				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
+
+				// Notify dashboard of job completion
+				if dashboardCollector != nil {
+					dashboardCollector.UpdateJobProgress(jobExecutor.Name, dashboard.JobProgress{
+						JobName:          jobExecutor.Name,
+						CurrentIteration: jobExecutor.JobIterations,
+						TotalIterations:  jobExecutor.JobIterations,
+						PercentComplete:  100.0,
+						Phase:            "complete",
+						ObjectsCreated:   atomic.LoadInt32(&jobExecutor.objectOperations),
+					})
+				}
 			}
 			if !jobExecutor.MetricsAggregate {
 				// We stop and index measurements per job
@@ -283,7 +337,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 }
 
 func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) error {
-	jobExecutors := newExecutorList(configSpec, kubeClientProvider, nil)
+	jobExecutors := newExecutorList(configSpec, kubeClientProvider, nil, nil)
 	for _, jobExecutor := range jobExecutors {
 		jobExecutor.gc(ctx, nil)
 	}
@@ -375,11 +429,11 @@ func verifyJobDefaults(job *config.Job, defaultTimeout time.Duration) {
 }
 
 // newExecutorList Returns a list of executors
-func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration) []JobExecutor {
+func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration, dashboardCollector *dashboard.Collector) []JobExecutor {
 	var executorList []JobExecutor
 	for _, job := range configSpec.Jobs {
 		verifyJobDefaults(&job, configSpec.GlobalConfig.Timeout)
-		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job, embedCfg))
+		executorList = append(executorList, newExecutor(configSpec, kubeClientProvider, job, embedCfg, dashboardCollector))
 	}
 	return executorList
 }

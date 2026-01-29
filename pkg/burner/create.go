@@ -33,6 +33,7 @@ import (
 	"maps"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/dashboard"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -132,6 +133,27 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		if ex.JobIterations > 1 && i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
+
+			// Publish progress to dashboard if enabled
+			if ex.dashboardCollector != nil {
+				currentObjects := atomic.LoadInt32(&ex.objectOperations)
+				elapsedTime := time.Since(ex.startTime)
+				qps := 0.0
+				if elapsedTime.Seconds() > 0 {
+					qps = float64(currentObjects) / elapsedTime.Seconds()
+				}
+
+				ex.dashboardCollector.UpdateJobProgress(ex.Name, dashboard.JobProgress{
+					JobName:          ex.Name,
+					CurrentIteration: i - iterationStart,
+					TotalIterations:  iterationEnd - iterationStart,
+					ObjectsCreated:   currentObjects,
+					PercentComplete:  float64(percent) * 10.0,
+					QPS:              qps,
+					Phase:            "running",
+				})
+			}
+
 			percent++
 		}
 		if ex.nsRequired && ex.NamespacedIterations {
