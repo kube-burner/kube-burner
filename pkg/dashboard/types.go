@@ -34,6 +34,18 @@ const (
 	MessageTypeSnapshot MessageType = "snapshot"
 )
 
+// Job phase constants
+const (
+	// PhaseRunning indicates the job is actively running
+	PhaseRunning = "running"
+	// PhaseChurning indicates the job is in churning phase
+	PhaseChurning = "churning"
+	// PhaseVerifying indicates the job is verifying resources
+	PhaseVerifying = "verifying"
+	// PhaseComplete indicates the job has completed
+	PhaseComplete = "complete"
+)
+
 // Message represents a WebSocket message sent to clients
 type Message struct {
 	Type      MessageType `json:"type"`

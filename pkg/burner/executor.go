@@ -41,22 +41,22 @@ type ObjectFinalizer func(ex *JobExecutor, obj *object)
 
 type JobExecutor struct {
 	config.Job
-	objects           []*object
-	createdNamespaces map[string]bool
-	uuid              string
-	runid             string
-	limiter           *rate.Limiter
-	waitLimiter       *rate.Limiter
-	nsRequired        bool
-	itemHandler       ItemHandler
-	objectFinalizer   ObjectFinalizer
-	clientSet         kubernetes.Interface
-	restConfig        *rest.Config
-	dynamicClient     *dynamic.DynamicClient
-	kubeVirtClient    kubecli.KubevirtClient
-	functionTemplates []string
-	embedCfg          *fileutils.EmbedConfiguration
-	mapper            *restmapper.DeferredDiscoveryRESTMapper
+	objects            []*object
+	createdNamespaces  map[string]bool
+	uuid               string
+	runid              string
+	limiter            *rate.Limiter
+	waitLimiter        *rate.Limiter
+	nsRequired         bool
+	itemHandler        ItemHandler
+	objectFinalizer    ObjectFinalizer
+	clientSet          kubernetes.Interface
+	restConfig         *rest.Config
+	dynamicClient      *dynamic.DynamicClient
+	kubeVirtClient     kubecli.KubevirtClient
+	functionTemplates  []string
+	embedCfg           *fileutils.EmbedConfiguration
+	mapper             *restmapper.DeferredDiscoveryRESTMapper
 	deletionStrategy   string
 	objectOperations   int32
 	nsChurning         bool

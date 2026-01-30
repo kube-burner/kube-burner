@@ -74,7 +74,7 @@ func (c *Collector) UpdateJobProgress(jobName string, progress JobProgress) {
 	c.jobProgress[jobName] = &progress
 
 	// Track completed jobs
-	if progress.Phase == "complete" {
+	if progress.Phase == PhaseComplete {
 		atomic.AddInt32(&c.completedJobs, 1)
 	}
 
@@ -196,7 +196,7 @@ func (c *Collector) CalculateETA() time.Duration {
 
 	// Add fractional progress from currently running jobs
 	for _, progress := range c.jobProgress {
-		if progress.Phase == "running" || progress.Phase == "churning" || progress.Phase == "verifying" {
+		if progress.Phase == PhaseRunning || progress.Phase == PhaseChurning || progress.Phase == PhaseVerifying {
 			completedWork += progress.PercentComplete / 100.0
 		}
 	}
@@ -226,7 +226,7 @@ func (c *Collector) calculateOverallProgress() float64 {
 
 	// Add fractional progress from currently running jobs
 	for _, progress := range c.jobProgress {
-		if progress.Phase == "running" || progress.Phase == "churning" || progress.Phase == "verifying" {
+		if progress.Phase == PhaseRunning || progress.Phase == PhaseChurning || progress.Phase == PhaseVerifying {
 			completedWork += progress.PercentComplete / 100.0
 		}
 	}
@@ -252,7 +252,7 @@ func (c *Collector) GetSnapshot() DashboardSnapshot {
 	// Calculate current QPS
 	var currentQPS float64
 	for _, progress := range c.jobProgress {
-		if progress.Phase == "running" {
+		if progress.Phase == PhaseRunning {
 			currentQPS += progress.QPS
 		}
 	}

@@ -236,7 +236,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 						CurrentIteration: jobExecutor.JobIterations,
 						TotalIterations:  jobExecutor.JobIterations,
 						PercentComplete:  100.0,
-						Phase:            "complete",
+						Phase:            dashboard.PhaseComplete,
 						ObjectsCreated:   atomic.LoadInt32(&jobExecutor.objectOperations),
 					})
 				}

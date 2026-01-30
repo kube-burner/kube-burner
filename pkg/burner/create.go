@@ -150,7 +150,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 					ObjectsCreated:   currentObjects,
 					PercentComplete:  float64(percent) * 10.0,
 					QPS:              qps,
-					Phase:            "running",
+					Phase:            dashboard.PhaseRunning,
 				})
 			}
 
