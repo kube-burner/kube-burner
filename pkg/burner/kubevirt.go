@@ -134,7 +134,11 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	switch obj.KubeVirtOp {
 	case config.KubeVirtOpStart:
 		options := kubevirtV1.StartOptions{}
-		startPaused := util.GetBoolValue(obj.InputVars, "startPaused")
+		startPaused, err := util.GetBoolValue(obj.InputVars, "startPaused")
+		if err != nil {
+			log.Errorf("Error getting startPaused: %v", err)
+			return
+		}
 		if startPaused != nil {
 			options.Paused = *startPaused
 			operationConfig = supportedOps[config.KubeVirtOpPause]
@@ -142,7 +146,11 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Start(context.Background(), item.GetName(), &options)
 	case config.KubeVirtOpStop:
 		stopOpts := &kubevirtV1.StopOptions{}
-		force := util.GetBoolValue(obj.InputVars, "force")
+		force, err := util.GetBoolValue(obj.InputVars, "force")
+		if err != nil {
+			log.Errorf("Error getting force: %v", err)
+			return
+		}
 		if force != nil && *force {
 			gracePeriod := int64(0)
 			stopOpts.GracePeriod = &gracePeriod
@@ -150,7 +158,11 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Stop(context.Background(), item.GetName(), stopOpts)
 	case config.KubeVirtOpRestart:
 		restartOpts := &kubevirtV1.RestartOptions{}
-		force := util.GetBoolValue(obj.InputVars, "force")
+		force, err := util.GetBoolValue(obj.InputVars, "force")
+		if err != nil {
+			log.Errorf("Error getting force: %v", err)
+			return
+		}
 		if force != nil && *force {
 			gracePeriod := int64(0)
 			restartOpts.GracePeriodSeconds = &gracePeriod
@@ -243,21 +255,36 @@ func getVolumeSourceFromVolume(ex *JobExecutor, volumeName, namespace string) (*
 }
 
 func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
-	volumeName := util.GetStringValue(extraArgs, "volumeName")
+	volumeName, err := util.GetStringValue(extraArgs, "volumeName")
+	if err != nil {
+		return err
+	}
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
 	}
 
-	diskTypePtr := util.GetStringValue(extraArgs, "diskType")
+	diskTypePtr, err := util.GetStringValue(extraArgs, "diskType")
+	if err != nil {
+		return err
+	}
 	diskType := "disk"
 	if diskTypePtr != nil {
 		diskType = *diskTypePtr
 	}
 
-	serial := util.GetStringValue(extraArgs, "serial")
-	cache := util.GetStringValue(extraArgs, "cache")
+	serial, err := util.GetStringValue(extraArgs, "serial")
+	if err != nil {
+		return err
+	}
+	cache, err := util.GetStringValue(extraArgs, "cache")
+	if err != nil {
+		return err
+	}
 
-	persistPtr := util.GetBoolValue(extraArgs, "persist")
+	persistPtr, err := util.GetBoolValue(extraArgs, "persist")
+	if err != nil {
+		return err
+	}
 	persist := false
 	if persistPtr != nil {
 		persist = *persistPtr
@@ -328,18 +355,23 @@ func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]
 }
 
 func removeVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
-	volumeName := util.GetStringValue(extraArgs, "volumeName")
+	volumeName, err := util.GetStringValue(extraArgs, "volumeName")
+	if err != nil {
+		return err
+	}
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
 	}
 
-	persistPtr := util.GetBoolValue(extraArgs, "persist")
+	persistPtr, err := util.GetBoolValue(extraArgs, "persist")
+	if err != nil {
+		return err
+	}
 	persist := false
 	if persistPtr != nil {
 		persist = *persistPtr
 	}
 
-	var err error
 	retry := 0
 	for retry < maxRetries {
 		if !persist {
