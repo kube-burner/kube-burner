@@ -134,7 +134,8 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	switch obj.KubeVirtOp {
 	case config.KubeVirtOpStart:
 		options := kubevirtV1.StartOptions{}
-		startPaused, err := util.GetBoolValue(obj.InputVars, "startPaused")
+		var startPaused *bool
+		startPaused, err = util.GetBoolValue(obj.InputVars, "startPaused")
 		if err != nil {
 			log.Errorf("Error getting startPaused: %v", err)
 			return
@@ -146,7 +147,8 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Start(context.Background(), item.GetName(), &options)
 	case config.KubeVirtOpStop:
 		stopOpts := &kubevirtV1.StopOptions{}
-		force, err := util.GetBoolValue(obj.InputVars, "force")
+		var force *bool
+		force, err = util.GetBoolValue(obj.InputVars, "force")
 		if err != nil {
 			log.Errorf("Error getting force: %v", err)
 			return
@@ -158,7 +160,8 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Stop(context.Background(), item.GetName(), stopOpts)
 	case config.KubeVirtOpRestart:
 		restartOpts := &kubevirtV1.RestartOptions{}
-		force, err := util.GetBoolValue(obj.InputVars, "force")
+		var force *bool
+		force, err = util.GetBoolValue(obj.InputVars, "force")
 		if err != nil {
 			log.Errorf("Error getting force: %v", err)
 			return
