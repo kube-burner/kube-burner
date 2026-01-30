@@ -100,6 +100,22 @@ type GlobalConfig struct {
 	FunctionTemplates []string `yaml:"functionTemplates"`
 	// DeletionStrategy global deletion strategy for all created objects
 	DeletionStrategy string `yaml:"deletionStrategy" json:"deletionStrategy,omitempty"`
+	// Dashboard configuration for real-time metrics visualization
+	Dashboard DashboardConfig `yaml:"dashboard" json:"dashboard,omitempty"`
+}
+
+// DashboardConfig holds the dashboard server configuration
+type DashboardConfig struct {
+	// Enabled enables the real-time metrics dashboard
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// Address is the bind address for the dashboard server
+	Address string `yaml:"address" json:"address"`
+	// Port is the port for the dashboard server
+	Port int `yaml:"port" json:"port"`
+	// UpdateInterval is the interval for polling measurements
+	UpdateInterval time.Duration `yaml:"updateInterval" json:"updateInterval"`
+	// EmbedUI enables serving the embedded dashboard UI
+	EmbedUI bool `yaml:"embedUI" json:"embedUI"`
 }
 
 // Object defines an object that kube-burner will create

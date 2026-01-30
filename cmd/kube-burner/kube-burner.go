@@ -82,6 +82,9 @@ func initCmd() *cobra.Command {
 	var allowMissingKeys bool
 	var rc int
 	var setValues []string
+	var dashboardEnabled, dashboardEmbedUI bool
+	var dashboardAddress string
+	var dashboardPort int
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -130,6 +133,11 @@ func initCmd() *cobra.Command {
 				fmt.Printf("%s", err.Error())
 				os.Exit(1)
 			}
+			// Apply dashboard CLI flags to config
+			configSpec.GlobalConfig.Dashboard.Enabled = dashboardEnabled
+			configSpec.GlobalConfig.Dashboard.Address = dashboardAddress
+			configSpec.GlobalConfig.Dashboard.Port = dashboardPort
+			configSpec.GlobalConfig.Dashboard.EmbedUI = dashboardEmbedUI
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,
@@ -163,6 +171,10 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.Flags().StringSliceVar(&setValues, "set", []string{}, "Set arbitrary key=value pairs to override values in the config file")
+	cmd.Flags().BoolVar(&dashboardEnabled, "dashboard", false, "Enable real-time metrics dashboard")
+	cmd.Flags().StringVar(&dashboardAddress, "dashboard-address", "0.0.0.0", "Dashboard server bind address")
+	cmd.Flags().IntVar(&dashboardPort, "dashboard-port", 9090, "Dashboard server port")
+	cmd.Flags().BoolVar(&dashboardEmbedUI, "dashboard-ui", true, "Serve embedded dashboard UI")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd

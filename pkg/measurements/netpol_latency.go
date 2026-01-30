@@ -450,7 +450,11 @@ func (n *netpolLatency) processResults() {
 	}
 	resp.Body.Close()
 	for name, npl := range npResults {
-		latencySummary := metrics.NewLatencySummary(npl, name)
+		latencySummary, err := metrics.NewLatencySummary(npl, name)
+		if err != nil {
+			log.Warnf("Failed to calculate latency summary for netpol %s: %v", name, err)
+			continue
+		}
 		log.Tracef("netpol %s latency slice %v\n", name, npl)
 		log.Tracef("%s: 50th: %d 95th: %d 99th: %d min: %d max: %d avg: %d\n", name, latencySummary.P50, latencySummary.P95, latencySummary.P99, latencySummary.Min, latencySummary.Max, latencySummary.Avg)
 
@@ -606,18 +610,29 @@ func (n *netpolLatency) normalizeMetrics() {
 		n.NormLatencies = append(n.NormLatencies, metric)
 		return true
 	})
-	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
-		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
+	calcSummary := func(name string, inputLatencies []float64) (metrics.LatencyQuantiles, error) {
+		latencySummary, err := metrics.NewLatencySummary(inputLatencies, name)
+		if err != nil {
+			return latencySummary, err
+		}
 		latencySummary.UUID = n.Uuid
 		latencySummary.Timestamp = time.Now().UTC()
 		latencySummary.Metadata = n.Metadata
 		latencySummary.MetricName = netpolLatencyQuantilesMeasurement
 		latencySummary.JobName = n.JobConfig.Name
-		return latencySummary
+		return latencySummary, nil
 	}
 	if sLen > 0 {
-		n.LatencyQuantiles = append(n.LatencyQuantiles, calcSummary("Ready", latencies))
-		n.LatencyQuantiles = append(n.LatencyQuantiles, calcSummary("minReady", minLatencies))
+		if summary, err := calcSummary("Ready", latencies); err != nil {
+			log.Warnf("Failed to calculate Ready latency summary: %v", err)
+		} else {
+			n.LatencyQuantiles = append(n.LatencyQuantiles, summary)
+		}
+		if summary, err := calcSummary("minReady", minLatencies); err != nil {
+			log.Warnf("Failed to calculate minReady latency summary: %v", err)
+		} else {
+			n.LatencyQuantiles = append(n.LatencyQuantiles, summary)
+		}
 	}
 }
 

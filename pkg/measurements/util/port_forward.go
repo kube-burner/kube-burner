@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
@@ -52,7 +53,8 @@ func NewPodPortForwarder(clientset kubernetes.Interface, restConfig rest.Config,
 	select {
 	case <-readyChan:
 		if len(errOut.String()) != 0 {
-			panic(errOut.String())
+			close(stopChan)
+			return &PodPortForwarder{}, fmt.Errorf("port forwarding error output: %s", errOut.String())
 		}
 		log.Infof("Port forwarding started between %s:%s", port, port)
 	case err := <-errorChan:
