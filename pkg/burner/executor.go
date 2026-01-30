@@ -15,19 +15,14 @@
 package burner
 
 import (
-	"context"
-	"fmt"
-	"strings"
-	"sync"
-
 	"maps"
+	"sync"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -62,7 +57,6 @@ type JobExecutor struct {
 	deletionStrategy  string
 	objectOperations  int32
 	nsChurning        bool
-	HealthCheckFunc   func(context.Context) error
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {
@@ -101,56 +95,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	default:
 		log.Fatalf("Unknown jobType: %s", job.JobType)
 	}
-	ex.HealthCheckFunc = ex.defaultHealthCheck
 	return ex
-}
-
-// defaultHealthCheck performs Kubernetes-native health checks that should work across distributions.
-func (ex *JobExecutor) defaultHealthCheck(ctx context.Context) error {
-	// 1) Check API server healthz
-	if discovery := ex.clientSet.Discovery(); discovery != nil {
-		if rc := discovery.RESTClient(); rc != nil {
-			if data, err := rc.Get().AbsPath("/healthz").DoRaw(ctx); err != nil {
-				return err
-			} else {
-				// common healthy response contains "ok"
-				s := string(data)
-				if !strings.Contains(strings.ToLower(s), "ok") {
-					return fmt.Errorf("apiserver health check failed: %s", s)
-				}
-			}
-		}
-	}
-	// 2) Check node conditions
-	nodes, err := ex.clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	var problems []string
-	for _, node := range nodes.Items {
-		var readyFound bool
-		for _, c := range node.Status.Conditions {
-			switch string(c.Type) {
-			case "Ready":
-				readyFound = true
-				if c.Status != "True" {
-					problems = append(problems, fmt.Sprintf("node %s not Ready (status=%s)", node.Name, c.Status))
-				}
-			case "MemoryPressure", "DiskPressure", "PIDPressure":
-				if c.Status == "True" {
-					problems = append(problems, fmt.Sprintf("node %s has pressure: %s", node.Name, c.Type))
-				}
-			}
-		}
-		if !readyFound {
-			problems = append(problems, fmt.Sprintf("node %s missing Ready condition", node.Name))
-		}
-	}
-	if len(problems) > 0 {
-		return fmt.Errorf("cluster health issues: %s", strings.Join(problems, "; "))
-	}
-	log.Info("Cluster health check passed, proceeding to next step")
-	return nil
 }
 
 func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {

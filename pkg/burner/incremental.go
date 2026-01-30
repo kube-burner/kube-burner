@@ -189,10 +189,8 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 			}
 			log.Info("Cluster health check script succeeded, proceeding to next step")
 		} else {
-			if err := ex.HealthCheckFunc(ctx); err != nil {
-				allErrs = append(allErrs, err)
-				return allErrs
-			}
+			util.ClusterHealthCheck(ex.clientSet)
+			log.Info("Proceeding to the next step")
 		}
 
 		if stepDelay > 0 {
