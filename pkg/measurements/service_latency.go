@@ -179,7 +179,7 @@ func (s *serviceLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 
 	s.LatencyQuantiles, s.NormLatencies = nil, nil
-	if err := deployPodInNamespace(
+	if err := DeployPodInNamespace(
 		s.ClientSet,
 		types.SvcLatencyNs,
 		types.SvcLatencyCheckerName,
