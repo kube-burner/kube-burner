@@ -111,7 +111,6 @@ func TestHandleUpdatePVC(t *testing.T) {
 	if pm.resizeStarted == 0 {
 		t.Fatal("Expected resizeStarted timestamp to be set on spec change")
 	}
-	resizeStartTime := pm.resizeStarted
 
 	// 5. Complete Resize
 	pvcResized := &corev1.PersistentVolumeClaim{
