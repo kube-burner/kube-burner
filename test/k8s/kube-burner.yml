@@ -69,6 +69,17 @@ jobs:
     errorOnVerify: true
     jobIterationDelay: 1s
     maxWaitTimeout: 2m
+{{ if .INCREMENTAL_LOAD }}
+    incrementalLoad:
+      minIterations: 5
+      maxIterations: 20
+      stepDelay: 2s
+      pattern:
+        type: linear
+        linear:
+          minSteps: 4
+          stepSize: 5
+{{ end }}
     churnConfig:
       cycles: {{ .CHURN_CYCLES }}
       percent: 50
