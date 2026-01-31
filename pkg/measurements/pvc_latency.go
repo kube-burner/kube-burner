@@ -15,6 +15,7 @@
 package measurements
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -157,30 +159,25 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 		} else {
 			log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
 		}
-		// Track resize operations via conditions
-		for _, condition := range pvc.Status.Conditions {
-			if condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
-				if condition.Status == corev1.ConditionTrue && pm.resizeStarted == 0 {
-					pm.resizeStarted = time.Now().UTC().UnixMilli()
-					log.Debugf("PVC %s filesystem resize pending", pvc.Name)
-				}
-			}
-			if condition.Type == corev1.PersistentVolumeClaimResizing {
-				if condition.Status == corev1.ConditionTrue && pm.resizeStarted == 0 {
-					pm.resizeStarted = time.Now().UTC().UnixMilli()
-					log.Debugf("PVC %s is resizing", pvc.Name)
-				}
+
+		// Detect resize start by spec change (works for all provisioners)
+		if pvc.Spec.Resources.Requests.Storage() != nil {
+			requestedSize := pvc.Spec.Resources.Requests.Storage().String()
+			if requestedSize != pm.Size && pm.resizeStarted == 0 {
+				pm.resizeStarted = time.Now().UTC().UnixMilli()
+				log.Debugf("PVC %s resize started: %s -> %s", pvc.Name, pm.Size, requestedSize)
 			}
 		}
 
 		// Check if resize completed by comparing capacity
-		if pvc.Status.Capacity != nil {
-			currentCapacity := pvc.Status.Capacity.Storage().String()
-			if currentCapacity != pm.Size {
-				if pm.resizeStarted > 0 && pm.ResizeLatency == 0 {
+		if pm.resizeStarted > 0 && pm.ResizeLatency == 0 {
+			if pvc.Status.Capacity != nil {
+				currentCapacity := pvc.Status.Capacity.Storage().String()
+				// If capacity has changed from original size, it's done
+				if currentCapacity != pm.Size {
 					pm.ResizeLatency = int(time.Now().UTC().UnixMilli() - pm.resizeStarted)
 					pm.ResizedCapacity = currentCapacity
-					log.Debugf("PVC %s resize completed: %s -> %s in %dms",
+					log.Debugf("PVC %s resize completed (capacity update): %s -> %s in %dms",
 						pvc.Name, pm.Size, currentCapacity, pm.ResizeLatency)
 				}
 			}
@@ -200,6 +197,20 @@ func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err != nil {
 		return fmt.Errorf("error getting GVR for %s: %w", "PersistentVolumeClaim", err)
 	}
+
+	// Preload existing PVCs so patch jobs (resize-volumes) have metrics state
+	pvcs, err := p.ClientSet.CoreV1().PersistentVolumeClaims("").List(
+		context.TODO(),
+		metav1.ListOptions{LabelSelector: p.LabelSelector},
+	)
+	if err != nil {
+		log.Errorf("Error listing PVCs for preload: %v", err)
+	} else {
+		for i := range pvcs.Items {
+			p.handleCreatePVC(&pvcs.Items[i])
+		}
+	}
+
 	p.startMeasurement(
 		[]MeasurementWatcher{
 			{
@@ -242,14 +253,18 @@ func (p *pvcLatency) Stop() error {
 func (p *pvcLatency) normalizeMetrics() float64 {
 	totalPVCs := 0
 	erroredPVCs := 0
+	stopTimestamp := time.Now().UTC().UnixMilli()
 
 	p.Metrics.Range(func(key, value any) bool {
 		m := value.(pvcMetric)
 
-		// Skip PVCs with incomplete resize (same pattern as job/volumeSnapshot/dataVolume)
+		// Final check for resize completion at the end of the job
 		if m.resizeStarted > 0 && m.ResizeLatency == 0 {
-			log.Warningf("PVC %v resize latency ignored as it did not complete", m.Name)
-			return true
+			m.ResizeLatency = int(stopTimestamp - m.resizeStarted)
+			if m.ResizedCapacity == "" {
+				m.ResizedCapacity = "unknown (calculated at stop)"
+			}
+			log.Infof("PVC %v resize latency calculated at job end: %dms", m.Name, m.ResizeLatency)
 		}
 		// If a pvc does not reach the stable state, we skip that one
 		if m.bound == 0 && m.lost == 0 {
@@ -279,7 +294,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 			m.LostLatency = 0
 		}
 
-		// ResizeLatency is already calculated in handleUpdatePVC, just validate
+		// ResizeLatency is already calculated in handleUpdatePVC or above, just validate
 		if m.ResizeLatency < 0 {
 			log.Tracef("ResizeLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.ResizeLatency = 0
