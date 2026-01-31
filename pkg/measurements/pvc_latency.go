@@ -15,6 +15,7 @@
 package measurements
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -42,6 +44,7 @@ var (
 		string(corev1.ClaimPending): {},
 		string(corev1.ClaimBound):   {},
 		string(corev1.ClaimLost):    {},
+		"Resized":                   {},
 	}
 	supportedPvcLatencyJobTypes = map[config.JobType]struct{}{
 		config.CreationJob: {},
@@ -51,23 +54,26 @@ var (
 )
 
 type pvcMetric struct {
-	Timestamp      time.Time `json:"timestamp"`
-	pending        int64
-	PendingLatency int `json:"pendingLatency"`
-	bound          int64
-	BindingLatency int `json:"bindingLatency"`
-	lost           int64
-	LostLatency    int    `json:"lostLatency"`
-	UUID           string `json:"uuid"`
-	Name           string `json:"pvcName"`
-	JobName        string `json:"jobName,omitempty"`
-	Namespace      string `json:"namespace"`
-	MetricName     string `json:"metricName"`
-	Size           string `json:"size"`
-	StorageClass   string `json:"storageClass"`
-	JobIteration   int    `json:"jobIteration"`
-	Replica        int    `json:"replica"`
-	Metadata       any    `json:"metadata,omitempty"`
+	Timestamp       time.Time `json:"timestamp"`
+	pending         int64
+	PendingLatency  int `json:"pendingLatency"`
+	bound           int64
+	BindingLatency  int `json:"bindingLatency"`
+	lost            int64
+	LostLatency     int `json:"lostLatency"`
+	resizeStarted   int64
+	ResizeLatency   int    `json:"resizeLatency"`
+	ResizedCapacity string `json:"resizedCapacity,omitempty"`
+	UUID            string `json:"uuid"`
+	Name            string `json:"pvcName"`
+	JobName         string `json:"jobName,omitempty"`
+	Namespace       string `json:"namespace"`
+	MetricName      string `json:"metricName"`
+	Size            string `json:"size"`
+	StorageClass    string `json:"storageClass"`
+	JobIteration    int    `json:"jobIteration"`
+	Replica         int    `json:"replica"`
+	Metadata        any    `json:"metadata,omitempty"`
 }
 
 type pvcLatency struct {
@@ -102,6 +108,7 @@ func (p *pvcLatency) handleCreatePVC(obj any) {
 	}
 	log.Tracef("handleCreatePVC: %s", pvc.Name)
 	pvcLabels := pvc.GetLabels()
+
 	p.Metrics.LoadOrStore(string(pvc.UID), pvcMetric{
 		Timestamp:    time.Now().UTC(),
 		Namespace:    pvc.Namespace,
@@ -128,7 +135,7 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 	if value, exists := p.Metrics.Load(string(pvc.UID)); exists {
 		pm := value.(pvcMetric)
 		log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
-		if pm.bound == 0 || pm.lost == 0 {
+		if pm.bound == 0 && pm.lost == 0 {
 			// https://pkg.go.dev/k8s.io/api/core/v1#PersistentVolumeClaimPhase
 			if pvc.Status.Phase == corev1.ClaimPending {
 				if pm.pending == 0 {
@@ -152,19 +159,58 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 		} else {
 			log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
 		}
+
+		// Detect resize start by spec change (works for all provisioners)
+		if pvc.Spec.Resources.Requests.Storage() != nil {
+			requestedSize := pvc.Spec.Resources.Requests.Storage().String()
+			if requestedSize != pm.Size && pm.resizeStarted == 0 {
+				pm.resizeStarted = time.Now().UTC().UnixMilli()
+				log.Debugf("PVC %s resize started: %s -> %s", pvc.Name, pm.Size, requestedSize)
+			}
+		}
+
+		// Check if resize completed by comparing capacity
+		if pm.resizeStarted > 0 && pm.ResizeLatency == 0 {
+			if pvc.Status.Capacity != nil {
+				currentCapacity := pvc.Status.Capacity.Storage().String()
+				// If capacity has changed from original size, it's done
+				if currentCapacity != pm.Size {
+					pm.ResizeLatency = int(time.Now().UTC().UnixMilli() - pm.resizeStarted)
+					pm.ResizedCapacity = currentCapacity
+					log.Debugf("PVC %s resize completed (capacity update): %s -> %s in %dms",
+						pvc.Name, pm.Size, currentCapacity, pm.ResizeLatency)
+				}
+			}
+		}
+
+		p.Metrics.Store(string(pvc.UID), pm)
 	}
 }
 
 // start pvcLatency measurement
 func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	if p.JobConfig.JobType == config.ReadJob || p.JobConfig.JobType == config.PatchJob || p.JobConfig.JobType == config.DeletionJob {
+	if p.JobConfig.JobType == config.ReadJob {
 		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
 	}
 	gvr, err := util.ResourceToGVR(p.RestConfig, "PersistentVolumeClaim", "v1")
 	if err != nil {
 		return fmt.Errorf("error getting GVR for %s: %w", "PersistentVolumeClaim", err)
 	}
+
+	// Preload existing PVCs so patch jobs (resize-volumes) have metrics state
+	pvcs, err := p.ClientSet.CoreV1().PersistentVolumeClaims("").List(
+		context.TODO(),
+		metav1.ListOptions{LabelSelector: p.LabelSelector},
+	)
+	if err != nil {
+		log.Errorf("Error listing PVCs for preload: %v", err)
+	} else {
+		for i := range pvcs.Items {
+			p.handleCreatePVC(&pvcs.Items[i])
+		}
+	}
+
 	p.startMeasurement(
 		[]MeasurementWatcher{
 			{
@@ -207,9 +253,19 @@ func (p *pvcLatency) Stop() error {
 func (p *pvcLatency) normalizeMetrics() float64 {
 	totalPVCs := 0
 	erroredPVCs := 0
+	stopTimestamp := time.Now().UTC().UnixMilli()
 
 	p.Metrics.Range(func(key, value any) bool {
 		m := value.(pvcMetric)
+
+		// Final check for resize completion at the end of the job
+		if m.resizeStarted > 0 && m.ResizeLatency == 0 {
+			m.ResizeLatency = int(stopTimestamp - m.resizeStarted)
+			if m.ResizedCapacity == "" {
+				m.ResizedCapacity = "unknown (calculated at stop)"
+			}
+			log.Infof("PVC %v resize latency calculated at job end: %dms", m.Name, m.ResizeLatency)
+		}
 		// If a pvc does not reach the stable state, we skip that one
 		if m.bound == 0 && m.lost == 0 {
 			log.Tracef("PVC %v latency ignored as it did not reach a stable state", m.Name)
@@ -238,6 +294,12 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 			m.LostLatency = 0
 		}
 
+		// ResizeLatency is already calculated in handleUpdatePVC or above, just validate
+		if m.ResizeLatency < 0 {
+			log.Tracef("ResizeLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+			m.ResizeLatency = 0
+		}
+
 		totalPVCs++
 		erroredPVCs += errorFlag
 		p.NormLatencies = append(p.NormLatencies, m)
@@ -255,6 +317,7 @@ func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.ClaimPending): float64(pvcMetric.PendingLatency),
 		string(corev1.ClaimBound):   float64(pvcMetric.BindingLatency),
 		string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
+		"Resized":                   float64(pvcMetric.ResizeLatency),
 	}
 }
 
@@ -265,7 +328,8 @@ func (p *pvcLatency) IsCompatible() bool {
 
 // pvcTransformFunc preserves the following fields for latency measurements:
 // - metadata: name, namespace, uid, creationTimestamp, labels
-// - status: phase, conditions
+// - spec: resources, storageClassName
+// - status: phase, conditions ,capacity
 func pvcTransformFunc() cache.TransformFunc {
 	return func(obj interface{}) (interface{}, error) {
 		u, ok := obj.(*unstructured.Unstructured)
@@ -275,11 +339,23 @@ func pvcTransformFunc() cache.TransformFunc {
 
 		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
+		// Preserve spec fields
+		if resources, found, _ := unstructured.NestedMap(u.Object, "spec", "resources"); found {
+			_ = unstructured.SetNestedMap(minimal.Object, resources, "spec", "resources")
+		}
+		if storageClassName, found, _ := unstructured.NestedString(u.Object, "spec", "storageClassName"); found {
+			_ = unstructured.SetNestedField(minimal.Object, storageClassName, "spec", "storageClassName")
+		}
+
+		// Preserve status fields
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
 		}
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
+		}
+		if capacity, found, _ := unstructured.NestedMap(u.Object, "status", "capacity"); found {
+			_ = unstructured.SetNestedMap(minimal.Object, capacity, "status", "capacity")
 		}
 
 		return minimal, nil
