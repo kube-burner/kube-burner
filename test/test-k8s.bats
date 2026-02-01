@@ -78,9 +78,6 @@ teardown_file() {
   
   run_cmd ${KUBE_BURNER} init -c kube-burner-hooks.yml --uuid=${UUID} --log-level=info
   
-  # Manual cleanup to trigger GC hooks if they haven't fired
-  kubectl delete ns -l kube-burner.io/job=${JOB_NAME} --ignore-not-found --wait=false 2>/dev/null || true
-
   echo "Running verify_hooks_with_helpers for ${JOB_NAME}"
   if ! verify_hooks_with_helpers kube-burner-hooks.yml "${JOB_NAME}"; then
     echo "verify_hooks_with_helpers failed, dumping hook logs for debugging:"

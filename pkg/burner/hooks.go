@@ -34,18 +34,20 @@ type hookResult struct {
 }
 
 type HookManager struct {
-	ctx        context.Context
-	cancel     context.CancelFunc
-	resultChan chan hookResult
+	ctx         context.Context
+	cancel      context.CancelFunc
+	resultChan  chan hookResult
+	backgrounWg sync.WaitGroup
 }
 
 // NewHookManager creates a new HookManager
 func NewHookManager(ctx context.Context, hookCount int) *HookManager {
 	ctx, cancel := context.WithCancel(ctx)
 	return &HookManager{
-		ctx:        ctx,
-		cancel:     cancel,
-		resultChan: make(chan hookResult, hookCount),
+		ctx:         ctx,
+		cancel:      cancel,
+		resultChan:  make(chan hookResult, hookCount),
+		backgrounWg: sync.WaitGroup{},
 	}
 }
 
@@ -54,14 +56,7 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 	if len(hooks) == 0 {
 		return nil
 	}
-
-	var (
-		foregroundWg  sync.WaitGroup
-		errorInternal []error
-	)
-	// Channel to collect hook results
-	resultChan := make(chan hookResult, len(hooks))
-
+	// Execute background hooks in parallel
 	for _, hook := range hooks {
 		if hook.When != when {
 			continue
@@ -76,28 +71,21 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 			if err := hm.executeBackgroundHook(hook); err != nil {
 				return fmt.Errorf("failed to start background hook at '%s': %w", when, err)
 			}
-		} else {
-			foregroundWg.Add(1)
-			go func(h config.Hook) {
-				defer foregroundWg.Done()
-				if err := hm.executeForegroundHook(h); err != nil {
-					resultChan <- hookResult{
-						err: err,
-					}
-				}
-			}(hook)
 		}
 	}
-
-	foregroundWg.Wait()
-	close(resultChan)
-
-	for err := range resultChan {
-		errorInternal = append(errorInternal, err.err)
-	}
-
-	if len(errorInternal) > 0 {
-		return fmt.Errorf("hook execution errorInternal at '%s': %v", when, errorInternal)
+	// Execute foreground hooks sequentially
+	for _, hook := range hooks {
+		if hook.When != when {
+			continue
+		}
+		if len(hook.Cmd) == 0 {
+			continue
+		}
+		if !hook.Background {
+			if err := hm.executeForegroundHook(hook); err != nil {
+				return fmt.Errorf("foreground hook execution failed at '%s': %w", when, err)
+			}
+		}
 	}
 
 	return nil
@@ -119,7 +107,7 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start background hook: %w", err)
 	}
-
+	hm.backgrounWg.Add(1)
 	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr)
 
 	return nil
@@ -127,6 +115,7 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 
 // monitorBackgroundHook monitors a background hook with proper error handling
 func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer) {
+	defer hm.backgrounWg.Done()
 	// Wait for process with timeout context
 	errChan := make(chan error, 1)
 	go func() {
@@ -199,14 +188,19 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 	return nil
 }
 
-// GetBackgroundHookResults returns results from background hooks (non-blocking)
-func (hm *HookManager) GetBackgroundHookResults() []hookResult {
+// WaitBackgroundHooks waits for all background hooks to complete and returns their results
+func (hm *HookManager) WaitBackgroundHooks() []hookResult {
+	hm.backgrounWg.Wait()
+
+	// Drain results from the channel (non-blocking)
 	var results []hookResult
 	for {
 		select {
 		case result := <-hm.resultChan:
 			results = append(results, result)
 		default:
+			// No more results, reset channel for future hooks and return
+			hm.resultChan = make(chan hookResult, cap(hm.resultChan))
 			return results
 		}
 	}

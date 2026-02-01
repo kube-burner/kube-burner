@@ -354,8 +354,8 @@ verify_hooks_with_helpers() {
   check_hook "beforeCleanup" 1 || failed=1
   
   # GC hooks execute during job cleanup
-  check_hook "beforeGC" 1 ge || failed=1
-  check_hook "afterGC" 1 ge || failed=1
+  check_hook "beforeGC" 1 eq || failed=1
+  check_hook "afterGC" 1 eq || failed=1
 
   [ "$failed" -eq 0 ] && echo "All hooks verified successfully" && return 0
   echo "Hook verification failed" && return 1

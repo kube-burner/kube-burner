@@ -146,7 +146,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				// Collect background hook results
 				if len(jobExecutor.Hooks) > 0 {
-					backgroundResults := jobExecutor.hookManager.GetBackgroundHookResults()
+					backgroundResults := jobExecutor.hookManager.WaitBackgroundHooks()
 					for _, result := range backgroundResults {
 						if result.err != nil {
 							log.Errorf("Background hook failed: %v (duration: %v)", result.err, result.duration)
