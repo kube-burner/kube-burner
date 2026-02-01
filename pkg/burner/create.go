@@ -460,7 +460,6 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		// Re-create objects that were deleted
 		log.Infof("Re-creating %d deleted namespaces", numToChurn)
-		// TODO: add hook before deployment here
 		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
 			errs = append(errs, jobErrs...)
 		}
