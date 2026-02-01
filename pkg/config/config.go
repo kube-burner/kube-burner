@@ -302,10 +302,10 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 			configSpec.Jobs[i].Namespace = job.Namespace[:57]
 		}
 		if job.JobIterations < 1 && (job.JobType == CreationJob || job.JobType == ReadJob) {
-			return configSpec, fmt.Errorf("Job %s has < 1 iterations", job.Name)
+			return configSpec, fmt.Errorf("invalid value for metricsClosing: %s", job.MetricsClosing)
 		}
 		if _, ok := metricsClosing[job.MetricsClosing]; !ok {
-			return configSpec, fmt.Errorf("Invalid value for metricsClosing: %s", job.MetricsClosing)
+			return configSpec, fmt.Errorf("invalid value for metricsClosing: %s", job.MetricsClosing)
 		}
 		if job.JobType == DeletionJob {
 			configSpec.Jobs[i].PreLoadImages = false
