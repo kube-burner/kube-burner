@@ -172,7 +172,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			if !ex.NamespacedIterations || !namespacesWaited[ns] {
 				log.Infof("Waiting up to %s for actions to be completed in namespace %s", ex.MaxWaitTimeout, ns)
 				wg.Wait()
-				if errs := ex.waitForObjects(ns); errs != nil {
+				if errs := ex.waitForObjects(ctx, ns); errs != nil {
 					waitErrors = append(waitErrors, errs...)
 				}
 				namespacesWaited[ns] = true
@@ -186,7 +186,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	// Wait for all replicas to be created
 	wg.Wait()
 	if ex.WaitWhenFinished {
-		if errs := ex.waitForCompletion(iterationStart, iterationEnd, ns, namespacesWaited); len(errs) > 0 {
+		if errs := ex.waitForCompletion(ctx, iterationStart, iterationEnd, ns, namespacesWaited); len(errs) > 0 {
 			waitErrors = append(waitErrors, errs...)
 		}
 	}
@@ -216,7 +216,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
-			ex.limiter.Wait(context.TODO())
+			ex.limiter.Wait(ctx)
 			newObjects, gvks := ex.renderTemplateForObjectMultiple(obj, iteration, r)
 			newObject := newObjects[obj.documentIndex]
 			gvk := gvks[obj.documentIndex]
@@ -256,7 +256,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 }
 
 // waitForCompletion waits for objects to be ready across the relevant namespaces
-func (ex *JobExecutor) waitForCompletion(iterationStart, iterationEnd int, ns string, namespacesWaited map[string]bool) []error {
+func (ex *JobExecutor) waitForCompletion(ctx context.Context, iterationStart, iterationEnd int, ns string, namespacesWaited map[string]bool) []error {
 	log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
 	// This semaphore limits the maximum number of concurrent goroutines
 	sem := make(chan int, int(ex.restConfig.QPS))
@@ -277,7 +277,7 @@ func (ex *JobExecutor) waitForCompletion(iterationStart, iterationEnd int, ns st
 				<-sem
 				wg.Done()
 			}()
-			if err := ex.waitForObjects(namespace); err != nil {
+			if err := ex.waitForObjects(ctx, namespace); err != nil {
 				select {
 				case errChan <- err:
 				default:
@@ -518,7 +518,7 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				}
 			}
 		}
-		ex.verifyDelete(ctx, deletedObjects)
+		ex.verifyDelete(deletedObjects)
 		ex.reCreateDeletedObjects(ctx, deletedObjects)
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 		time.Sleep(ex.ChurnConfig.Delay)
@@ -538,21 +538,21 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ex.limiter.Wait(context.TODO())
+			ex.limiter.Wait(ctx)
 			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout)
 		}()
 	}
 	wg.Wait()
 	for namespace := range affectedNamespaces {
-		ex.waitForObjects(namespace)
+		ex.waitForObjects(ctx, namespace)
 	}
 }
 
 // verifyDelete verifies if the object has been deleted
-func (ex *JobExecutor) verifyDelete(ctx context.Context, deletedObjects []churnDeletedObject) {
+func (ex *JobExecutor) verifyDelete(deletedObjects []churnDeletedObject) {
 	for _, obj := range deletedObjects {
-		wait.PollUntilContextCancel(ctx, time.Second, true, func(pollCtx context.Context) (done bool, err error) {
-			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(pollCtx, obj.object.GetName(), metav1.GetOptions{})
+		wait.PollUntilContextCancel(context.TODO(), time.Second, true, func(ctx context.Context) (done bool, err error) {
+			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(context.TODO(), obj.object.GetName(), metav1.GetOptions{})
 			if kerrors.IsNotFound(err) {
 				return true, nil
 			}
