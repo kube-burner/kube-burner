@@ -125,9 +125,9 @@ func (ex *JobExecutor) setupKubeVirtJob() {
 	}
 }
 
-func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func kubeOpHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
-	ex.limiter.Wait(context.TODO())
+	ex.limiter.Wait(ctx)
 
 	operationConfig := supportedOps[obj.KubeVirtOp]
 	var err error

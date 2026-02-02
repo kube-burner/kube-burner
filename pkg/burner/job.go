@@ -141,7 +141,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					executedJobs[jobExecutorIdx].ChurnEnd = &churnEnd
 				}
 				// If object verification is enabled
-				if jobExecutor.VerifyObjects && !jobExecutor.Verify() {
+				if jobExecutor.VerifyObjects && !jobExecutor.Verify(ctx) {
 					err := errors.New("object verification failed")
 					// If errorOnVerify is enabled. Set RC to 1 and append error
 					if jobExecutor.ErrorOnVerify {
@@ -214,7 +214,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 		}
 		if globalConfig.WaitWhenFinished {
-			runWaitList(jobExecutors)
+			runWaitList(ctx, jobExecutors)
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
@@ -385,7 +385,7 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 }
 
 // Runs on wait list at the end of benchmark
-func runWaitList(jobExecutors []JobExecutor) []error {
+func runWaitList(ctx context.Context, jobExecutors []JobExecutor) []error {
 	var allErrs []error
 	var mu sync.Mutex
 	for _, executor := range jobExecutors {
@@ -401,7 +401,7 @@ func runWaitList(jobExecutors []JobExecutor) []error {
 					<-sem
 					wg.Done()
 				}()
-				if errs := executor.waitForObjects(ns); errs != nil {
+				if errs := executor.waitForObjects(ctx, ns); errs != nil {
 					mu.Lock()
 					allErrs = append(allErrs, errs...)
 					mu.Unlock()
