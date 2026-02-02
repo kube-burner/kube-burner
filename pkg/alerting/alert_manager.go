@@ -52,7 +52,9 @@ type alertProfile []struct {
 	// Informative comment reported when the alarm is triggered
 	Description string `yaml:"description"`
 	// Alert Severity
-	Severity severityLevel `yaml:"severity"`
+	Severity     severityLevel `yaml:"severity"`
+	exprTemplate *template.Template
+	descTemplate *template.Template
 }
 
 // alert definition
@@ -131,8 +133,7 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
 	for _, alert := range a.alertProfile {
-		t, _ := template.New("").Parse(alert.Expr)
-		t.Execute(&renderedQuery, vars)
+		alert.exprTemplate.Execute(&renderedQuery, vars)
 		expr := renderedQuery.String()
 		renderedQuery.Reset()
 		log.Debugf("Evaluating expression: '%s'", expr)
@@ -141,7 +142,7 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, a.uuid, alert.Description, a.metadata, alert.Severity, job.ChurnStart, job.ChurnEnd)
+		alertData, err := parseMatrix(v, a.uuid, alert.descTemplate, a.metadata, alert.Severity, job.ChurnStart, job.ChurnEnd)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)
@@ -155,21 +156,25 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 }
 
 func (a *AlertManager) validateTemplates() error {
-	for _, a := range a.alertProfile {
-		if _, err := template.New("").Parse(strings.Join(append(baseTemplate, a.Description), "")); err != nil {
-			return fmt.Errorf("template validation error '%s': %s", a.Description, err)
+	for i := range a.alertProfile {
+		var err error
+		a.alertProfile[i].exprTemplate, err = template.New("").Parse(a.alertProfile[i].Expr)
+		if err != nil {
+			return fmt.Errorf("template validation error '%s': %s", a.alertProfile[i].Expr, err)
+		}
+		a.alertProfile[i].descTemplate, err = template.New("").Parse(strings.Join(append(baseTemplate, a.alertProfile[i].Description), ""))
+		if err != nil {
+			return fmt.Errorf("template validation error '%s': %s", a.alertProfile[i].Description, err)
 		}
 	}
 	return nil
 }
 
-func parseMatrix(value model.Value, uuid, description string, metadata any, severity severityLevel, churnStart, churnEnd *time.Time) ([]any, error) {
+func parseMatrix(value model.Value, uuid string, descTemplate *template.Template, metadata any, severity severityLevel, churnStart, churnEnd *time.Time) ([]any, error) {
 	var renderedDesc bytes.Buffer
 	var templateData descriptionTemplate
-	// The same query can fire multiple alerts, so we have to return an array of them
 	var alertSet []any
 	errs := []error{}
-	t, _ := template.New("").Parse(strings.Join(append(baseTemplate, description), ""))
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return alertSet, fmt.Errorf("unsupported result format: %s", value.Type().String())
@@ -181,9 +186,8 @@ func parseMatrix(value model.Value, uuid, description string, metadata any, seve
 		}
 		for _, val := range v.Values {
 			renderedDesc.Reset()
-			// Take 3 decimals
 			templateData.Value = math.Round(float64(val.Value)*1000) / 1000
-			if err := t.Execute(&renderedDesc, templateData); err != nil {
+			if err := descTemplate.Execute(&renderedDesc, templateData); err != nil {
 				msg := fmt.Errorf("alert rendering error: %s", err)
 				log.Error(msg.Error())
 				errs = append(errs, err)
