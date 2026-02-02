@@ -145,18 +145,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterDeployment, err)
 				}
 				// Collect background hook results
-				if len(jobExecutor.Hooks) > 0 {
-					backgroundResults := jobExecutor.hookManager.WaitBackgroundHooks()
-					for _, result := range backgroundResults {
-						if result.err != nil {
-							log.Errorf("Background hook failed: %v (duration: %v)", result.err, result.duration)
-							errs = append(errs, result.err)
-							innerRC = 1
-						} else {
-							log.Infof("Background hook completed successfully (duration: %v)", result.duration)
-						}
-					}
-				}
+				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 				if ctx.Err() != nil {
 					return
 				}
@@ -188,6 +177,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterDeployment, err)
 				}
+				// Collect background hook results for hooks started during the beforeDeployment and afterDeployment stages
+				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 				if ctx.Err() != nil {
 					return
 				}
@@ -210,6 +201,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 				}
 
+				// Collect background hook results from beforeCleanup
+				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 			}
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
@@ -255,6 +248,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterCleanup); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterCleanup, err)
 				}
+				// Collect background hook results from afterCleanup
+				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 			}
 		}
 		if globalConfig.WaitWhenFinished {
@@ -276,6 +271,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterCleanup); err != nil {
 						log.Errorf("Error executing hooks for %s: %v", config.HookAfterCleanup, err)
 					}
+					// Collect background hook results from afterCleanup
+					errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 				}
 				// We add an extra dummy job to executedJobs to index metrics from this stage
 				executedJobs = append(executedJobs, prometheus.Job{

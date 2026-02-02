@@ -155,11 +155,7 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 
 func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 	log.Infof("Executing foreground hook: %v", hook.Cmd)
-	timeout := 5 * time.Minute
-	ctx, cancel := context.WithTimeout(hm.ctx, timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, hook.Cmd[0], hook.Cmd[1:]...)
+	cmd := exec.CommandContext(hm.ctx, hook.Cmd[0], hook.Cmd[1:]...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -177,9 +173,9 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 	}
 
 	if err != nil {
-		// Check if it was a timeout
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return fmt.Errorf("hook timed out after %v at '%s': %w", timeout, hook.When, err)
+		// Check if the command was canceled via the context
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(hm.ctx.Err(), context.Canceled) {
+			return fmt.Errorf("hook canceled at '%s' after %v: %w", hook.When, duration, err)
 		}
 		return fmt.Errorf("hook failed at '%s' after %v: %w", hook.When, duration, err)
 	}
