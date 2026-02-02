@@ -449,8 +449,7 @@ hooks:
 2. **Use foreground hooks for setup** - Block execution for critical setup steps
 3. **Handle errors appropriately** - Foreground hook failures will fail the job
 4. **Use absolute paths** - Specify full paths to executables and scripts
-5. **Pass context via environment** - Hooks inherit environment variables from kube-burner
-6. **Keep hooks lightweight for `onEachIteration`** - This runs for every iteration
+5. **Keep hooks lightweight for `onEachIteration`** - This runs for every iteration
 
 #### Error Handling
 
