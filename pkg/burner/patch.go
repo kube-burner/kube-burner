@@ -44,7 +44,11 @@ func (ex *JobExecutor) setupPatchJob() {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
 		log.Infof("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, ex.mapper, APIVersionV1, ex.embedCfg))
+		obj, err := newObject(o, ex.mapper, APIVersionV1, ex.embedCfg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		ex.objects = append(ex.objects, obj)
 	}
 }
 
@@ -68,7 +72,12 @@ func patchHandler(ex *JobExecutor, obj *object, originalItem unstructured.Unstru
 		} else {
 			asJson = true
 		}
-		data = ex.renderTemplateForObject(obj, iteration, 0, asJson)
+		var err error
+		data, err = ex.renderTemplateForObject(obj, iteration, 0, asJson)
+		if err != nil {
+			log.Errorf("Error rendering patch template: %s", err)
+			return
+		}
 	}
 
 	ns := originalItem.GetNamespace()

@@ -213,7 +213,8 @@ func (vmiml *vmimLatency) Collect(measurementWg *sync.WaitGroup) {
 	}
 	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(vmiml.RestConfig)
 	if err != nil {
-		log.Fatalf("Failed to get kubevirt client - %v", err)
+		log.Errorf("Failed to get kubevirt client - %v", err)
+		return
 	}
 	namespaces := strings.Split(vmiml.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {

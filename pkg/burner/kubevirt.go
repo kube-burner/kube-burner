@@ -107,7 +107,10 @@ func (ex *JobExecutor) setupKubeVirtJob() {
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		obj := newObject(o, ex.mapper, kubeVirtAPIVersionV1, ex.embedCfg)
+		obj, err := newObject(o, ex.mapper, kubeVirtAPIVersionV1, ex.embedCfg)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		if o.KubeVirtOp == config.KubeVirtOpMigrate && obj.waitGVR == nil {
 			obj.waitGVR = &schema.GroupVersionResource{
@@ -134,24 +137,30 @@ func kubeOpHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	switch obj.KubeVirtOp {
 	case config.KubeVirtOpStart:
 		options := kubevirtV1.StartOptions{}
-		startPaused := util.GetBoolValue(obj.InputVars, "startPaused")
-		if startPaused != nil {
+		startPaused, errVal := util.GetBoolValue(obj.InputVars, "startPaused")
+		if errVal != nil {
+			log.Errorf("Error parsing startPaused: %v", errVal)
+		} else if startPaused != nil {
 			options.Paused = *startPaused
 			operationConfig = supportedOps[config.KubeVirtOpPause]
 		}
 		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Start(context.Background(), item.GetName(), &options)
 	case config.KubeVirtOpStop:
 		stopOpts := &kubevirtV1.StopOptions{}
-		force := util.GetBoolValue(obj.InputVars, "force")
-		if force != nil && *force {
+		force, errVal := util.GetBoolValue(obj.InputVars, "force")
+		if errVal != nil {
+			log.Errorf("Error parsing force: %v", errVal)
+		} else if force != nil && *force {
 			gracePeriod := int64(0)
 			stopOpts.GracePeriod = &gracePeriod
 		}
 		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Stop(context.Background(), item.GetName(), stopOpts)
 	case config.KubeVirtOpRestart:
 		restartOpts := &kubevirtV1.RestartOptions{}
-		force := util.GetBoolValue(obj.InputVars, "force")
-		if force != nil && *force {
+		force, errVal := util.GetBoolValue(obj.InputVars, "force")
+		if errVal != nil {
+			log.Errorf("Error parsing force: %v", errVal)
+		} else if force != nil && *force {
 			gracePeriod := int64(0)
 			restartOpts.GracePeriodSeconds = &gracePeriod
 		}
@@ -243,21 +252,36 @@ func getVolumeSourceFromVolume(ex *JobExecutor, volumeName, namespace string) (*
 }
 
 func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
-	volumeName := util.GetStringValue(extraArgs, "volumeName")
+	volumeName, err := util.GetStringValue(extraArgs, "volumeName")
+	if err != nil {
+		return fmt.Errorf("error getting volumeName: %v", err)
+	}
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
 	}
 
-	diskTypePtr := util.GetStringValue(extraArgs, "diskType")
+	diskTypePtr, err := util.GetStringValue(extraArgs, "diskType")
+	if err != nil {
+		return fmt.Errorf("error getting diskType: %v", err)
+	}
 	diskType := "disk"
 	if diskTypePtr != nil {
 		diskType = *diskTypePtr
 	}
 
-	serial := util.GetStringValue(extraArgs, "serial")
-	cache := util.GetStringValue(extraArgs, "cache")
+	serial, err := util.GetStringValue(extraArgs, "serial")
+	if err != nil {
+		return fmt.Errorf("error getting serial: %v", err)
+	}
+	cache, err := util.GetStringValue(extraArgs, "cache")
+	if err != nil {
+		return fmt.Errorf("error getting cache: %v", err)
+	}
 
-	persistPtr := util.GetBoolValue(extraArgs, "persist")
+	persistPtr, err := util.GetBoolValue(extraArgs, "persist")
+	if err != nil {
+		return fmt.Errorf("error getting persist: %v", err)
+	}
 	persist := false
 	if persistPtr != nil {
 		persist = *persistPtr
@@ -328,18 +352,23 @@ func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]
 }
 
 func removeVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
-	volumeName := util.GetStringValue(extraArgs, "volumeName")
+	volumeName, err := util.GetStringValue(extraArgs, "volumeName")
+	if err != nil {
+		return fmt.Errorf("error getting volumeName: %v", err)
+	}
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
 	}
 
-	persistPtr := util.GetBoolValue(extraArgs, "persist")
+	persistPtr, err := util.GetBoolValue(extraArgs, "persist")
+	if err != nil {
+		return fmt.Errorf("error getting persist: %v", err)
+	}
 	persist := false
 	if persistPtr != nil {
 		persist = *persistPtr
 	}
 
-	var err error
 	retry := 0
 	for retry < maxRetries {
 		if !persist {

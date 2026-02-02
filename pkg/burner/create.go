@@ -74,7 +74,10 @@ func (ex *JobExecutor) setupCreateJob() {
 		if err != nil {
 			log.Fatalf("Error cleaning up template %s: %s", o.ObjectTemplate, err)
 		}
-		unsList, gvks := yamlToUnstructuredMultiple(o.ObjectTemplate, cleanTemplate)
+		unsList, gvks, err := yamlToUnstructuredMultiple(o.ObjectTemplate, cleanTemplate)
+		if err != nil {
+			log.Fatalf("Error parsing template %s: %s", o.ObjectTemplate, err)
+		}
 
 		// Get GVK for this specific object and Process if multi yaml document
 		for i, gvk := range gvks {
@@ -217,7 +220,11 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		go func(r int) {
 			defer wg.Done()
 			ex.limiter.Wait(context.TODO())
-			newObjects, gvks := ex.renderTemplateForObjectMultiple(obj, iteration, r)
+			newObjects, gvks, err := ex.renderTemplateForObjectMultiple(obj, iteration, r)
+			if err != nil {
+				log.Errorf("Error rendering object: %s", err)
+				return
+			}
 			newObject := newObjects[obj.documentIndex]
 			gvk := gvks[obj.documentIndex]
 
@@ -231,7 +238,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			// If the mapping fails, the function returns early, preventing a futile create attempt.
 			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
 			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
-			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			_, err = ex.mapper.RESTMapping(gvk.GroupKind())
 
 			if err != nil {
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)

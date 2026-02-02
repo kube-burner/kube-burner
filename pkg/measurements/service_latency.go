@@ -113,12 +113,14 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		// If service is loadbalancer first wait for the IP assignment
 		if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
 			if err := s.waitForIngress(svc); err != nil {
-				log.Fatal(err)
+				log.Error(err)
+				return
 			}
 			ipAssignedLatency = time.Since(now)
 		}
 		if err := s.waitForEndpointSlices(svc); err != nil {
-			log.Fatal(err)
+			log.Error(err)
+			return
 		}
 		// This conditionals prevents a nil pointer dereference panic that can happen when the
 		// measurement is stopped by end of job J, and then the benchmark continues with job J+1,

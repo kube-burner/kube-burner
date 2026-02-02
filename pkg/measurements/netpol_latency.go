@@ -150,17 +150,17 @@ func getNamespacesByLabel(s *metav1.LabelSelector) []string {
 // might be using the same remote namespace pod selector. As the pod addresses for
 // the pod selector already stored in nsPodAddresses, fetches by the later
 // namespaces can use from nsPodAddresses instead of querying kube-apiserver
-func addPodsByLabel(clientSet kubernetes.Interface, ns string, ps *metav1.LabelSelector) []string {
+func addPodsByLabel(clientSet kubernetes.Interface, ns string, ps *metav1.LabelSelector) ([]string, error) {
 	var addresses []string
 	selectorString := ns
 	listOptions := metav1.ListOptions{}
 	if ns == "" {
-		return nil
+		return nil, nil
 	}
 	if ps != nil {
 		selector, err := metav1.LabelSelectorAsSelector(ps)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		listOptions.LabelSelector = selector.String()
 		selectorString = selector.String()
@@ -168,7 +168,7 @@ func addPodsByLabel(clientSet kubernetes.Interface, ns string, ps *metav1.LabelS
 	if podsMap, ok := nsPodAddresses[ns]; !ok || podsMap[selectorString] == nil {
 		pods, err := clientSet.CoreV1().Pods(ns).List(context.TODO(), listOptions)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		for _, pod := range pods.Items {
 			addresses = append(addresses, pod.Status.PodIP)
@@ -178,10 +178,8 @@ func addPodsByLabel(clientSet kubernetes.Interface, ns string, ps *metav1.LabelS
 		} else {
 			nsPodAddresses[ns][selectorString] = addresses
 		}
-	} else {
-		addresses = nsPodAddresses[ns][selectorString]
 	}
-	return addresses
+	return nsPodAddresses[ns][selectorString], nil
 }
 
 // Record the network policy creation timestamp when it is created.
@@ -196,7 +194,7 @@ func (n *netpolLatency) handleCreateNetpol(obj any) {
 }
 
 // Render the network policy from the object template using iteration details as input
-func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj config.Object, objectSpec []byte) []*networkingv1.NetworkPolicy {
+func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj config.Object, objectSpec []byte) ([]*networkingv1.NetworkPolicy, error) {
 
 	templateData := map[string]any{
 		"JobName":   n.JobConfig.Name,
@@ -207,7 +205,7 @@ func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj confi
 	maps.Copy(templateData, obj.InputVars)
 	renderedObj, err := kutil.RenderTemplate(objectSpec, templateData, kutil.MissingKeyError, []string{})
 	if err != nil {
-		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
+		return nil, fmt.Errorf("template error in %s: %s", obj.ObjectTemplate, err)
 	}
 
 	networkingv1.AddToScheme(scheme.Scheme)
@@ -223,15 +221,15 @@ func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj confi
 			if err == io.EOF {
 				break
 			}
-			log.Fatalf("Error decoding YAML document: %v", err)
+			return nil, fmt.Errorf("error decoding YAML document: %v", err)
 		}
 		objBytes, err := json.Marshal(rawObj)
 		if err != nil {
-			log.Fatalf("Error marshaling raw object: %v", err)
+			return nil, fmt.Errorf("error marshaling raw object: %v", err)
 		}
 		netpolObj, _, err := decode(objBytes, nil, nil)
 		if err != nil {
-			log.Fatalf("Failed to decode NetworkPolicy: %v", err)
+			return nil, fmt.Errorf("failed to decode NetworkPolicy: %v", err)
 		}
 		networkPolicy, ok := netpolObj.(*networkingv1.NetworkPolicy)
 		if !ok {
@@ -241,7 +239,7 @@ func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj confi
 		policies = append(policies, networkPolicy)
 
 	}
-	return policies
+	return policies, nil
 }
 
 // It parses the network policy object for each iteration and identify the remote pods from which the namespace has to allow ingress traffic.
@@ -249,12 +247,13 @@ func (n *netpolLatency) getNetworkPolicies(iteration int, replica int, obj confi
 // For example, local pods in namespace-1 will be accepting http requests from remote namespace-2 pods when ingress-1 in namespace-1 specify namespace-2 as remote.
 // connections is map of each client pod with list of addresses it has to send connection requests. Network policy name is also stored along with the addresses.
 // Note: this measurement package only parses template to get IP addresses of pods but never creates network policies. kube-burner's "burner" package creates network policies
-func (n *netpolLatency) prepareConnections() {
+// func (n *netpolLatency) prepareConnections() error {
+func (n *netpolLatency) prepareConnections() error {
 	// Reset latency slices, required in multi-job benchmarks
 	for _, obj := range n.JobConfig.Objects {
 		cleanTemplate, err := readTemplate(obj, n.EmbedCfg)
 		if err != nil {
-			log.Fatalf("Error in readTemplate %s: %s", obj.ObjectTemplate, err)
+			return fmt.Errorf("error in readTemplate %s: %w", obj.ObjectTemplate, err)
 		}
 
 		if !hasNetworkPolicy(obj, cleanTemplate) {
@@ -264,10 +263,17 @@ func (n *netpolLatency) prepareConnections() {
 		for i := range n.JobConfig.JobIterations {
 			for r := 1; r <= obj.Replicas; r++ {
 
-				for _, networkPolicy := range n.getNetworkPolicies(i, r, obj, cleanTemplate) {
+				networkPolicies, err := n.getNetworkPolicies(i, r, obj, cleanTemplate)
+				if err != nil {
+					return fmt.Errorf("failed to get network policies: %v", err)
+				}
+				for _, networkPolicy := range networkPolicies {
 					nsIndex := i / n.JobConfig.IterationsPerNamespace
 					namespace := fmt.Sprintf("%s-%d", n.JobConfig.Namespace, nsIndex)
-					localPods := addPodsByLabel(n.ClientSet, namespace, &networkPolicy.Spec.PodSelector)
+					localPods, err := addPodsByLabel(n.ClientSet, namespace, &networkPolicy.Spec.PodSelector)
+					if err != nil {
+						return fmt.Errorf("failed to get local pods: %v", err)
+					}
 					for _, ingress := range networkPolicy.Spec.Ingress {
 						var ingressPorts []int32
 						for _, from := range ingress.From {
@@ -277,7 +283,7 @@ func (n *netpolLatency) prepareConnections() {
 							}
 							for _, port := range ingress.Ports {
 								if *port.Protocol != corev1.ProtocolTCP {
-									log.Fatalf("Only TCP ports supported in testing")
+									return fmt.Errorf("only TCP ports supported in testing")
 								}
 								// Server listens on only one port for ping test
 								if port.Port.IntVal == serverPingTestPort {
@@ -287,7 +293,10 @@ func (n *netpolLatency) prepareConnections() {
 							}
 							namespaces := getNamespacesByLabel(from.NamespaceSelector)
 							for _, namespace := range namespaces {
-								remoteAddrs := addPodsByLabel(n.ClientSet, namespace, from.PodSelector)
+								remoteAddrs, err := addPodsByLabel(n.ClientSet, namespace, from.PodSelector)
+								if err != nil {
+									return fmt.Errorf("failed to get remote pods: %v", err)
+								}
 								for _, ra := range remoteAddrs {
 									// exclude sending connection request to same ip address
 									otherIPs := []string{}
@@ -330,11 +339,17 @@ func (n *netpolLatency) prepareConnections() {
 			}
 		}
 	}
+	return nil
 }
 
 // hasNetwork policy checks if the object is a network policy
 func hasNetworkPolicy(obj config.Object, t []byte) bool {
-	for _, kind := range getObjectTypes(obj, t) {
+	types, err := getObjectTypes(obj, t)
+	if err != nil {
+		log.Errorf("Error getting object types: %v", err)
+		return false
+	}
+	for _, kind := range types {
 		if kind == "NetworkPolicy" {
 			return true
 		}
@@ -343,28 +358,28 @@ func hasNetworkPolicy(obj config.Object, t []byte) bool {
 }
 
 // Send connections information to proxy pod
-func sendConnections() {
+func (n *netpolLatency) sendConnections() error {
 	data, err := json.Marshal(connections)
 	if err != nil {
-		log.Fatalf("Failed to marshal payload: %v", err)
+		return fmt.Errorf("failed to marshal payload: %v", err)
 	}
 
 	url := fmt.Sprintf("http://%s/initiate", proxyEndpoint)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		log.Fatalf("Failed to send request: %v", err)
+		return fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		log.Debugf("Connection information sent successfully")
 	}
-	waitForCondition(fmt.Sprintf("http://%s/checkConnectionsStatus", proxyEndpoint))
+	return waitForCondition(fmt.Sprintf("http://%s/checkConnectionsStatus", proxyEndpoint))
 }
 
 // Periodically check if proxy pod finished communication with all client pods,
 // during 1) sending connection information 2) retrieving results
-func waitForCondition(url string) {
+func waitForCondition(url string) error {
 	timeout := time.After(30 * time.Minute)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -372,65 +387,63 @@ func waitForCondition(url string) {
 	for {
 		select {
 		case <-timeout:
-			log.Fatalf("Timeout reached. Stopping further checks.")
-			return
+			return fmt.Errorf("timeout reached. Stopping further checks")
 		case <-ticker.C:
 			resp, err := http.Get(url)
 			if err != nil {
-				log.Fatalf("Failed to check status: %v", err)
-				continue
+				return fmt.Errorf("failed to check status: %v", err)
 			}
 
 			body, err := io.ReadAll(resp.Body)
 			resp.Body.Close()
 			if err != nil {
-				log.Fatalf("Failed to read response body: %v", err)
-				continue
+				return fmt.Errorf("failed to read response body: %v", err)
 			}
 			var response ProxyResponse
 			err = json.Unmarshal(body, &response)
 			if err != nil {
-				log.Fatalf("Error decoding response: %v", err)
-				return
+				return fmt.Errorf("error decoding response: %v", err)
 			}
 			if response.Result {
-				return
+				return nil
 			}
 		}
 	}
 }
 
 // Get results from proxy pod and parse them.
-func (n *netpolLatency) processResults() {
+func (n *netpolLatency) processResults() error {
 	serverURL := fmt.Sprintf("http://%s", proxyEndpoint)
 	resp, err := http.Get(fmt.Sprintf("%s/stop", serverURL))
 	if err != nil {
-		log.Fatalf("Failed to retrieve results: %v", err)
+		return fmt.Errorf("failed to stop proxy: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("Unexpected status code: %d", resp.StatusCode)
+		return fmt.Errorf("unexpected status code from stop: %d", resp.StatusCode)
 	}
 	resp.Body.Close()
 	// Wait till proxy got results from all pods
-	waitForCondition(fmt.Sprintf("%s/checkStopStatus", serverURL))
+	if err := waitForCondition(fmt.Sprintf("%s/checkStopStatus", serverURL)); err != nil {
+		return err
+	}
 
 	// Retrieve the results
 	resp, err = http.Get(fmt.Sprintf("%s/results", serverURL))
 	if err != nil {
-		log.Fatalf("Failed to retrieve results: %v", err)
+		return fmt.Errorf("failed to retrieve results: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("Unexpected status code: %d", resp.StatusCode)
+		return fmt.Errorf("unexpected status code from results: %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("Failed to read response body: %v", err)
+		return fmt.Errorf("failed to read response body: %v", err)
 	}
 
 	if err := json.Unmarshal(body, &clusterResults); err != nil {
-		log.Fatalf("Failed to unmarshal results: %v", err)
+		return fmt.Errorf("failed to unmarshal results: %v", err)
 	}
 	log.Tracef("clusterResults %v", clusterResults)
 	for pod, results := range clusterResults {
@@ -467,25 +480,26 @@ func (n *netpolLatency) processResults() {
 			JobName:         n.JobConfig.Name,
 		})
 	}
+	return nil
 }
 
 // Read network policy object template
 func readTemplate(o config.Object, embedCfg *fileutils.EmbedConfiguration) ([]byte, error) {
 	f, err := fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
 	if err != nil {
-		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
+		return nil, fmt.Errorf("error reading template %s: %s", o.ObjectTemplate, err)
 	}
 	t, err := io.ReadAll(f)
 	if err != nil {
-		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
+		return nil, fmt.Errorf("error reading template %s: %s", o.ObjectTemplate, err)
 	}
 	return t, err
 }
 
-func getObjectTypes(o config.Object, t []byte) []string {
+func getObjectTypes(o config.Object, t []byte) ([]string, error) {
 	cleanTemplate, err := kutil.CleanupTemplate(t)
 	if err != nil {
-		log.Fatalf("Error preparing template %s: %s", o.ObjectTemplate, err)
+		return nil, fmt.Errorf("error preparing template %s: %s", o.ObjectTemplate, err)
 	}
 	var kinds []string
 	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(cleanTemplate), 4096)
@@ -510,7 +524,7 @@ func getObjectTypes(o config.Object, t []byte) []string {
 		kinds = append(kinds, uns.GetKind())
 	}
 
-	return kinds
+	return kinds, nil
 
 }
 
@@ -541,10 +555,14 @@ func (n *netpolLatency) Start(measurementWg *sync.WaitGroup) error {
 		proxyEndpoint = fmt.Sprintf("127.0.0.1:%s", networkPolicyProxyPort)
 	}
 	// Parse network policy template for each iteration and prepare connections for client pods
-	n.prepareConnections()
+	if err := n.prepareConnections(); err != nil {
+		return err
+	}
 	// send connection information to proxy to deliver to client pods
 	if len(connections) > 0 {
-		sendConnections()
+		if err := n.sendConnections(); err != nil {
+			return err
+		}
 	}
 	gvr, err := kutil.ResourceToGVR(n.RestConfig, "NetworkPolicy", "networking.k8s.io/v1")
 	if err != nil {
@@ -575,7 +593,9 @@ func (n *netpolLatency) Stop() error {
 		}
 	}
 	if len(connections) > 0 {
-		n.processResults()
+		if err := n.processResults(); err != nil {
+			return err
+		}
 	}
 	proxyPortForwarder.CancelPodPortForwarder()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)

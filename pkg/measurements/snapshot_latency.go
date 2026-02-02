@@ -171,7 +171,8 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 	}
 	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(vsl.RestConfig)
 	if err != nil {
-		log.Fatalf("Failed to get kubevirt client - %v", err)
+		log.Errorf("Failed to get kubevirt client - %v", err)
+		return
 	}
 	namespaces := strings.Split(vsl.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {

@@ -17,6 +17,7 @@ package burner
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -107,15 +108,15 @@ func updateChildLabels(obj *unstructured.Unstructured, labels map[string]string)
 	}
 }
 
-func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind) {
+func yamlToUnstructured(fileName string, y []byte, uns *unstructured.Unstructured) (runtime.Object, *schema.GroupVersionKind, error) {
 	o, gvk, err := scheme.Codecs.UniversalDeserializer().Decode(y, nil, uns)
 	if err != nil {
-		log.Fatalf("Error decoding YAML (%s): %s", fileName, err)
+		return nil, nil, fmt.Errorf("error decoding YAML (%s): %s", fileName, err)
 	}
-	return o, gvk
+	return o, gvk, nil
 }
 
-func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unstructured, []*schema.GroupVersionKind) {
+func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unstructured, []*schema.GroupVersionKind, error) {
 	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(y), 4096)
 	var gvks []*schema.GroupVersionKind
 	var objects []*unstructured.Unstructured
@@ -133,9 +134,9 @@ func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unst
 		gvks = append(gvks, &gvk)
 	}
 	if len(objects) == 0 {
-		log.Fatalf("Error decoding YAML (%s): no objects found", fileName)
+		return nil, nil, fmt.Errorf("error decoding YAML (%s): no objects found", fileName)
 	}
-	return objects, gvks
+	return objects, gvks, nil
 }
 
 // resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements

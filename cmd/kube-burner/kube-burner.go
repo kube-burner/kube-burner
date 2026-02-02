@@ -111,7 +111,10 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatal(err.Error())
 			}
-			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			kubeClientProvider, err := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			if err != nil {
+				log.Fatal(err)
+			}
 			clientSet, _ = kubeClientProvider.DefaultClientSet()
 			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
@@ -185,7 +188,11 @@ func healthCheck() *cobra.Command {
 			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
-			clientSet, _ := config.NewKubeClientProvider(kubeConfig, kubeContext).ClientSet(0, 0)
+			kubeClientProvider, err := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			if err != nil {
+				log.Fatal(err)
+			}
+			clientSet, _ := kubeClientProvider.ClientSet(0, 0)
 			util.ClusterHealthCheck(clientSet)
 		},
 	}
@@ -209,7 +216,10 @@ func destroyCmd() *cobra.Command {
 			if !skipLogFile {
 				util.SetupFileLogging(uuid)
 			}
-			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			kubeClientProvider, err := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			if err != nil {
+				log.Fatal(err)
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
@@ -293,15 +303,22 @@ func measureCmd() *cobra.Command {
 					log.Fatalf("Error reading provided user metadata: %v", err)
 				}
 			}
-			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
+			kubeClientProvider, err := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			if err != nil {
+				log.Fatal(err)
+			}
+			measurementsInstance, err := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
 				&config.Job{
 					Name:    jobName,
 					JobType: config.CreationJob,
 				},
-				config.NewKubeClientProvider(kubeConfig, kubeContext),
+				kubeClientProvider,
 				nil,
 				selector,
 			)
+			if err != nil {
+				log.Fatal(err)
+			}
 			measurementsInstance.Start()
 			log.Infof("Running measurements for %s", duration)
 			time.Sleep(duration)

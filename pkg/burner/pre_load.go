@@ -99,7 +99,10 @@ func getJobImages(job JobExecutor) ([]string, error) {
 		if err != nil {
 			return imageList, err
 		}
-		unsList, _ := yamlToUnstructuredMultiple(object.ObjectTemplate, renderedObj)
+		unsList, _, err := yamlToUnstructuredMultiple(object.ObjectTemplate, renderedObj)
+		if err != nil {
+			return imageList, err
+		}
 		for _, uns := range unsList {
 			images := extractImagesFromObject(uns, renderedObj)
 			imageList = append(imageList, images...)
@@ -153,7 +156,7 @@ func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabe
 	maps.Copy(nsLabels, namespaceLabels)
 	maps.Copy(nsAnnotations, namespaceAnnotations)
 	if err := util.CreateNamespace(clientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	dsName := "preload"
 	ds := appsv1.DaemonSet{

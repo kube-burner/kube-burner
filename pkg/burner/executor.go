@@ -15,6 +15,7 @@
 package burner
 
 import (
+	"fmt"
 	"sync"
 
 	"maps"
@@ -99,7 +100,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	return ex
 }
 
-func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {
+func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) ([]byte, error) {
 	// Processing template
 	templateData := map[string]any{
 		jobName:      ex.Name,
@@ -117,22 +118,24 @@ func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIn
 
 	renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption, ex.functionTemplates)
 	if err != nil {
-		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
+		return nil, fmt.Errorf("template error in %s: %w", obj.ObjectTemplate, err)
 	}
 
 	if asJson {
 		newObject := &unstructured.Unstructured{}
-		yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject)
+		if _, _, err := yamlToUnstructured(obj.ObjectTemplate, renderedObj, newObject); err != nil {
+			return nil, err
+		}
 		renderedObj, err = newObject.MarshalJSON()
 		if err != nil {
-			log.Fatalf("Error converting YAML to JSON")
+			return nil, fmt.Errorf("error converting YAML to JSON: %w", err)
 		}
 	}
 
-	return renderedObj
+	return renderedObj, nil
 }
 
-func (ex *JobExecutor) renderTemplateForObjectMultiple(obj *object, iteration, replicaIndex int) ([]*unstructured.Unstructured, []*schema.GroupVersionKind) {
+func (ex *JobExecutor) renderTemplateForObjectMultiple(obj *object, iteration, replicaIndex int) ([]*unstructured.Unstructured, []*schema.GroupVersionKind, error) {
 	// Processing template
 	templateData := map[string]any{
 		jobName:      ex.Name,
@@ -150,9 +153,8 @@ func (ex *JobExecutor) renderTemplateForObjectMultiple(obj *object, iteration, r
 
 	renderedObj, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption, ex.functionTemplates)
 	if err != nil {
-		log.Fatalf("Template error in %s: %s", obj.ObjectTemplate, err)
+		return nil, nil, fmt.Errorf("template error in %s: %w", obj.ObjectTemplate, err)
 	}
 
-	objects, gvks := yamlToUnstructuredMultiple(obj.ObjectTemplate, renderedObj)
-	return objects, gvks
+	return yamlToUnstructuredMultiple(obj.ObjectTemplate, renderedObj)
 }

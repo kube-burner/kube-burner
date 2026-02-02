@@ -109,8 +109,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			errs = append(errs, watcherStartErrors...)
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
-				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg, fmt.Sprintf("%s=%s", config.KubeBurnerLabelRunID, globalConfig.RUNID))
-				measurementsInstance.Start()
+				measurementsInstance, err = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg, fmt.Sprintf("%s=%s", config.KubeBurnerLabelRunID, globalConfig.RUNID))
+				if err != nil {
+					errs = append(errs, err)
+					log.Errorf("Failed to initialize measurements: %v", err)
+					innerRC = rcMeasurement
+				} else {
+					measurementsInstance.Start()
+				}
 			}
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
@@ -187,7 +193,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				elapsedTime := jobEnd.Sub(executedJobs[jobExecutorIdx].Start).Round(time.Second)
 				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
 			}
-			if !jobExecutor.MetricsAggregate {
+			if !jobExecutor.MetricsAggregate && measurementsInstance != nil {
 				// We stop and index measurements per job
 				if err = measurementsInstance.Stop(); err != nil {
 					errs = append(errs, err)
@@ -296,7 +302,7 @@ func handlePreloadImages(executorList []JobExecutor, kubeClientProvider *config.
 	for _, executor := range executorList {
 		if executor.PreLoadImages && executor.JobType == config.CreationJob {
 			if err := preLoadImages(executor, clientSet); err != nil {
-				log.Fatal(err.Error())
+				log.Errorf("Preload images failed: %v", err)
 			}
 		}
 	}
@@ -448,7 +454,7 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 			CleanupNamespaceResourcesByLabel(ctx, *ex, obj, obj.namespace, labelSelector)
 			err := waitForDeleteResourceInNamespace(ctx, *ex, obj, obj.namespace, labelSelector)
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Errorf("Failed to wait for deletion of resource in namespace: %v", err)
 			}
 		}
 	}

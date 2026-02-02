@@ -159,7 +159,7 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
 	if p.JobConfig.JobType == config.ReadJob || p.JobConfig.JobType == config.PatchJob || p.JobConfig.JobType == config.DeletionJob {
-		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
+		return fmt.Errorf("unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
 	}
 	gvr, err := util.ResourceToGVR(p.RestConfig, "PersistentVolumeClaim", "v1")
 	if err != nil {
