@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"sync"
 	"time"
 
@@ -119,11 +118,15 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					// Before GC
 					if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeGC); err != nil {
 						log.Errorf("Hook execution failed: %v", err)
+						errs = append(errs, err)
+						innerRC = 1
 					}
 					jobExecutor.gc(ctx, nil)
 					// After GC
 					if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterGC); err != nil {
 						log.Errorf("Hook execution failed: %v", err)
+						errs = append(errs, err)
+						innerRC = 1
 					}
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
@@ -136,6 +139,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookBeforeDeployment, err)
+					errs = append(errs, err)
+					innerRC = 1
 				}
 				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations); jobErrs != nil {
 					errs = append(errs, jobErrs...)
@@ -143,6 +148,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterDeployment, err)
+					errs = append(errs, err)
+					innerRC = 1
 				}
 				// Collect background hook results
 				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
@@ -169,6 +176,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			} else {
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookBeforeDeployment, err)
+					errs = append(errs, err)
+					innerRC = 1
 				}
 				if jobErrs := jobExecutor.Run(ctx); len(jobErrs) > 0 {
 					errs = append(errs, jobErrs...)
@@ -176,6 +185,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterDeployment); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterDeployment, err)
+					errs = append(errs, err)
+					innerRC = 1
 				}
 				// Collect background hook results for hooks started during the beforeDeployment and afterDeployment stages
 				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
@@ -187,6 +198,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				// Execute beforeCleanup hooks first
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeCleanup); err != nil {
 					log.Errorf("Hook execution failed: %v", err)
+					errs = append(errs, err)
+					innerRC = 1
 				}
 
 				if jobExecutor.BeforeCleanup != "" {
@@ -242,11 +255,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance = nil
 			}
 			watcherStopErrs := watcherManager.StopAll()
-			slices.Concat(errs, watcherStopErrs)
+			errs = append(errs, watcherStopErrs...)
 			if jobExecutor.GC {
 				jobExecutor.gc(ctx, nil)
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterCleanup); err != nil {
 					log.Errorf("Error executing hooks for %s: %v", config.HookAfterCleanup, err)
+					errs = append(errs, err)
+					innerRC = 1
 				}
 				// Collect background hook results from afterCleanup
 				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
@@ -270,6 +285,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				for _, jobExecutor := range jobExecutors {
 					if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookAfterCleanup); err != nil {
 						log.Errorf("Error executing hooks for %s: %v", config.HookAfterCleanup, err)
+						errs = append(errs, err)
+						innerRC = 1
 					}
 					// Collect background hook results from afterCleanup
 					errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
