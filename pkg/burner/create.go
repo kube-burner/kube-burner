@@ -93,6 +93,9 @@ func (ex *JobExecutor) setupCreateJob() {
 				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 			} else {
 				obj.gvr = schema.GroupVersionResource{}
+				// For templated kinds that couldn't be resolved at setup time,
+				// assume they might be namespaced. This will be confirmed at runtime.
+				obj.namespaced = true
 			}
 			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
 			if obj.namespaced && obj.namespace == "" {
@@ -139,17 +142,8 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
-			if obj.gvr == (schema.GroupVersionResource{}) {
-				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
-				ex.resolveObjectMapping(obj)
-				if ex.nsRequired {
-					nsName := ex.Namespace
-					if ex.NamespacedIterations {
-						nsName = ex.generateNamespace(i)
-					}
-					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations)
-				}
-			}
+			// Skip resolveObjectMapping for templated kinds (GVR will be resolved at render time)
+			// When gvr is empty, the kind is likely templated and will be resolved in replicaHandler
 			kbLabels := map[string]string{
 				config.KubeBurnerLabelUUID:         ex.uuid,
 				config.KubeBurnerLabelJob:          ex.Name,
@@ -227,16 +221,25 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			newObject.SetLabels(objectLabels)
 			updateChildLabels(newObject, objectLabels)
 
-			// Before attempting to create an object, this error check confirms the REST mapping exists.
-			// If the mapping fails, the function returns early, preventing a futile create attempt.
-			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
-			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
-			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			// Resolve the REST mapping dynamically using the rendered GVK.
+			// This is needed for templated kinds that couldn't be resolved at setup time.
+			// Reset the mapper to ensure we get fresh discovery data (needed when CRDs are created in earlier iterations)
+			ex.mapper.Reset()
+			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
 
 			if err != nil {
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
 				return
 			}
+
+			// Use the dynamically resolved GVR and namespaced status
+			gvr := mapping.Resource
+			namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
+
+			// Store the resolved GVR for later cleanup and verification
+			// This is essential for templated kinds that produce different GVRs per iteration
+			obj.resolvedGVRs.Store(gvr.String(), gvr)
+
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
 			// wait for ready, etc. Without this wait group, running for example,
@@ -245,10 +248,10 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			replicaWg.Add(1)
 			go func(n string) {
 				defer replicaWg.Done()
-				if !obj.namespaced {
+				if !namespaced {
 					n = ""
 				}
-				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, gvr, n, newObject, ex.MaxWaitTimeout)
 			}(ns)
 		}(r)
 	}

@@ -24,6 +24,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 )
@@ -35,7 +36,22 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 		log.Infof("Deleting namespace %s using GVR", namespace)
 		for _, obj := range ex.objects {
 			if obj.namespaced {
-				CleanupNamespaceResourcesByLabel(ctx, ex, obj, namespace, labelSelector)
+				// Collect GVRs to clean up: use static GVR if available, otherwise use dynamically resolved GVRs
+				var gvrsToCleanup []schema.GroupVersionResource
+				if obj.gvr != (schema.GroupVersionResource{}) {
+					gvrsToCleanup = append(gvrsToCleanup, obj.gvr)
+				} else {
+					// Templated kind case: use dynamically resolved GVRs stored during creation
+					obj.resolvedGVRs.Range(func(key, value any) bool {
+						if gvr, ok := value.(schema.GroupVersionResource); ok {
+							gvrsToCleanup = append(gvrsToCleanup, gvr)
+						}
+						return true
+					})
+				}
+				for _, gvr := range gvrsToCleanup {
+					cleanupResourcesByGVR(ctx, ex, gvr, namespace, labelSelector)
+				}
 			}
 		}
 		err := waitForDeleteNamespacedResources(ctx, ex, namespace, labelSelector)
@@ -44,6 +60,26 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 		}
 	}
 	return nil
+}
+
+// cleanupResourcesByGVR cleans up resources for a specific GVR
+func cleanupResourcesByGVR(ctx context.Context, ex JobExecutor, gvr schema.GroupVersionResource, namespace string, labelSelector string) {
+	resourceInterface := ex.dynamicClient.Resource(gvr).Namespace(namespace)
+	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		log.Errorf("Unable to list %vs in %v: %v", gvr.Resource, namespace, err)
+		return
+	}
+	if len(resources.Items) > 0 {
+		log.Infof("Deleting %d %ss labeled with %s in %s", len(resources.Items), gvr.Resource, labelSelector, namespace)
+	}
+	for _, item := range resources.Items {
+		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
+			if !errors.IsNotFound(err) {
+				log.Errorf("Error deleting %v/%v in %v: %v", item.GetKind(), item.GetName(), namespace, err)
+			}
+		}
+	}
 }
 
 // Deletes resources with the give labelSelector within a namespace
@@ -80,6 +116,20 @@ func CleanupNonNamespacedResourcesByLabel(ctx context.Context, ex JobExecutor, o
 	}
 }
 
+// cleanupNonNamespacedResourcesByGVR cleans up non-namespaced resources for a specific GVR
+func cleanupNonNamespacedResourcesByGVR(ctx context.Context, ex JobExecutor, gvr schema.GroupVersionResource, labelSelector string) {
+	resourceInterface := ex.dynamicClient.Resource(gvr)
+	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		log.Debugf("Unable to list resources for GVR %s: %v. Skipping", gvr.Resource, err)
+		return
+	}
+	if len(resources.Items) > 0 {
+		log.Infof("Deleting %d %ss labeled with %s", len(resources.Items), gvr.Resource, labelSelector)
+		util.DeleteNonNamespacedResources(ctx, resources, resourceInterface)
+	}
+}
+
 func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, namespace string, labelSelector string) error {
 	for _, obj := range ex.objects {
 		// If churning is enabled and object doesn't have churning enabled we skip that object from deletion
@@ -87,17 +137,32 @@ func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, names
 			continue
 		}
 		if obj.namespaced {
-			err := waitForDeleteResourceInNamespace(ctx, ex, obj, namespace, labelSelector)
-			if err != nil {
-				return fmt.Errorf("error waiting for %s to be deleted: %v", obj.Kind, err)
+			// Collect GVRs to wait for: use static GVR if available, otherwise use dynamically resolved GVRs
+			var gvrsToWait []schema.GroupVersionResource
+			if obj.gvr != (schema.GroupVersionResource{}) {
+				gvrsToWait = append(gvrsToWait, obj.gvr)
+			} else {
+				// Templated kind case: use dynamically resolved GVRs stored during creation
+				obj.resolvedGVRs.Range(func(key, value any) bool {
+					if gvr, ok := value.(schema.GroupVersionResource); ok {
+						gvrsToWait = append(gvrsToWait, gvr)
+					}
+					return true
+				})
+			}
+			for _, gvr := range gvrsToWait {
+				err := waitForDeleteResourceByGVR(ctx, ex, gvr, namespace, labelSelector)
+				if err != nil {
+					return fmt.Errorf("error waiting for %s to be deleted: %v", gvr.Resource, err)
+				}
 			}
 		}
 	}
 	return nil
 }
 
-func waitForDeleteResourceInNamespace(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) error {
-	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
+func waitForDeleteResourceByGVR(ctx context.Context, ex JobExecutor, gvr schema.GroupVersionResource, namespace string, labelSelector string) error {
+	resourceInterface := ex.dynamicClient.Resource(gvr).Namespace(namespace)
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
@@ -105,10 +170,27 @@ func waitForDeleteResourceInNamespace(ctx context.Context, ex JobExecutor, obj *
 			return false, err
 		}
 		if len(objList.Items) > 0 {
-			log.Debugf("Waiting for %d %ss labeled with %s in %s to be deleted", len(objList.Items), obj.Kind, labelSelector, namespace)
+			log.Debugf("Waiting for %d %ss labeled with %s in %s to be deleted", len(objList.Items), gvr.Resource, labelSelector, namespace)
 			return false, nil
 		}
 		return true, nil
 	})
 	return err
 }
+
+// func waitForDeleteResourceInNamespace(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) error {
+// 	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
+// 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+// 		objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+// 		if err != nil {
+// 			log.Errorf("Error listing objects: %v", err)
+// 			return false, err
+// 		}
+// 		if len(objList.Items) > 0 {
+// 			log.Debugf("Waiting for %d %ss labeled with %s in %s to be deleted", len(objList.Items), obj.Kind, labelSelector, namespace)
+// 			return false, nil
+// 		}
+// 		return true, nil
+// 	})
+// 	return err
+// }

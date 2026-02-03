@@ -1,0 +1,32 @@
+---
+# Test configuration for symbolic GVK implementation
+# This tests the scenario where a kind has multiple API versions
+# and kube-burner needs to track symbolic GVKs for proper resolution
+global:
+  gc: true
+      
+jobs:
+  # First, create CRDs with templated kind names
+  - name: create-crds
+    jobType: create
+    jobIterations: 3
+    namespacedIterations: false
+    qps: 5
+    burst: 5
+    waitWhenFinished: true
+    objects:
+      - objectTemplate: templates/test-crd.yml
+        replicas: 1
+
+  # Then create CRs that use the templated kinds
+  - name: create-crs
+    jobType: create
+    jobIterations: 3
+    namespace: symbolic-gvk-test
+    namespacedIterations: false
+    qps: 5
+    burst: 5
+    waitWhenFinished: true
+    objects:
+      - objectTemplate: templates/test-cr.yml
+        replicas: 2

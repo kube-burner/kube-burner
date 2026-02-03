@@ -17,13 +17,14 @@ package burner
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/meta"
+	// "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -139,19 +140,19 @@ func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unst
 }
 
 // resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements
-func (ex *JobExecutor) resolveObjectMapping(obj *object) {
-	ex.mapper.Reset()
-	mapping, err := ex.mapper.RESTMapping(obj.gvk.GroupKind())
-	if err != nil {
-		log.Fatal(err)
-	}
-	obj.gvr = mapping.Resource
-	obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-	obj.Kind = obj.gvk.Kind
-	if obj.namespaced && obj.namespace == "" {
-		ex.nsRequired = true
-	}
-}
+// func (ex *JobExecutor) resolveObjectMapping(obj *object) {
+// 	ex.mapper.Reset()
+// 	mapping, err := ex.mapper.RESTMapping(obj.gvk.GroupKind())
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	obj.gvr = mapping.Resource
+// 	obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+// 	obj.Kind = obj.gvk.Kind
+// 	if obj.namespaced && obj.namespace == "" {
+// 		ex.nsRequired = true
+// 	}
+// }
 
 // Verify verifies the number of created objects
 func (ex *JobExecutor) Verify() bool {
@@ -170,19 +171,41 @@ func (ex *JobExecutor) Verify() bool {
 			LabelSelector: selector.String(),
 			Limit:         objectLimit,
 		}
+
+		// Collect GVRs to verify: use static GVR if available, otherwise use dynamically resolved GVRs
+		var gvrsToVerify []schema.GroupVersionResource
+		if obj.gvr != (schema.GroupVersionResource{}) {
+			// Standard case: use the static GVR
+			gvrsToVerify = append(gvrsToVerify, obj.gvr)
+		} else {
+			// Templated kind case: use dynamically resolved GVRs stored during creation
+			obj.resolvedGVRs.Range(func(key, value any) bool {
+				if gvr, ok := value.(schema.GroupVersionResource); ok {
+					gvrsToVerify = append(gvrsToVerify, gvr)
+				}
+				return true
+			})
+			if len(gvrsToVerify) == 0 {
+				log.Warnf("No resolved GVRs found for templated kind object at index %d, skipping verification", objectIndex)
+				continue
+			}
+		}
+
 		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
 			replicas = 0
-			for {
-				objList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
-				if err != nil {
-					log.Errorf("Error verifying object: %s", err)
-					return false, nil
-				}
-				replicas += len(objList.Items)
-				listOptions.Continue = objList.GetContinue()
-				// If continue is not set
-				if listOptions.Continue == "" {
-					break
+			for _, gvr := range gvrsToVerify {
+				for {
+					objList, err = ex.dynamicClient.Resource(gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
+					if err != nil {
+						log.Errorf("Error verifying object %s: %s", gvr.Resource, err)
+						return false, nil
+					}
+					replicas += len(objList.Items)
+					listOptions.Continue = objList.GetContinue()
+					// If continue is not set
+					if listOptions.Continue == "" {
+						break
+					}
 				}
 			}
 			return true, nil
@@ -198,11 +221,15 @@ func (ex *JobExecutor) Verify() bool {
 		} else {
 			objectsExpected = obj.Replicas * ex.JobIterations
 		}
+		resourceName := obj.gvr.Resource
+		if resourceName == "" {
+			resourceName = fmt.Sprintf("%d templated kinds", len(gvrsToVerify))
+		}
 		if replicas != objectsExpected {
-			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
+			log.Errorf("%s found: %d Expected: %d", resourceName, replicas, objectsExpected)
 			success = false
 		} else {
-			log.Debugf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
+			log.Debugf("%s found: %d Expected: %d", resourceName, replicas, objectsExpected)
 		}
 	}
 	return success
