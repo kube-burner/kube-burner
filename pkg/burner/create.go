@@ -316,10 +316,10 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 			ns = objNs
 		}
 		if ns != "" {
-			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(context.TODO(), obj, metav1.CreateOptions{})
+			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(ctx, obj, metav1.CreateOptions{})
 		} else {
 			if !ex.nsChurning {
-				uns, err = ex.dynamicClient.Resource(gvr).Create(context.TODO(), obj, metav1.CreateOptions{})
+				uns, err = ex.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
 			} else {
 				// Skip non-namespaced objects during namespace churning - they won't be deleted with the namespace
 				log.Debugf("Skipping non-namespaced object %s/%s during namespace churning", obj.GetKind(), obj.GetName())
@@ -518,7 +518,7 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				}
 			}
 		}
-		ex.verifyDelete(deletedObjects)
+		ex.verifyDelete(ctx, deletedObjects)
 		ex.reCreateDeletedObjects(ctx, deletedObjects)
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 		time.Sleep(ex.ChurnConfig.Delay)
@@ -549,10 +549,10 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 }
 
 // verifyDelete verifies if the object has been deleted
-func (ex *JobExecutor) verifyDelete(deletedObjects []churnDeletedObject) {
+func (ex *JobExecutor) verifyDelete(ctx context.Context, deletedObjects []churnDeletedObject) {
 	for _, obj := range deletedObjects {
-		wait.PollUntilContextCancel(context.TODO(), time.Second, true, func(ctx context.Context) (done bool, err error) {
-			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(context.TODO(), obj.object.GetName(), metav1.GetOptions{})
+		wait.PollUntilContextCancel(ctx, time.Second, true, func(pollCtx context.Context) (done bool, err error) {
+			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(pollCtx, obj.object.GetName(), metav1.GetOptions{})
 			if kerrors.IsNotFound(err) {
 				return true, nil
 			}
