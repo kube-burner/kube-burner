@@ -15,13 +15,13 @@
 package burner
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/utils/ptr"
 )
 
@@ -56,7 +57,6 @@ type churnDeletedObject struct {
 func (ex *JobExecutor) setupCreateJob() {
 	var f io.Reader
 	var err error
-	var templateRegex = regexp.MustCompile(`\{\{.*}}`)
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
@@ -79,7 +79,7 @@ func (ex *JobExecutor) setupCreateJob() {
 		}
 		unsList, gvks := yamlToUnstructuredMultiple(o.ObjectTemplate, cleanTemplate)
 
-		// Get raw kinds to detect templated kinds
+		// Get raw kinds from original template to detect templated kinds
 		rawKinds, err := getRawKinds(t)
 		if err != nil {
 			log.Fatalf("Error parsing raw template %s: %s", o.ObjectTemplate, err)
@@ -98,8 +98,8 @@ func (ex *JobExecutor) setupCreateJob() {
 				documentIndex: i,
 			}
 			if i < len(rawKinds) {
-				// Use regex to check if the kind field contains Go template syntax ({{...}}).
-				if templateRegex.MatchString(rawKinds[i]) {
+				// Check if the raw kind field contains Go template syntax ({{...}})
+				if strings.Contains(rawKinds[i], "{{") {
 					obj.IsKindTemplated = true
 				}
 			}
@@ -615,21 +615,77 @@ func trimObject(obj *unstructured.Unstructured) {
 	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "controller-uid")
 }
 
-// getRawKinds returns the kinds of the objects in the given content
+// getRawKinds extracts the kind field values from raw template content.
+// Uses k8s.io/apimachinery/pkg/util/yaml.YAMLReader from client-go to split YAML documents,
+// then extracts kind fields using line scanning to handle Go template syntax safely.
+// Preserves template syntax like {{.Kind}} for detection.
+// Returns an error if any document is missing a kind field.
 func getRawKinds(content []byte) ([]string, error) {
-	decoder := yaml.NewDecoder(bytes.NewReader(content))
 	var kinds []string
+
+	// Use client-go's YAMLReader to split multi-document YAML
+	reader := kubeyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(content)))
+
+	docIndex := 0
 	for {
-		var obj struct {
-			Kind string `yaml:"kind"`
-		}
-		if err := decoder.Decode(&obj); err != nil {
+		doc, err := reader.Read()
+		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, err
 		}
-		kinds = append(kinds, obj.Kind)
+
+		// Skip empty documents
+		if len(bytes.TrimSpace(doc)) == 0 {
+			continue
+		}
+
+		// Extract kind using line scanning to handle Go template syntax safely
+		kind, err := extractKindFromDocument(doc)
+		if err != nil {
+			return nil, fmt.Errorf("document %d: %w", docIndex, err)
+		}
+		kinds = append(kinds, kind)
+		docIndex++
 	}
+
 	return kinds, nil
+}
+
+// extractKindFromDocument extracts the kind field value from a YAML document using line scanning.
+// It looks for top-level "kind:" fields (no indentation) to handle Go template syntax safely.
+// This approach is necessary because templates may contain Go template syntax (e.g., {{.Kind}})
+// that would cause standard YAML parsers to fail.
+// Returns ErrKindNotFound if the document does not contain a kind field.
+func extractKindFromDocument(doc []byte) (string, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(doc))
+	var ErrKindNotFound = fmt.Errorf("kind field not found in YAML document")
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		trimmedLine := bytes.TrimSpace(line)
+
+		// Look for top-level "kind:" field (no leading whitespace)
+		if bytes.HasPrefix(line, []byte("kind:")) ||
+			(bytes.HasPrefix(trimmedLine, []byte("kind:")) &&
+				!bytes.HasPrefix(line, []byte(" ")) &&
+				!bytes.HasPrefix(line, []byte("\t"))) {
+
+			// Extract the value after "kind:"
+			parts := bytes.SplitN(trimmedLine, []byte(":"), 2)
+			if len(parts) == 2 {
+				kindValue := string(bytes.TrimSpace(parts[1]))
+				if kindValue == "" {
+					return "", fmt.Errorf("%w: kind field is empty", ErrKindNotFound)
+				}
+				return kindValue, nil
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error scanning document: %w", err)
+	}
+
+	return "", ErrKindNotFound
 }
