@@ -251,6 +251,10 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			newObject.SetLabels(objectLabels)
 			updateChildLabels(newObject, objectLabels)
 
+			// Before attempting to create an object, this error check confirms the REST mapping exists.
+			// If the mapping fails, the function returns early, preventing a futile create attempt.
+			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
+			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
 			// Resolve the REST mapping dynamically using the rendered GVK.
 			// This is needed for templated kinds that couldn't be resolved at setup time.
 			// Reset the mapper to ensure we get fresh discovery data (needed when CRDs are created in earlier iterations)
