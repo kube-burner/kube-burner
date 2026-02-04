@@ -15,7 +15,7 @@ jobs:
     burst: 5
     waitWhenFinished: true
     objects:
-      - objectTemplate: templates/test-crd.yml
+      - objectTemplate: objectTemplates/test-crd.yml
         replicas: 1
 
   # Then create CRs that use the templated kinds
@@ -28,5 +28,5 @@ jobs:
     burst: 5
     waitWhenFinished: true
     objects:
-      - objectTemplate: templates/test-cr.yml
+      - objectTemplate: objectTemplates/test-cr.yml
         replicas: 2
