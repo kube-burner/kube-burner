@@ -520,7 +520,7 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				}
 			}
 		}
-		ex.verifyDelete(deletedObjects)
+		ex.verifyDelete(ctx, deletedObjects)
 		ex.reCreateDeletedObjects(ctx, deletedObjects)
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 		time.Sleep(ex.ChurnConfig.Delay)
@@ -551,10 +551,10 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 }
 
 // verifyDelete verifies if the object has been deleted
-func (ex *JobExecutor) verifyDelete(deletedObjects []churnDeletedObject) {
+func (ex *JobExecutor) verifyDelete(ctx context.Context, deletedObjects []churnDeletedObject) {
 	for _, obj := range deletedObjects {
-		wait.PollUntilContextCancel(context.TODO(), time.Second, true, func(ctx context.Context) (done bool, err error) {
-			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(context.TODO(), obj.object.GetName(), metav1.GetOptions{})
+		wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
+			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(ctx, obj.object.GetName(), metav1.GetOptions{})
 			if kerrors.IsNotFound(err) {
 				return true, nil
 			}
