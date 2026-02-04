@@ -24,7 +24,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	// "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -140,19 +140,19 @@ func yamlToUnstructuredMultiple(fileName string, y []byte) ([]*unstructured.Unst
 }
 
 // resolveObjectMapping resets the REST mapper and resolves the object's resource mapping and namespace requirements
-// func (ex *JobExecutor) resolveObjectMapping(obj *object) {
-// 	ex.mapper.Reset()
-// 	mapping, err := ex.mapper.RESTMapping(obj.gvk.GroupKind())
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	obj.gvr = mapping.Resource
-// 	obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
-// 	obj.Kind = obj.gvk.Kind
-// 	if obj.namespaced && obj.namespace == "" {
-// 		ex.nsRequired = true
-// 	}
-// }
+func (ex *JobExecutor) resolveObjectMapping(obj *object) {
+	ex.mapper.Reset()
+	mapping, err := ex.mapper.RESTMapping(obj.gvk.GroupKind())
+	if err != nil {
+		log.Fatal(err)
+	}
+	obj.gvr = mapping.Resource
+	obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+	obj.Kind = obj.gvk.Kind
+	if obj.namespaced && obj.namespace == "" {
+		ex.nsRequired = true
+	}
+}
 
 // Verify verifies the number of created objects
 func (ex *JobExecutor) Verify() bool {
@@ -368,4 +368,34 @@ func (ex *JobExecutor) runParallel(ctx context.Context) []error {
 	}
 	wg.Wait()
 	return ex.waitForObjects("")
+}
+
+// isLikelyNamespaced checks if a kind is typically namespaced based on common patterns.
+// This function is used as a fallback when the REST mapper cannot resolve a templated kind
+// at setup time. The actual scope is always determined at runtime via the discovery API.
+func (ex *JobExecutor) isLikelyNamespaced(kind string) bool {
+	// Common cluster-scoped resources
+	clusterScopedKinds := map[string]bool{
+		"Namespace":                      true,
+		"Node":                           true,
+		"PersistentVolume":               true,
+		"ClusterRole":                    true,
+		"ClusterRoleBinding":             true,
+		"StorageClass":                   true,
+		"CustomResourceDefinition":       true,
+		"PriorityClass":                  true,
+		"RuntimeClass":                   true,
+		"CSIDriver":                      true,
+		"CSINode":                        true,
+		"ValidatingWebhookConfiguration": true,
+		"MutatingWebhookConfiguration":   true,
+	}
+
+	// If it's a known cluster-scoped resource, return false
+	if clusterScopedKinds[kind] {
+		return false
+	}
+
+	// Default to namespaced for unknown kinds (safer assumption)
+	return true
 }

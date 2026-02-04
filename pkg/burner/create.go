@@ -15,11 +15,13 @@
 package burner
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,6 +56,7 @@ type churnDeletedObject struct {
 func (ex *JobExecutor) setupCreateJob() {
 	var f io.Reader
 	var err error
+	var templateRegex = regexp.MustCompile(`\{\{.*}}`)
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
 		if o.Replicas < 1 {
@@ -76,6 +79,12 @@ func (ex *JobExecutor) setupCreateJob() {
 		}
 		unsList, gvks := yamlToUnstructuredMultiple(o.ObjectTemplate, cleanTemplate)
 
+		// Get raw kinds to detect templated kinds
+		rawKinds, err := getRawKinds(t)
+		if err != nil {
+			log.Fatalf("Error parsing raw template %s: %s", o.ObjectTemplate, err)
+		}
+
 		// Get GVK for this specific object and Process if multi yaml document
 		for i, gvk := range gvks {
 			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
@@ -88,6 +97,13 @@ func (ex *JobExecutor) setupCreateJob() {
 				gvk:           gvk,
 				documentIndex: i,
 			}
+			if i < len(rawKinds) {
+				// Use regex to check if the kind field contains Go template syntax ({{...}}).
+				if templateRegex.MatchString(rawKinds[i]) {
+					obj.IsKindTemplated = true
+				}
+			}
+
 			if err == nil {
 				obj.gvr = mapping.Resource
 				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
@@ -95,7 +111,7 @@ func (ex *JobExecutor) setupCreateJob() {
 				obj.gvr = schema.GroupVersionResource{}
 				// For templated kinds that couldn't be resolved at setup time,
 				// assume they might be namespaced. This will be confirmed at runtime.
-				obj.namespaced = true
+				obj.namespaced = ex.isLikelyNamespaced(gvk.Kind)
 			}
 			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
 			if obj.namespaced && obj.namespace == "" {
@@ -142,8 +158,20 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
-			// Skip resolveObjectMapping for templated kinds (GVR will be resolved at render time)
-			// When gvr is empty, the kind is likely templated and will be resolved in replicaHandler
+			// If the object is not kind templated, we need to resolve the GVR at runtime
+			if !obj.IsKindTemplated {
+				if obj.gvr == (schema.GroupVersionResource{}) {
+					// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
+					ex.resolveObjectMapping(obj)
+					if ex.nsRequired {
+						nsName := ex.Namespace
+						if ex.NamespacedIterations {
+							nsName = ex.generateNamespace(i)
+						}
+						ns = ex.createNamespace(nsName, nsLabels, nsAnnotations)
+					}
+				}
+			}
 			kbLabels := map[string]string{
 				config.KubeBurnerLabelUUID:         ex.uuid,
 				config.KubeBurnerLabelJob:          ex.Name,
@@ -579,4 +607,23 @@ func trimObject(obj *unstructured.Unstructured) {
 	unstructured.RemoveNestedField(obj.Object, "spec", "selector", "matchLabels", "batch.kubernetes.io/controller-uid")
 	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "batch.kubernetes.io/controller-uid")
 	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "controller-uid")
+}
+
+// getRawKinds returns the kinds of the objects in the given content
+func getRawKinds(content []byte) ([]string, error) {
+	decoder := yaml.NewDecoder(bytes.NewReader(content))
+	var kinds []string
+	for {
+		var obj struct {
+			Kind string `yaml:"kind"`
+		}
+		if err := decoder.Decode(&obj); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		kinds = append(kinds, obj.Kind)
+	}
+	return kinds, nil
 }

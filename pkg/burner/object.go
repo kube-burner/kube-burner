@@ -41,7 +41,8 @@ type object struct {
 	// resolvedGVRs tracks GVRs resolved at runtime for templated kinds.
 	// Key is the GVR string, value is the GVR itself.
 	// This is needed because templated kinds produce different GVRs per iteration.
-	resolvedGVRs sync.Map
+	resolvedGVRs    sync.Map
+	IsKindTemplated bool
 }
 
 func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
@@ -79,13 +80,6 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 				mapping = m
 			}
 		}
-		//	fallback if no exact match found
-		if mapping == nil {
-			mapping = mappings[0]
-			log.Warnf("Ambiguous Kind %s. Defaulting to %s. Available options: %v",
-				obj.Kind, mapping.Resource.GroupVersion(), symbolicGVKs)
-		}
-
 	}
 
 	var waitGVR *schema.GroupVersionResource
