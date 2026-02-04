@@ -165,58 +165,20 @@ Examples of valid configuration files can be found in the [examples folder](http
 !!! note
     Linear pattern falls back to a single step when `minSteps` is not provided and the implementation guards against division-by-zero when computing ranges. The runner will stop on any health-check error (script non-zero exit or built-in check failure).
 
-#### Math Explanation
+#### Incremental load behavior
 
-Let:
+The incremental load feature gradually increases the number of iterations from a configured minimum (`minIterations`) to a configured maximum (`maxIterations`) while retaining the resources created in each step. Two growth patterns are supported:
 
-- $m$ = `minIterations`
-- $N$ = `maxIterations`
-- $\Delta t$ = `stepDelay`
-- For linear: $s$ = `pattern.linear.stepSize`
-- For exponential: 
-  * $b$ = `pattern.exponential.base`
-  * $w$ = `pattern.exponential.warmupSteps`
-  * $M$ = `pattern.exponential.maxIncrease`
+- Linear: iterations increase by a fixed amount each step (configured with `pattern.linear.stepSize`).
+- Exponential: iterations grow multiplicatively using `pattern.exponential.base`. An optional `pattern.exponential.warmupSteps` value can apply a few initial linear increases before exponential growth begins.
 
-Linear pattern:
+After each increase the runner performs the configured health check and will stop early on failure. Between successful steps the runner waits the configured `stepDelay` before applying the next increase.
 
-$$I_j = (m + (j-1)\cdot s\bigr).....N \qquad j = 1,2,\dots,t$$
+Simple examples:
+- Linear: `minIterations=10`, `maxIterations=50`, `pattern.linear.stepSize=10` → 10, 20, 30, 40, 50 with constant increments of 10 iterations in each step.
+- Exponential: `minIterations=5`, `maxIterations=100`, `pattern.exponential.base=2` → 5, 10, 20, 40, 80, 100 by simply multiplying the iterations by 2 in each step.
 
-where the number of steps is
-
-$$t = \left\lfloor\dfrac{N - m}{s}\right\rfloor + 1$$
-
-Exponential pattern (no warmup):
-
-$$I_j = (m\cdot min(M, b^{\,j-1}\bigr)).....N \qquad j = 1,2,\dots,t$$
-
-with
-
-$$t = \left\lceil\log_b\left(\dfrac{N}{m}\right)\right\rceil + 1$$
-
-If `warmupSteps = w > 0`, the first $w$ steps are increased more slowly (linear warmup), then exponential growth applies starting from the value reached at step $w$.
-
-After each step the runner performs the configured health check. If the health check fails the process stops early. Between successful steps the runner waits $\Delta t$ before applying the next $I_j$.
-
-#### Numeric examples (step-by-step)
-
-Linear (explicit):
-- Params: $m=10$, $N=50$, $s=10$, $\Delta t=30\text{s}$
-- Number of steps: $t=\left\lfloor\dfrac{50-10}{10}\right\rfloor+1=5$
-- Iterations per step: $I_1=10,\ I_2=20,\ I_3=30,\ I_4=40,\ I_5=50$
-- Sequence: create 10 (i.e. total 10) → health check → wait 30s → create 10 (.i.e. total 10) → health check → wait 30s → … → create 10 (.i.e. total 50 and done).
-
-Exponential (explicit):
-- Params: $m=5$, $N=100$, $b=2$, $\Delta t=20\text{s}$
-- Number of steps: $t=\left\lceil\log_2\left(\dfrac{100}{5}\right)\right\rceil+1=6$
-- Iterations per step: $I_1=5,\ I_2=10,\ I_3=20,\ I_4=40,\ I_5=80,\ I_6=100$
-- Sequence: create 5 (.i.e. total 5) → health check → wait 20s → create 5 (.i.e. total 10) → health check → wait 20s → create 10 (.i.e. total 20) → … → create 20 (.i.e. total 100).
-
-Warmup + Exponential (explicit):
-- Params: $m=2$, $w=2$, $b=3$, $N=200$, $\Delta t=15\text{s}$
-- Warmup (linear) steps: $I_1=2,\ I_2=4$ (increase by $m$)
-- Exponential thereafter (starting from 4): $I_3=\min(200, 4 + 2\cdot3^1)=10,\ I_4=\min(200, 10+2\cdot3^2) = 28,\ I_5=\min(200, 28+2\cdot3^3)=82,\ I_6=\min(200, 82+2\cdot3^4) = 198,\ I_7=\min(200, 198+2\cdot3^5) = 200$
-- Sequence: create 2 (.i.e. total 2) → health check → wait 15s → create 2 (.i.e. total 4) → health check → wait 15s → create 6 (.i.e. total 10) → … → create 2 (.i.e total 200).
+These examples illustrate the typical behavior without requiring mathematical formulas.
 
 ### Watchers
 
