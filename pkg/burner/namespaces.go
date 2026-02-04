@@ -55,7 +55,7 @@ func CleanupNamespaceResourcesByLabel(ctx context.Context, ex JobExecutor, obj *
 		return
 	}
 	if len(resources.Items) > 0 {
-		log.Infof("Deleting %d %ss labeled with %s in %s", len(resources.Items), obj.Kind, labelSelector, namespace)
+		log.Debugf("Deleting %d %ss labeled with %s in %s", len(resources.Items), obj.Kind, labelSelector, namespace)
 	}
 	for _, item := range resources.Items {
 		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {

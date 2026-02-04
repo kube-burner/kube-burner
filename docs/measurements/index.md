@@ -402,7 +402,8 @@ Where `quantileName` matches with the node conditions and can be:
 And the metrics, error rates, and their thresholds work the same way as in the pod latency measurement.
 
 ## PVC latency
-Note: This measurement is not supported for patch, read and delete jobs. Because it requires all the events from creation to reaching a stable end state to happen during a job.
+!!! note
+    This measurement is not supported for patch, read and delete jobs. Because it requires all the events from creation to reaching a stable end state to happen during a job.
 
 Collects latencies from different pvc phases on the cluster, these **latency metrics are in ms**. It can be enabled with:
 
@@ -488,6 +489,7 @@ Where `quantileName` matches with the pvc phases and can be:
 - `Pending`: Indicates that PVC is not yet bound.
 - `Bound`: Indicates that PVC is bound.
 - `Lost`: Indicates that the PVC has lost their underlying PersistentVolume.
+- `Resize`: Indicates that the PVC has been resized.
 
 !!! info
     More information about the PVC phases can be found at the [kubernetes api documentation](https://pkg.go.dev/k8s.io/api/core/v1#PersistentVolumeClaimPhase).
