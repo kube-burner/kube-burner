@@ -288,7 +288,7 @@ teardown_file() {
 
 # bats test_tags=subsystem:core
 @test "test-symbolic-gvk-config.yaml: symbolic GVK resolution" {
-  run_cmd ${KUBE_BURNER} init -c test-symbolic-gvk-config.yaml --uuid=${UUID} --log-level=debug
+  run_cmd ${KUBE_BURNER} init -c test-symbolic-gvk-config.yaml --uuid=${UUID} --log-level=debug --set global.gc=false
   verify_object_count CustomResourceDefinition 3 "" kube-burner.io/job=create-crds,kube-burner.io/uuid=${UUID}
   
   # Verify each templated kind
