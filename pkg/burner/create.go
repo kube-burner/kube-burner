@@ -325,6 +325,7 @@ func (ex *JobExecutor) waitForCompletion(iterationStart, iterationEnd int, ns st
 func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
+	atomic.AddInt32(&ex.objectOperations, 1)
 	if log.GetLevel() == log.TraceLevel {
 		out, _ := yaml.Marshal(obj)
 		log.Trace(string(out))
@@ -371,7 +372,6 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 			log.Error("Retrying object creation")
 			return false, nil
 		}
-		atomic.AddInt32(&ex.objectOperations, 1)
 		if ns != "" {
 			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		} else {
