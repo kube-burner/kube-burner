@@ -279,8 +279,7 @@ func measureCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			defer f.Close()
-			configSpec, err := config.Parse(configFile, time.Hour, f)
+			configSpec, err := config.Parse(uuid, time.Hour, f)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
