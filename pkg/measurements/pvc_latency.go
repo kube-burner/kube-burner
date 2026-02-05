@@ -128,12 +128,6 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 	if value, exists := p.Metrics.Load(string(pvc.UID)); exists {
 		pm := value.(pvcMetric)
 		log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
-		if pm.StorageClass == "" || pm.StorageClass == "unknown" {
-			pm.StorageClass = getStorageClassName(*pvc)
-		}
-		if pm.Size == "" || pm.Size == "0" {
-			pm.Size = pvc.Spec.Resources.Requests.Storage().String()
-		}
 		if pm.bound == 0 || pm.lost == 0 {
 			if pvc.Status.Phase == corev1.ClaimPending {
 				if pm.pending == 0 {
