@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"strings"
 	"text/template"
 	"time"
@@ -208,7 +207,7 @@ func parseMatrix(value model.Value, uuid, description string, metadata any, seve
 				errs = append(errs, errors.New(msg))
 			case sevCritical:
 				log.Errorf("🚨 %s", msg)
-				os.Exit(rcAlert)
+				errs = append(errs, fmt.Errorf("%s", msg))
 			default:
 				log.Infof("🚨 %s", msg)
 			}

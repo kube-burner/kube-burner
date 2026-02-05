@@ -15,6 +15,7 @@
 package measurements
 
 import (
+	"fmt"
 	"sync"
 
 	"dario.cat/mergo"
@@ -93,12 +94,12 @@ func NewMeasurementsFactory(configSpec config.Spec, metadata map[string]any, add
 	}
 }
 
-func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration, labelSelector string) *Measurements {
+func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration, labelSelector string) (*Measurements, error) {
 	ms := Measurements{
 		MeasurementsMap: make(map[string]Measurement),
 	}
 	if _, err := metav1.ParseToLabelSelector(labelSelector); err != nil {
-		log.Fatalf("Invalid selector: %v", err)
+		return nil, fmt.Errorf("invalid selector: %v", err)
 	}
 	clientSet, restConfig := kubeClientProvider.ClientSet(jobConfig.QPS, jobConfig.Burst)
 	log.Infof("Initializing measurements for job: %s", jobConfig.Name)
@@ -119,7 +120,7 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 	}
 	for name, measurement := range mergedMeasurements {
 		if !isIndexerOk(msf.ConfigSpec, measurement) {
-			log.Fatalf("One of the indexers for measurement %s has not been found", measurement.Name)
+			return nil, fmt.Errorf("one of the indexers for measurement %s has not been found", measurement.Name)
 		}
 		newMeasurementFactoryFunc, exists := measurementFactoryMap[name]
 		if !exists {
@@ -128,7 +129,7 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 		}
 		mf, err := newMeasurementFactoryFunc(msf.ConfigSpec, measurement, msf.Metadata, labelSelector)
 		if err != nil {
-			log.Fatalf("Failed to create measurement [%s]: %v", name, err)
+			return nil, fmt.Errorf("failed to create measurement [%s]: %v", name, err)
 		}
 		msInstance := mf.NewMeasurement(jobConfig, clientSet, restConfig, embedCfg)
 		if !jobConfig.MetricsAggregate && !msInstance.IsCompatible() {
@@ -138,7 +139,7 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 		ms.MeasurementsMap[name] = msInstance
 		log.Infof("Registered measurement: %s", name)
 	}
-	return &ms
+	return &ms, nil
 }
 
 // Start starts registered measurements

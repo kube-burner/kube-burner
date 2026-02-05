@@ -20,7 +20,6 @@ import (
 	"math"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,7 +40,7 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, 
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-func GetBoolValue(m map[string]any, key string) *bool {
+func GetBoolValue(m map[string]any, key string) (*bool, error) {
 	var ret *bool
 	var convertedValue bool
 
@@ -56,20 +55,20 @@ func GetBoolValue(m map[string]any, key string) *bool {
 			case "false":
 				convertedValue = false
 			default:
-				log.Fatalf("cannot convert %v to bool", v)
+				return nil, fmt.Errorf("cannot convert %v to bool", v)
 			}
 			ret = &convertedValue
 		case float64:
 			convertedValue = v == 1
 			ret = &convertedValue
 		default:
-			log.Fatalf("unexpected type for '%s' field: %T", key, v)
+			return nil, fmt.Errorf("unexpected type for '%s' field: %T", key, v)
 		}
 	}
-	return ret
+	return ret, nil
 }
 
-func GetIntegerValue(m map[string]any, key string) *int {
+func GetIntegerValue(m map[string]any, key string) (*int, error) {
 	var ret *int
 	var intValue int
 
@@ -84,16 +83,16 @@ func GetIntegerValue(m map[string]any, key string) *int {
 			if _, err := fmt.Sscanf(v, "%d", &intValue); err == nil {
 				ret = &intValue
 			} else {
-				log.Fatalf("cannot convert %v to int", v)
+				return nil, fmt.Errorf("cannot convert %v to int", v)
 			}
 		default:
-			log.Fatalf("unexpected type for 'paused' field: %T", v)
+			return nil, fmt.Errorf("unexpected type for '%s' field: %T", key, v)
 		}
 	}
-	return ret
+	return ret, nil
 }
 
-func GetStringValue(m map[string]any, key string) *string {
+func GetStringValue(m map[string]any, key string) (*string, error) {
 	var ret *string
 	var strValue string
 
@@ -114,10 +113,10 @@ func GetStringValue(m map[string]any, key string) *string {
 			}
 			ret = &strValue
 		default:
-			log.Fatalf("unexpected type for '%s' field: %T", key, v)
+			return nil, fmt.Errorf("unexpected type for '%s' field: %T", key, v)
 		}
 	}
-	return ret
+	return ret, nil
 }
 
 // ResourceToGVR maps resource kind to appropriate GVR

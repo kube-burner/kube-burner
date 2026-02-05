@@ -74,7 +74,7 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	var wg sync.WaitGroup
 	err := os.MkdirAll(p.Config.PProfDirectory, 0744)
 	if err != nil {
-		log.Fatalf("Error creating pprof directory: %s", err)
+		return fmt.Errorf("error creating pprof directory: %s", err)
 	}
 	if p.needsDaemonSet() {
 		if err := p.deployDaemonSet(); err != nil {

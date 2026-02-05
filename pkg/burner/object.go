@@ -15,6 +15,7 @@
 package burner
 
 import (
+	"fmt"
 	"io"
 
 	log "github.com/sirupsen/logrus"
@@ -38,19 +39,19 @@ type object struct {
 	documentIndex int
 }
 
-func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
+func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) (*object, error) {
 	if obj.APIVersion == "" {
 		obj.APIVersion = defaultAPIVersion
 	}
 
 	if len(obj.LabelSelector) == 0 {
-		log.Fatalf("Empty labelSelectors not allowed with: %s", obj.Kind)
+		return nil, fmt.Errorf("empty labelSelectors not allowed with: %s", obj.Kind)
 	}
 
 	gvk := schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 	mapping, err := mapper.RESTMapping(gvk.GroupKind())
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	var waitGVR *schema.GroupVersionResource
@@ -61,7 +62,7 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 		gvk = schema.FromAPIVersionAndKind(obj.WaitOptions.APIVersion, obj.WaitOptions.Kind)
 		mapping, err = mapper.RESTMapping(gvk.GroupKind())
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		waitGVR = &mapping.Resource
 	}
@@ -77,17 +78,17 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 		log.Debugf("Rendering template: %s", obj.ObjectTemplate)
 		f, err := fileutils.GetWorkloadReader(obj.ObjectTemplate, embedCfg)
 		if err != nil {
-			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
+			return nil, fmt.Errorf("error reading template %s: %w", obj.ObjectTemplate, err)
 		}
 		if closer, ok := f.(io.Closer); ok {
 			defer closer.Close()
 		}
 		t, err := io.ReadAll(f)
 		if err != nil {
-			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
+			return nil, fmt.Errorf("error reading template %s: %w", obj.ObjectTemplate, err)
 		}
 		o.objectSpec = t
 	}
 
-	return &o
+	return &o, nil
 }

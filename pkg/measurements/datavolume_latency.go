@@ -207,7 +207,8 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 	}
 	kubeVirtClient, err := kubecli.GetKubevirtClientFromRESTConfig(dv.RestConfig)
 	if err != nil {
-		log.Fatalf("Failed to get kubevirt client - %v", err)
+		log.Errorf("Failed to get kubevirt client - %v", err)
+		return
 	}
 	namespaces := strings.Split(dv.JobConfig.Namespace, ",")
 	for _, namespace := range namespaces {
