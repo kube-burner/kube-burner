@@ -195,7 +195,7 @@ func (ex *JobExecutor) Verify(ctx context.Context) bool {
 			replicas = 0
 			for _, gvr := range gvrsToVerify {
 				for {
-					objList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, listOptions)
+					objList, err = ex.dynamicClient.Resource(gvr).Namespace(metav1.NamespaceAll).List(ctx, listOptions)
 					if err != nil {
 						log.Errorf("Error verifying object %s: %s", gvr.Resource, err)
 						return false, nil
