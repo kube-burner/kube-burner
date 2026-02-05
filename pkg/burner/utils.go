@@ -173,9 +173,6 @@ func (ex *JobExecutor) Verify(ctx context.Context) bool {
 		err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
 			replicas = 0
 			for {
-				if ctx.Err() != nil {
-					return false, ctx.Err()
-				}
 				objList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, listOptions)
 				if err != nil {
 					log.Errorf("Error verifying object: %s", err)

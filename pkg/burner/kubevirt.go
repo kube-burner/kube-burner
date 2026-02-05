@@ -139,7 +139,7 @@ func kubeOpHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstr
 			options.Paused = *startPaused
 			operationConfig = supportedOps[config.KubeVirtOpPause]
 		}
-		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Start(context.Background(), item.GetName(), &options)
+		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Start(ctx, item.GetName(), &options)
 	case config.KubeVirtOpStop:
 		stopOpts := &kubevirtV1.StopOptions{}
 		force := util.GetBoolValue(obj.InputVars, "force")
@@ -147,7 +147,7 @@ func kubeOpHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstr
 			gracePeriod := int64(0)
 			stopOpts.GracePeriod = &gracePeriod
 		}
-		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Stop(context.Background(), item.GetName(), stopOpts)
+		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Stop(ctx, item.GetName(), stopOpts)
 	case config.KubeVirtOpRestart:
 		restartOpts := &kubevirtV1.RestartOptions{}
 		force := util.GetBoolValue(obj.InputVars, "force")
@@ -155,9 +155,9 @@ func kubeOpHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstr
 			gracePeriod := int64(0)
 			restartOpts.GracePeriodSeconds = &gracePeriod
 		}
-		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Restart(context.Background(), item.GetName(), restartOpts)
+		err = ex.kubeVirtClient.VirtualMachine(item.GetNamespace()).Restart(ctx, item.GetName(), restartOpts)
 	case config.KubeVirtOpPause:
-		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Pause(context.Background(), item.GetName(), &kubevirtV1.PauseOptions{})
+		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Pause(ctx, item.GetName(), &kubevirtV1.PauseOptions{})
 	case config.KubeVirtOpUnpause:
 		if len(obj.WaitOptions.CustomStatusPaths) == 0 {
 			obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
@@ -167,7 +167,7 @@ func kubeOpHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstr
 				},
 			}
 		}
-		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Unpause(context.Background(), item.GetName(), &kubevirtV1.UnpauseOptions{})
+		err = ex.kubeVirtClient.VirtualMachineInstance(item.GetNamespace()).Unpause(ctx, item.GetName(), &kubevirtV1.UnpauseOptions{})
 	case config.KubeVirtOpMigrate:
 		if len(obj.WaitOptions.CustomStatusPaths) == 0 {
 			obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
@@ -195,11 +195,11 @@ func kubeOpHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstr
 				VMIName: item.GetName(),
 			},
 		}
-		_, err = ex.kubeVirtClient.VirtualMachineInstanceMigration(item.GetNamespace()).Create(context.Background(), vmim, metav1.CreateOptions{})
+		_, err = ex.kubeVirtClient.VirtualMachineInstanceMigration(item.GetNamespace()).Create(ctx, vmim, metav1.CreateOptions{})
 	case config.KubeVirtOpAddVolume:
-		err = addVolume(ex, item.GetName(), item.GetNamespace(), obj.InputVars)
+		err = addVolume(ctx, ex, item.GetName(), item.GetNamespace(), obj.InputVars)
 	case config.KubeVirtOpRemoveVolume:
-		err = removeVolume(ex, item.GetName(), item.GetNamespace(), obj.InputVars)
+		err = removeVolume(ctx, ex, item.GetName(), item.GetNamespace(), obj.InputVars)
 	}
 
 	if err != nil {
@@ -215,9 +215,9 @@ func kubeOpHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstr
 	}
 }
 
-func getVolumeSourceFromVolume(ex *JobExecutor, volumeName, namespace string) (*kubevirtV1.HotplugVolumeSource, error) {
+func getVolumeSourceFromVolume(ctx context.Context, ex *JobExecutor, volumeName, namespace string) (*kubevirtV1.HotplugVolumeSource, error) {
 	//Check if data volume exists.
-	_, err := ex.kubeVirtClient.CdiClient().CdiV1beta1().DataVolumes(namespace).Get(context.TODO(), volumeName, metav1.GetOptions{})
+	_, err := ex.kubeVirtClient.CdiClient().CdiV1beta1().DataVolumes(namespace).Get(ctx, volumeName, metav1.GetOptions{})
 	if err == nil {
 		return &kubevirtV1.HotplugVolumeSource{
 			DataVolume: &kubevirtV1.DataVolumeSource{
@@ -227,7 +227,7 @@ func getVolumeSourceFromVolume(ex *JobExecutor, volumeName, namespace string) (*
 		}, nil
 	}
 	// DataVolume not found, try PVC
-	_, err = ex.kubeVirtClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), volumeName, metav1.GetOptions{})
+	_, err = ex.kubeVirtClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, volumeName, metav1.GetOptions{})
 	if err == nil {
 		return &kubevirtV1.HotplugVolumeSource{
 			PersistentVolumeClaim: &kubevirtV1.PersistentVolumeClaimVolumeSource{
@@ -242,7 +242,7 @@ func getVolumeSourceFromVolume(ex *JobExecutor, volumeName, namespace string) (*
 	return nil, fmt.Errorf("volume %s is not a DataVolume or PersistentVolumeClaim", volumeName)
 }
 
-func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
+func addVolume(ctx context.Context, ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
@@ -263,7 +263,7 @@ func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]
 		persist = *persistPtr
 	}
 
-	volumeSource, err := getVolumeSourceFromVolume(ex, *volumeName, namespace)
+	volumeSource, err := getVolumeSourceFromVolume(ctx, ex, *volumeName, namespace)
 	if err != nil {
 		return err
 	}
@@ -306,9 +306,9 @@ func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]
 	retry := 0
 	for retry < maxRetries {
 		if !persist {
-			err = ex.kubeVirtClient.VirtualMachineInstance(namespace).AddVolume(context.Background(), vmiName, hotplugRequest)
+			err = ex.kubeVirtClient.VirtualMachineInstance(namespace).AddVolume(ctx, vmiName, hotplugRequest)
 		} else {
-			err = ex.kubeVirtClient.VirtualMachine(namespace).AddVolume(context.Background(), vmiName, hotplugRequest)
+			err = ex.kubeVirtClient.VirtualMachine(namespace).AddVolume(ctx, vmiName, hotplugRequest)
 		}
 		if err != nil && err.Error() != concurrentError {
 			return fmt.Errorf("error adding volume, %v", err)
@@ -327,7 +327,7 @@ func addVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]
 	return nil
 }
 
-func removeVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
+func removeVolume(ctx context.Context, ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
 	volumeName := util.GetStringValue(extraArgs, "volumeName")
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
@@ -343,11 +343,11 @@ func removeVolume(ex *JobExecutor, vmiName, namespace string, extraArgs map[stri
 	retry := 0
 	for retry < maxRetries {
 		if !persist {
-			err = ex.kubeVirtClient.VirtualMachineInstance(namespace).RemoveVolume(context.Background(), vmiName, &kubevirtV1.RemoveVolumeOptions{
+			err = ex.kubeVirtClient.VirtualMachineInstance(namespace).RemoveVolume(ctx, vmiName, &kubevirtV1.RemoveVolumeOptions{
 				Name: *volumeName,
 			})
 		} else {
-			err = ex.kubeVirtClient.VirtualMachine(namespace).RemoveVolume(context.Background(), vmiName, &kubevirtV1.RemoveVolumeOptions{
+			err = ex.kubeVirtClient.VirtualMachine(namespace).RemoveVolume(ctx, vmiName, &kubevirtV1.RemoveVolumeOptions{
 				Name: *volumeName,
 			})
 		}

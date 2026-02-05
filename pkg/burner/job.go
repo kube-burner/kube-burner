@@ -90,7 +90,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
-		handlePreloadImages(jobExecutors, kubeClientProvider)
+		handlePreloadImages(ctx, jobExecutors, kubeClientProvider)
 		// Iterate job list
 		var measurementsInstance *measurements.Measurements
 		var measurementsJobName string
@@ -291,11 +291,11 @@ func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *co
 }
 
 // If requests, preload the images used in the test into the node
-func handlePreloadImages(executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
+func handlePreloadImages(ctx context.Context, executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
 	clientSet, _ := kubeClientProvider.DefaultClientSet()
 	for _, executor := range executorList {
 		if executor.PreLoadImages && executor.JobType == config.CreationJob {
-			if err := preLoadImages(executor, clientSet); err != nil {
+			if err := preLoadImages(ctx, executor, clientSet); err != nil {
 				log.Fatal(err.Error())
 			}
 		}

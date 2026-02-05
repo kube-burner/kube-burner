@@ -213,10 +213,12 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		maps.Copy(copiedLabels, labels)
 		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
 
+		if err := ex.limiter.Wait(ctx); err != nil {
+			return
+		}
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
-			ex.limiter.Wait(ctx)
 			newObjects, gvks := ex.renderTemplateForObjectMultiple(obj, iteration, r)
 			newObject := newObjects[obj.documentIndex]
 			gvk := gvks[obj.documentIndex]
