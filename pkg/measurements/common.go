@@ -40,7 +40,7 @@ func getIntFromLabels(labels map[string]string, key string) int {
 	return 0
 }
 
-func deployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, image string, command []string) error {
+func DeployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, image string, command []string) error {
 	var podObj = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,

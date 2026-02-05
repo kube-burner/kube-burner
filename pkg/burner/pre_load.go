@@ -69,7 +69,7 @@ type NestedVM struct {
 	} `yaml:"spec"`
 }
 
-func preLoadImages(job JobExecutor, clientSet kubernetes.Interface) error {
+func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.Interface) error {
 	log.Info("Pre-load: images from job ", job.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
@@ -79,7 +79,7 @@ func preLoadImages(job JobExecutor, clientSet kubernetes.Interface) error {
 		log.Infof("No images found to pre-load, continuing")
 		return nil
 	}
-	err = createDSs(clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
+	err = createDSs(ctx, clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
@@ -148,7 +148,7 @@ func extractImagesFromObject(uns *unstructured.Unstructured, renderedObj []byte)
 	return imageList
 }
 
-func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
+func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
 	nsLabels := map[string]string{
 		"kube-burner-preload": "true",
 	}
@@ -204,7 +204,7 @@ func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabe
 	}
 
 	log.Infof("Pre-load: Creating DaemonSet using images %v in namespace %s", imageList, preLoadNs)
-	_, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
+	_, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(ctx, &ds, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}

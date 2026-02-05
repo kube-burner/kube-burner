@@ -52,7 +52,7 @@ func (ex *JobExecutor) setupPatchJob() {
 	}
 }
 
-func patchHandler(ex *JobExecutor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func patchHandler(ctx context.Context, ex *JobExecutor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
 	// There are several patch modes. Three of them are client-side, and one
 	// of them is server-side.
@@ -83,17 +83,17 @@ func patchHandler(ex *JobExecutor, obj *object, originalItem unstructured.Unstru
 	ns := originalItem.GetNamespace()
 	log.Debugf("Patching %s/%s in namespace %s", originalItem.GetKind(),
 		originalItem.GetName(), ns)
-	ex.limiter.Wait(context.TODO())
+	ex.limiter.Wait(ctx)
 
 	var uns *unstructured.Unstructured
 	var err error
 	if obj.namespaced {
 		uns, err = ex.dynamicClient.Resource(obj.gvr).Namespace(ns).
-			Patch(context.TODO(), originalItem.GetName(),
+			Patch(ctx, originalItem.GetName(),
 				types.PatchType(obj.PatchType), data, patchOptions)
 	} else {
 		uns, err = ex.dynamicClient.Resource(obj.gvr).
-			Patch(context.TODO(), originalItem.GetName(),
+			Patch(ctx, originalItem.GetName(),
 				types.PatchType(obj.PatchType), data, patchOptions)
 	}
 	if err != nil {

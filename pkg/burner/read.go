@@ -42,16 +42,16 @@ func (ex *JobExecutor) setupReadJob() {
 	log.Infof("Job %s: %d iterations", ex.Name, ex.JobIterations)
 }
 
-func readHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func readHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
-	ex.limiter.Wait(context.TODO())
+	ex.limiter.Wait(ctx)
 	var err error
 	if obj.namespaced {
 		log.Debugf("Reading %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
-		_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
+		_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Get(ctx, item.GetName(), metav1.GetOptions{})
 	} else {
 		log.Debugf("Reading %s/%s", item.GetKind(), item.GetName())
-		_, err = ex.dynamicClient.Resource(obj.gvr).Get(context.TODO(), item.GetName(), metav1.GetOptions{})
+		_, err = ex.dynamicClient.Resource(obj.gvr).Get(ctx, item.GetName(), metav1.GetOptions{})
 	}
 	if err != nil {
 		log.Errorf("Error found reading %s/%s: %s", item.GetKind(), item.GetName(), err)

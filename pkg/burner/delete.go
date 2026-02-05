@@ -50,16 +50,16 @@ func (ex *JobExecutor) setupDeleteJob() {
 	}
 }
 
-func deleteHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
+func deleteHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup) {
 	defer wg.Done()
-	ex.limiter.Wait(context.TODO())
+	ex.limiter.Wait(ctx)
 	var err error
 	if obj.namespaced {
 		log.Debugf("Removing %s/%s from namespace %s", item.GetKind(), item.GetName(), item.GetNamespace())
-		err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+		err = ex.dynamicClient.Resource(obj.gvr).Namespace(item.GetNamespace()).Delete(ctx, item.GetName(), metav1.DeleteOptions{})
 	} else {
 		log.Debugf("Removing %s/%s", item.GetKind(), item.GetName())
-		err = ex.dynamicClient.Resource(obj.gvr).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+		err = ex.dynamicClient.Resource(obj.gvr).Delete(ctx, item.GetName(), metav1.DeleteOptions{})
 	}
 	if err != nil {
 		log.Errorf("Error found removing %s/%s: %s", item.GetKind(), item.GetName(), err)
@@ -67,13 +67,13 @@ func deleteHandler(ex *JobExecutor, obj *object, item unstructured.Unstructured,
 	atomic.AddInt32(&ex.objectOperations, 1)
 }
 
-func verifyDelete(ex *JobExecutor, obj *object) {
+func verifyDelete(ctx context.Context, ex *JobExecutor, obj *object) {
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
-	wait.PollUntilContextCancel(context.TODO(), 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		itemList, err := ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+	wait.PollUntilContextCancel(ctx, 2*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		itemList, err := ex.dynamicClient.Resource(obj.gvr).List(ctx, listOptions)
 		if err != nil {
 			log.Error(err.Error())
 			return false, nil
