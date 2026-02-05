@@ -74,33 +74,44 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	var wg sync.WaitGroup
 	err := os.MkdirAll(p.Config.PProfDirectory, 0744)
 	if err != nil {
-		log.Fatalf("Error creating pprof directory: %s", err)
+		return fmt.Errorf("error creating pprof directory: %v", err)
 	}
 	if p.needsDaemonSet() {
 		if err := p.deployDaemonSet(); err != nil {
-			log.Errorf("Error deploying DaemonSet: %s", err)
-			return err
+			return fmt.Errorf("error deploying DaemonSet: %v", err)
 		}
 		if err := p.waitForDaemonSetReady(); err != nil {
-			log.Errorf("Error waiting for DaemonSet to be ready: %s", err)
-			return err
+			return fmt.Errorf("error waiting for DaemonSet to be ready: %v", err)
 		}
 	}
 	p.stopChannel = make(chan bool)
-	p.getPProf(&wg, true)
+	if err := p.copyCerts(); err != nil {
+		return fmt.Errorf("error copying certificates: %v", err)
+	}
+	p.getPProf(&wg, "start")
 	wg.Wait()
 	go func() {
 		defer close(p.stopChannel)
-		ticker := time.NewTicker(p.Config.PProfInterval)
-		defer ticker.Stop()
+		var ticker *time.Ticker
+		var tickerC <-chan time.Time
+		if p.Config.PProfInterval > 0 {
+			ticker = time.NewTicker(p.Config.PProfInterval)
+			tickerC = ticker.C
+			defer ticker.Stop()
+		} else {
+			// If interval is 0, use nil channel which never sends (infinite ticker)
+			tickerC = nil
+		}
 		for {
 			select {
-			case <-ticker.C:
+			case <-tickerC:
 				// Copy certificates only in the first iteration
-				p.getPProf(&wg, false)
+				p.getPProf(&wg, time.Now().Format(time.RFC3339))
 				wg.Wait()
 			case <-p.stopChannel:
-				ticker.Stop()
+				if ticker != nil {
+					ticker.Stop()
+				}
 				return
 			}
 		}
@@ -108,7 +119,43 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	return nil
 }
 
-func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
+func (p *pprof) copyCerts() error {
+	for pos, target := range p.Config.PProfTargets {
+		if target.CertFile != "" && target.KeyFile != "" {
+			pods, err := p.getPods(target)
+			if err != nil {
+				log.Errorf("error getting pods for target %s: %v", target.Name, err)
+				continue
+			}
+			for _, pod := range pods {
+				var cert, privKey io.Reader
+				// target is a copy of one of the slice elements, so we need to modify the target object directly from the slice
+				p.Config.PProfTargets[pos].Cert, p.Config.PProfTargets[pos].Key, err = readCerts(target.CertFile, target.KeyFile)
+				if err != nil {
+					return fmt.Errorf("error reading certificates from %s and %s: %v", target.CertFile, target.KeyFile, err)
+				}
+				if target.Cert != "" && target.Key != "" {
+					certData, err := base64.StdEncoding.DecodeString(target.Cert)
+					if err != nil {
+						return fmt.Errorf("error decoding pprof certificate data from %s: %v", target.Name, err)
+					}
+					privKeyData, err := base64.StdEncoding.DecodeString(target.Key)
+					if err != nil {
+						return fmt.Errorf("error decoding pprof private key data from %s: %v", target.Name, err)
+					}
+					cert = strings.NewReader(string(certData))
+					privKey = strings.NewReader(string(privKeyData))
+					if err = p.copyCertsToPod(pod, cert, privKey); err != nil {
+						return fmt.Errorf("error copying certificate and private key to pod %s: %v", pod.Name, err)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
 	if p.getPprofNodeTargets(target) != nil { // Node target
 		labelSelector := labels.Set(p.getPprofNodeTargets(target)).String()
@@ -116,54 +163,33 @@ func (p *pprof) getPods(target types.PProftarget) []corev1.Pod {
 			FieldSelector: "status.phase=Running",
 		})
 		if err != nil {
-			log.Errorf("Error found listing DaemonSet pods: %s", err)
-			return []corev1.Pod{}
+			return []corev1.Pod{}, fmt.Errorf("error listing DaemonSet pods: %v", err)
 		}
-		return podList.Items
+		return podList.Items, nil
 	}
 	labelSelector := labels.Set(target.LabelSelector).String()
 	podList, err := p.ClientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
-		log.Errorf("Error found listing pods labeled with %s: %s", labelSelector, err)
+		return []corev1.Pod{}, fmt.Errorf("error listing pods labeled with %s: %v", labelSelector, err)
 	}
-	return podList.Items
+	return podList.Items, nil
 }
 
-func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
-	var err error
+func (p *pprof) getPProf(wg *sync.WaitGroup, suffix string) {
 	for pos, target := range p.Config.PProfTargets {
 		log.Infof("Collecting %s pprof", target.Name)
-		podList := p.getPods(target)
-		for _, pod := range podList {
-			var cert, privKey io.Reader
-			if target.CertFile != "" && target.KeyFile != "" && first {
-				// target is a copy of one of the slice elements, so we need to modify the target object directly from the slice
-				p.Config.PProfTargets[pos].Cert, p.Config.PProfTargets[pos].Key, err = readCerts(target.CertFile, target.KeyFile)
-				if err != nil {
-					log.Error(err)
-					continue
-				}
-			}
-			if target.Cert != "" && target.Key != "" && first {
-				certData, err := base64.StdEncoding.DecodeString(target.Cert)
-				if err != nil {
-					log.Errorf("Error decoding pprof certificate data from %s", target.Name)
-					continue
-				}
-				privKeyData, err := base64.StdEncoding.DecodeString(target.Key)
-				if err != nil {
-					log.Errorf("Error decoding pprof private key data from %s", target.Name)
-					continue
-				}
-				cert = strings.NewReader(string(certData))
-				privKey = strings.NewReader(string(privKeyData))
-			}
+		pods, err := p.getPods(target)
+		if err != nil {
+			log.Errorf("error getting pods for target %s: %v", target.Name, err)
+			continue
+		}
+		for _, pod := range pods {
 			wg.Add(1)
 			go func(target types.PProftarget, pod corev1.Pod) {
 				defer wg.Done()
-				pprofFile := fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Name, time.Now().Unix())
+				pprofFile := fmt.Sprintf("%s-%s-%s.pprof", target.Name, pod.Name, suffix)
 				if target.LabelSelector == nil {
-					pprofFile = fmt.Sprintf("%s-%s-%d.pprof", target.Name, pod.Spec.NodeName, time.Now().Unix())
+					pprofFile = fmt.Sprintf("%s-%s-%s.pprof", target.Name, pod.Spec.NodeName, suffix)
 				}
 				var stderr bytes.Buffer
 				f, err := os.Create(path.Join(p.Config.PProfDirectory, pprofFile))
@@ -172,12 +198,6 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, first bool) {
 					return
 				}
 				defer f.Close()
-				if cert != nil && privKey != nil && first {
-					if err = p.copyCertsToPod(pod, cert, privKey); err != nil {
-						log.Error(err)
-						return
-					}
-				}
 
 				command, pprofReq := p.buildPProfRequest(target, pod)
 
@@ -253,6 +273,9 @@ func (p *pprof) Collect(measurementWg *sync.WaitGroup) {
 
 func (p *pprof) Stop() error {
 	p.stopChannel <- true
+	var wg sync.WaitGroup
+	p.getPProf(&wg, "end")
+	wg.Wait()
 	if p.needsDaemonSet() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
