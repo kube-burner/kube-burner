@@ -16,6 +16,7 @@ package burner
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"maps"

@@ -252,7 +252,10 @@ func getVolumeSourceFromVolume(ctx context.Context, ex *JobExecutor, volumeName,
 }
 
 func addVolume(ctx context.Context, ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
-	volumeName := util.GetStringValue(extraArgs, "volumeName")
+	volumeName, err := util.GetStringValue(extraArgs, "volumeName")
+	if err != nil {
+		return fmt.Errorf("error getting volumeName: %v", err)
+	}
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
 	}
@@ -349,7 +352,10 @@ func addVolume(ctx context.Context, ex *JobExecutor, vmiName, namespace string, 
 }
 
 func removeVolume(ctx context.Context, ex *JobExecutor, vmiName, namespace string, extraArgs map[string]any) error {
-	volumeName := util.GetStringValue(extraArgs, "volumeName")
+	volumeName, err := util.GetStringValue(extraArgs, "volumeName")
+	if err != nil {
+		return fmt.Errorf("error getting volumeName: %v", err)
+	}
 	if volumeName == nil {
 		return fmt.Errorf("'volumeName' is mandatory")
 	}

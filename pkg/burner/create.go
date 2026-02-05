@@ -222,7 +222,11 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		wg.Add(1)
 		go func(r int) {
 			defer wg.Done()
-			newObjects, gvks := ex.renderTemplateForObjectMultiple(obj, iteration, r)
+			newObjects, gvks, err := ex.renderTemplateForObjectMultiple(obj, iteration, r)
+			if err != nil {
+				log.Errorf("Error rendering object: %s", err)
+				return
+			}
 			newObject := newObjects[obj.documentIndex]
 			gvk := gvks[obj.documentIndex]
 
@@ -237,7 +241,6 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
 			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
 			_, err = ex.mapper.RESTMapping(gvk.GroupKind())
-
 			if err != nil {
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
 				return
