@@ -79,6 +79,7 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
 		}
+		defer f.Close()
 		t, err := io.ReadAll(f)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
