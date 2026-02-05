@@ -151,8 +151,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					errs = append(errs, err)
 					innerRC = 1
 				}
-				// Collect background hook results
-				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 				if ctx.Err() != nil {
 					return
 				}
@@ -188,8 +186,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					errs = append(errs, err)
 					innerRC = 1
 				}
-				// Collect background hook results for hooks started during the beforeDeployment and afterDeployment stages
-				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 				if ctx.Err() != nil {
 					return
 				}
@@ -213,9 +209,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 					log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 				}
-
-				// Collect background hook results from beforeCleanup
-				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 			}
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
@@ -263,9 +256,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					errs = append(errs, err)
 					innerRC = 1
 				}
-				// Collect background hook results from afterCleanup
-				errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 			}
+			// Collect all background hook results once after all hook stages are complete for this job.
+			errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 		}
 		if globalConfig.WaitWhenFinished {
 			runWaitList(ctx, jobExecutors)
@@ -288,7 +281,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 						errs = append(errs, err)
 						innerRC = 1
 					}
-					// Collect background hook results from afterCleanup
+					// Collect background hook results from the global GC metrics phase.
 					errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 				}
 				// We add an extra dummy job to executedJobs to index metrics from this stage
