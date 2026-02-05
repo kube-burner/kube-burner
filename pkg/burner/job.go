@@ -89,7 +89,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
-		handlePreloadImages(jobExecutors, kubeClientProvider)
+		handlePreloadImages(ctx, jobExecutors, kubeClientProvider)
 		// Iterate job list
 		var measurementsInstance *measurements.Measurements
 		var measurementsJobName string
@@ -164,7 +164,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					executedJobs[jobExecutorIdx].ChurnEnd = &churnEnd
 				}
 				// If object verification is enabled
-				if jobExecutor.VerifyObjects && !jobExecutor.Verify() {
+				if jobExecutor.VerifyObjects && !jobExecutor.Verify(ctx) {
 					err := errors.New("object verification failed")
 					// If errorOnVerify is enabled. Set RC to 1 and append error
 					if jobExecutor.ErrorOnVerify {
@@ -268,7 +268,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 		}
 		if globalConfig.WaitWhenFinished {
-			runWaitList(jobExecutors)
+			runWaitList(ctx, jobExecutors)
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
@@ -354,11 +354,11 @@ func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *co
 }
 
 // If requests, preload the images used in the test into the node
-func handlePreloadImages(executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
+func handlePreloadImages(ctx context.Context, executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
 	clientSet, _ := kubeClientProvider.DefaultClientSet()
 	for _, executor := range executorList {
 		if executor.PreLoadImages && executor.JobType == config.CreationJob {
-			if err := preLoadImages(executor, clientSet); err != nil {
+			if err := preLoadImages(ctx, executor, clientSet); err != nil {
 				log.Fatal(err.Error())
 			}
 		}
@@ -448,7 +448,7 @@ func newExecutorList(configSpec config.Spec, kubeClientProvider *config.KubeClie
 }
 
 // Runs on wait list at the end of benchmark
-func runWaitList(jobExecutors []JobExecutor) []error {
+func runWaitList(ctx context.Context, jobExecutors []JobExecutor) []error {
 	var allErrs []error
 	var mu sync.Mutex
 	for _, executor := range jobExecutors {
@@ -464,7 +464,7 @@ func runWaitList(jobExecutors []JobExecutor) []error {
 					<-sem
 					wg.Done()
 				}()
-				if errs := executor.waitForObjects(ns); errs != nil {
+				if errs := executor.waitForObjects(ctx, ns); errs != nil {
 					mu.Lock()
 					allErrs = append(allErrs, errs...)
 					mu.Unlock()

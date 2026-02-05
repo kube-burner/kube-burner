@@ -38,12 +38,18 @@ jobs:
         k8s-version: ${{ fromJson(needs.fetch-latest-kind-node-tags.outputs.tags) }}
     steps:
 
-    - name: Check out code
+    - name: Checkout PR head
       uses: actions/checkout@v6
       with:
-        fetch-depth: 1
+        # Use the PR head SHA
         ref: ${{ github.event.pull_request.head.sha }}
+        # Fetch only the most recent commit of the PR
+        fetch-depth: 1
         persist-credentials: false
+
+    - name: Fetch base branch for comparison
+      # This tells Git about origin/main (or master) without downloading the whole repo
+      run: git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
 
     - name: Download kube-burner binary
       uses: actions/download-artifact@v7
