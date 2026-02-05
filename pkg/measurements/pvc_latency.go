@@ -265,6 +265,7 @@ func (p *pvcLatency) IsCompatible() bool {
 
 // pvcTransformFunc preserves the following fields for latency measurements:
 // - metadata: name, namespace, uid, creationTimestamp, labels
+// - spec: storageClassName, resources
 // - status: phase, conditions
 func pvcTransformFunc() cache.TransformFunc {
 	return func(obj interface{}) (interface{}, error) {
@@ -275,6 +276,15 @@ func pvcTransformFunc() cache.TransformFunc {
 
 		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
+		// Preserve spec fields needed for metrics
+		if storageClassName, found, _ := unstructured.NestedString(u.Object, "spec", "storageClassName"); found {
+			_ = unstructured.SetNestedField(minimal.Object, storageClassName, "spec", "storageClassName")
+		}
+		if resources, found, _ := unstructured.NestedMap(u.Object, "spec", "resources"); found {
+			_ = unstructured.SetNestedMap(minimal.Object, resources, "spec", "resources")
+		}
+
+		// Preserve status fields needed for latency tracking
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
 		}
