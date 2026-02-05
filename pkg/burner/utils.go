@@ -155,7 +155,7 @@ func (ex *JobExecutor) resolveObjectMapping(obj *object) {
 }
 
 // Verify verifies the number of created objects
-func (ex *JobExecutor) Verify() bool {
+func (ex *JobExecutor) Verify(ctx context.Context) bool {
 	var objList *unstructured.UnstructuredList
 	var replicas int
 	success := true
@@ -195,7 +195,7 @@ func (ex *JobExecutor) Verify() bool {
 			replicas = 0
 			for _, gvr := range gvrsToVerify {
 				for {
-					objList, err = ex.dynamicClient.Resource(gvr).Namespace(metav1.NamespaceAll).List(context.TODO(), listOptions)
+					objList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, listOptions)
 					if err != nil {
 						log.Errorf("Error verifying object %s: %s", gvr.Resource, err)
 						return false, nil
@@ -265,7 +265,7 @@ func (ex *JobExecutor) Run(ctx context.Context) []error {
 	return errs
 }
 
-func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.UnstructuredList, error) {
+func (ex *JobExecutor) getItemListForObject(ctx context.Context, obj *object) (*unstructured.UnstructuredList, error) {
 	var itemList *unstructured.UnstructuredList
 	labelSelector := labels.Set(obj.LabelSelector).String()
 	listOptions := metav1.ListOptions{
@@ -274,7 +274,7 @@ func (ex *JobExecutor) getItemListForObject(obj *object) (*unstructured.Unstruct
 
 	// Try to find the list of resources by GroupVersionResource.
 	err := util.RetryWithExponentialBackOff(func() (done bool, err error) {
-		itemList, err = ex.dynamicClient.Resource(obj.gvr).List(context.TODO(), listOptions)
+		itemList, err = ex.dynamicClient.Resource(obj.gvr).List(ctx, listOptions)
 		if err != nil {
 			log.Errorf("Error found listing %s labeled with %s: %s", obj.gvr.Resource, labelSelector, err)
 			return false, nil
@@ -295,7 +295,7 @@ func (ex *JobExecutor) runSequential(ctx context.Context) []error {
 			if ctx.Err() != nil {
 				return []error{ctx.Err()}
 			}
-			itemList, err := ex.getItemListForObject(obj)
+			itemList, err := ex.getItemListForObject(ctx, obj)
 			if err != nil {
 				continue
 			}
@@ -303,14 +303,14 @@ func (ex *JobExecutor) runSequential(ctx context.Context) []error {
 			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, obj, item, i, objectTimeUTC, &wg)
+				go ex.itemHandler(ctx, ex, obj, item, i, objectTimeUTC, &wg)
 			}
 			// Wait for all items in the object
 			wg.Wait()
 
 			// If requested, wait for the completion of the specific object
 			if ex.ObjectWait {
-				if err := ex.waitForObject("", obj); err != nil {
+				if err := ex.waitForObject(ctx, "", obj); err != nil {
 					if errs == nil {
 						errs = append(errs, err)
 					}
@@ -318,7 +318,7 @@ func (ex *JobExecutor) runSequential(ctx context.Context) []error {
 			}
 
 			if ex.objectFinalizer != nil {
-				ex.objectFinalizer(ex, obj)
+				ex.objectFinalizer(ctx, ex, obj)
 			}
 			// Wait between object
 			if ex.ObjectDelay > 0 {
@@ -327,7 +327,7 @@ func (ex *JobExecutor) runSequential(ctx context.Context) []error {
 			}
 		}
 		if ex.WaitWhenFinished {
-			if err := ex.waitForObjects(""); err != nil {
+			if err := ex.waitForObjects(ctx, ""); err != nil {
 				errs = append(errs, err...)
 			}
 		}
@@ -354,7 +354,7 @@ func (ex *JobExecutor) runParallel(ctx context.Context) []error {
 		if ctx.Err() != nil {
 			return []error{ctx.Err()}
 		}
-		itemList, err := ex.getItemListForObject(obj)
+		itemList, err := ex.getItemListForObject(ctx, obj)
 		if err != nil {
 			continue
 		}
@@ -362,12 +362,12 @@ func (ex *JobExecutor) runParallel(ctx context.Context) []error {
 			objectTimeUTC := time.Now().UTC().Unix()
 			for _, item := range itemList.Items {
 				wg.Add(1)
-				go ex.itemHandler(ex, obj, item, j, objectTimeUTC, &wg)
+				go ex.itemHandler(ctx, ex, obj, item, j, objectTimeUTC, &wg)
 			}
 		}
 	}
 	wg.Wait()
-	return ex.waitForObjects("")
+	return ex.waitForObjects(ctx, "")
 }
 
 // isLikelyNamespaced checks if a kind is typically namespaced based on common patterns.
