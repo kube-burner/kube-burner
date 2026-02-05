@@ -63,22 +63,39 @@ func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []any) error 
 	return utilerrors.NewAggregate(errs)
 }
 
-func NewLatencySummary(input []float64, name string) LatencyQuantiles {
+func NewLatencySummary(input []float64, name string) (LatencyQuantiles, error) {
 	latencyQuantiles := LatencyQuantiles{
 		QuantileName: name,
 		Timestamp:    time.Now().UTC(),
 	}
-	val, _ := stats.Percentile(input, 50)
+	if len(input) == 0 {
+		return latencyQuantiles, fmt.Errorf("cannot calculate latency summary: empty input slice for %s", name)
+	}
+	var err error
+	var val float64
+	if val, err = stats.Percentile(input, 50); err != nil {
+		return latencyQuantiles, fmt.Errorf("failed to calculate P50 for %s: %w", name, err)
+	}
 	latencyQuantiles.P50 = int(val)
-	val, _ = stats.Percentile(input, 95)
+	if val, err = stats.Percentile(input, 95); err != nil {
+		return latencyQuantiles, fmt.Errorf("failed to calculate P95 for %s: %w", name, err)
+	}
 	latencyQuantiles.P95 = int(val)
-	val, _ = stats.Percentile(input, 99)
+	if val, err = stats.Percentile(input, 99); err != nil {
+		return latencyQuantiles, fmt.Errorf("failed to calculate P99 for %s: %w", name, err)
+	}
 	latencyQuantiles.P99 = int(val)
-	val, _ = stats.Min(input)
+	if val, err = stats.Min(input); err != nil {
+		return latencyQuantiles, fmt.Errorf("failed to calculate Min for %s: %w", name, err)
+	}
 	latencyQuantiles.Min = int(val)
-	val, _ = stats.Max(input)
+	if val, err = stats.Max(input); err != nil {
+		return latencyQuantiles, fmt.Errorf("failed to calculate Max for %s: %w", name, err)
+	}
 	latencyQuantiles.Max = int(val)
-	val, _ = stats.Mean(input)
+	if val, err = stats.Mean(input); err != nil {
+		return latencyQuantiles, fmt.Errorf("failed to calculate Mean for %s: %w", name, err)
+	}
 	latencyQuantiles.Avg = int(val)
-	return latencyQuantiles
+	return latencyQuantiles, nil
 }
