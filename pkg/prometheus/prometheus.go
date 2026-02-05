@@ -92,10 +92,15 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 				if requiresInstant {
 					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
 				}
+				if len(docsToIndex) > 0 {
+					p.indexDatapoints(docsToIndex)
+					docsToIndex = make(map[string][]any)
+				} else {
+					log.Warnf("No documents to index for metric %s", metric.MetricName)
+				}
 			}
 		}
 	}
-	p.indexDatapoints(docsToIndex)
 	return nil
 }
 
