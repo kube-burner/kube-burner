@@ -16,6 +16,7 @@ package workloads
 
 import (
 	"embed"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -75,6 +76,9 @@ func (wh *WorkloadHelper) Run(configFile string) int {
 	f, err := fileutils.GetWorkloadReader(configFile, wh.embedCfg)
 	if err != nil {
 		log.Fatalf("Error reading configuration file: %v", err.Error())
+	}
+	if closer, ok := f.(io.Closer); ok {
+		defer closer.Close()
 	}
 	ConfigSpec, err = config.ParseWithUserdata(wh.UUID, wh.Timeout, f, nil, false, wh.additionalVars, wh.setVars)
 	if err != nil {

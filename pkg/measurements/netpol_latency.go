@@ -476,6 +476,9 @@ func readTemplate(o config.Object, embedCfg *fileutils.EmbedConfiguration) ([]by
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 	}
 	t, err := io.ReadAll(f)
+	if closer, ok := f.(io.Closer); ok {
+		closer.Close()
+	}
 	if err != nil {
 		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 	}
