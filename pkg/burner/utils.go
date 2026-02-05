@@ -396,6 +396,5 @@ func (ex *JobExecutor) isLikelyNamespaced(kind string) bool {
 		return false
 	}
 
-	// Default to namespaced for unknown kinds (safer assumption)
 	return true
 }
