@@ -53,7 +53,6 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 		log.Info("Indexer not configured, skipping metric scraping")
 		return nil
 	}
-	docsToIndex := make(map[string][]any)
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
 	for _, eachJob := range jobList {
@@ -72,6 +71,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 				eachJob.JobConfig.Name,
 				eachJob.JobConfig.MetricsClosing)
 			for _, metric := range metricProfile.metrics {
+				docsToIndex := make(map[string][]any, 2)
 				requiresInstant := false
 				t, _ := template.New("").Parse(metric.Query)
 				if err := t.Execute(&renderedQuery, vars); err != nil {
@@ -92,10 +92,14 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 				if requiresInstant {
 					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
 				}
+				if len(docsToIndex) > 0 {
+					p.indexDatapoints(docsToIndex)
+				} else {
+					log.Warnf("No documents to index for metric %s", metric.MetricName)
+				}
 			}
 		}
 	}
-	p.indexDatapoints(docsToIndex)
 	return nil
 }
 
