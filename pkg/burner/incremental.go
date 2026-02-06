@@ -33,16 +33,16 @@ type IterationCalculator interface {
 // NewIterationCalculator returns an IterationCalculator based on job's IncrementalLoad config.
 func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 	cfg := ex.IncrementalLoad
-	minIt := cfg.MinIterations
-	if minIt <= 0 {
-		minIt = ex.JobIterations
+	startIt := cfg.StartIterations
+	if startIt <= 0 {
+		startIt = ex.JobIterations
 	}
-	maxIt := cfg.MaxIterations
-	if maxIt < minIt {
-		maxIt = minIt
+	totalIt := cfg.TotalIterations
+	if totalIt < startIt {
+		totalIt = startIt
 	}
-	if maxIt <= 0 {
-		return &linearCalculator{min: 0, max: 0, step: 0}
+	if totalIt <= 0 {
+		return &linearCalculator{start: 0, total: 0, step: 0}
 	}
 	if cfg.Pattern.Type == config.ExponentialPattern {
 		base := 2.0
@@ -51,17 +51,17 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 		if cfg.Pattern.Exponential != nil && cfg.Pattern.Exponential.Base > 0 {
 			base = cfg.Pattern.Exponential.Base
 		}
-		return &exponentialCalculator{min: minIt, max: maxIt, base: base, maxIncrease: maxInc, warmup: warmup, stepNo: 0}
+		return &exponentialCalculator{start: startIt, total: totalIt, base: base, maxIncrease: maxInc, warmup: warmup, stepNo: 0}
 	} else {
 		step := 1
 		if cfg.Pattern.Linear != nil {
 			step = cfg.Pattern.Linear.StepSize
 		}
-		totalSteps := int(math.Ceil(float64(maxIt-minIt) / float64(step)))
+		totalSteps := int(math.Ceil(float64(totalIt-startIt) / float64(step)))
 		if cfg.Pattern.Linear.MinSteps > 0 && totalSteps < cfg.Pattern.Linear.MinSteps {
-			remaining := maxIt - minIt
+			remaining := totalIt - startIt
 			if remaining <= 0 {
-				step = maxIt
+				step = totalIt
 			} else {
 				step = int(math.Ceil(float64(remaining) / float64(cfg.Pattern.Linear.MinSteps)))
 			}
@@ -69,40 +69,40 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 		if step <= 0 {
 			step = 1
 		}
-		return &linearCalculator{min: minIt, max: maxIt, step: step}
+		return &linearCalculator{start: startIt, total: totalIt, step: step}
 	}
 }
 
-// linearCalculator increments iterations by a fixed step until max is reached.
+// linearCalculator increments iterations by a fixed step until total is reached.
 type linearCalculator struct {
-	min  int
-	max  int
-	step int
+	start int
+	total int
+	step  int
 }
 
 func (l *linearCalculator) Next(current int) (start, end int, done bool) {
-	if l.max <= 0 || current == l.max {
+	if l.total <= 0 || current == l.total {
 		return 0, 0, true
 	}
-	// first step: create min iterations
+	// first step: create start iterations
 	if current == 0 {
-		next := l.min
-		if next > l.max {
-			next = l.max
+		next := l.start
+		if next > l.total {
+			next = l.total
 		}
 		return 0, next, false
 	}
 	next := current + l.step
-	if next > l.max {
-		next = l.max
+	if next > l.total {
+		next = l.total
 	}
 	return current, next, false
 }
 
 // exponentialCalculator increases iterations exponentially after an optional warmup.
 type exponentialCalculator struct {
-	min         int
-	max         int
+	start       int
+	total       int
 	base        float64
 	maxIncrease int
 	warmup      int
@@ -110,22 +110,22 @@ type exponentialCalculator struct {
 }
 
 func (e *exponentialCalculator) Next(current int) (start, end int, done bool) {
-	if e.max <= 0 || current == e.max {
+	if e.total <= 0 || current == e.total {
 		return 0, 0, true
 	}
 	if current == 0 {
 		e.stepNo = 1
-		next := e.min
-		if next > e.max {
-			next = e.max
+		next := e.start
+		if next > e.total {
+			next = e.total
 		}
 		return 0, next, false
 	}
 	e.stepNo++
 	if e.warmup > 0 && e.stepNo <= e.warmup {
-		candidate := current + e.min
-		if candidate > e.max {
-			candidate = e.max
+		candidate := current + e.start
+		if candidate > e.total {
+			candidate = e.total
 		}
 		return current, candidate, false
 	}
@@ -133,7 +133,7 @@ func (e *exponentialCalculator) Next(current int) (start, end int, done bool) {
 	if e.warmup > 0 {
 		expPower = float64(e.stepNo - e.warmup)
 	}
-	increase := int(math.Pow(e.base, expPower)) * e.min
+	increase := int(math.Pow(e.base, expPower)) * e.start
 	if increase <= 0 {
 		increase = 1
 	}
@@ -141,8 +141,8 @@ func (e *exponentialCalculator) Next(current int) (start, end int, done bool) {
 		increase = e.maxIncrease
 	}
 	candidate := current + increase
-	if candidate > e.max {
-		candidate = e.max
+	if candidate > e.total {
+		candidate = e.total
 	}
 	return current, candidate, false
 }

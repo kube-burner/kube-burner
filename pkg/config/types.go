@@ -202,7 +202,7 @@ type Job struct {
 	GC bool `yaml:"gc" json:"gc"`
 	// Measurements job-specific measurements to enable
 	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
-	// IncrementalLoad enables incremental load behavior for creation jobs
+	// IncrementalLoad enables incremental load behaviour for creation jobs
 	IncrementalLoad *IncrementalLoad `yaml:"incrementalLoad" json:"incrementalLoad,omitempty"`
 }
 
@@ -218,16 +218,16 @@ type WaitOptions struct {
 }
 
 type IncrementalLoad struct {
-	// MinIterations minimum number of iterations to start with
-	MinIterations int `yaml:"minIterations" json:"minIterations,omitempty"`
-	// MaxIterations maximum number of iterations to go upto
-	MaxIterations int `yaml:"maxIterations" json:"maxIterations,omitempty"`
+	// StartIterations initial number of iterations to start with
+	StartIterations int `yaml:"startIterations" json:"startIterations,omitempty"`
+	// TotalIterations total number of iterations to go upto
+	TotalIterations int `yaml:"totalIterations" json:"totalIterations,omitempty"`
 	// StepDelay time delay between each incremental step
 	StepDelay time.Duration `yaml:"stepDelay" json:"stepDelay,omitempty"`
-	// HealthCheckScript optional shell script to run as a health check between steps
-	HealthCheckScript string `yaml:"healthCheckScript" json:"healthCheckScript,omitempty"`
 	// Pattern load patterns
 	Pattern LoadPattern `yaml:"pattern" json:"pattern,omitempty"`
+	// HealthCheckScript optional shell script to run as a health check between steps
+	HealthCheckScript string `yaml:"healthCheckScript" json:"healthCheckScript,omitempty"`
 }
 
 type LoadPattern struct {

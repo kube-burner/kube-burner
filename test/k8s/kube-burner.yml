@@ -71,8 +71,8 @@ jobs:
     maxWaitTimeout: 2m
 {{ if .INCREMENTAL_LOAD }}
     incrementalLoad:
-      minIterations: 5
-      maxIterations: 20
+      startIterations: 5
+      totalIterations: 20
       stepDelay: 2s
       pattern:
         type: linear
