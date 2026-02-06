@@ -129,7 +129,6 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 		pm := value.(pvcMetric)
 		log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
 		if pm.bound == 0 || pm.lost == 0 {
-			// https://pkg.go.dev/k8s.io/api/core/v1#PersistentVolumeClaimPhase
 			if pvc.Status.Phase == corev1.ClaimPending {
 				if pm.pending == 0 {
 					log.Debugf("PVC %s is pending", pvc.Name)
@@ -280,6 +279,12 @@ func pvcTransformFunc() cache.TransformFunc {
 		}
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
+		}
+		if storageClassName, found, _ := unstructured.NestedString(u.Object, "spec", "storageClassName"); found {
+			_ = unstructured.SetNestedField(minimal.Object, storageClassName, "spec", "storageClassName")
+		}
+		if resources, found, _ := unstructured.NestedMap(u.Object, "spec", "resources"); found {
+			_ = unstructured.SetNestedMap(minimal.Object, resources, "spec", "resources")
 		}
 
 		return minimal, nil
