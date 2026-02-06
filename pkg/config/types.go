@@ -219,9 +219,9 @@ type WaitOptions struct {
 
 type IncrementalLoad struct {
 	// MinIterations minimum number of iterations to start with
-	MinIterations int `yaml:"minIterations" json:"minIterations,omitempty"`
+	StartIterations int `yaml:"startIterations" json:"startIterations,omitempty"`
 	// MaxIterations maximum number of iterations to go upto
-	MaxIterations int `yaml:"maxIterations" json:"maxIterations,omitempty"`
+	TotalIterations int `yaml:"totalIterations" json:"totalIterations,omitempty"`
 	// StepDelay time delay between each incremental step
 	StepDelay time.Duration `yaml:"stepDelay" json:"stepDelay,omitempty"`
 	// Pattern load patterns

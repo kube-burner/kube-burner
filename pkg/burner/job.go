@@ -290,12 +290,11 @@ func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *co
 	return nil
 }
 
-// runCreateOrIncremental runs either a full create job or an incremental create
-// depending on the job configuration.
+// runCreateOrIncremental depending on the job configuration.
 func runCreateOrIncremental(ctx context.Context, jobExecutor JobExecutor) []error {
 	if jobExecutor.IncrementalLoad != nil {
 		calculator := NewIterationCalculator(jobExecutor)
-		return RunIncrementalCreateJob(ctx, jobExecutor, calculator, jobExecutor.IncrementalLoad.StepDelay)
+		return jobExecutor.RunIncrementalCreateJob(ctx, calculator)
 	}
 	return jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations)
 }

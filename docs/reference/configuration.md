@@ -151,8 +151,8 @@ Examples of valid configuration files can be found in the [examples folder](http
 
 | Option | Description | Type | Default |
 |--------|-------------|------|---------|
-| `minIterations` | Minimum iterations to start with. If omitted, the job's `jobIterations` is used. | Integer | `jobIterations` |
-| `maxIterations` | Maximum iterations to reach. If omitted, no increase beyond `minIterations` is performed. | Integer | same as `minIterations` |
+| `startIterations` | Initial number of iterations to start with. If omitted, the job's `jobIterations` is used. | Integer | `jobIterations` |
+| `totalIterations` | Total number of iterations to reach. If omitted, no increase beyond `startIterations` is performed. | Integer | same as `startIterations` |
 | `stepDelay` | Delay between incremental steps (Go duration, e.g., `30s`). | Duration | `0s` |
 | `pattern.type` | Load pattern: `linear` or `exponential`. | String | `linear` |
 | `pattern.linear.minSteps` | Minimum number of steps for linear pattern. | Integer | `0` |
@@ -164,6 +164,21 @@ Examples of valid configuration files can be found in the [examples folder](http
 
 !!! note
     Linear pattern falls back to a single step when `minSteps` is not provided and the implementation guards against division-by-zero when computing ranges. The runner will stop on any health-check error (script non-zero exit or built-in check failure).
+
+#### Incremental load behavior
+
+The incremental load feature gradually increases the number of iterations from a configured start (`startIterations`) to a configured total (`totalIterations`) while retaining the resources created in each step. Two growth patterns are supported:
+
+- Linear: iterations increase by a fixed amount each step (configured with `pattern.linear.stepSize`).
+- Exponential: iterations grow multiplicatively using `pattern.exponential.base`. An optional `pattern.exponential.warmupSteps` value can apply a few initial linear increases before exponential growth begins.
+
+After each increase the runner performs the configured health check and will stop early on failure. Between successful steps the runner waits the configured `stepDelay` before applying the next increase.
+
+Simple examples:
+- Linear: `startIterations=10`, `totalIterations=50`, `pattern.linear.stepSize=10` → 10, 20, 30, 40, 50 with constant increments of 10 iterations in each step.
+- Exponential: `startIterations=5`, `totalmaxIterations=100`, `pattern.exponential.base=2` → 5, 10, 20, 40, 80, 100 by simply multiplying the iterations by 2 in each step.
+
+These examples illustrate the typical behavior without requiring mathematical formulas.
 
 ### Watchers
 

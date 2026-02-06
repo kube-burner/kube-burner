@@ -195,8 +195,8 @@ func (ex *JobExecutor) Verify(ctx context.Context) bool {
 		var objectsExpected int
 		if obj.RunOnce {
 			objectsExpected = obj.Replicas
-		} else if ex.IncrementalLoad != nil && (ex.IncrementalLoad.MaxIterations > 0 || ex.IncrementalLoad.MinIterations > 0) {
-			objectsExpected = obj.Replicas * int(math.Max(float64(ex.IncrementalLoad.MinIterations), float64(ex.IncrementalLoad.MaxIterations)))
+		} else if ex.IncrementalLoad != nil && (ex.IncrementalLoad.TotalIterations > 0 || ex.IncrementalLoad.StartIterations > 0) {
+			objectsExpected = obj.Replicas * int(math.Max(float64(ex.IncrementalLoad.StartIterations), float64(ex.IncrementalLoad.TotalIterations)))
 		} else {
 			objectsExpected = obj.Replicas * ex.JobIterations
 		}
