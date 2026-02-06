@@ -33,7 +33,7 @@ func (ex *JobExecutor) setupReadJob() {
 
 	for _, o := range ex.Objects {
 		log.Debugf("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, ex.mapper, APIVersionV1, ex.embedCfg))
+		ex.objects = append(ex.objects, newObject(o, ex.mapper, APIVersionV1))
 	}
 	log.Infof("Job %s: %d iterations", ex.Name, ex.JobIterations)
 }

@@ -44,35 +44,35 @@ func NewEmbedConfiguration(embedFS *embed.FS, embedWorkloadsDir, embedMetricsDir
 	}
 }
 
-func GetWorkloadReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
+func GetWorkloadReader(location string, embedCfg *EmbedConfiguration) (io.ReadCloser, error) {
 	if embedCfg != nil {
 		return getEmbedReader(location, embedCfg.fs, embedCfg.workloadsDir)
 	}
 	return getReader(location)
 }
 
-func GetMetricsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
+func GetMetricsReader(location string, embedCfg *EmbedConfiguration) (io.ReadCloser, error) {
 	if embedCfg != nil {
 		return getEmbedReader(location, embedCfg.fs, embedCfg.metricsDir)
 	}
 	return getReader(location)
 }
 
-func GetAlertsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
+func GetAlertsReader(location string, embedCfg *EmbedConfiguration) (io.ReadCloser, error) {
 	if embedCfg != nil {
 		return getEmbedReader(location, embedCfg.fs, embedCfg.alertsDir)
 	}
 	return getReader(location)
 }
 
-func GetScriptsReader(location string, embedCfg *EmbedConfiguration) (io.Reader, error) {
+func GetScriptsReader(location string, embedCfg *EmbedConfiguration) (io.ReadCloser, error) {
 	if embedCfg != nil {
 		return getEmbedReader(location, embedCfg.fs, embedCfg.scriptsDir)
 	}
 	return getReader(location)
 }
 
-func getEmbedReader(location string, embedFS *embed.FS, embedDir string) (io.Reader, error) {
+func getEmbedReader(location string, embedFS *embed.FS, embedDir string) (io.ReadCloser, error) {
 	if _, err := os.Stat(location); err == nil {
 		log.Infof("Config file %v available in the current directory, using it", location)
 		return getReader(location)
@@ -87,8 +87,8 @@ func getEmbedReader(location string, embedFS *embed.FS, embedDir string) (io.Rea
 	}
 }
 
-func getReader(location string) (io.Reader, error) {
-	var f io.Reader
+func getReader(location string) (io.ReadCloser, error) {
+	var f io.ReadCloser
 	u, err := url.Parse(location)
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
 		f, err = getBodyForURL(location, nil)
@@ -104,8 +104,7 @@ func getReader(location string) (io.Reader, error) {
 	return f, nil
 }
 
-// getBodyForURL reads an URL and returns a reader
-func getBodyForURL(stringURL string, body io.Reader) (io.Reader, error) {
+func getBodyForURL(stringURL string, body io.ReadCloser) (io.ReadCloser, error) {
 	u, err := url.ParseRequestURI(stringURL)
 	if err != nil {
 		return body, err

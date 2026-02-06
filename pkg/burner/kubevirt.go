@@ -107,7 +107,8 @@ func (ex *JobExecutor) setupKubeVirtJob() {
 			o.Kind = kubeVirtDefaultKind
 		}
 
-		obj := newObject(o, ex.mapper, kubeVirtAPIVersionV1, ex.embedCfg)
+		obj := newObject(o, ex.mapper, kubeVirtAPIVersionV1)
+		obj.loadTemplate(ex.embedCfg)
 
 		if o.KubeVirtOp == config.KubeVirtOpMigrate && obj.waitGVR == nil {
 			obj.waitGVR = &schema.GroupVersionResource{
