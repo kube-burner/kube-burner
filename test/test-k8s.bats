@@ -42,6 +42,7 @@ setup() {
   export CHURN_CYCLES=0
   export PRELOAD_IMAGES=false
   export GC=true
+  export INCREMENTAL_LOAD=""
   export JOBGC=false
   export LOCAL_INDEXING=""
   export ALERTING=""
@@ -284,4 +285,10 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} measure -c kube-burner-measure.yml --uuid=${UUID} --log-level=debug --duration=1m --selector=app=kube-burner-measure
   check_file_exists ${METRICS_FOLDER}/pprof/*.pprof
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
+}
+
+@test "kube-burner.yml: incremental-load=true" {
+  export INCREMENTAL_LOAD=true LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
 }
