@@ -55,7 +55,7 @@ func areNodesHealthy(ctx context.Context, clientset kubernetes.Interface) bool {
 	var isHealthy = true
 	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Errorf("error getting nodes: %v", err)
+		log.Errorf("Error getting nodes: %v", err)
 		return false
 	}
 
