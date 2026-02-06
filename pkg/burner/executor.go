@@ -16,8 +16,6 @@ package burner
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"sync"
 
 	"maps"
@@ -38,8 +36,8 @@ import (
 )
 
 // Executor contains the information required to execute a job
-type ItemHandler func(ex *JobExecutor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup)
-type ObjectFinalizer func(ex *JobExecutor, obj *object)
+type ItemHandler func(ctx context.Context, ex *JobExecutor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup)
+type ObjectFinalizer func(ctx context.Context, ex *JobExecutor, obj *object)
 
 type JobExecutor struct {
 	config.Job
