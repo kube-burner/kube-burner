@@ -74,20 +74,9 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 	}
 }
 
-	if obj.ObjectTemplate != "" {
-		log.Debugf("Rendering template: %s", obj.ObjectTemplate)
-		f, err := fileutils.GetWorkloadReader(obj.ObjectTemplate, embedCfg)
-		if err != nil {
-			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
-		}
-		if closer, ok := f.(io.Closer); ok {
-			defer closer.Close()
-		}
-		t, err := io.ReadAll(f)
-		if err != nil {
-			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
-		}
-		o.objectSpec = t
+func (o *object) loadTemplate(embedCfg *fileutils.EmbedConfiguration) {
+	if o.ObjectTemplate == "" {
+		return
 	}
 	log.Debugf("Rendering template: %s", o.ObjectTemplate)
 	f, err := fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
