@@ -38,7 +38,7 @@ type object struct {
 	documentIndex int
 }
 
-func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
+func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string) *object {
 	if obj.APIVersion == "" {
 		obj.APIVersion = defaultAPIVersion
 	}
@@ -66,26 +66,27 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 		waitGVR = &mapping.Resource
 	}
 
-	o := object{
+	return &object{
 		Object:     obj,
 		gvr:        mapping.Resource,
 		waitGVR:    waitGVR,
 		namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 	}
+}
 
-	if obj.ObjectTemplate != "" {
-		log.Debugf("Rendering template: %s", obj.ObjectTemplate)
-		f, err := fileutils.GetWorkloadReader(obj.ObjectTemplate, embedCfg)
-		if err != nil {
-			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
-		}
-		defer f.Close()
-		t, err := io.ReadAll(f)
-		if err != nil {
-			log.Fatalf("Error reading template %s: %s", obj.ObjectTemplate, err)
-		}
-		o.objectSpec = t
+func (o *object) loadTemplate(embedCfg *fileutils.EmbedConfiguration) {
+	if o.ObjectTemplate == "" {
+		return
 	}
-
-	return &o
+	log.Debugf("Rendering template: %s", o.ObjectTemplate)
+	f, err := fileutils.GetWorkloadReader(o.ObjectTemplate, embedCfg)
+	if err != nil {
+		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
+	}
+	defer f.Close()
+	t, err := io.ReadAll(f)
+	if err != nil {
+		log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
+	}
+	o.objectSpec = t
 }

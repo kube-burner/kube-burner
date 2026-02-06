@@ -44,7 +44,9 @@ func (ex *JobExecutor) setupPatchJob() {
 			log.Fatalln("Empty Patch Type not allowed")
 		}
 		log.Infof("Job %s: %s %s with selector %s", ex.Name, ex.JobType, o.Kind, labels.Set(o.LabelSelector))
-		ex.objects = append(ex.objects, newObject(o, ex.mapper, APIVersionV1, ex.embedCfg))
+		obj := newObject(o, ex.mapper, APIVersionV1)
+		obj.loadTemplate(ex.embedCfg)
+		ex.objects = append(ex.objects, obj)
 	}
 }
 
