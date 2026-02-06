@@ -71,7 +71,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 				eachJob.JobConfig.Name,
 				eachJob.JobConfig.MetricsClosing)
 			for _, metric := range metricProfile.metrics {
-				docsToIndex := make(map[string][]any)
+				docsToIndex := make(map[string][]any, 2)
 				requiresInstant := false
 				t, _ := template.New("").Parse(metric.Query)
 				if err := t.Execute(&renderedQuery, vars); err != nil {
