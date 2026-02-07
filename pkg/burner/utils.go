@@ -342,3 +342,19 @@ func (ex *JobExecutor) runParallel(ctx context.Context) []error {
 	wg.Wait()
 	return ex.waitForObjects(ctx, "")
 }
+
+func (ex *JobExecutor) CollectAndLogBackgroundHookResults(errs []error, innerRC int) ([]error, int) {
+	if len(ex.Hooks) > 0 {
+		backgroundResults := ex.hookManager.WaitBackgroundHooks()
+		for _, result := range backgroundResults {
+			if result.err != nil {
+				log.Errorf("Background hook failed: %v (duration: %v)", result.err, result.duration)
+				errs = append(errs, result.err)
+				innerRC = 1
+			} else {
+				log.Infof("Background hook completed successfully (duration: %v)", result.duration)
+			}
+		}
+	}
+	return errs, innerRC
+}
