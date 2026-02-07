@@ -66,10 +66,10 @@ var (
 	}
 )
 
-func (ex *JobExecutor) waitForObjects(ns string) []error {
+func (ex *JobExecutor) waitForObjects(ctx context.Context, ns string) []error {
 	var errs []error
 	for _, obj := range ex.objects {
-		if err := ex.waitForObject(ns, obj); err != nil {
+		if err := ex.waitForObject(ctx, ns, obj); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -81,7 +81,7 @@ func (ex *JobExecutor) waitForObjects(ns string) []error {
 	return errs
 }
 
-func (ex *JobExecutor) waitForObject(ns string, obj *object) error {
+func (ex *JobExecutor) waitForObject(ctx context.Context, ns string, obj *object) error {
 	if !obj.Wait || obj.ready {
 		return nil
 	}
@@ -96,7 +96,7 @@ func (ex *JobExecutor) waitForObject(ns string, obj *object) error {
 
 	var err error
 	if len(obj.WaitOptions.CustomStatusPaths) > 0 {
-		err = ex.verifyCondition(ns, obj, labelSelectorString)
+		err = ex.verifyCondition(ctx, ns, obj, labelSelectorString)
 	} else {
 		kind := obj.Kind
 		if obj.WaitOptions.Kind != "" {
@@ -105,19 +105,19 @@ func (ex *JobExecutor) waitForObject(ns string, obj *object) error {
 		}
 		if waiterConditionPath, ok := waitersConditionPaths[kind]; ok {
 			obj.WaitOptions.CustomStatusPaths = waiterConditionPath.toStatusPaths(0)
-			err = ex.verifyCondition(ns, obj, labelSelectorString)
+			err = ex.verifyCondition(ctx, ns, obj, labelSelectorString)
 		} else {
 			switch kind {
 			case Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, VirtualMachineInstanceReplicaSet:
-				err = ex.waitForReplicas(ns, obj, waitStatusMap[kind], labelSelectorString)
+				err = ex.waitForReplicas(ctx, ns, obj, waitStatusMap[kind], labelSelectorString)
 			case Pod:
-				err = ex.waitForPod(ns, labelSelectorString)
+				err = ex.waitForPod(ctx, ns, labelSelectorString)
 			case Build, BuildConfig:
-				err = ex.waitForBuild(ns, obj, labelSelectorString)
+				err = ex.waitForBuild(ctx, ns, obj, labelSelectorString)
 			case PersistentVolumeClaim:
-				err = ex.waitForPVC(ns, labelSelectorString)
+				err = ex.waitForPVC(ctx, ns, labelSelectorString)
 			case VolumeSnapshot:
-				err = ex.waitForVolumeSnapshot(ns, obj, labelSelectorString)
+				err = ex.waitForVolumeSnapshot(ctx, ns, obj, labelSelectorString)
 			}
 		}
 	}
@@ -134,10 +134,10 @@ func (ex *JobExecutor) waitForObject(ns string, obj *object) error {
 	return nil
 }
 
-func (ex *JobExecutor) waitForReplicas(ns string, obj *object, waitPath statusPath, labelSelector string) error {
-	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		ex.waitLimiter.Wait(context.TODO())
-		resources, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+func (ex *JobExecutor) waitForReplicas(ctx context.Context, ns string, obj *object, waitPath statusPath, labelSelector string) error {
+	err := wait.PollUntilContextTimeout(ctx, time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+		ex.waitLimiter.Wait(ctx)
+		resources, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
@@ -163,10 +163,10 @@ func (ex *JobExecutor) waitForReplicas(ns string, obj *object, waitPath statusPa
 	return err
 }
 
-func (ex *JobExecutor) waitForPVC(ns string, labelSelector string) error {
-	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		ex.limiter.Wait(context.TODO())
-		pvcs, err := ex.clientSet.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{
+func (ex *JobExecutor) waitForPVC(ctx context.Context, ns string, labelSelector string) error {
+	err := wait.PollUntilContextTimeout(ctx, time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+		ex.limiter.Wait(ctx)
+		pvcs, err := ex.clientSet.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
@@ -184,16 +184,16 @@ func (ex *JobExecutor) waitForPVC(ns string, labelSelector string) error {
 	return err
 }
 
-func (ex *JobExecutor) waitForPod(ns string, labelSelector string) error {
-	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+func (ex *JobExecutor) waitForPod(ctx context.Context, ns string, labelSelector string) error {
+	err := wait.PollUntilContextTimeout(ctx, time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		// We need to paginate these requests to ensure we don't miss any pods
 		listOptions := metav1.ListOptions{
 			Limit:         1000,
 			LabelSelector: labelSelector,
 		}
 		for {
-			ex.limiter.Wait(context.TODO())
-			pods, err := ex.clientSet.CoreV1().Pods(ns).List(context.TODO(), listOptions)
+			ex.limiter.Wait(ctx)
+			pods, err := ex.clientSet.CoreV1().Pods(ns).List(ctx, listOptions)
 			if err != nil {
 				log.Errorf("Error listing pods in %s: %v", ns, err)
 				return false, nil
@@ -218,12 +218,12 @@ func (ex *JobExecutor) waitForPod(ns string, labelSelector string) error {
 	return err
 }
 
-func (ex *JobExecutor) waitForBuild(ns string, obj *object, labelSelector string) error {
+func (ex *JobExecutor) waitForBuild(ctx context.Context, ns string, obj *object, labelSelector string) error {
 	buildStatus := []string{"New", "Pending", "Running"}
 	var build types.UnstructuredContent
-	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
-		ex.limiter.Wait(context.TODO())
-		builds, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+	err := wait.PollUntilContextTimeout(ctx, time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+		ex.limiter.Wait(ctx)
+		builds, err := ex.dynamicClient.Resource(obj.gvr).Namespace(ns).List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
@@ -252,20 +252,20 @@ func (ex *JobExecutor) waitForBuild(ns string, obj *object, labelSelector string
 	return err
 }
 
-func (ex *JobExecutor) verifyCondition(ns string, obj *object, labelSelector string) error {
+func (ex *JobExecutor) verifyCondition(ctx context.Context, ns string, obj *object, labelSelector string) error {
 	gvr := obj.gvr
 	if obj.waitGVR != nil {
 		gvr = *obj.waitGVR
 	}
-	err := wait.PollUntilContextTimeout(context.TODO(), time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Second, ex.MaxWaitTimeout, true, func(ctx context.Context) (done bool, err error) {
 		var objs *unstructured.UnstructuredList
-		ex.limiter.Wait(context.TODO())
+		ex.limiter.Wait(ctx)
 		if obj.namespaced {
-			objs, err = ex.dynamicClient.Resource(gvr).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+			objs, err = ex.dynamicClient.Resource(gvr).Namespace(ns).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
 		} else {
-			objs, err = ex.dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{
+			objs, err = ex.dynamicClient.Resource(gvr).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
 		}
@@ -328,7 +328,7 @@ func (ex *JobExecutor) verifyCondition(ns string, obj *object, labelSelector str
 	return err
 }
 
-func (ex *JobExecutor) waitForVolumeSnapshot(ns string, obj *object, labelSelector string) error {
+func (ex *JobExecutor) waitForVolumeSnapshot(ctx context.Context, ns string, obj *object, labelSelector string) error {
 	if len(obj.WaitOptions.CustomStatusPaths) == 0 {
 		obj.WaitOptions.CustomStatusPaths = []config.StatusPath{
 			{
@@ -337,5 +337,5 @@ func (ex *JobExecutor) waitForVolumeSnapshot(ns string, obj *object, labelSelect
 			},
 		}
 	}
-	return ex.verifyCondition(ns, obj, labelSelector)
+	return ex.verifyCondition(ctx, ns, obj, labelSelector)
 }
