@@ -116,7 +116,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if jobExecutor.JobType == config.CreationJob {
 				if jobExecutor.Cleanup {
 					log.Info("Cleaning up previous runs")
-					jobExecutor.gc(ctx, nil)
+					if err := jobExecutor.gc(ctx, nil); err != nil {
+						log.Errorf("Cleanup failed: %v", err)
+					}
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					log.Info("Churning enabled")
@@ -208,9 +210,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance = nil
 			}
 			watcherStopErrs := watcherManager.StopAll()
-			slices.Concat(errs, watcherStopErrs)
+			errs = slices.Concat(errs, watcherStopErrs)
 			if jobExecutor.GC {
-				jobExecutor.gc(ctx, nil)
+				if err := jobExecutor.gc(ctx, nil); err != nil {
+					log.Errorf("Garbage collection failed: %v", err)
+				}
 			}
 		}
 		if globalConfig.WaitWhenFinished {
@@ -221,7 +225,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			//nolint:govet
 			for _, jobExecutor := range jobExecutors {
 				gcWg.Add(1)
-				go jobExecutor.gc(ctx, &gcWg)
+				go func(executor JobExecutor) {
+					if err := executor.gc(ctx, &gcWg); err != nil {
+						log.Errorf("Garbage collection failed: %v", err)
+					}
+				}(jobExecutor)
 			}
 			if globalConfig.GCMetrics {
 				cleanupStart := time.Now().UTC()
@@ -285,7 +293,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) error {
 	jobExecutors := newExecutorList(configSpec, kubeClientProvider, nil)
 	for _, jobExecutor := range jobExecutors {
-		jobExecutor.gc(ctx, nil)
+		if err := jobExecutor.gc(ctx, nil); err != nil {
+			log.Errorf("Garbage collection failed: %v", err)
+		}
 	}
 	return nil
 }
@@ -413,7 +423,7 @@ func runWaitList(ctx context.Context, jobExecutors []JobExecutor) []error {
 	return allErrs
 }
 
-func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
+func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) error {
 	labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelJob, ex.Name)
 	if wg != nil {
 		defer wg.Done()
@@ -440,6 +450,7 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 			log.Error(err.Error())
 		}
 	}
+
 	for _, obj := range ex.objects {
 		ex.limiter.Wait(ctx)
 		if !obj.namespaced {
@@ -448,8 +459,9 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 			CleanupNamespaceResourcesByLabel(ctx, *ex, obj, obj.namespace, labelSelector)
 			err := waitForDeleteResourceInNamespace(ctx, *ex, obj, obj.namespace, labelSelector)
 			if err != nil {
-				log.Fatal(err.Error())
+				return err
 			}
 		}
 	}
+	return nil
 }
