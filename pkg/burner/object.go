@@ -16,6 +16,7 @@ package burner
 
 import (
 	"io"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,6 +37,12 @@ type object struct {
 	namespaced    bool
 	ready         bool
 	documentIndex int
+	symbolicGVK   []*schema.GroupVersionKind
+	// resolvedGVRs tracks GVRs resolved at runtime for templated kinds.
+	// Key is the GVR string, value is the GVR itself.
+	// This is needed because templated kinds produce different GVRs per iteration.
+	resolvedGVRs    sync.Map
+	IsKindTemplated bool
 }
 
 func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
@@ -48,9 +55,31 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 	}
 
 	gvk := schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
-	mapping, err := mapper.RESTMapping(gvk.GroupKind())
+	var symbolicGVKs []*schema.GroupVersionKind
+
+	mappings, err := mapper.RESTMappings(gvk.GroupKind())
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if len(mappings) == 0 {
+		log.Fatalf("No Resources found for kind: %s", obj.Kind)
+	}
+
+	var mapping *meta.RESTMapping
+
+	if len(mappings) == 1 {
+		mapping = mappings[0]
+	} else {
+		log.Debugf("Found %d mappings for %s", len(mappings), obj.Kind)
+
+		for _, m := range mappings {
+			gv := m.Resource.GroupVersion()
+			symbolicGVKs = append(symbolicGVKs, &schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: obj.Kind})
+			if gv.String() == obj.APIVersion {
+				mapping = m
+			}
+		}
 	}
 
 	var waitGVR *schema.GroupVersionResource
@@ -58,19 +87,21 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 		if obj.WaitOptions.APIVersion == "" {
 			obj.WaitOptions.APIVersion = obj.APIVersion
 		}
-		gvk = schema.FromAPIVersionAndKind(obj.WaitOptions.APIVersion, obj.WaitOptions.Kind)
-		mapping, err = mapper.RESTMapping(gvk.GroupKind())
+		waitGVK := schema.FromAPIVersionAndKind(obj.WaitOptions.APIVersion, obj.WaitOptions.Kind)
+		waitMapping, err := mapper.RESTMapping(waitGVK.GroupKind())
 		if err != nil {
 			log.Fatal(err)
 		}
-		waitGVR = &mapping.Resource
+		waitGVR = &waitMapping.Resource
 	}
 
 	o := object{
-		Object:     obj,
-		gvr:        mapping.Resource,
-		waitGVR:    waitGVR,
-		namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		Object:      obj,
+		gvr:         mapping.Resource,
+		waitGVR:     waitGVR,
+		namespaced:  mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		gvk:         &gvk,
+		symbolicGVK: symbolicGVKs,
 	}
 
 	if obj.ObjectTemplate != "" {
