@@ -63,7 +63,7 @@ func defaultMetadataTransformOpts() metadataTransformOptions {
 }
 
 // PodTransformFunc preserves the following fields for latency measurements:
-// - metadata: name, namespace, uid, creationTimestamp, labels
+// - metadata: name, namespace, uid, creationTimestamp, labels, ownerReferences
 // - spec: nodeName
 // - status: conditions
 func PodTransformFunc() cache.TransformFunc {
@@ -73,7 +73,11 @@ func PodTransformFunc() cache.TransformFunc {
 			return obj, nil
 		}
 
-		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
+		minimal := createMinimalUnstructured(u, metadataTransformOptions{
+			includeNamespace:       true,
+			includeLabels:          true,
+			includeOwnerReferences: true,
+		})
 
 		if nodeName, found, _ := unstructured.NestedString(u.Object, "spec", "nodeName"); found && nodeName != "" {
 			_ = unstructured.SetNestedField(minimal.Object, nodeName, "spec", "nodeName")
