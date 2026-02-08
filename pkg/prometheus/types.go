@@ -15,6 +15,7 @@
 package prometheus
 
 import (
+	"text/template"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
@@ -58,10 +59,11 @@ type metricProfile struct {
 
 // metricDefinition describes what metrics kube-burner collects
 type metricDefinition struct {
-	Query        string `yaml:"query"`
-	MetricName   string `yaml:"metricName"`
-	Instant      bool   `yaml:"instant"`
-	CaptureStart bool   `yaml:"captureStart"`
+	Query         string `yaml:"query"`
+	MetricName    string `yaml:"metricName"`
+	Instant       bool   `yaml:"instant"`
+	CaptureStart  bool   `yaml:"captureStart"`
+	queryTemplate *template.Template
 }
 
 type metric struct {

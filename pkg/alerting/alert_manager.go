@@ -45,15 +45,19 @@ const (
 	rcAlert                       = 3
 )
 
-// alertProfile expression list
-type alertProfile []struct {
+type alertDefinition struct {
 	// PromQL expression to evaluate
 	Expr string `yaml:"expr"`
 	// Informative comment reported when the alarm is triggered
 	Description string `yaml:"description"`
 	// Alert Severity
-	Severity severityLevel `yaml:"severity"`
+	Severity            severityLevel `yaml:"severity"`
+	exprTemplate        *template.Template
+	descriptionTemplate *template.Template
 }
+
+// alertProfile expression list
+type alertProfile []alertDefinition
 
 // alert definition
 type alert struct {
@@ -114,7 +118,7 @@ func (a *AlertManager) readProfile(alertProfileCfg string) error {
 	if err = yamlDec.Decode(&a.alertProfile); err != nil {
 		return fmt.Errorf("error decoding alert profile %s: %s", alertProfileCfg, err)
 	}
-	return a.validateTemplates()
+	return a.compileTemplates()
 }
 
 // Evaluate evaluates expressions
@@ -131,8 +135,10 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 	vars := util.EnvToMap()
 	vars["elapsed"] = fmt.Sprintf("%dm", elapsed)
 	for _, alert := range a.alertProfile {
-		t, _ := template.New("").Parse(alert.Expr)
-		t.Execute(&renderedQuery, vars)
+		if err := alert.exprTemplate.Execute(&renderedQuery, vars); err != nil {
+			log.Warnf("Error rendering query: %v", err)
+			continue
+		}
 		expr := renderedQuery.String()
 		renderedQuery.Reset()
 		log.Debugf("Evaluating expression: '%s'", expr)
@@ -141,7 +147,7 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, a.uuid, alert.Description, a.metadata, alert.Severity, job.ChurnStart, job.ChurnEnd)
+		alertData, err := parseMatrix(v, a.uuid, alert.descriptionTemplate, a.metadata, alert.Severity, job.ChurnStart, job.ChurnEnd)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)
@@ -154,22 +160,30 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 	return utilerrors.NewAggregate(errs)
 }
 
-func (a *AlertManager) validateTemplates() error {
-	for _, a := range a.alertProfile {
-		if _, err := template.New("").Parse(strings.Join(append(baseTemplate, a.Description), "")); err != nil {
-			return fmt.Errorf("template validation error '%s': %s", a.Description, err)
+func (a *AlertManager) compileTemplates() error {
+	for i, alert := range a.alertProfile {
+		t, err := template.New("").Parse(alert.Expr)
+		if err != nil {
+			return fmt.Errorf("template compilation error '%s': %s", alert.Expr, err)
 		}
+		a.alertProfile[i].exprTemplate = t
+
+		tDesc, err := template.New("").Parse(strings.Join(append(baseTemplate, alert.Description), ""))
+		if err != nil {
+			return fmt.Errorf("template compilation error '%s': %s", alert.Description, err)
+		}
+		a.alertProfile[i].descriptionTemplate = tDesc
 	}
 	return nil
 }
 
-func parseMatrix(value model.Value, uuid, description string, metadata any, severity severityLevel, churnStart, churnEnd *time.Time) ([]any, error) {
+func parseMatrix(value model.Value, uuid string, t *template.Template, metadata any, severity severityLevel, churnStart, churnEnd *time.Time) ([]any, error) {
 	var renderedDesc bytes.Buffer
 	var templateData descriptionTemplate
 	// The same query can fire multiple alerts, so we have to return an array of them
 	var alertSet []any
 	errs := []error{}
-	t, _ := template.New("").Parse(strings.Join(append(baseTemplate, description), ""))
+	// t, _ := template.New("").Parse(strings.Join(append(baseTemplate, description), ""))
 	data, ok := value.(model.Matrix)
 	if !ok {
 		return alertSet, fmt.Errorf("unsupported result format: %s", value.Type().String())
