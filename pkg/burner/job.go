@@ -208,7 +208,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance = nil
 			}
 			watcherStopErrs := watcherManager.StopAll()
-			slices.Concat(errs, watcherStopErrs)
+			errs = slices.Concat(errs, watcherStopErrs)
 			if jobExecutor.GC {
 				jobExecutor.gc(ctx, nil)
 			}
