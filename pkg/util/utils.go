@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -168,4 +169,13 @@ func ConvertAnyToTyped[T any](obj any) (*T, error) {
 		return nil, fmt.Errorf("failed to unmarshal into typed object: %w", err)
 	}
 	return &typedObj, nil
+}
+
+// NormalizeLabels replaces dots in label keys with underscores to avoid issues when exporting metrics to certain backends.
+func NormalizeLabels(labels map[string]string) map[string]string {
+	out := make(map[string]string, len(labels))
+	for k, v := range labels {
+		out[strings.ReplaceAll(k, ".", "_")] = v
+	}
+	return out
 }
