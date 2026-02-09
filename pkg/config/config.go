@@ -302,10 +302,10 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 			configSpec.Jobs[i].Namespace = job.Namespace[:57]
 		}
 		if job.JobIterations < 1 && (job.JobType == CreationJob || job.JobType == ReadJob) {
-			log.Fatalf("Job %s has < 1 iterations", job.Name)
+			return configSpec, fmt.Errorf("invalid value for metricsClosing: %s", job.MetricsClosing)
 		}
 		if _, ok := metricsClosing[job.MetricsClosing]; !ok {
-			log.Fatalf("Invalid value for metricsClosing: %s", job.MetricsClosing)
+			return configSpec, fmt.Errorf("invalid value for metricsClosing: %s", job.MetricsClosing)
 		}
 		if job.JobType == DeletionJob {
 			configSpec.Jobs[i].PreLoadImages = false
@@ -317,7 +317,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	return configSpec, nil
 }
 
-func NewKubeClientProvider(config, context string) *KubeClientProvider {
+func NewKubeClientProvider(config, context string) (*KubeClientProvider, error) {
 	var kubeConfigPath string
 	if config != "" {
 		kubeConfigPath = config
@@ -330,7 +330,7 @@ func NewKubeClientProvider(config, context string) *KubeClientProvider {
 	var err error
 	if kubeConfigPath == "" {
 		if restConfig, err = rest.InClusterConfig(); err != nil {
-			log.Fatalf("no running cluster found (no kubeconfig and no in-cluster config): %v", err) // If no kubeconfig is provided or no env vars are set
+			return nil, fmt.Errorf("no running cluster found (no kubeconfig and no in-cluster config): %v", err)
 		}
 	} else {
 		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -338,18 +338,18 @@ func NewKubeClientProvider(config, context string) *KubeClientProvider {
 			&clientcmd.ConfigOverrides{CurrentContext: context},
 		)
 		if restConfig, err = kubeConfig.ClientConfig(); err != nil {
-			log.Fatalf("invalid kubeconfig or unreachable cluster: %v", err) // If kubeconfig is provided, but invalid or cluster is unreachable
+			return nil, fmt.Errorf("invalid kubeconfig or unreachable cluster: %v", err)
 		}
 
 		clientset, err := kubernetes.NewForConfig(restConfig)
 		if err != nil {
-			log.Fatalf("unable to create Kubernetes client: %v", err) // If kubeconfig is provided, but unable to create client
+			return nil, fmt.Errorf("unable to create Kubernetes client: %v", err)
 		}
 		if _, err := clientset.Discovery().ServerVersion(); err != nil {
-			log.Fatalf("cluster config found but cannot reach API server: %v", err) // If kubeconfig is provided, but unable to reach API server
+			return nil, fmt.Errorf("cluster config found but cannot reach API server: %v", err)
 		}
 	}
-	return &KubeClientProvider{restConfig: restConfig}
+	return &KubeClientProvider{restConfig: restConfig}, nil
 }
 
 func (p *KubeClientProvider) DefaultClientSet() (kubernetes.Interface, *rest.Config) {
