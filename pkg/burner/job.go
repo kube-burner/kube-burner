@@ -214,7 +214,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 		}
 		if globalConfig.WaitWhenFinished {
-			runWaitList(jobExecutors)
+			errs = append(errs, runWaitList(jobExecutors)...)
 		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
