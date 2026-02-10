@@ -73,8 +73,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 			for _, metric := range metricProfile.metrics {
 				docsToIndex := make(map[string][]any, 2)
 				requiresInstant := false
-				t, _ := template.New("").Parse(metric.Query)
-				if err := t.Execute(&renderedQuery, vars); err != nil {
+				if err := metric.queryTemplate.Execute(&renderedQuery, vars); err != nil {
 					log.Warnf("Error rendering query: %v", err)
 					continue
 				}
@@ -153,6 +152,11 @@ func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfi
 		if md.MetricName == "" {
 			return fmt.Errorf("metricName not defined in query number %d", i+1)
 		}
+		t, err := template.New(md.MetricName).Parse(md.Query)
+		if err != nil {
+			return fmt.Errorf("error parsing query %s: %v", md.Query, err)
+		}
+		metricProfile.metrics[i].queryTemplate = t
 	}
 	p.MetricProfiles = append(p.MetricProfiles, metricProfile)
 	return nil
