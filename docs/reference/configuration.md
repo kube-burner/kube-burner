@@ -91,6 +91,26 @@ env:
 ```
 We are all set! We should have our function rendered at the runtime and can be reused in future as well.
 
+## DeletionStrategy
+
+kube-burner supports multiple deletion strategies that control how resources
+created during a run are cleaned up.
+
+### default
+- Deletes all namespaced resources created by kube-burner
+- Deletes the namespaces created by kube-burner
+- Namespace deletion is performed after resources are removed
+
+### gvr
+- Deletes only **namespaced resources** created by kube-burner using GVR-based garbage collection
+- **Does NOT delete namespaces**, even if they were created by kube-burner
+- Namespace deletion is intentionally excluded from this strategy
+
+> Note:
+> The `gvr` deletion strategy will not remove empty namespaces.
+> This behavior is intentional and by design.
+> If namespace deletion is required, use the `default` deletion strategy.
+
 ## Jobs
 
 This section contains the list of jobs `kube-burner` will execute. Each job can hold the following parameters.
