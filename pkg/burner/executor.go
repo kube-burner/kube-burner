@@ -16,9 +16,8 @@ package burner
 
 import (
 	"context"
-	"sync"
-
 	"maps"
+	"sync"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
