@@ -1,0 +1,45 @@
+---
+# CRD template that creates CRDs with templated kind names
+# This creates TestResource0, TestResource1, TestResource2, etc.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: testresources{{.Iteration}}.testresource.example.com
+spec:
+  group: testresource.example.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                workload:
+                  type: string
+                iterations:
+                  type: integer
+    - name: v1beta1
+      served: true
+      storage: false
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                workload:
+                  type: string
+                iterations:
+                  type: integer
+  scope: Namespaced
+  names:
+    plural: testresources{{.Iteration}}
+    singular: testresource{{.Iteration}}
+    kind: TestResource{{.Iteration}}
+    shortNames:
+      - tr{{.Iteration}}
