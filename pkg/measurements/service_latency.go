@@ -140,9 +140,9 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 				case corev1.ServiceTypeLoadBalancer:
 					for _, ingress := range svc.Status.LoadBalancer.Ingress {
 						if ingress.IP != "" {
-							ips = append(ips, ingress.Hostname)
-						} else {
 							ips = append(ips, ingress.IP)
+						} else if ingress.Hostname != "" {
+							ips = append(ips, ingress.Hostname)
 						}
 					}
 					port = specPort.Port
