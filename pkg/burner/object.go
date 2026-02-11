@@ -58,12 +58,12 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 		if obj.WaitOptions.APIVersion == "" {
 			obj.WaitOptions.APIVersion = obj.APIVersion
 		}
-		gvk = schema.FromAPIVersionAndKind(obj.WaitOptions.APIVersion, obj.WaitOptions.Kind)
-		mapping, err = mapper.RESTMapping(gvk.GroupKind())
+		waitGVK := schema.FromAPIVersionAndKind(obj.WaitOptions.APIVersion, obj.WaitOptions.Kind)
+		waitMapping, err := mapper.RESTMapping(waitGVK.GroupKind())
 		if err != nil {
 			log.Fatal(err)
 		}
-		waitGVR = &mapping.Resource
+		waitGVR = &waitMapping.Resource
 	}
 
 	o := object{
