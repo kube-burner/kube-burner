@@ -141,8 +141,10 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
 			if obj.gvr == (schema.GroupVersionResource{}) {
-				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
-				ex.resolveObjectMapping(obj)
+				// resolveObjectMapping may set ex.nsRequired to true if the object is loaded but doesn't have a namespace specified
+				if !strings.Contains(obj.Kind, "{{") {
+					ex.resolveObjectMapping(obj)
+				}
 				if ex.nsRequired {
 					nsName := ex.Namespace
 					if ex.NamespacedIterations {
@@ -235,7 +237,11 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
 			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
 			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
-
+			if err != nil {
+				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
+				return
+			}
+			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
 			if err != nil {
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
 				return
@@ -251,7 +257,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 				if !obj.namespaced {
 					n = ""
 				}
-				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, mapping.Resource, n, newObject, ex.MaxWaitTimeout)
 			}(ns)
 		}(r)
 	}
