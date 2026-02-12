@@ -102,6 +102,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 	if annotation, ok := svc.Annotations[config.KubeBurnerLabelServiceLatency]; ok {
 		if annotation == "false" {
 			log.Debugf("Annotation found, discarding service %v/%v", svc.Namespace, svc.Name)
+			return
 		}
 	}
 	log.Debugf("Handling service: %v/%v", svc.Namespace, svc.Name)
