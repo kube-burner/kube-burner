@@ -1,5 +1,5 @@
 
-.PHONY: build build-release build-hardened build-hardened-cgo lint clean test help images push manifest manifest-build all
+.PHONY: build build-release build-hardened build-hardened-cgo lint clean test help images push manifest manifest-build check-docs all
 
 
 ARCH ?= $(shell uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
@@ -50,6 +50,7 @@ help:
 	@echo '    [ARCH=arch] make images       		Build images for arch, default amd64'
 	@echo '    [ARCH=arch] make push         		Push images for arch, default amd64'
 	@echo '    make manifest                 		Create and push manifest for the different architectures supported'
+	@echo '    make check-docs               		Check docs for broken links'
 	@echo '    make help                     		Show this message'
 
 build: $(BIN_PATH)
@@ -124,3 +125,7 @@ test: lint test-k8s
 
 test-k8s:
 	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats -j $(JOBS) $(FILTER_TAGS)
+
+check-docs:
+	@echo "Checking docs for broken links..."
+	$(ENGINE) run --rm -t -v $(CURDIR):/input lycheeverse/lychee --verbose --no-progress --exclude-loopback --exclude 'goreportcard.com' --exclude 'github.com' --exclude 'img.shields.io' --exclude 'kubernetes.slack.com' --exclude 'prom.my-domain.com' --exclude 'web.domain.com' --exclude 'remote-endpoint' --exclude 'remotehost' --exclude 'localhost' '/input/docs/**/*.md'

@@ -36,6 +36,7 @@ type object struct {
 	namespaced    bool
 	ready         bool
 	documentIndex int
+	hasRun        bool
 }
 
 func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {

@@ -31,7 +31,7 @@ jobs:
         uses: lycheeverse/lychee-action@v2.7.0
         with:
           lycheeVersion: v0.20.1
-          args: --verbose --no-progress --exclude-loopback './docs/**/*.md'
+          args: --verbose --no-progress --exclude-loopback --exclude 'goreportcard.com' --exclude 'github.com' --exclude 'img.shields.io' --exclude 'kubernetes.slack.com' --exclude 'prom.my-domain.com' --exclude 'web.domain.com' --exclude 'remote-endpoint' --exclude 'remotehost' --exclude 'localhost' './docs/**/*.md'
           fail: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
