@@ -1,0 +1,12 @@
+- metrics: ["../../metrics-profiles/metrics.yaml"]
+  alerts: ["../../metrics-profiles/alerts.yml"]
+  indexer:
+    esServers: ['https://ocp-qe:Best-footballplayer-test8@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com']
+    insecureSkipVerify: true
+    defaultIndex: ripsaw-kube-burner
+    type: opensearch
+- metrics: ["../../metrics-profiles/metrics.yaml"]
+  alerts: ["../../metrics-profiles/alerts.yml"]
+  indexer:
+    type: local
+    metricsDirectory: collected-metrics-test-uuid
