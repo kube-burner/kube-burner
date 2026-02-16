@@ -6,7 +6,15 @@ KIND_VERSION=${KIND_VERSION:-v0.19.0}
 K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
-KUBE_BURNER=${KUBE_BURNER:-kube-burner}
+if [[ -n "${KUBE_BURNER}" ]]; then
+  : # KUBE_BURNER is already set
+elif [[ -n "${PREFIX}" ]] && [[ -x "${DESTDIR}${PREFIX}/bin/kube-burner" ]]; then
+  KUBE_BURNER="${DESTDIR}${PREFIX}/bin/kube-burner"
+elif [[ -x "${DESTDIR}/usr/local/bin/kube-burner" ]]; then
+  KUBE_BURNER="${DESTDIR}/usr/local/bin/kube-burner"
+else
+  KUBE_BURNER=$(command -v kube-burner || echo "kube-burner")
+fi
 KIND_YAML=${KIND_YAML:-kind.yml}
 KUBEVIRT_CR=${KUBEVIRT_CR:-objectTemplates/kubevirt-cr.yaml}
 

@@ -3,6 +3,7 @@
 
 
 ARCH ?= $(shell uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+PREFIX ?= /usr/local
 BIN_NAME = kube-burner
 BIN_DIR = bin
 BIN_PATH = $(BIN_DIR)/$(ARCH)/$(BIN_NAME)
@@ -99,7 +100,8 @@ clean:
 	test ! -e $(BIN_DIR) || rm -Rf $(BIN_PATH)
 
 install:
-	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install $(BIN_PATH) $(DESTDIR)$(PREFIX)/bin/$(BIN_NAME)
 
 images:
 	@echo -e "\n\033[2mBuilding container $(CONTAINER_NAME_ARCH)\033[0m"
@@ -122,5 +124,9 @@ manifest-build:
 
 test: lint test-k8s
 
-test-k8s:
+test-k8s: $(BIN_PATH)
 	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats -j $(JOBS) $(FILTER_TAGS)
+
+check-docs:
+	@echo "Checking docs for broken links..."
+	$(ENGINE) run --rm -t -v $(CURDIR):/input lycheeverse/lychee --verbose --no-progress --exclude-loopback --exclude 'goreportcard.com' --exclude 'github.com' --exclude 'img.shields.io' --exclude 'kubernetes.slack.com' --exclude 'prom.my-domain.com' --exclude 'web.domain.com' --exclude 'remote-endpoint' --exclude 'remotehost' --exclude 'localhost' '/input/docs/**/*.md'

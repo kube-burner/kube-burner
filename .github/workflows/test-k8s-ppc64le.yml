@@ -39,13 +39,13 @@ jobs:
 
     - name: Download kubectl binary
       run: |
-        wget https://dl.k8s.io/${K8S_VERSION}/bin/linux/ppc64le/kubectl -O /tmp/kubectl --no-verbose
-        chmod +x /tmp/kubectl
+        wget https://dl.k8s.io/${K8S_VERSION}/bin/linux/ppc64le/kubectl -O ${{ runner.temp }}/kubectl --no-verbose
+        chmod +x ${{ runner.temp }}/kubectl
 
     - name:  Build and install kube-burner binary.
       run: |
         make build
-        cp bin/ppc64le/kube-burner /tmp
+        cp bin/ppc64le/kube-burner ${{ runner.temp }}
 
     - name: Build container images
       run: make images
@@ -54,7 +54,7 @@ jobs:
 
     - name: Execute tests
       run: |
-        export PATH=${PATH}:/tmp/
+        export PATH=${PATH}:${{ runner.temp }}/
         make test-k8s
       env:
         TERM: linux
@@ -63,5 +63,5 @@ jobs:
     - name: Clean up
       run: |
         rm -rf ${{ github.workspace }}/*
-        rm -rf /tmp/tmp*
-        rm /tmp/kube-burner
+        rm -rf ${{ runner.temp }}/tmp*
+        rm ${{ runner.temp }}/kube-burner
