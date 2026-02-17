@@ -32,7 +32,7 @@ CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)-$(ARCH)
 MANIFEST_ARCHS ?= amd64 arm64 ppc64le s390x
 
 # Bats
-JOBS ?= $(shell nproc)
+JOBS ?= $(shell nproc 2>/dev/null || echo 1)
 FILTER_TAGS ?= $(shell hack/get_changed_labels.py hack/bats_test_mappings.yml)
 
 all: lint build images push
@@ -103,7 +103,7 @@ install:
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install $(BIN_PATH) $(DESTDIR)$(PREFIX)/bin/$(BIN_NAME)
 
-images:
+images: $(BIN_PATH)
 	@echo -e "\n\033[2mBuilding container $(CONTAINER_NAME_ARCH)\033[0m"
 	$(ENGINE) build --arch=$(ARCH) -f Containerfile $(BIN_DIR)/$(ARCH)/ -t $(CONTAINER_NAME_ARCH)
 
