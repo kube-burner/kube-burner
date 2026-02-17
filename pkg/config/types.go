@@ -202,7 +202,7 @@ type Job struct {
 	GC bool `yaml:"gc" json:"gc"`
 	// Measurements job-specific measurements to enable
 	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
-	// IncrementalLoad enables incremental load behaviour for creation jobs
+	// IncrementalLoad enables incremental load behavior for creation jobs
 	IncrementalLoad *IncrementalLoad `yaml:"incrementalLoad" json:"incrementalLoad,omitempty"`
 }
 

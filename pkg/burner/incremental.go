@@ -16,12 +16,20 @@ package burner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
+	"github.com/google/uuid"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
+	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -151,26 +159,85 @@ func (e *exponentialCalculator) Next(current int) (start, end int, done bool) {
 func (ex *JobExecutor) RunIncrementalCreateJob(
 	ctx context.Context,
 	calculator IterationCalculator,
-) []error {
+	msFactory *measurements.MeasurementsFactory,
+	kubeClientProvider *config.KubeClientProvider,
+	embedCfg *fileutils.EmbedConfiguration,
+	measurementsJobName string,
+	metricsScraper metrics.Scraper,
+	configSpec config.Spec,
+) ([]error, []prometheus.Job) {
 
 	current := 0
 	stepDelay := ex.IncrementalLoad.StepDelay
 	var allErrs []error
+	var stepJobs []prometheus.Job
+	var startOperations, endOperations int32
+
+	originalUUID := ex.uuid
+	originalRunID := ex.runid
+	originalIterations := ex.JobIterations
 
 	for {
-		start, end, done := calculator.Next(current)
+		_, end, done := calculator.Next(current)
 		if done {
 			log.Infof("Incremental creation completed")
-			return allErrs
+			// Restore original UUID and run_id
+			ex.uuid = originalUUID
+			ex.runid = originalRunID
+			ex.JobIterations = originalIterations
+			configSpec.GlobalConfig.UUID = originalUUID
+			return allErrs, stepJobs
 		}
 
-		log.Infof("Running incremental step: iterations [%d → %d)", start, end)
+		log.Infof("Running incremental cumulative step: total iterations = %d", end)
 
-		if errs := ex.RunCreateJob(ctx, start, end); len(errs) > 0 {
+		// Generate unique UUID for this incremental step; parent UUID is constant
+		stepUUID := uuid.New().String()
+		ex.uuid = stepUUID
+		configSpec.GlobalConfig.UUID = stepUUID
+		// Generate unique step-specific run_id for measurements
+		stepRunID := uuid.New().String()
+		ex.runid = stepRunID
+		log.Infof("Step UUID: %s (Parent UUID: %s), Run_ID: %s", stepUUID, originalUUID, stepRunID)
+		ex.JobIterations = end
+
+		// create measurements specific for this incremental step using step UUID and run_id
+		labelSelector := fmt.Sprintf("%s=%s,%s=%s", config.KubeBurnerLabelRunID, stepRunID, config.KubeBurnerLabelUUID, stepUUID)
+
+		// create step-specific metadata with only parentUUID in metadata section
+		stepMetadata := make(map[string]any)
+		for k, v := range metricsScraper.SummaryMetadata {
+			stepMetadata[k] = v
+		}
+		stepMetadata["parentUUID"] = originalUUID
+		startOperations = ex.objectOperations
+
+		// create step-specific measurements factory with parentUUID in metadata
+		stepMsFactory := measurements.NewMeasurementsFactory(configSpec, stepMetadata, nil)
+		msInstance := stepMsFactory.NewMeasurements(&ex.Job, kubeClientProvider, embedCfg, labelSelector)
+		msInstance.Start()
+
+		stepStart := time.Now().UTC()
+
+		// For cumulative behavior, always create from 0 to end (so total becomes end)
+		if errs := ex.RunCreateJob(ctx, 0, end); len(errs) > 0 {
 			allErrs = append(allErrs, errs...)
-			return allErrs
+			if err := msInstance.Stop(); err != nil {
+				allErrs = append(allErrs, err)
+			}
+			return allErrs, stepJobs
 		}
 
+		if ex.VerifyObjects && !ex.Verify(ctx, &end) {
+			err := errors.New("object verification failed at total iterations: " + fmt.Sprint(end))
+			if ex.ErrorOnVerify {
+				allErrs = append(allErrs, err)
+			}
+			log.Error(err.Error())
+			return allErrs, stepJobs
+		}
+
+		// Health check
 		if script := ex.IncrementalLoad.HealthCheckScript; script != "" {
 			out, errOut, err := util.RunShellCmd(script, ex.embedCfg)
 			if out != nil {
@@ -185,13 +252,46 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 					stderr = errOut.String()
 				}
 				allErrs = append(allErrs, fmt.Errorf("health check script failed: %v; stderr: %s", err, stderr))
-				return allErrs
+				if err := msInstance.Stop(); err != nil {
+					allErrs = append(allErrs, err)
+				}
+				return allErrs, stepJobs
 			}
 			log.Info("Cluster health check script succeeded, proceeding to next step")
 		} else {
 			util.ClusterHealthCheck(ex.clientSet)
 			log.Info("Proceeding to the next step")
 		}
+
+		// stop measurements for this step and index them
+		if err := msInstance.Stop(); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if !ex.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
+			stepLocalIndexers := createUUIDScopedIndexers(configSpec, stepUUID)
+			remoteIndexers := getNonLocalIndexers(configSpec, metricsScraper.IndexerList)
+			log.Infof("%v", remoteIndexers)
+			if len(stepLocalIndexers) > 0 {
+				msInstance.Index(measurementsJobName, stepLocalIndexers)
+			}
+			if len(remoteIndexers) > 0 {
+				msInstance.Index(measurementsJobName, remoteIndexers)
+			}
+		}
+
+		log.Infof("Running garbage collection for job %s (uuid=%s) after incremental step", ex.Name, ex.uuid)
+		ex.gc(ctx, nil)
+		endOperations = ex.objectOperations
+
+		stepEnd := time.Now().UTC()
+		stepJobs = append(stepJobs, prometheus.Job{
+			Start:            stepStart,
+			End:              stepEnd,
+			JobConfig:        ex.Job,
+			ObjectOperations: endOperations - startOperations,
+			UUID:             stepUUID,
+			ParentUUID:       originalUUID,
+		})
 
 		if stepDelay > 0 {
 			log.Infof("Sleeping %v before next step", stepDelay)
@@ -200,4 +300,52 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 
 		current = end
 	}
+}
+
+// createUUIDScopedIndexers creates new indexers with UUID-scoped directories for local indexers, returning a map of alias to indexer.
+func createUUIDScopedIndexers(configSpec config.Spec, stepUUID string) map[string]indexers.Indexer {
+	scopedIndexers := make(map[string]indexers.Indexer)
+	for i, endpoint := range configSpec.MetricsEndpoints {
+		if endpoint.Type == indexers.LocalIndexer {
+			// Create UUID-scoped directory for this step's metrics (RunID stays internal)
+			originalDir := endpoint.MetricsDirectory
+			if originalDir == "" {
+				originalDir = "collected-metrics"
+			}
+			// Create new indexer config with UUID-scoped directory
+			uuidDir := filepath.Join(originalDir, stepUUID)
+			scopedConfig := endpoint.IndexerConfig
+			scopedConfig.MetricsDirectory = uuidDir
+			indexer, err := indexers.NewIndexer(scopedConfig)
+			if err != nil {
+				log.Warnf("Failed to create UUID-scoped indexer: %v", err)
+				continue
+			}
+			// Use endpoint alias as key, or generate one
+			key := endpoint.Alias
+			if key == "" {
+				key = fmt.Sprintf("indexer-%d", i)
+			}
+			scopedIndexers[key] = *indexer
+		}
+	}
+	return scopedIndexers
+}
+
+// getNonLocalIndexers filters out local indexers and returns only remote indexers (ES, etc.)
+func getNonLocalIndexers(configSpec config.Spec, indexerList map[string]indexers.Indexer) map[string]indexers.Indexer {
+	remoteIndexers := make(map[string]indexers.Indexer)
+	// Build a set of non-local aliases from configuration
+	for i, endpoint := range configSpec.MetricsEndpoints {
+		if endpoint.Type != indexers.LocalIndexer {
+			alias := endpoint.Alias
+			if alias == "" {
+				alias = fmt.Sprintf("indexer-%d", i)
+			}
+			if indexer, exists := indexerList[alias]; exists {
+				remoteIndexers[alias] = indexer
+			}
+		}
+	}
+	return remoteIndexers
 }

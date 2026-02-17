@@ -49,6 +49,8 @@ type Job struct {
 	ChurnEnd         *time.Time
 	JobConfig        config.Job
 	ObjectOperations int32
+	UUID             string
+	ParentUUID       string
 }
 
 type metricProfile struct {
