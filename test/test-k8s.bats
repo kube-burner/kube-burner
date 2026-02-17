@@ -42,6 +42,7 @@ setup() {
   export CHURN_CYCLES=0
   export PRELOAD_IMAGES=false
   export GC=true
+  export INCREMENTAL_LOAD=""
   export JOBGC=false
   export LOCAL_INDEXING=""
   export ALERTING=""
@@ -97,14 +98,14 @@ teardown_file() {
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement jobLatencyMeasurement jobLatencyQuantilesMeasurement alert
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
   verify_object_count pod 0 "" kube-burner.io/uuid=${UUID}
-  check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
+  check_file_list ${METRICS_FOLDER}/prometheusRSS_${UUID}.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
 # bats test_tags=subsystem:preload,subsystem:indexing
 @test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true; set-preload=true" {
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
-  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS_${UUID}.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
   verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
 }
 
@@ -112,11 +113,11 @@ teardown_file() {
 @test "kube-burner index: local-indexing=true; tarball=true" {
   sleep 1m # Sleep is required to prevent collecting metrics right after spinning up the cluster, which can lead to missing datapoints
   run_cmd ${KUBE_BURNER} index --uuid=${UUID} -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz --start="$(date -d "-30 seconds" +%s)" --metrics-directory=${METRICS_FOLDER}
-  check_file_list ${METRICS_FOLDER}/top2PrometheusCPU.json ${METRICS_FOLDER}/top2PrometheusCPU-start.json ${METRICS_FOLDER}/prometheusRSS.json
+  check_file_list ${METRICS_FOLDER}/top2PrometheusCPU_${UUID}.json ${METRICS_FOLDER}/top2PrometheusCPU-start_${UUID}.json ${METRICS_FOLDER}/prometheusRSS_${UUID}.json
   run_cmd ${KUBE_BURNER} import --tarball=metrics.tgz --es-server=${ES_SERVER} --es-index=${ES_INDEX} --metrics-directory ${METRICS_FOLDER}
   rm -rf ${METRICS_FOLDER:?}/*
   run_cmd ${KUBE_BURNER} index --uuid=${UUID} -e metrics-endpoints.yaml --es-server=${ES_SERVER} --es-index=${ES_INDEX} --start="$(date -d "-30 seconds" +%s)" --metrics-directory ${METRICS_FOLDER}
-  check_file_list ${METRICS_FOLDER}/top2PrometheusCPU.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/prometheusRSS.json
+  check_file_list ${METRICS_FOLDER}/top2PrometheusCPU_${UUID}.json ${METRICS_FOLDER}/prometheusRSS_${UUID}.json ${METRICS_FOLDER}/prometheusRSS_${UUID}.json
   rm -rf ${METRICS_FOLDER:?}/*
 }
 
@@ -126,7 +127,7 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c kube-burner-delete.yml --uuid ${UUID} --log-level=debug
   verify_object_count namespace 0 "" kube-burner.io/uuid=${UUID}
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
-  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-delete-job.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-delete-job.json ${METRICS_FOLDER}/prometheusBuildInfo.json
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-delete-job.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-delete-job.json ${METRICS_FOLDER}/prometheusBuildInfo_${UUID}.json
 }
 
 # bats test_tags=subsystem:job-type-read,subsystem:custom-kubeconfig
@@ -134,7 +135,7 @@ teardown_file() {
   export ES_INDEXING=true LOCAL_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
-  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo_${UUID}.json
 }
 
 # bats test_tags=subsystem:health-check
@@ -284,4 +285,10 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} measure -c kube-burner-measure.yml --uuid=${UUID} --log-level=debug --duration=1m --selector=app=kube-burner-measure
   check_file_exists ${METRICS_FOLDER}/pprof/*.pprof
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
+}
+
+@test "kube-burner.yml: incremental-load=true" {
+  export INCREMENTAL_LOAD=true LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo_${UUID}.json
 }

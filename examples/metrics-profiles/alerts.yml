@@ -1,3 +1,0 @@
-- expr: up == 1
-  description: Prometheus {{$labels.instance}} is up & running
-  severity: warning
