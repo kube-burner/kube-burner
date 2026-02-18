@@ -260,6 +260,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	}
 
 	inputData, err := getInputData(userDataFileReader, additionalVars)
+	inputData["UUID"] = uuid
 	if err != nil {
 		return configSpec, err
 	}
