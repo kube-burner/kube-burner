@@ -31,7 +31,7 @@ CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/kube-burner:$(VERSION)-$(ARCH)
 MANIFEST_ARCHS ?= amd64 arm64 ppc64le s390x
 
 # Bats
-JOBS ?= $(shell nproc)
+JOBS ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 FILTER_TAGS ?= $(shell hack/get_changed_labels.py hack/bats_test_mappings.yml)
 
 all: lint build images push
@@ -122,5 +122,19 @@ manifest-build:
 
 test: lint test-k8s
 
+check-dependencies:
+	@command -v bats >/dev/null 2>&1 || (echo "Error: bats not found"; exit 1)
+	@command -v kubectl >/dev/null 2>&1 || (echo "Error: kubectl not found"; exit 1)
+	@command -v $(ENGINE) >/dev/null 2>&1 || (echo "Error: $(ENGINE) not found. Try setting ENGINE=docker or installing podman."; exit 1)
+	@command -v python3 >/dev/null 2>&1 || (echo "Error: python3 not found"; exit 1)
+	@command -v jq >/dev/null 2>&1 || (echo "Error: jq not found"; exit 1)
+	@if [ "$(TEST_BINARY)" != "$(CURDIR)/$(BIN_PATH)" ]; then \
+		test -f "$(TEST_BINARY)" || (echo "Error: TEST_BINARY $(TEST_BINARY) not found"; exit 1); \
+	fi
+
+test-k8s: check-dependencies
+ifeq ($(TEST_BINARY),$(CURDIR)/$(BIN_PATH))
+test-k8s: $(BIN_PATH)
+endif
 test-k8s:
-	cd test && KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats -j $(JOBS) $(FILTER_TAGS)
+	cd test && OCI_BIN=$(ENGINE) KUBE_BURNER=$(TEST_BINARY) bats $(if $(TEST_FILTER),--filter "$(TEST_FILTER)",) -F pretty -T --print-output-on-failure test-k8s.bats -j $(JOBS) $(FILTER_TAGS)
