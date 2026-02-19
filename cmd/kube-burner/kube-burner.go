@@ -117,12 +117,14 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			var userDataFileReader io.Reader
+			defer configFileReader.Close()
+			var userDataFileReader io.ReadCloser
 			if userDataFile != "" {
 				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
 				if err != nil {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
+				defer userDataFileReader.Close()
 			}
 			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil, setVars)
 			if err != nil {
@@ -216,12 +218,14 @@ func destroyCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			var userDataFileReader io.Reader
+			defer configFileReader.Close()
+			var userDataFileReader io.ReadCloser
 			if userDataFile != "" {
 				userDataFileReader, err = fileutils.GetWorkloadReader(userDataFile, nil)
 				if err != nil {
 					log.Fatalf("Error reading user data file %s: %s", userDataFile, err)
 				}
+				defer userDataFileReader.Close()
 			}
 			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, true, nil, nil)
 			if err != nil {
@@ -275,7 +279,7 @@ func measureCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
 			}
-			configSpec, err := config.Parse(configFile, time.Hour, f)
+			configSpec, err := config.Parse(uuid, time.Hour, f)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
