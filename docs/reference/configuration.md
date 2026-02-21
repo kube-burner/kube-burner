@@ -102,14 +102,12 @@ created during a run are cleaned up.
 - Namespace deletion is performed after resources are removed
 
 ### gvr
-- Deletes only **namespaced resources** created by kube-burner using GVR-based garbage collection
-- **Does NOT delete namespaces**, even if they were created by kube-burner
-- Namespace deletion is intentionally excluded from this strategy
+- Deletes namespaced resources one by one using GVR-based deletion
+- After removing those resources, deletes their parent namespaces
+- Finally garbage-collects cluster-scoped namespaces created by the job
 
 > Note:
-> The `gvr` deletion strategy will not remove empty namespaces.
-> This behavior is intentional and by design.
-> If namespace deletion is required, use the `default` deletion strategy.
+> The `gvr` strategy deletes namespaced resources first. Namespace deletion occurs after those resources are removed as part of the overall cleanup flow.
 
 ## Jobs
 
