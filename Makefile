@@ -18,7 +18,7 @@ HARDENED_CGO_LDFLAGS = -linkmode=external -extldflags "-Wl,-z,relro,-z,now"
 
 GIT_COMMIT = $(shell git rev-parse HEAD)
 VERSION ?= $(shell hack/tag_name.sh)
-SOURCES := $(shell find . -type f -name "*.go")
+SOURCES := $(shell find cmd pkg -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
 KUBE_BURNER_VERSION= github.com/cloud-bulldozer/go-commons/v2/version
 
