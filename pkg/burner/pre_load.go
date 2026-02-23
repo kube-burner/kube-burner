@@ -79,17 +79,45 @@ func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.In
 		log.Infof("No images found to pre-load, continuing")
 		return nil
 	}
-	err = createDSs(ctx, clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
+	dsName, err := createDSs(ctx, clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
-	log.Infof("Pre-load: Sleeping for %v", job.PreLoadPeriod)
-	time.Sleep(job.PreLoadPeriod)
+	log.Infof("Pre-load: Waiting up to %v for DaemonSet %s/%s to be ready", job.PreLoadPeriod, preLoadNs, dsName)
+	if err := waitForDSReady(ctx, clientSet, dsName, job.PreLoadPeriod); err != nil {
+		return fmt.Errorf("pre-load: %v", err)
+	}
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	util.CleanupNamespacesByLabel(ctx, clientSet, "kube-burner-preload=true")
 	return nil
+}
+
+func waitForDSReady(ctx context.Context, clientSet kubernetes.Interface, dsName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	watcher, err := clientSet.AppsV1().DaemonSets(preLoadNs).Watch(ctx, metav1.ListOptions{
+		FieldSelector: fmt.Sprintf("metadata.name=%s", dsName),
+	})
+	if err != nil {
+		return fmt.Errorf("watching DaemonSet %s/%s: %v", preLoadNs, dsName, err)
+	}
+	defer watcher.Stop()
+	for event := range watcher.ResultChan() {
+		ds, ok := event.Object.(*appsv1.DaemonSet)
+		if !ok {
+			continue
+		}
+		desired := ds.Status.DesiredNumberScheduled
+		ready := ds.Status.NumberReady
+		log.Debugf("Pre-load: DaemonSet %s status: desired=%d, ready=%d", dsName, desired, ready)
+		if desired > 0 && ready == desired {
+			log.Infof("Pre-load: DaemonSet %s is ready (%d/%d nodes)", dsName, ready, desired)
+			return nil
+		}
+	}
+	return fmt.Errorf("timed out waiting for DaemonSet %s/%s to be ready", preLoadNs, dsName)
 }
 
 func getJobImages(job JobExecutor) ([]string, error) {
@@ -145,7 +173,7 @@ func extractImagesFromObject(uns *unstructured.Unstructured, renderedObj []byte)
 	return imageList
 }
 
-func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
+func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) (string, error) {
 	nsLabels := map[string]string{
 		"kube-burner-preload": "true",
 	}
@@ -153,7 +181,7 @@ func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []
 	maps.Copy(nsLabels, namespaceLabels)
 	maps.Copy(nsAnnotations, namespaceAnnotations)
 	if err := util.CreateNamespace(clientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("creating namespace: %v", err)
 	}
 	dsName := "preload"
 	ds := appsv1.DaemonSet{
@@ -201,9 +229,9 @@ func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []
 	}
 
 	log.Infof("Pre-load: Creating DaemonSet using images %v in namespace %s", imageList, preLoadNs)
-	_, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(ctx, &ds, metav1.CreateOptions{})
+	created, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(ctx, &ds, metav1.CreateOptions{})
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return created.Name, nil
 }

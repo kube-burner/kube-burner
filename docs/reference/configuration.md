@@ -137,7 +137,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `errorOnVerify`              | Set RC to 1 when objects verification fails                                                                                           | Boolean  | true     |
 | `skipIndexing`               | Skip metric indexing on this job                                                                                                      | Boolean  | false    |
 | `preLoadImages`              | Kube-burner will create a DS before triggering the job to pull all the images of the job                                              | Boolean  |          |
-| `preLoadPeriod`              | How long to wait for the preload DaemonSet                                                                                            | Duration | 1m       |
+| `preLoadPeriod`              | Maximum time to wait for the preload DaemonSet to become ready on all nodes                                                           | Duration | 2m       |
 | `preloadNodeLabels`          | Add node selector labels for the resources created in preload stage                                                                   | Object   | {}       |
 | `namespaceLabels`            | Add custom labels to the namespaces created by kube-burner                                                                            | Object   | {}       |
 | `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}       |

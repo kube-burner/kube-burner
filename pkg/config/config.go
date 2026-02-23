@@ -133,7 +133,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		JobType:                CreationJob,
 		WaitForDeletion:        true,
 		PreLoadImages:          true,
-		PreLoadPeriod:          1 * time.Minute,
+		PreLoadPeriod:          2 * time.Minute,
 		MetricsClosing:         AfterJobPause,
 		Measurements:           []mtypes.Measurement{},
 	}
