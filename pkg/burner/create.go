@@ -55,7 +55,7 @@ type churnDeletedObject struct {
 }
 
 func (ex *JobExecutor) setupCreateJob() {
-	var f io.Reader
+	var f io.ReadCloser
 	var err error
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
@@ -68,6 +68,7 @@ func (ex *JobExecutor) setupCreateJob() {
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)
 		}
+		defer f.Close()
 		t, err := io.ReadAll(f)
 		if err != nil {
 			log.Fatalf("Error reading template %s: %s", o.ObjectTemplate, err)

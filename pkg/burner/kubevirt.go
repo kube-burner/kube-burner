@@ -25,6 +25,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,7 +40,6 @@ const (
 	kubeVirtAPIVersionV1 = "kubevirt.io/v1"
 	kubeVirtDefaultKind  = "VirtualMachine"
 	maxRetries           = 15
-	concurrentError      = "the server rejected our request due to an error in our request"
 )
 
 type OperationConfig struct {
@@ -310,7 +310,7 @@ func addVolume(ctx context.Context, ex *JobExecutor, vmiName, namespace string, 
 		} else {
 			err = ex.kubeVirtClient.VirtualMachine(namespace).AddVolume(ctx, vmiName, hotplugRequest)
 		}
-		if err != nil && err.Error() != concurrentError {
+		if err != nil && !errors.IsConflict(err) {
 			return fmt.Errorf("error adding volume, %v", err)
 		}
 		if err == nil {
@@ -352,7 +352,7 @@ func removeVolume(ctx context.Context, ex *JobExecutor, vmiName, namespace strin
 			})
 		}
 
-		if err != nil && err.Error() != concurrentError {
+		if err != nil && !errors.IsConflict(err) {
 			return fmt.Errorf("error removing volume, %v", err)
 		}
 		if err == nil {
