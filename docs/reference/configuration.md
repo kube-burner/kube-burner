@@ -98,13 +98,14 @@ created during a run are cleaned up.
 
 ### default
 - Deletes all namespaced resources created by kube-burner
-- Deletes the namespaces created by kube-burner
+- Deletes the namespaces created by kube-burner, hence their child objects too
 - Namespace deletion is performed after resources are removed
+- Deletes cluster-scoped objects created by kube-burner
 
 ### gvr
 - Deletes namespaced resources one by one using GVR-based deletion
 - After removing those resources, deletes their parent namespaces
-- Finally garbage-collects cluster-scoped namespaces created by the job
+- Finally garbage-collects cluster-scoped obcts created by kube-burner
 
 > Note:
 > The `gvr` strategy deletes namespaced resources first. Namespace deletion occurs after those resources are removed as part of the overall cleanup flow.
