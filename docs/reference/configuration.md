@@ -105,7 +105,7 @@ created during a run are cleaned up.
 ### gvr
 - Deletes namespaced resources one by one using GVR-based deletion
 - After removing those resources, deletes their parent namespaces
-- Finally garbage-collects cluster-scoped obcts created by kube-burner
+- Finally garbage-collects cluster-scoped objects created by kube-burner
 
 > Note:
 > The `gvr` strategy deletes namespaced resources first. Namespace deletion occurs after those resources are removed as part of the overall cleanup flow.
