@@ -175,8 +175,21 @@ The incremental load feature increases the number of iterations from a configure
 After each increase the runner performs the configured health check and will stop early on failure. Between successful steps the runner waits the configured `stepDelay` before applying the next increase.
 
 Simple examples:
-- Linear: `startIterations=10`, `totalIterations=50`, `pattern.linear.stepSize=10` → 10, 20, 30, 40, 50 with constant increments of 10 iterations in each step.
-- Exponential: `startIterations=5`, `totalmaxIterations=100`, `pattern.exponential.base=2` → 5, 10, 20, 40, 80, 100 by simply multiplying the iterations by 2 in each step.
+- Linear example (`startIterations=10`, `totalIterations=50`, `pattern.linear.stepSize=10`):
+  - Step 1 runs 10 iterations, captures metircs and does GC preparing for the next step.
+  - Step 2 similarly runs the entrie cycle for 20 iterations and (+10).
+  - Step 3 runs 30 (+10).
+  - Step 4 runs 40 (+10).
+  - Step 5 runs 50 (+10, target reached).
+  - Progression: `10 → 20 → 30 → 40 → 50`.
+- Exponential example (`startIterations=5`, `totalIterations=100`, `pattern.exponential.base=2`):
+  - Step 1 runs 5 iterations, captures metircs and does GC preparing for the next step.
+  - Step 2 similarly runs the entire cycle for 10 iterations and (×2).
+  - Step 3 runs 20 (×2).
+  - Step 4 runs 40 (×2).
+  - Step 5 runs 80 (×2).
+  - Step 6 would be 160, but it is capped at the configured target, so it runs 100.
+  - Progression: `5 → 10 → 20 → 40 → 80 → 100`.
 
 ### Watchers
 
