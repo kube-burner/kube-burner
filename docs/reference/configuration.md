@@ -99,7 +99,6 @@ created during a run are cleaned up.
 ### default
 - Deletes all namespaced resources created by kube-burner
 - Deletes the namespaces created by kube-burner, hence their child objects too
-- Namespace deletion is performed after resources are removed
 - Deletes cluster-scoped objects created by kube-burner
 
 ### gvr
