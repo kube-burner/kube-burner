@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"strings"
 	"time"
 
@@ -79,6 +80,9 @@ func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.In
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
+	// Deduplicate images
+	slices.Sort(imageList)
+	imageList = slices.Compact(imageList)
 	if len(imageList) == 0 {
 		log.Infof("No images found to pre-load, continuing")
 		return nil
