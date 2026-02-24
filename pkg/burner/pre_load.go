@@ -37,6 +37,7 @@ import (
 var preLoadNs = fmt.Sprintf("preload-kube-burner-%05d", rand.Intn(100000))
 
 const preLoadPollInterval = 5 * time.Second
+const preLoadIgnoreContainerName = "ignore-container-status"
 
 // NestedPod represents a pod nested in a higher level object such as deployment or a daemonset
 type NestedPod struct {
@@ -95,7 +96,7 @@ func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.In
 	// 5 minutes should be more than enough to cleanup this namespace
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	util.CleanupNamespacesByLabel(ctx, clientSet, "kube-burner-preload=true")
+	util.CleanupNamespacesByLabel(ctx, clientSet, fmt.Sprintf("%s=true", preLoadNs))
 	return nil
 }
 
@@ -116,7 +117,7 @@ func waitForImagePull(ctx context.Context, clientSet kubernetes.Interface, desir
 			pulledTotal := 0
 			for _, pod := range pods.Items {
 				for _, cs := range pod.Status.ContainerStatuses {
-					if cs.Name != "pause" && cs.ImageID != "" {
+					if cs.Name != preLoadIgnoreContainerName && cs.ImageID != "" {
 						pulledTotal++
 					}
 				}
@@ -190,7 +191,7 @@ func extractImagesFromObject(uns *unstructured.Unstructured, renderedObj []byte)
 
 func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) (int, error) {
 	nsLabels := map[string]string{
-		"kube-burner-preload": "true",
+		preLoadNs: "true",
 	}
 	nsAnnotations := make(map[string]string)
 	maps.Copy(nsLabels, namespaceLabels)
@@ -219,7 +220,7 @@ func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []
 					TerminationGracePeriodSeconds: ptr.To[int64](0),
 					Containers: []corev1.Container{
 						{
-							Name:  "pause",
+							Name:  preLoadIgnoreContainerName,
 							Image: "registry.k8s.io/pause:3.1",
 						},
 					},
