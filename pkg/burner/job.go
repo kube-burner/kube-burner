@@ -270,7 +270,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		errs = append(errs, err)
 		rc = rcTimeout
 		if measurementsInstance != nil {
-			measurementsInstance.Stop()
+			if err := measurementsInstance.Stop(); err != nil {
+				errs = append(errs, err)
+			}
 			if len(metricsScraper.IndexerList) > 0 {
 				measurementsInstance.Index(measurementsJobName, metricsScraper.IndexerList)
 			}
