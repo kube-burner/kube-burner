@@ -38,7 +38,6 @@ import (
 var preLoadNs = fmt.Sprintf("preload-kube-burner-%05d", rand.Intn(100000))
 
 const preLoadPollInterval = 5 * time.Second
-const preLoadPauseImage = "registry.k8s.io/pause:3.1"
 
 // NestedPod represents a pod nested in a higher level object such as deployment or a daemonset
 type NestedPod struct {
@@ -124,7 +123,7 @@ func waitForImagePull(ctx context.Context, clientSet kubernetes.Interface, desir
 }
 
 // countPulledImages counts unique (pod, image) pairs from Pulled events,
-// excluding the pause container image.
+// only considering preload containers (named "pull-N").
 func countPulledImages(ctx context.Context, clientSet kubernetes.Interface) (int, error) {
 	events, err := clientSet.CoreV1().Events(preLoadNs).List(ctx, metav1.ListOptions{
 		FieldSelector: "reason=Pulled",
@@ -137,8 +136,11 @@ func countPulledImages(ctx context.Context, clientSet kubernetes.Interface) (int
 	}
 	seen := make(map[podImage]struct{})
 	for _, event := range events.Items {
+		if !strings.Contains(event.InvolvedObject.FieldPath, "{pull-") {
+			continue
+		}
 		image := extractImageFromEvent(event.Message)
-		if image == "" || image == preLoadPauseImage {
+		if image == "" {
 			continue
 		}
 		seen[podImage{event.InvolvedObject.Name, image}] = struct{}{}
@@ -245,7 +247,7 @@ func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []
 					Containers: []corev1.Container{
 						{
 							Name:  "pause",
-							Image: preLoadPauseImage,
+							Image: "registry.k8s.io/pause:3.1",
 						},
 					},
 					NodeSelector: nodeSelectorLabels,
