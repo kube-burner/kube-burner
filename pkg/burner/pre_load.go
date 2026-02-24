@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"maps"
@@ -37,7 +38,7 @@ import (
 var preLoadNs = fmt.Sprintf("preload-kube-burner-%05d", rand.Intn(100000))
 
 const preLoadPollInterval = 5 * time.Second
-const preLoadIgnoreContainerName = "ignore-container-status"
+const preLoadPauseImage = "registry.k8s.io/pause:3.1"
 
 // NestedPod represents a pod nested in a higher level object such as deployment or a daemonset
 type NestedPod struct {
@@ -105,28 +106,14 @@ func waitForImagePull(ctx context.Context, clientSet kubernetes.Interface, desir
 	ticker := time.NewTicker(preLoadPollInterval)
 	defer ticker.Stop()
 	for {
-		pods, err := clientSet.CoreV1().Pods(preLoadNs).List(ctx, metav1.ListOptions{
-			LabelSelector: "app=preload",
-		})
+		pulledTotal, err := countPulledImages(ctx, clientSet)
 		if err != nil {
-			return fmt.Errorf("listing pods in namespace %s: %v", preLoadNs, err)
+			return err
 		}
-		if len(pods.Items) < desired {
-			log.Debugf("Pre-load: %d/%d pods created", len(pods.Items), desired)
-		} else {
-			pulledTotal := 0
-			for _, pod := range pods.Items {
-				for _, cs := range pod.Status.ContainerStatuses {
-					if cs.Name != preLoadIgnoreContainerName && cs.ImageID != "" {
-						pulledTotal++
-					}
-				}
-			}
-			log.Debugf("Pre-load: %d/%d images pulled across %d pods", pulledTotal, expectedTotal, len(pods.Items))
-			if pulledTotal == expectedTotal {
-				log.Infof("Pre-load: All images pulled on %d nodes", desired)
-				return nil
-			}
+		log.Debugf("Pre-load: %d/%d images pulled across %d nodes", pulledTotal, expectedTotal, desired)
+		if pulledTotal == expectedTotal {
+			log.Infof("Pre-load: All images pulled on %d nodes", desired)
+			return nil
 		}
 		select {
 		case <-ctx.Done():
@@ -134,6 +121,43 @@ func waitForImagePull(ctx context.Context, clientSet kubernetes.Interface, desir
 		case <-ticker.C:
 		}
 	}
+}
+
+// countPulledImages counts unique (pod, image) pairs from Pulled events,
+// excluding the pause container image.
+func countPulledImages(ctx context.Context, clientSet kubernetes.Interface) (int, error) {
+	events, err := clientSet.CoreV1().Events(preLoadNs).List(ctx, metav1.ListOptions{
+		FieldSelector: "reason=Pulled",
+	})
+	if err != nil {
+		return 0, fmt.Errorf("listing events in namespace %s: %v", preLoadNs, err)
+	}
+	type podImage struct {
+		pod, image string
+	}
+	seen := make(map[podImage]struct{})
+	for _, event := range events.Items {
+		image := extractImageFromEvent(event.Message)
+		if image == "" || image == preLoadPauseImage {
+			continue
+		}
+		seen[podImage{event.InvolvedObject.Name, image}] = struct{}{}
+	}
+	return len(seen), nil
+}
+
+// extractImageFromEvent parses the image reference from a kubelet Pulled event message.
+// Expected format: Successfully pulled image "IMAGE" in ...
+func extractImageFromEvent(message string) string {
+	_, after, found := strings.Cut(message, "\"")
+	if !found {
+		return ""
+	}
+	image, _, found := strings.Cut(after, "\"")
+	if !found {
+		return ""
+	}
+	return image
 }
 
 func getJobImages(job JobExecutor) ([]string, error) {
@@ -220,8 +244,8 @@ func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []
 					TerminationGracePeriodSeconds: ptr.To[int64](0),
 					Containers: []corev1.Container{
 						{
-							Name:  preLoadIgnoreContainerName,
-							Image: "registry.k8s.io/pause:3.1",
+							Name:  "pause",
+							Image: preLoadPauseImage,
 						},
 					},
 					NodeSelector: nodeSelectorLabels,
