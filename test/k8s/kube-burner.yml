@@ -60,7 +60,7 @@ jobs:
       replicas: 1
     namespacedIterations: true
     preLoadImages: {{ .PRELOAD_IMAGES }}
-    preLoadPeriod: 2m
+    preLoadPeriod: 5m
     cleanup: true
     namespace: {{ .JOB_NAME }}
     podWait: false
