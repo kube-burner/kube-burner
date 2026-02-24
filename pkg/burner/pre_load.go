@@ -17,6 +17,7 @@ package burner
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"maps"
@@ -33,7 +34,8 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-const preLoadNs = "preload-kube-burner"
+var preLoadNs = fmt.Sprintf("preload-kube-burner-%05d", rand.Intn(100000))
+
 const preLoadPollInterval = 5 * time.Second
 
 // NestedPod represents a pod nested in a higher level object such as deployment or a daemonset
