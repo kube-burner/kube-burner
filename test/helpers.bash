@@ -302,3 +302,63 @@ check_metrics_not_created_for_job() {
     return 1
   fi
 }
+
+verify_hooks_with_helpers() {
+  local config_file="${1:-kube-burner-hooks.yml}"
+  local job_name="${2:-basic-hook-test}"
+  local hook_log_dir="/tmp/kube-burner-hooks"
+  local failed=0
+  
+  echo "Verifying hooks execution for job: ${job_name}"
+  
+  # Read config settings
+  local job_iterations=2
+  
+  if [ -f "$config_file" ]; then
+    local val
+    val=$(awk "/name: *${job_name}/{f=1} f && /jobIterations:/{print \$2; exit}" "$config_file" 2>/dev/null || echo "")
+    [ -n "$val" ] && job_iterations="$val"
+  fi
+
+  # Helper to check hook execution count
+  check_hook() {
+    local hook="$1" expected="$2" operator="${3:-eq}"
+    local log_file="${hook_log_dir}/hook-${hook}.log"
+    local count=0
+    
+    [ -f "$log_file" ] && count=$(grep -c "Hook Execution:" "$log_file" 2>/dev/null || echo 0)
+    
+    case "$operator" in
+      eq) 
+        if [ "$count" -eq "$expected" ]; then
+          echo "PASS: ${hook} executed ${count} times"
+          return 0
+        fi
+        ;;
+      ge) 
+        if [ "$count" -ge "$expected" ]; then
+          echo "PASS: ${hook} executed ${count} times (expected >= ${expected})"
+          return 0
+        fi
+        ;;
+    esac
+    
+    echo "FAIL: ${hook} executed ${count} times, expected ${operator} ${expected}"
+    return 1
+  }
+
+  # Verify reliable job lifecycle hooks
+  check_hook "beforeJobExecution" 1 || failed=1
+  check_hook "afterJobExecution" 1 || failed=1
+  check_hook "onEachIteration" ${job_iterations} ge || failed=1
+  check_hook "beforeCleanup" 1 || failed=1
+  
+  # GC hooks execute during job cleanup
+  check_hook "beforeGC" 1 eq || failed=1
+  check_hook "afterGC" 1 eq || failed=1
+
+  [ "$failed" -eq 0 ] && echo "All hooks verified successfully" && return 0
+  echo "Hook verification failed" && return 1
+}
+
+

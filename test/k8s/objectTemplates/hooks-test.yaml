@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod-{{.Iteration}}-{{.Replica}}
+  labels:
+    app: hook-test
+    iteration: "{{.Iteration}}"
+    replica: "{{.Replica}}"
+spec:
+  containers:
+  - name: pause
+    image: {{.containerImage}}
+    command: ["sh", "-c", "exit 0"]
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "10m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+  restartPolicy: Never
+  terminationGracePeriodSeconds: 0

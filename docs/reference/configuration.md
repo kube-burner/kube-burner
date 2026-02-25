@@ -148,6 +148,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | 0s       |
 | `metricsAggregate`           | Aggregate the metrics collected for this job with those of the next one                                                               | Boolean  | false    |
 | `metricsClosing`             | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                  | String   | afterJobPause |
+| `hooks`                      | List of hooks to execute at different job stages. See [hooks section](#hooks)                                                         | List     | []       |
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
@@ -337,6 +338,142 @@ This will create both the Gateway and VirtualService for each iteration, with pr
 
 !!! note
     Each document in the multi-document template is treated as a separate object internally, but they share the same replica configuration and input variables from the parent object definition.
+
+### Hooks
+
+Hooks allow you to execute external commands at various stages of job execution. They support both foreground (blocking) and background (non-blocking) execution modes.
+
+#### Hook Configuration
+
+Hooks are configured as a list under the `hooks` field in a job:
+
+| Option       | Description                                             | Type     | Default |
+|--------------|---------------------------------------------------------|----------|---------|
+| `cmd`        | Command and arguments to execute                        | List     | []      |
+| `when`       | Execution stage for the hook                            | String   | ""      |
+| `background` | Run hook in background (non-blocking)                   | Boolean  | false   |
+
+#### Supported Hook Stages
+
+The `when` field specifies at which stage the hook should execute:
+
+| Stage                    | Description                                           |
+|--------------------------|-------------------------------------------------------|
+| `beforeJobExecution`     | Before job objects are created                        |
+| `afterJobExecution`      | After job objects are created                         |
+| `onEachIteration`        | On each job iteration                                 |
+| `beforeChurn`            | Before churn operation starts                         |
+| `afterChurn`             | After churn operation completes                       |
+| `beforeCleanup`          | Before cleanup/deletion begins                        |
+| `afterCleanup`           | After cleanup/deletion completes                      |
+| `beforeGC`               | Before garbage collection                             |
+| `afterGC`                | After garbage collection                              |
+
+#### Execution Behavior
+
+**Foreground Hooks** (`background: false`):
+
+- Execute sequentially in the order defined
+- Block job execution until completion
+- No timeout by default (respects parent context cancellation only)
+- Errors cause job to fail
+
+**Background Hooks** (`background: true`):
+
+- All background hooks for a stage start in parallel
+- Job execution continues immediately
+- Results are collected at the end of the job execution
+- Errors are reported but don't block execution
+- Properly cleaned up when parent context is cancelled
+
+**Execution Order:**
+
+1. All background hooks for the stage start in parallel
+2. Foreground hooks execute sequentially after background hooks start
+3. Background hooks are waited on before proceeding to the next major phase
+
+#### Example Configuration
+
+```yaml
+jobs:
+  - name: my-workload
+    jobType: create
+    jobIterations: 100
+    namespace: workload-ns
+    
+    hooks:
+      # Background monitoring hook - runs throughout deployment
+      - cmd: ["/bin/bash", "/scripts/monitor-resources.sh"]
+        when: beforeJobExecution
+        background: true
+      
+      # Foreground setup hook - blocks until complete
+      - cmd: ["/usr/bin/setup-environment.sh", "--mode=production"]
+        when: beforeJobExecution
+        background: false
+      
+      # Per-iteration hook
+      - cmd: ["/bin/bash", "/scripts/log-iteration.sh"]
+        when: onEachIteration
+        background: false
+      
+      # Cleanup verification
+      - cmd: ["/scripts/verify-cleanup.sh"]
+        when: afterCleanup
+        background: false
+    
+    objects:
+      - objectTemplate: deployment.yml
+        replicas: 10
+```
+
+#### Use Cases
+
+**Long-running background monitoring:**
+```yaml
+hooks:
+  - cmd: ["/usr/bin/prometheus-monitor", "--output=/metrics"]
+    when: beforeJobExecution
+    background: true
+```
+
+**VM provisioning and readiness:**
+```yaml
+hooks:
+  - cmd: ["/scripts/provision-vm.sh", "--wait-ready"]
+    when: beforeJobExecution
+    background: false  # No timeout, waits as long as needed
+```
+
+**Data collection during churn:**
+```yaml
+hooks:
+  - cmd: ["/scripts/collect-churn-metrics.sh"]
+    when: beforeChurn
+    background: true
+```
+
+**Sequential cleanup verification:**
+```yaml
+hooks:
+  - cmd: ["/scripts/check-resources.sh"]
+    when: afterCleanup
+    background: false
+```
+
+#### Best Practices
+
+1. **Use background hooks for monitoring** - Start monitoring/data collection in the background while workload runs
+2. **Use foreground hooks for setup** - Block execution for critical setup steps
+3. **Handle errors appropriately** - Foreground hook failures will fail the job
+4. **Use absolute paths** - Specify full paths to executables and scripts
+5. **Keep hooks lightweight for `onEachIteration`** - This runs for every iteration
+
+#### Error Handling
+
+- **Foreground hooks**: Errors stop job execution and are reported immediately
+- **Background hooks**: Errors are collected and reported after job completion
+- All hook errors are included in job summary and return code
 
 ## Job types
 
