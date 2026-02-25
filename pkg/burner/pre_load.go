@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 )
@@ -97,33 +98,28 @@ func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.In
 	if err := waitForImagePull(preloadCtx, clientSet, desired, len(imageList)); err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
-	// 5 minutes should be more than enough to cleanup this namespace
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	util.CleanupNamespacesByLabel(ctx, clientSet, fmt.Sprintf("%s=true", preLoadNs))
+	util.CleanupNamespacesByLabel(preloadCtx, clientSet, fmt.Sprintf("%s=true", preLoadNs))
 	return nil
 }
 
 func waitForImagePull(ctx context.Context, clientSet kubernetes.Interface, desired, imageCount int) error {
 	expectedTotal := desired * imageCount
-	ticker := time.NewTicker(preLoadPollInterval)
-	defer ticker.Stop()
-	for {
+	err := wait.PollUntilContextCancel(ctx, preLoadPollInterval, true, func(ctx context.Context) (bool, error) {
 		pulledTotal, err := countPulledImages(ctx, clientSet)
 		if err != nil {
-			return err
+			return false, err
 		}
 		log.Debugf("Pre-load: %d/%d images pulled across %d nodes", pulledTotal, expectedTotal, desired)
 		if pulledTotal == expectedTotal {
 			log.Infof("Pre-load: All images pulled on %d nodes", desired)
-			return nil
+			return true, nil
 		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for images to be pulled in namespace %s", preLoadNs)
-		case <-ticker.C:
-		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for images to be pulled in namespace %s: %w", preLoadNs, err)
 	}
+	return nil
 }
 
 // countPulledImages counts unique (pod, image) pairs from Pulled events,
@@ -273,23 +269,24 @@ func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []
 	if err != nil {
 		return 0, err
 	}
-	ticker := time.NewTicker(preLoadPollInterval)
-	defer ticker.Stop()
-	for {
+	var desired int
+	err = wait.PollUntilContextCancel(ctx, preLoadPollInterval, true, func(ctx context.Context) (bool, error) {
 		dsList, err := clientSet.AppsV1().DaemonSets(preLoadNs).List(ctx, metav1.ListOptions{})
 		if err != nil {
-			return 0, fmt.Errorf("getting DaemonSet status in %s: %v", preLoadNs, err)
+			log.Errorf("Error getting DaemonSet status in %s: %v", preLoadNs, err)
+			return false, nil
 		}
 		if len(dsList.Items) > 0 {
-			if desired := int(dsList.Items[0].Status.DesiredNumberScheduled); desired > 0 {
-				log.Debugf("Pre-load: DaemonSet scheduled on %d nodes", desired)
-				return desired, nil
+			if d := int(dsList.Items[0].Status.DesiredNumberScheduled); d > 0 {
+				log.Debugf("Pre-load: DaemonSet scheduled on %d nodes", d)
+				desired = d
+				return true, nil
 			}
 		}
-		select {
-		case <-ctx.Done():
-			return 0, fmt.Errorf("timed out waiting for DaemonSet to be scheduled in %s", preLoadNs)
-		case <-ticker.C:
-		}
+		return false, nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("timed out waiting for DaemonSet to be scheduled in %s: %w", preLoadNs, err)
 	}
+	return desired, nil
 }
