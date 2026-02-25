@@ -265,23 +265,21 @@ func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []
 	}
 
 	log.Infof("Pre-load: Creating DaemonSet using images %v in namespace %s", imageList, preLoadNs)
-	_, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(ctx, &ds, metav1.CreateOptions{})
+	created, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(ctx, &ds, metav1.CreateOptions{})
 	if err != nil {
 		return 0, err
 	}
 	var desired int
 	err = wait.PollUntilContextCancel(ctx, preLoadPollInterval, true, func(ctx context.Context) (bool, error) {
-		dsList, err := clientSet.AppsV1().DaemonSets(preLoadNs).List(ctx, metav1.ListOptions{})
+		ds, err := clientSet.AppsV1().DaemonSets(preLoadNs).Get(ctx, created.Name, metav1.GetOptions{})
 		if err != nil {
 			log.Errorf("Error getting DaemonSet status in %s: %v", preLoadNs, err)
 			return false, nil
 		}
-		if len(dsList.Items) > 0 {
-			if d := int(dsList.Items[0].Status.DesiredNumberScheduled); d > 0 {
-				log.Debugf("Pre-load: DaemonSet scheduled on %d nodes", d)
-				desired = d
-				return true, nil
-			}
+		if d := int(ds.Status.DesiredNumberScheduled); d > 0 {
+			log.Debugf("Pre-load: DaemonSet scheduled on %d nodes", d)
+			desired = d
+			return true, nil
 		}
 		return false, nil
 	})
