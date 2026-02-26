@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"sync"
 	"time"
 
@@ -77,6 +76,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var executedJobs []prometheus.Job
 	var jobExecutors []JobExecutor
 	var msWg, gcWg sync.WaitGroup
+	var measurementsInstance *measurements.Measurements
+	var measurementsJobName string
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -92,8 +93,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		handlePreloadImages(ctx, jobExecutors, kubeClientProvider)
 		// Iterate job list
-		var measurementsInstance *measurements.Measurements
-		var measurementsJobName string
+
 		for jobExecutorIdx, jobExecutor := range jobExecutors {
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
@@ -208,7 +208,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance = nil
 			}
 			watcherStopErrs := watcherManager.StopAll()
-			slices.Concat(errs, watcherStopErrs)
+			errs = append(errs, watcherStopErrs...)
 			if jobExecutor.GC {
 				jobExecutor.gc(ctx, nil)
 			}
@@ -269,6 +269,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 		errs = append(errs, err)
 		rc = rcTimeout
+		if measurementsInstance != nil {
+			if err := measurementsInstance.Stop(); err != nil {
+				errs = append(errs, err)
+			}
+			if len(metricsScraper.IndexerList) > 0 {
+				measurementsInstance.Index(measurementsJobName, metricsScraper.IndexerList)
+			}
+		}
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	if globalConfig.GC {

@@ -133,7 +133,7 @@ func (j *Job) UnmarshalYAML(unmarshal func(any) error) error {
 		JobType:                CreationJob,
 		WaitForDeletion:        true,
 		PreLoadImages:          true,
-		PreLoadPeriod:          1 * time.Minute,
+		PreLoadPeriod:          10 * time.Minute,
 		MetricsClosing:         AfterJobPause,
 		Measurements:           []mtypes.Measurement{},
 	}
@@ -260,6 +260,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	}
 
 	inputData, err := getInputData(userDataFileReader, additionalVars)
+	inputData["UUID"] = uuid
 	if err != nil {
 		return configSpec, err
 	}
