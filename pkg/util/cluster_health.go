@@ -19,8 +19,41 @@ func ClusterHealthCheck(clientSet kubernetes.Interface) {
 }
 
 func ClusterHealthyVanillaK8s(clientset kubernetes.Interface) bool {
+	ctx := context.Background()
+
+	// 1) API server health
+	if !isAPIServerHealthy(ctx, clientset) {
+		return false
+	}
+
+	// 2) Node health
+	return areNodesHealthy(ctx, clientset)
+}
+
+func isAPIServerHealthy(ctx context.Context, clientset kubernetes.Interface) bool {
+	rc := clientset.Discovery().RESTClient()
+	if rc == nil {
+		log.Error("discovery REST client is nil")
+		return false
+	}
+
+	data, err := rc.Get().AbsPath("/healthz").DoRaw(ctx)
+	if err != nil {
+		log.Errorf("apiserver health check error: %v", err)
+		return false
+	}
+
+	if string(data) != "ok" {
+		log.Errorf("apiserver health check failed: %s", string(data))
+		return false
+	}
+
+	return true
+}
+
+func areNodesHealthy(ctx context.Context, clientset kubernetes.Interface) bool {
 	var isHealthy = true
-	nodes, err := clientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Errorf("Error getting nodes: %v", err)
 		return false
@@ -40,5 +73,6 @@ func ClusterHealthyVanillaK8s(clientset kubernetes.Interface) bool {
 
 		}
 	}
+
 	return isHealthy
 }
