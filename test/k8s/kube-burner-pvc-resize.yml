@@ -1,0 +1,43 @@
+---
+global:
+  measurements:
+    - name: pvcLatency
+
+metricsEndpoints:
+  - indexer:
+      type: local
+      metricsDirectory: {{ .METRICS_FOLDER }}
+
+jobs:
+  - name: pvc-resize
+    jobType: create
+    jobIterations: 1
+    qps: 10
+    burst: 10
+    namespacedIterations: false
+    namespace: pvc-resize-test
+    waitWhenFinished: true # Ensure bound before next job
+    podWait: false
+    maxWaitTimeout: 5m # Increased timeout
+    objects:
+      - objectTemplate: objectTemplates/pvc.yml
+        replicas: 2
+        inputVars:
+          size: "1Gi"
+
+  - name: pvc-patch
+    jobType: patch
+    jobIterations: 1
+    qps: 10
+    burst: 10
+    namespacedIterations: false
+    namespace: pvc-resize-test
+    executionMode: parallel
+    jobPause: 60s
+    objects:
+      - kind: PersistentVolumeClaim
+        labelSelector: {kube-burner-job: pvc-resize}
+        patchType: "application/merge-patch+json"
+        objectTemplate: objectTemplates/pvc-patch.json
+        inputVars:
+          pvcSize: "2Gi"

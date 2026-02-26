@@ -137,61 +137,36 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 		return
 	}
 	log.Tracef("handleUpdatePVC: %s", pvc.Name)
-<<<<<<< HEAD
-
 	value, exists := p.Metrics.Load(string(pvc.UID))
 	if !exists {
 		return
 	}
-
 	pm := value.(pvcMetric)
+
 	log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
 	now := time.Now().UTC().UnixMilli()
 
 	// 1. Phase Tracking (capture timestamps of first entry into each state)
-	switch pvc.Status.Phase {
-	case corev1.ClaimPending:
-		if pm.pending == 0 {
-			pm.pending = now
-			log.Debugf("PVC %s is pending", pvc.Name)
-		}
-	case corev1.ClaimBound:
-		if pm.bound == 0 {
-			pm.bound = now
-			log.Debugf("PVC %s is bound", pvc.Name)
-		}
-	case corev1.ClaimLost:
-		if pm.lost == 0 {
-			pm.lost = now
-			log.Debugf("PVC %s is lost", pvc.Name)
-=======
-	if value, exists := p.Metrics.Load(string(pvc.UID)); exists {
-		pm := value.(pvcMetric)
-		log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
-		if pm.bound == 0 || pm.lost == 0 {
-			if pvc.Status.Phase == corev1.ClaimPending {
-				if pm.pending == 0 {
-					log.Debugf("PVC %s is pending", pvc.Name)
-					pm.pending = time.Now().UTC().UnixMilli()
-				}
+	if pm.bound == 0 || pm.lost == 0 {
+		switch pvc.Status.Phase {
+		case corev1.ClaimPending:
+			if pm.pending == 0 {
+				pm.pending = now
+				log.Debugf("PVC %s is pending", pvc.Name)
 			}
-			if pvc.Status.Phase == corev1.ClaimBound {
-				if pm.bound == 0 {
-					log.Debugf("PVC %s is bound", pvc.Name)
-					pm.bound = time.Now().UTC().UnixMilli()
-				}
+		case corev1.ClaimBound:
+			if pm.bound == 0 {
+				pm.bound = now
+				log.Debugf("PVC %s is bound", pvc.Name)
 			}
-			if pvc.Status.Phase == corev1.ClaimLost {
-				if pm.lost == 0 {
-					log.Debugf("PVC %s is lost", pvc.Name)
-					pm.lost = time.Now().UTC().UnixMilli()
-				}
+		case corev1.ClaimLost:
+			if pm.lost == 0 {
+				pm.lost = now
+				log.Debugf("PVC %s is lost", pvc.Name)
 			}
-			p.Metrics.Store(string(pvc.UID), pm)
-		} else {
-			log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
->>>>>>> 5217d1426bb17e9e1723128703e3ab8fbe625e40
 		}
+	} else {
+		log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
 	}
 
 	// 2. Resize Detection
