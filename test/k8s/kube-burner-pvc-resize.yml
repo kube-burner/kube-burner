@@ -16,14 +16,19 @@ jobs:
     burst: 10
     namespacedIterations: false
     namespace: pvc-resize-test
-    waitWhenFinished: true # Ensure bound before next job
+    waitWhenFinished: true
     podWait: false
-    maxWaitTimeout: 5m # Increased timeout
+    maxWaitTimeout: 5m
     objects:
       - objectTemplate: objectTemplates/pvc.yml
         replicas: 2
         inputVars:
           size: "1Gi"
+      - objectTemplate: objectTemplates/pod.yml
+        replicas: 2
+        wait: true
+        inputVars:
+          mountPVC: true
 
   - name: pvc-patch
     jobType: patch
@@ -36,7 +41,7 @@ jobs:
     jobPause: 60s
     objects:
       - kind: PersistentVolumeClaim
-        labelSelector: {kube-burner-job: pvc-resize}
+        labelSelector: {"kube-burner.io/job": pvc-resize}
         patchType: "application/merge-patch+json"
         objectTemplate: objectTemplates/pvc-patch.json
         inputVars:

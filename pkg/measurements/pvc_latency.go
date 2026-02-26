@@ -146,8 +146,13 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 	log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
 	now := time.Now().UTC().UnixMilli()
 
-	// 1. Phase Tracking (capture timestamps of first entry into each state)
-	if pm.bound == 0 || pm.lost == 0 {
+	// 1. Compute requested size first - needed to guard phase tracking
+	requestedSize := pvc.Spec.Resources.Requests.Storage().String()
+
+	// 2. Phase Tracking (capture timestamps of first entry into each state)
+	// Guard with requestedSize == pm.Size: if size changed, this is a resize update,
+	// not a binding event. We must NOT set pm.bound here or we get phantom latency.
+	if requestedSize == pm.Size && (pm.bound == 0 || pm.lost == 0) {
 		switch pvc.Status.Phase {
 		case corev1.ClaimPending:
 			if pm.pending == 0 {
@@ -166,11 +171,8 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 			}
 		}
 	} else {
-		log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
+		log.Tracef("Skipping phase tracking for PVC %s (phase=%s, sizeChanged=%v)", pvc.Name, pvc.Status.Phase, requestedSize != pm.Size)
 	}
-
-	// 2. Resize Detection
-	requestedSize := pvc.Spec.Resources.Requests.Storage().String()
 
 	// Detect resize start by spec change (works for all provisioners)
 	if requestedSize != pm.Size && pm.resizeStarted == 0 {
