@@ -121,6 +121,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `namespace`                  | Namespace base name to use                                                                                                            | String   | ""       |
 | `namespacedIterations`       | Whether to create a namespace per job iteration                                                                                       | Boolean  | true     |
 | `iterationsPerNamespace`     | The maximum number of `jobIterations` to create in a single namespace. Important for node-density workloads that create Services.     | Integer  | 1        |
+| `namespaceDelay`             | Adds a configurable delay between creation of namespaces when `iterationsPerNamespace` is used. Useful to reduce OVS saturation when too many pods are created at once. | Duration | 0s       |
 | `cleanup`                    | Cleanup clean up old namespaces                                                                                                       | Boolean  | true     |
 | `podWait`                    | Wait for all pods/jobs (including probes) to be running/completed before moving forward to the next job iteration                     | Boolean  | false    |
 | `waitWhenFinished`           | Wait for all pods/jobs (including probes) to be running/completed when all job iterations are completed                               | Boolean  | true     |
