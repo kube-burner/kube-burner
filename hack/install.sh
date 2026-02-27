@@ -7,7 +7,11 @@ set -euo pipefail
 
 # Configuration
 REPO="kube-burner/kube-burner"
-INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin/}"
+if [[ -n "${PREFIX}" ]]; then
+  INSTALL_DIR="${DESTDIR}${PREFIX}/bin"
+else
+  INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin/}"
+fi
 
 # Detect OS
 detect_os() {
