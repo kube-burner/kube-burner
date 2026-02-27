@@ -159,10 +159,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 			}
 			ex.objects[objectIndex].LabelSelector = kbLabels
 			if obj.RunOnce {
-				if i == 0 {
+				if !obj.hasRun {
 					// this executes only once during the first iteration of an object
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
 					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
+					obj.hasRun = true
 				}
 			} else {
 				ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
