@@ -55,7 +55,7 @@ jobs:
       uses: actions/download-artifact@v7
       with:
         name: kube-burner
-        path: /tmp/
+        path: ${{ runner.temp }}/
 
     - name: Install bats
       uses: bats-core/bats-action@3.0.1
@@ -68,7 +68,7 @@ jobs:
 
     - name: Execute Tests
       run: |
-        chmod +x /tmp/kube-burner
+        chmod +x ${{ runner.temp }}/kube-burner
         make test-k8s
       env:
         TERM: linux
@@ -76,4 +76,4 @@ jobs:
         KIND_VERSION: v0.19.0
         K8S_VERSION: ${{matrix.k8s-version}}
         PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
-        TEST_BINARY: /tmp/kube-burner
+        TEST_BINARY: ${{ runner.temp }}/kube-burner
