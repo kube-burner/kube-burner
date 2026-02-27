@@ -91,6 +91,24 @@ env:
 ```
 We are all set! We should have our function rendered at the runtime and can be reused in future as well.
 
+## DeletionStrategy
+
+kube-burner supports multiple deletion strategies that control how resources
+created during a run are cleaned up.
+
+### default
+- Deletes all namespaced resources created by kube-burner
+- Deletes the namespaces created by kube-burner, hence their child objects too
+- Deletes cluster-scoped objects created by kube-burner
+
+### gvr
+- Deletes namespaced resources one by one using GVR-based deletion
+- After removing those resources, deletes their parent namespaces
+- Finally garbage-collects cluster-scoped objects created by kube-burner
+
+> Note:
+> The `gvr` strategy deletes namespaced resources first. Namespace deletion occurs after those resources are removed as part of the overall cleanup flow.
+
 ## Jobs
 
 This section contains the list of jobs `kube-burner` will execute. Each job can hold the following parameters.
@@ -118,8 +136,8 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `verifyObjects`              | Verify object count after running each job                                                                                            | Boolean  | true     |
 | `errorOnVerify`              | Set RC to 1 when objects verification fails                                                                                           | Boolean  | true     |
 | `skipIndexing`               | Skip metric indexing on this job                                                                                                      | Boolean  | false    |
-| `preLoadImages`              | Kube-burner will create a DS before triggering the job to pull all the images of the job                                              | Boolean  |          |
-| `preLoadPeriod`              | How long to wait for the preload DaemonSet                                                                                            | Duration | 1m       |
+| `preLoadImages`              | Kube-burner will create a DS before triggering the job to pull all the images of the job                                              | Boolean  | true     |
+| `preLoadPeriod`              | Maximum time to wait for the preload DaemonSet to become ready on all nodes and cleanup pre-load objects                              | Duration | 10m      |
 | `preloadNodeLabels`          | Add node selector labels for the resources created in preload stage                                                                   | Object   | {}       |
 | `namespaceLabels`            | Add custom labels to the namespaces created by kube-burner                                                                            | Object   | {}       |
 | `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}       |
@@ -127,7 +145,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
 | `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
-| `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | 0s       |
+| `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | false    |
 | `metricsAggregate`           | Aggregate the metrics collected for this job with those of the next one                                                               | Boolean  | false    |
 | `metricsClosing`             | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                  | String   | afterJobPause |
 
@@ -613,7 +631,7 @@ All object templates are injected with the variables below by default:
 - `Iteration`: Job iteration number.
 - `Replica`: Object replica number. Keep in mind that this number is reset to 1 with each job iteration.
 - `JobName`: Job name.
-- `UUID`: Benchmark UUID.
+- `UUID`: Benchmark UUID. (Can be also referenced in the main configuration file)
 - `RunID`: Internal run id. Can be used to match resources for metrics collection
 
 In addition, you can also inject arbitrary variables with the option `inputVars` of the object:

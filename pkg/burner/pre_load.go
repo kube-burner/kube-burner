@@ -17,6 +17,9 @@ package burner
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"slices"
+	"strings"
 	"time"
 
 	"maps"
@@ -29,11 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 )
 
-const preLoadNs = "preload-kube-burner"
+var preLoadNs = fmt.Sprintf("preload-kube-burner-%05d", rand.Intn(100000))
+
+const preLoadPollInterval = 5 * time.Second
 
 // NestedPod represents a pod nested in a higher level object such as deployment or a daemonset
 type NestedPod struct {
@@ -69,27 +75,91 @@ type NestedVM struct {
 	} `yaml:"spec"`
 }
 
-func preLoadImages(job JobExecutor, clientSet kubernetes.Interface) error {
+func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.Interface) error {
 	log.Info("Pre-load: images from job ", job.Name)
 	imageList, err := getJobImages(job)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
+	// Deduplicate images
+	slices.Sort(imageList)
+	imageList = slices.Compact(imageList)
 	if len(imageList) == 0 {
 		log.Infof("No images found to pre-load, continuing")
 		return nil
 	}
-	err = createDSs(clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
+	preloadCtx, preloadCancel := context.WithTimeout(ctx, job.PreLoadPeriod)
+	defer preloadCancel()
+	desired, err := createDSs(preloadCtx, clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
-	log.Infof("Pre-load: Sleeping for %v", job.PreLoadPeriod)
-	time.Sleep(job.PreLoadPeriod)
-	// 5 minutes should be more than enough to cleanup this namespace
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	util.CleanupNamespacesByLabel(ctx, clientSet, "kube-burner-preload=true")
+	log.Infof("Pre-load: Waiting for images to be pulled on %d nodes (timeout %v)", desired, job.PreLoadPeriod)
+	if err := waitForImagePull(preloadCtx, clientSet, desired, len(imageList)); err != nil {
+		return fmt.Errorf("pre-load: %v", err)
+	}
+	util.CleanupNamespacesByLabel(preloadCtx, clientSet, fmt.Sprintf("%s=true", preLoadNs))
 	return nil
+}
+
+func waitForImagePull(ctx context.Context, clientSet kubernetes.Interface, desired, imageCount int) error {
+	expectedTotal := desired * imageCount
+	err := wait.PollUntilContextCancel(ctx, preLoadPollInterval, true, func(ctx context.Context) (bool, error) {
+		pulledTotal, err := countPulledImages(ctx, clientSet)
+		if err != nil {
+			return false, err
+		}
+		log.Debugf("Pre-load: %d/%d images pulled across %d nodes", pulledTotal, expectedTotal, desired)
+		if pulledTotal == expectedTotal {
+			log.Infof("Pre-load: All images pulled on %d nodes", desired)
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for images to be pulled in namespace %s: %w", preLoadNs, err)
+	}
+	return nil
+}
+
+// countPulledImages counts unique (pod, image) pairs from Pulled events,
+// only considering preload containers (named "pull-N").
+func countPulledImages(ctx context.Context, clientSet kubernetes.Interface) (int, error) {
+	events, err := clientSet.CoreV1().Events(preLoadNs).List(ctx, metav1.ListOptions{
+		FieldSelector: "reason=Pulled",
+	})
+	if err != nil {
+		return 0, fmt.Errorf("listing events in namespace %s: %v", preLoadNs, err)
+	}
+	type podImage struct {
+		pod, image string
+	}
+	seen := make(map[podImage]struct{})
+	for _, event := range events.Items {
+		if !strings.Contains(event.InvolvedObject.FieldPath, "{pull-") {
+			continue
+		}
+		image := extractImageFromEvent(event.Message)
+		if image == "" {
+			continue
+		}
+		seen[podImage{event.InvolvedObject.Name, image}] = struct{}{}
+	}
+	return len(seen), nil
+}
+
+// extractImageFromEvent parses the image reference from a kubelet Pulled event message.
+// Expected format: Successfully pulled image "IMAGE" in ...
+func extractImageFromEvent(message string) string {
+	_, after, found := strings.Cut(message, "\"")
+	if !found {
+		return ""
+	}
+	image, _, found := strings.Cut(after, "\"")
+	if !found {
+		return ""
+	}
+	return image
 }
 
 func getJobImages(job JobExecutor) ([]string, error) {
@@ -145,15 +215,15 @@ func extractImagesFromObject(uns *unstructured.Unstructured, renderedObj []byte)
 	return imageList
 }
 
-func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) error {
+func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) (int, error) {
 	nsLabels := map[string]string{
-		"kube-burner-preload": "true",
+		preLoadNs: "true",
 	}
 	nsAnnotations := make(map[string]string)
 	maps.Copy(nsLabels, namespaceLabels)
 	maps.Copy(nsAnnotations, namespaceAnnotations)
 	if err := util.CreateNamespace(clientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
-		log.Fatal(err)
+		return 0, fmt.Errorf("creating namespace: %v", err)
 	}
 	dsName := "preload"
 	ds := appsv1.DaemonSet{
@@ -174,13 +244,10 @@ func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabe
 				},
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: ptr.To[int64](0),
-					InitContainers:                []corev1.Container{},
-					// Only Always restart policy is supported
 					Containers: []corev1.Container{
 						{
-							Name:            "sleep",
-							Image:           "registry.k8s.io/pause:3.1",
-							ImagePullPolicy: corev1.PullAlways,
+							Name:  "pause",
+							Image: "registry.k8s.io/pause:3.1",
 						},
 					},
 					NodeSelector: nodeSelectorLabels,
@@ -189,21 +256,35 @@ func createDSs(clientSet kubernetes.Interface, imageList []string, namespaceLabe
 		},
 	}
 
-	// Add the list of containers using images
 	for i, image := range imageList {
-		container := corev1.Container{
-			Name:            fmt.Sprintf("container-%d", i),
-			ImagePullPolicy: corev1.PullAlways,
+		ds.Spec.Template.Spec.Containers = append(ds.Spec.Template.Spec.Containers, corev1.Container{
+			Name:            fmt.Sprintf("pull-%d", i),
 			Image:           image,
-			Command:         []string{"echo", fmt.Sprintf("init container-%d completed", i)},
-		}
-		ds.Spec.Template.Spec.InitContainers = append(ds.Spec.Template.Spec.InitContainers, container)
+			ImagePullPolicy: corev1.PullAlways,
+		})
 	}
 
 	log.Infof("Pre-load: Creating DaemonSet using images %v in namespace %s", imageList, preLoadNs)
-	_, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(context.TODO(), &ds, metav1.CreateOptions{})
+	created, err := clientSet.AppsV1().DaemonSets(preLoadNs).Create(ctx, &ds, metav1.CreateOptions{})
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	var desired int
+	err = wait.PollUntilContextCancel(ctx, preLoadPollInterval, true, func(ctx context.Context) (bool, error) {
+		ds, err := clientSet.AppsV1().DaemonSets(preLoadNs).Get(ctx, created.Name, metav1.GetOptions{})
+		if err != nil {
+			log.Errorf("Error getting DaemonSet status in %s: %v", preLoadNs, err)
+			return false, nil
+		}
+		if d := int(ds.Status.DesiredNumberScheduled); d > 0 {
+			log.Debugf("Pre-load: DaemonSet scheduled on %d nodes", d)
+			desired = d
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("timed out waiting for DaemonSet to be scheduled in %s: %w", preLoadNs, err)
+	}
+	return desired, nil
 }
