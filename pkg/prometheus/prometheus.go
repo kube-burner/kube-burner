@@ -56,6 +56,10 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 	var renderedQuery bytes.Buffer
 	vars := util.EnvToMap()
 	for _, eachJob := range jobList {
+		uuid := p.UUID
+		if eachJob.UUID != "" {
+			uuid = eachJob.UUID
+		}
 		jobStart := eachJob.Start
 		jobEnd := eachJob.End
 		vars["elapsed"] = fmt.Sprintf("%ds", int(jobEnd.Sub(jobStart).Seconds()))
@@ -82,15 +86,15 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 				renderedQuery.Reset()
 				if metric.Instant {
 					if metric.CaptureStart {
-						docsToIndex[metric.MetricName+"-start"] = append(docsToIndex[metric.MetricName+"-start"], p.runInstantQuery(query, metric.MetricName+"-start", jobStart, eachJob)...)
+						docsToIndex[metric.MetricName+"-start"+"_"+uuid] = append(docsToIndex[metric.MetricName+"-start"+"_"+uuid], p.runInstantQuery(query, metric.MetricName+"-start", jobStart, eachJob)...)
 					}
-					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
+					docsToIndex[metric.MetricName+"_"+uuid] = append(docsToIndex[metric.MetricName+"_"+uuid], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
 				} else {
 					requiresInstant = ((jobEnd.Sub(jobStart).Milliseconds())%(p.Step.Milliseconds()) != 0)
-					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runRangeQuery(query, metric.MetricName, jobStart, jobEnd, eachJob)...)
+					docsToIndex[metric.MetricName+"_"+uuid] = append(docsToIndex[metric.MetricName+"_"+uuid], p.runRangeQuery(query, metric.MetricName, jobStart, jobEnd, eachJob)...)
 				}
 				if requiresInstant {
-					docsToIndex[metric.MetricName] = append(docsToIndex[metric.MetricName], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
+					docsToIndex[metric.MetricName+"_"+uuid] = append(docsToIndex[metric.MetricName+"_"+uuid], p.runInstantQuery(query, metric.MetricName, jobEnd, eachJob)...)
 				}
 				if len(docsToIndex) > 0 {
 					p.indexDatapoints(docsToIndex)
@@ -160,14 +164,25 @@ func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfi
 
 // Create metric creates metric to be indexed
 func (p *Prometheus) createMetric(query, metricName string, job Job, labels model.Metric, value model.SampleValue, timestamp time.Time, isInstant bool) metric {
+	uuid := p.UUID
+	if job.UUID != "" {
+		uuid = job.UUID
+	}
+	metadata := map[string]any{}
+	for k, v := range p.metadata {
+		metadata[k] = v
+	}
+	if job.ParentUUID != "" {
+		metadata["parentUUID"] = job.ParentUUID
+	}
 	m := metric{
 		Labels:     make(map[string]string),
-		UUID:       p.UUID,
+		UUID:       uuid,
 		Query:      query,
 		MetricName: metricName,
 		Timestamp:  timestamp,
 		JobName:    job.JobConfig.Name,
-		Metadata:   p.metadata,
+		Metadata:   metadata,
 	}
 	for k, v := range labels {
 		if k != model.MetricNameLabel {

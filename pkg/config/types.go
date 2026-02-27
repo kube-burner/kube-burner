@@ -202,6 +202,8 @@ type Job struct {
 	GC bool `yaml:"gc" json:"gc"`
 	// Measurements job-specific measurements to enable
 	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
+	// IncrementalLoad enables incremental load behavior for creation jobs
+	IncrementalLoad *IncrementalLoad `yaml:"incrementalLoad" json:"incrementalLoad,omitempty"`
 }
 
 type WaitOptions struct {
@@ -213,6 +215,53 @@ type WaitOptions struct {
 	LabelSelector map[string]string `yaml:"labelSelector" json:"labelSelector,omitempty"`
 	// CustomStatusPaths defines the list of jq path specific status fields to check (e.g., [{"key":".[]conditions.type","value":"Available"}]).
 	CustomStatusPaths []StatusPath `yaml:"customStatusPaths" json:"customStatusPaths,omitempty"`
+}
+
+type IncrementalLoad struct {
+	// MinIterations minimum number of iterations to start with
+	StartIterations int `yaml:"startIterations" json:"startIterations,omitempty"`
+	// MaxIterations maximum number of iterations to go upto
+	TotalIterations int `yaml:"totalIterations" json:"totalIterations,omitempty"`
+	// StepDelay time delay between each incremental step
+	StepDelay time.Duration `yaml:"stepDelay" json:"stepDelay,omitempty"`
+	// Pattern load patterns
+	Pattern LoadPattern `yaml:"pattern" json:"pattern,omitempty"`
+	// HealthCheckScript optional shell script to run as a health check between steps
+	HealthCheckScript string `yaml:"healthCheckScript" json:"healthCheckScript,omitempty"`
+}
+
+type LoadPattern struct {
+	// Type types of load
+	Type LoadPatternType `yaml:"type" json:"type,omitempty"`
+	// Linear equation
+	Linear *LinearLoadConfig `yaml:"linear,omitempty" json:"linear,omitempty"`
+	// Exponential equation
+	Exponential *ExponentialLoadConfig `yaml:"exponential,omitempty" json:"exponential,omitempty"`
+}
+
+// LoadPatternType load pattern types
+// TODO to extend further
+type LoadPatternType string
+
+const (
+	LinearPattern      LoadPatternType = "linear"
+	ExponentialPattern LoadPatternType = "exponential"
+)
+
+type LinearLoadConfig struct {
+	// MinSteps minimum number of steps in the load
+	MinSteps int `yaml:"minSteps" json:"minSteps,omitempty"`
+	// StepSize step size in terms of iterations
+	StepSize int `yaml:"stepSize" json:"stepSize,omitempty"`
+}
+
+type ExponentialLoadConfig struct {
+	// Base base of the exponential equation
+	Base float64 `yaml:"base" json:"base,omitempty"`
+	// MaxIncrease maximum tolerable increase in an exponential bump
+	MaxIncrease int `yaml:"maxIncrease" json:"maxIncrease,omitempty"`
+	// WarmupSteps number of steps to warm up before exponential load
+	WarmupSteps int `yaml:"warmupSteps" json:"warmupSteps,omitempty"`
 }
 
 type Watcher struct {
