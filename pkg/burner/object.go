@@ -35,6 +35,7 @@ type object struct {
 	namespace     string
 	namespaced    bool
 	ready         bool
+	hasRun        bool
 	documentIndex int
 }
 
