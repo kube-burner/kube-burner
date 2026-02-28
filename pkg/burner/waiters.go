@@ -282,9 +282,13 @@ func (ex *JobExecutor) verifyCondition(ctx context.Context, ns string, obj *obje
 			isVerified := true
 			for _, statusPath := range obj.WaitOptions.CustomStatusPaths {
 				status, found, err := unstructured.NestedMap(item.Object, "status")
-				if err != nil || !found {
-					log.Errorf("Error extracting or finding status in object %s/%s: %v", item.GetKind(), item.GetName(), err)
+				if err != nil {
+					log.Errorf("Error extracting status from object %s/%s: %v", item.GetKind(), item.GetName(), err)
 					return false, err
+				}
+				if !found {
+					log.Debugf("Status not yet available for %s/%s, retrying", item.GetKind(), item.GetName())
+					return false, nil
 				}
 				isStatusValid := false
 				if len(status) != 0 {
