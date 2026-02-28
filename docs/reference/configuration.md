@@ -143,7 +143,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}       |
 | `churnConfig`                | Configures job churning, only supported for create jobs, see [churning jobs section](#churning-jobs)                                  | Object   | {}       |
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
-| `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
+| `executionMode`              | Execution mode for processing objects within a job. Only applies to `patch` and `kubevirt` job types (`create`, `delete`, and `read` jobs ignore this setting). More details at [execution modes](#execution-modes) | String   | Varies by job type |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
 | `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | false    |
 | `metricsAggregate`           | Aggregate the metrics collected for this job with those of the next one                                                               | Boolean  | false    |
@@ -156,7 +156,9 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
     When `jobType` is set to [Delete](#delete) the following settings are forced:
     `jobIterations` is set to `1`,
     `waitWhenFinished` is set to `false`,
-    `executionMode` is set to `sequential`
+    `executionMode` is set to `sequential`.
+    When `jobType` is set to [Read](#read), `executionMode` is forced to `sequential`.
+    Any user-specified `executionMode` value is ignored for these job types.
 
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
@@ -556,10 +558,54 @@ Wait is supported for the following operations:
 
 ## Execution Modes
 
-Patch jobs support different execution modes
+The `executionMode` parameter controls how objects are processed within a job. It is a **per-job setting** defined under each job entry in the configuration file. There is no global-level `executionMode` and no CLI flag to override it.
 
-- `parallel` - run all steps without any waiting between objects or iterations
-- `sequential` - Run for each object before moving to the next job iteration with an optional wait between objects and/or between iterations
+### Supported values
+
+- `parallel` — Process all objects across all iterations concurrently, without waiting between objects or iterations.
+- `sequential` — Process each object before moving to the next, with optional delays between objects (`objectDelay`) and/or between iterations (`jobIterationDelay`).
+
+### Per-job-type behavior
+
+| Job Type   | `executionMode` behavior | Default | User-configurable? |
+|------------|--------------------------|---------|---------------------|
+| `create`   | Not used. Create jobs have their own execution path and ignore this setting | N/A | No |
+| `patch`    | Fully supported | `parallel` | Yes |
+| `delete`   | Forced to `sequential`. User config is overridden | `sequential` | No |
+| `read`     | Forced to `sequential`. User config is overridden | `sequential` | No |
+| `kubevirt` | Fully supported | `sequential` | Yes |
+
+### Precedence rules
+
+1. For `delete` and `read` jobs, the implementation unconditionally sets `executionMode` to `sequential`, regardless of any user-specified value.
+2. For `patch` and `kubevirt` jobs, the user-specified value takes effect. If omitted, the default shown in the table above is used.
+3. There is no global `executionMode` setting and no CLI flag. The value is always resolved per job.
+
+### Example
+
+```yaml
+jobs:
+  - name: patch-deployments
+    jobType: patch
+    jobIterations: 5
+    executionMode: sequential   # User-configurable; default would be "parallel"
+    objectDelay: 2s              # Only effective when executionMode is "sequential"
+    objects:
+      - kind: Deployment
+        labelSelector: {kube-burner.io/job: create-deployments}
+        objectTemplate: templates/deployment_patch.json
+        patchType: "application/strategic-merge-patch+json"
+        apiVersion: apps/v1
+
+  - name: delete-objects
+    jobType: delete
+    # executionMode is forced to "sequential" for delete jobs;
+    # setting it here has no effect.
+    objects:
+      - kind: Deployment
+        labelSelector: {kube-burner.io/job: create-deployments}
+        apiVersion: apps/v1
+```
 
 ## Churning Jobs
 
