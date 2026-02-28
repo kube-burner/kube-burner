@@ -96,7 +96,7 @@ lint:
 	@echo "pre-commit executed."
 
 clean:
-	test ! -e $(BIN_DIR) || rm -Rf $(BIN_PATH)
+	rm -rf $(BIN_DIR)
 
 install:
 	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
