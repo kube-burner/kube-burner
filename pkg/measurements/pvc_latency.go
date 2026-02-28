@@ -15,6 +15,7 @@
 package measurements
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -42,6 +44,7 @@ var (
 		string(corev1.ClaimPending): {},
 		string(corev1.ClaimBound):   {},
 		string(corev1.ClaimLost):    {},
+		"Resized":                   {},
 	}
 	supportedPvcLatencyJobTypes = map[config.JobType]struct{}{
 		config.CreationJob: {},
@@ -51,23 +54,26 @@ var (
 )
 
 type pvcMetric struct {
-	Timestamp      time.Time `json:"timestamp"`
-	pending        int64
-	PendingLatency int `json:"pendingLatency"`
-	bound          int64
-	BindingLatency int `json:"bindingLatency"`
-	lost           int64
-	LostLatency    int    `json:"lostLatency"`
-	UUID           string `json:"uuid"`
-	Name           string `json:"pvcName"`
-	JobName        string `json:"jobName,omitempty"`
-	Namespace      string `json:"namespace"`
-	MetricName     string `json:"metricName"`
-	Size           string `json:"size"`
-	StorageClass   string `json:"storageClass"`
-	JobIteration   int    `json:"jobIteration"`
-	Replica        int    `json:"replica"`
-	Metadata       any    `json:"metadata,omitempty"`
+	Timestamp       time.Time `json:"timestamp"`
+	pending         int64
+	PendingLatency  int `json:"pendingLatency"`
+	bound           int64
+	BindingLatency  int `json:"bindingLatency"`
+	lost            int64
+	LostLatency     int `json:"lostLatency"`
+	resizeStarted   int64
+	ResizeLatency   int    `json:"resizeLatency"`
+	ResizedCapacity string `json:"resizedCapacity,omitempty"`
+	UUID            string `json:"uuid"`
+	Name            string `json:"pvcName"`
+	JobName         string `json:"jobName,omitempty"`
+	Namespace       string `json:"namespace"`
+	MetricName      string `json:"metricName"`
+	Size            string `json:"size"`
+	StorageClass    string `json:"storageClass"`
+	JobIteration    int    `json:"jobIteration"`
+	Replica         int    `json:"replica"`
+	Metadata        any    `json:"metadata,omitempty"`
 }
 
 type pvcLatency struct {
@@ -95,13 +101,19 @@ func (plmf pvcLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 
 // creates pvc metric
 func (p *pvcLatency) handleCreatePVC(obj any) {
-	pvc, err := util.ConvertAnyToTyped[corev1.PersistentVolumeClaim](obj)
-	if err != nil {
-		log.Errorf("failed to convert to PersistentVolumeClaim: %v", err)
-		return
+	var err error
+	// Verify that object type is pvc
+	pvc, ok := obj.(*corev1.PersistentVolumeClaim)
+	if !ok {
+		pvc, err = util.ConvertAnyToTyped[corev1.PersistentVolumeClaim](obj)
+		if err != nil {
+			log.Errorf("failed to convert to PersistentVolumeClaim: %v", err)
+			return
+		}
 	}
 	log.Tracef("handleCreatePVC: %s", pvc.Name)
 	pvcLabels := pvc.GetLabels()
+
 	p.Metrics.LoadOrStore(string(pvc.UID), pvcMetric{
 		Timestamp:    time.Now().UTC(),
 		Namespace:    pvc.Namespace,
@@ -125,44 +137,81 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 		return
 	}
 	log.Tracef("handleUpdatePVC: %s", pvc.Name)
-	if value, exists := p.Metrics.Load(string(pvc.UID)); exists {
-		pm := value.(pvcMetric)
-		log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
-		if pm.bound == 0 || pm.lost == 0 {
-			if pvc.Status.Phase == corev1.ClaimPending {
-				if pm.pending == 0 {
-					log.Debugf("PVC %s is pending", pvc.Name)
-					pm.pending = time.Now().UTC().UnixMilli()
-				}
+	value, exists := p.Metrics.Load(string(pvc.UID))
+	if !exists {
+		return
+	}
+	pm := value.(pvcMetric)
+
+	log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
+	now := time.Now().UTC().UnixMilli()
+
+	// 1. Compute requested size first - needed to guard phase tracking
+	requestedSize := pvc.Spec.Resources.Requests.Storage().String()
+
+	// 2. Phase Tracking (capture timestamps of first entry into each state)
+	// Guard with requestedSize == pm.Size: if size changed, this is a resize update,
+	// not a binding event. We must NOT set pm.bound here or we get phantom latency.
+	if requestedSize == pm.Size && (pm.bound == 0 || pm.lost == 0) {
+		switch pvc.Status.Phase {
+		case corev1.ClaimPending:
+			if pm.pending == 0 {
+				pm.pending = now
+				log.Debugf("PVC %s is pending", pvc.Name)
 			}
-			if pvc.Status.Phase == corev1.ClaimBound {
-				if pm.bound == 0 {
-					log.Debugf("PVC %s is bound", pvc.Name)
-					pm.bound = time.Now().UTC().UnixMilli()
-				}
+		case corev1.ClaimBound:
+			if pm.bound == 0 {
+				pm.bound = now
+				log.Debugf("PVC %s is bound", pvc.Name)
 			}
-			if pvc.Status.Phase == corev1.ClaimLost {
-				if pm.lost == 0 {
-					log.Debugf("PVC %s is lost", pvc.Name)
-					pm.lost = time.Now().UTC().UnixMilli()
-				}
+		case corev1.ClaimLost:
+			if pm.lost == 0 {
+				pm.lost = now
+				log.Debugf("PVC %s is lost", pvc.Name)
 			}
-			p.Metrics.Store(string(pvc.UID), pm)
-		} else {
-			log.Tracef("Skipping update for phase [%s] as PVC is already bound or lost", pvc.Status.Phase)
+		}
+	} else {
+		log.Tracef("Skipping phase tracking for PVC %s (phase=%s, sizeChanged=%v)", pvc.Name, pvc.Status.Phase, requestedSize != pm.Size)
+	}
+
+	// Detect resize start by spec change (works for all provisioners)
+	if requestedSize != pm.Size && pm.resizeStarted == 0 {
+		pm.resizeStarted = now
+		log.Debugf("PVC %s resize started: %s -> %s", pvc.Name, pm.Size, requestedSize)
+	}
+
+	// Check if resize completed by comparing capacity
+	if pm.resizeStarted > 0 && pm.ResizeLatency == 0 {
+		currentCapacity := pvc.Status.Capacity.Storage().String()
+		// If capacity matches requested, it's done
+		if currentCapacity == requestedSize {
+			pm.ResizeLatency = int(now - pm.resizeStarted)
+			pm.ResizedCapacity = currentCapacity
+			log.Debugf("PVC %s resize completed (capacity update): %s -> %s in %dms",
+				pvc.Name, pm.Size, currentCapacity, pm.ResizeLatency)
 		}
 	}
+
+	p.Metrics.Store(string(pvc.UID), pm)
 }
 
 // start pvcLatency measurement
 func (p *pvcLatency) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	if p.JobConfig.JobType == config.ReadJob || p.JobConfig.JobType == config.PatchJob || p.JobConfig.JobType == config.DeletionJob {
-		log.Fatalf("Unsupported jobType:%s for pvcLatency metric", p.JobConfig.JobType)
-	}
 	gvr, err := util.ResourceToGVR(p.RestConfig, "PersistentVolumeClaim", "v1")
 	if err != nil {
 		return fmt.Errorf("error getting GVR for %s: %w", "PersistentVolumeClaim", err)
+	}
+	pvcs, err := p.ClientSet.CoreV1().PersistentVolumeClaims("").List(
+		context.TODO(),
+		metav1.ListOptions{},
+	)
+	if err != nil {
+		log.Errorf("Error listing PVCs for preload: %v", err)
+	} else {
+		for i := range pvcs.Items {
+			p.handleCreatePVC(&pvcs.Items[i])
+		}
 	}
 	p.startMeasurement(
 		[]MeasurementWatcher{
@@ -209,8 +258,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 
 	p.Metrics.Range(func(key, value any) bool {
 		m := value.(pvcMetric)
-		// If a pvc does not reach the stable state, we skip that one
-		if m.bound == 0 && m.lost == 0 {
+		if m.resizeStarted == 0 && m.bound == 0 && m.lost == 0 {
 			log.Tracef("PVC %v latency ignored as it did not reach a stable state", m.Name)
 			return true
 		}
@@ -223,18 +271,26 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 			}
 			m.PendingLatency = 0
 		}
-
-		m.BindingLatency = int(m.bound - m.Timestamp.UnixMilli())
-		if m.BindingLatency < 0 {
-			log.Tracef("BindingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.BindingLatency = 0
+		if m.bound > 0 {
+			m.BindingLatency = int(m.bound - m.Timestamp.UnixMilli())
+			if m.BindingLatency < 0 {
+				log.Tracef("BindingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.BindingLatency = 0
+			}
+		}
+		if m.lost > 0 {
+			m.LostLatency = int(m.lost - m.Timestamp.UnixMilli())
+			if m.LostLatency < 0 {
+				log.Tracef("LostLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+				m.LostLatency = 0
+			}
 		}
 
-		m.LostLatency = int(m.lost - m.Timestamp.UnixMilli())
-		if m.LostLatency < 0 {
-			log.Tracef("LostLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
-			m.LostLatency = 0
+		// ResizeLatency is already calculated in handleUpdatePVC, just validate
+		if m.ResizeLatency < 0 {
+			log.Tracef("ResizeLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+			m.ResizeLatency = 0
 		}
 
 		totalPVCs++
@@ -254,6 +310,7 @@ func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
 		string(corev1.ClaimPending): float64(pvcMetric.PendingLatency),
 		string(corev1.ClaimBound):   float64(pvcMetric.BindingLatency),
 		string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
+		"Resize":                    float64(pvcMetric.ResizeLatency),
 	}
 }
 
@@ -264,7 +321,8 @@ func (p *pvcLatency) IsCompatible() bool {
 
 // pvcTransformFunc preserves the following fields for latency measurements:
 // - metadata: name, namespace, uid, creationTimestamp, labels
-// - status: phase, conditions
+// - spec: resources, storageClassName
+// - status: phase, conditions, capacity
 func pvcTransformFunc() cache.TransformFunc {
 	return func(obj interface{}) (interface{}, error) {
 		u, ok := obj.(*unstructured.Unstructured)
@@ -274,17 +332,23 @@ func pvcTransformFunc() cache.TransformFunc {
 
 		minimal := createMinimalUnstructured(u, defaultMetadataTransformOpts())
 
+		// Preserve spec fields
+		if resources, found, _ := unstructured.NestedMap(u.Object, "spec", "resources"); found {
+			_ = unstructured.SetNestedMap(minimal.Object, resources, "spec", "resources")
+		}
+		if storageClassName, found, _ := unstructured.NestedString(u.Object, "spec", "storageClassName"); found {
+			_ = unstructured.SetNestedField(minimal.Object, storageClassName, "spec", "storageClassName")
+		}
+
+		// Preserve status fields
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
 		}
 		if conditions, found, _ := unstructured.NestedSlice(u.Object, "status", "conditions"); found {
 			_ = unstructured.SetNestedSlice(minimal.Object, conditions, "status", "conditions")
 		}
-		if storageClassName, found, _ := unstructured.NestedString(u.Object, "spec", "storageClassName"); found {
-			_ = unstructured.SetNestedField(minimal.Object, storageClassName, "spec", "storageClassName")
-		}
-		if resources, found, _ := unstructured.NestedMap(u.Object, "spec", "resources"); found {
-			_ = unstructured.SetNestedMap(minimal.Object, resources, "spec", "resources")
+		if capacity, found, _ := unstructured.NestedMap(u.Object, "status", "capacity"); found {
+			_ = unstructured.SetNestedMap(minimal.Object, capacity, "status", "capacity")
 		}
 
 		return minimal, nil
