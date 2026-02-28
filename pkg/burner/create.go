@@ -15,6 +15,8 @@
 package burner
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -43,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/utils/ptr"
 )
 
@@ -77,6 +80,12 @@ func (ex *JobExecutor) setupCreateJob() {
 		}
 		unsList, gvks := yamlToUnstructuredMultiple(o.ObjectTemplate, cleanTemplate)
 
+		// Get raw kinds from original template to detect templated kinds
+		rawKinds, err := getRawKinds(t)
+		if err != nil {
+			log.Fatalf("Error parsing raw template %s: %s", o.ObjectTemplate, err)
+		}
+
 		// Get GVK for this specific object and Process if multi yaml document
 		for i, gvk := range gvks {
 			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
@@ -89,11 +98,21 @@ func (ex *JobExecutor) setupCreateJob() {
 				gvk:           gvk,
 				documentIndex: i,
 			}
+			if i < len(rawKinds) {
+				// Check if the raw kind field contains Go template syntax ({{...}})
+				if strings.Contains(rawKinds[i], "{{") {
+					obj.IsKindTemplated = true
+				}
+			}
+
 			if err == nil {
 				obj.gvr = mapping.Resource
 				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 			} else {
 				obj.gvr = schema.GroupVersionResource{}
+				// For templated kinds that couldn't be resolved at setup time,
+				// assume they might be namespaced. This will be confirmed at runtime.
+				obj.namespaced = ex.isLikelyNamespaced(gvk.Kind)
 			}
 			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
 			if obj.namespaced && obj.namespace == "" {
@@ -140,15 +159,18 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
-			if obj.gvr == (schema.GroupVersionResource{}) {
-				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
-				ex.resolveObjectMapping(obj)
-				if ex.nsRequired {
-					nsName := ex.Namespace
-					if ex.NamespacedIterations {
-						nsName = ex.generateNamespace(i)
+			// If the object is not kind templated, we need to resolve the GVR at runtime
+			if !obj.IsKindTemplated {
+				if obj.gvr == (schema.GroupVersionResource{}) {
+					// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
+					ex.resolveObjectMapping(obj)
+					if ex.nsRequired {
+						nsName := ex.Namespace
+						if ex.NamespacedIterations {
+							nsName = ex.generateNamespace(i)
+						}
+						ns = ex.createNamespace(nsName, nsLabels, nsAnnotations)
 					}
-					ns = ex.createNamespace(nsName, nsLabels, nsAnnotations)
 				}
 			}
 			kbLabels := map[string]string{
@@ -234,12 +256,25 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			// If the mapping fails, the function returns early, preventing a futile create attempt.
 			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
 			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
-			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			// Resolve the REST mapping dynamically using the rendered GVK.
+			// This is needed for templated kinds that couldn't be resolved at setup time.
+			// Reset the mapper to ensure we get fresh discovery data (needed when CRDs are created in earlier iterations)
+			ex.mapper.Reset()
+			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
 
 			if err != nil {
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
 				return
 			}
+
+			// Use the dynamically resolved GVR and namespaced status
+			gvr := mapping.Resource
+			namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
+
+			// Store the resolved GVR for later cleanup and verification
+			// This is essential for templated kinds that produce different GVRs per iteration
+			obj.resolvedGVRs.Store(gvr.String(), gvr)
+
 			// replicaWg is necessary because we want to wait for all replicas
 			// to be created before running any other action such as verify objects,
 			// wait for ready, etc. Without this wait group, running for example,
@@ -248,10 +283,10 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			replicaWg.Add(1)
 			go func(n string) {
 				defer replicaWg.Done()
-				if !obj.namespaced {
+				if !namespaced {
 					n = ""
 				}
-				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, gvr, n, newObject, ex.MaxWaitTimeout)
 			}(ns)
 		}(r)
 	}
@@ -579,4 +614,79 @@ func trimObject(obj *unstructured.Unstructured) {
 	unstructured.RemoveNestedField(obj.Object, "spec", "selector", "matchLabels", "batch.kubernetes.io/controller-uid")
 	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "batch.kubernetes.io/controller-uid")
 	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "controller-uid")
+}
+
+// getRawKinds extracts the kind field values from raw template content.
+// Uses k8s.io/apimachinery/pkg/util/yaml.YAMLReader from client-go to split YAML documents,
+// then extracts kind fields using line scanning to handle Go template syntax safely.
+// Preserves template syntax like {{.Kind}} for detection.
+// Returns an error if any document is missing a kind field.
+func getRawKinds(content []byte) ([]string, error) {
+	var kinds []string
+
+	// Use client-go's YAMLReader to split multi-document YAML
+	reader := kubeyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(content)))
+
+	docIndex := 0
+	for {
+		doc, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+
+		// Skip empty documents
+		if len(bytes.TrimSpace(doc)) == 0 {
+			continue
+		}
+
+		// Extract kind using line scanning to handle Go template syntax safely
+		kind, err := extractKindFromDocument(doc)
+		if err != nil {
+			return nil, fmt.Errorf("document %d: %w", docIndex, err)
+		}
+		kinds = append(kinds, kind)
+		docIndex++
+	}
+
+	return kinds, nil
+}
+
+// extractKindFromDocument extracts the kind field value from a YAML document using line scanning.
+// It looks for top-level "kind:" fields (no indentation) to handle Go template syntax safely.
+// This approach is necessary because templates may contain Go template syntax (e.g., {{.Kind}})
+// that would cause standard YAML parsers to fail.
+// Returns ErrKindNotFound if the document does not contain a kind field.
+func extractKindFromDocument(doc []byte) (string, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(doc))
+	var ErrKindNotFound = fmt.Errorf("kind field not found in YAML document")
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		trimmedLine := bytes.TrimSpace(line)
+
+		// Look for top-level "kind:" field (no leading whitespace)
+		if bytes.HasPrefix(line, []byte("kind:")) ||
+			(bytes.HasPrefix(trimmedLine, []byte("kind:")) &&
+				!bytes.HasPrefix(line, []byte(" ")) &&
+				!bytes.HasPrefix(line, []byte("\t"))) {
+
+			// Extract the value after "kind:"
+			parts := bytes.SplitN(trimmedLine, []byte(":"), 2)
+			if len(parts) == 2 {
+				kindValue := string(bytes.TrimSpace(parts[1]))
+				if kindValue == "" {
+					return "", fmt.Errorf("%w: kind field is empty", ErrKindNotFound)
+				}
+				return kindValue, nil
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error scanning document: %w", err)
+	}
+
+	return "", ErrKindNotFound
 }
