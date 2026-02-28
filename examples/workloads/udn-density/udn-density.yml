@@ -1,4 +1,11 @@
 ---
+{{- /* Default to L3 if not provided. Coerce to boolean from string/bool/env. */ -}}
+{{- $enableL3Str := ((get . "ENABLE_LAYER_3") | default "true") | printf "%v" | lower -}}
+{{- $enableL3 := or (eq $enableL3Str "true") (eq $enableL3Str "1") -}}
+{{- /* Allow switching to ClusterUserDefinedNetwork with CUDN=true/1 */ -}}
+{{- $cudnStr := ((get . "CUDN") | default "false") | printf "%v" | lower -}}
+{{- $isCUDN := or (eq $cudnStr "true") (eq $cudnStr "1") -}}
+{{- $layerSuffix := ternary "l3" "l2" $enableL3 -}}
 global:
   indexerConfig:
     esServers: [http://elastic-elk.apps.rsevilla.kube-burner.com]
@@ -20,10 +27,9 @@ global:
         labelSelector: {app: ovnkube-control-plane}
         url: http://localhost:29108/debug/pprof/profile?seconds=30
 
-
 jobs:
-  - name: udn-density-l3-pods
-    namespace: udn-density-l3-pods
+  - name: udn-density-{{$layerSuffix}}-pods
+    namespace: udn-density-{{$layerSuffix}}-pods
     jobIterations: 72
     qps: 20
     burst: 20
@@ -40,8 +46,7 @@ jobs:
       pod-security.kubernetes.io/warn: privileged
       k8s.ovn.org/primary-user-defined-network: ""
     objects:
-
-      - objectTemplate: udn_l3.yml
+      - objectTemplate: {{ if $isCUDN }}{{ if $enableL3 }}cudn_l3.yml{{ else }}cudn_l2.yml{{ end }}{{ else }}{{ if $enableL3 }}udn_l3.yml{{ else }}udn_l2.yml{{ end }}{{ end }}
         replicas: 1
 
       - objectTemplate: np-deny-all.yml

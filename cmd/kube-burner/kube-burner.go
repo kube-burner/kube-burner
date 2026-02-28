@@ -126,7 +126,8 @@ func initCmd() *cobra.Command {
 				}
 				defer userDataFileReader.Close()
 			}
-			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil, setVars)
+			// Make --set values available to templates during rendering (and still apply them post-render)
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, setVars, setVars)
 			if err != nil {
 				log.Error("Config error")
 				fmt.Printf("%s", err.Error())
