@@ -24,6 +24,7 @@ jobs:
         replicas: 2
         inputVars:
           size: "1Gi"
+          storageClassName: "{{ .STORAGE_CLASS_NAME }}"
       - objectTemplate: objectTemplates/pod.yml
         replicas: 2
         wait: true

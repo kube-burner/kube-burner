@@ -9,12 +9,12 @@ spec:
   - image: gcr.io/google_containers/pause:3.2
     name: pause
     imagePullPolicy: IfNotPresent
-    {{- if .mountPVC }}
+    {{- if (index . "mountPVC") }}
     volumeMounts:
     - mountPath: /data
       name: pvc-volume
     {{- end }}
-  {{- if .mountPVC }}
+  {{- if (index . "mountPVC") }}
   volumes:
   - name: pvc-volume
     persistentVolumeClaim:
