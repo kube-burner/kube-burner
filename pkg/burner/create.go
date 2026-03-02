@@ -490,17 +490,19 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnConfig.Cycles)
 			return
 		}
-		log.Infof("Deleting objects")
+		log.Infof("Deleting objects in churn cycle %d", cyclesCount)
 		for _, obj := range ex.objects {
-			// if churning is enabled in the object
-			if obj.Churn {
+			// if object is namespaced and churning is enabled in the object
+			if obj.Churn && obj.namespaced {
 				labelSelector := obj.LabelSelector
 				// Remove these labels to list all objects
 				delete(labelSelector, config.KubeBurnerLabelJobIteration)
 				delete(labelSelector, config.KubeBurnerLabelReplica)
+				log.Debugf("Listing %s across all namespaces with label selector: %v", obj.Kind, labelSelector)
 				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
 					LabelSelector: labels.FormatLabels(labelSelector),
 				})
+				log.Debugf("Total %s listed: %d, churning %d%%", obj.Kind, len(objectList.Items), ex.ChurnConfig.Percent)
 				if err != nil {
 					log.Errorf("Error listing objects: %v", err)
 					continue
@@ -508,8 +510,8 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
 				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
 				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
+				log.Debugf("Deleting %d %s across", numToChurn, obj.Kind)
 				for _, objToDelete := range objectsToDelete {
-					log.Debugf("Deleting %s/%s", objToDelete.GetKind(), objToDelete.GetName())
 					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
 						PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 					})
