@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
 )
 
@@ -492,16 +493,14 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 		}
 		log.Infof("Deleting objects in churn cycle %d", cyclesCount)
 		for _, obj := range ex.objects {
-			// if object is namespaced and churning is enabled in the object
-			if obj.Churn && obj.namespaced {
+			// if churning is enabled for the object
+			if obj.Churn {
 				labelSelector := obj.LabelSelector
 				// Remove these labels to list all objects
 				delete(labelSelector, config.KubeBurnerLabelJobIteration)
 				delete(labelSelector, config.KubeBurnerLabelReplica)
-				log.Debugf("Listing %s across all namespaces with label selector: %v", obj.Kind, labelSelector)
-				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
-					LabelSelector: labels.FormatLabels(labelSelector),
-				})
+				log.Debugf("Listing %s with label selector: %s", obj.Kind, labels.FormatLabels(labelSelector))
+				objectList, err = ex.dynamicClient.Resource(obj.gvr).List(ctx, metav1.ListOptions{LabelSelector: labels.FormatLabels(labelSelector)})
 				log.Debugf("Total %s listed: %d, churning %d%%", obj.Kind, len(objectList.Items), ex.ChurnConfig.Percent)
 				if err != nil {
 					log.Errorf("Error listing objects: %v", err)
@@ -510,14 +509,20 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
 				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
 				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
-				log.Debugf("Deleting %d %s across", numToChurn, obj.Kind)
+				log.Debugf("Deleting %d %s", numToChurn, obj.Kind)
 				for _, objToDelete := range objectsToDelete {
-					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
+					resource := ex.dynamicClient.Resource(obj.gvr)
+					var dr dynamic.ResourceInterface = resource
+					if obj.namespaced {
+						dr = resource.Namespace(objToDelete.GetNamespace())
+					}
+					err = dr.Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
 						PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 					})
 					if err != nil {
 						log.Errorf("Error deleting object %s/%s: %v", objToDelete.GetKind(), objToDelete.GetName(), err)
 					}
+
 					trimObject(&objToDelete)
 					// Store the deleted objects to re-create them later
 					deletedObjects = append(deletedObjects, churnDeletedObject{
@@ -564,6 +569,7 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 // verifyDelete verifies if the object has been deleted
 func (ex *JobExecutor) verifyDelete(ctx context.Context, deletedObjects []churnDeletedObject) {
 	for _, obj := range deletedObjects {
+		log.Debugf("Verifying deletion of %s", obj.gvr.Resource)
 		wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
 			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(ctx, obj.object.GetName(), metav1.GetOptions{})
 			if kerrors.IsNotFound(err) {
