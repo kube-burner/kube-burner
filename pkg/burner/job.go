@@ -136,6 +136,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn duration: %v", jobExecutor.ChurnConfig.Duration)
 					log.Infof("Churn percent: %v", jobExecutor.ChurnConfig.Percent)
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
+					log.Infof("Churn delete delay: %v", jobExecutor.ChurnConfig.DeleteDelay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
 				if err := jobExecutor.hookManager.executeHooks(jobExecutor.Hooks, config.HookBeforeDeployment); err != nil {

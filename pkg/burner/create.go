@@ -461,6 +461,10 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		// 1 hour timeout to delete namespace
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
+		if ex.ChurnConfig.DeleteDelay > 0 {
+			log.Infof("Sleeping for %v after deletion", ex.ChurnConfig.DeleteDelay)
+			time.Sleep(ex.ChurnConfig.DeleteDelay)
+		}
 		// Re-create objects that were deleted
 		log.Infof("Re-creating %d deleted namespaces", numToChurn)
 		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
@@ -531,6 +535,10 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 			}
 		}
 		ex.verifyDelete(ctx, deletedObjects)
+		if ex.ChurnConfig.DeleteDelay > 0 {
+			log.Infof("Sleeping for %v after deletion", ex.ChurnConfig.DeleteDelay)
+			time.Sleep(ex.ChurnConfig.DeleteDelay)
+		}
 		ex.reCreateDeletedObjects(ctx, deletedObjects)
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 		time.Sleep(ex.ChurnConfig.Delay)
