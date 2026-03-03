@@ -242,6 +242,8 @@ type ChurnConfig struct {
 	Duration time.Duration `yaml:"duration" json:"duration,omitempty"`
 	// Delay between sets
 	Delay time.Duration `yaml:"delay" json:"delay,omitempty"`
+	// Delay after deletion, before recreation
+	DeleteDelay time.Duration `yaml:"deleteDelay" json:"deleteDelay,omitempty"`
 	// Churning mode
 	Mode ChurnMode `yaml:"mode" json:"mode,omitempty"`
 }
