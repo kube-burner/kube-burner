@@ -96,7 +96,9 @@ func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.In
 	if err := waitForImagePull(preloadCtx, clientSet, desired, len(imageList)); err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
-	util.CleanupNamespacesByLabel(preloadCtx, clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", preLoadNs))
+	if err := util.CleanupNamespacesByLabel(preloadCtx, clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", preLoadNs)); err != nil {
+		return fmt.Errorf("pre-load: %v", err)
+	}
 	return nil
 }
 
