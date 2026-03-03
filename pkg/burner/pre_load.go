@@ -22,8 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"maps"
-
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -90,7 +88,7 @@ func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.In
 	}
 	preloadCtx, preloadCancel := context.WithTimeout(ctx, job.PreLoadPeriod)
 	defer preloadCancel()
-	desired, err := createDSs(preloadCtx, clientSet, imageList, job.NamespaceLabels, job.NamespaceAnnotations, job.PreLoadNodeLabels)
+	desired, err := createDSs(preloadCtx, clientSet, imageList, job.PreLoadNodeLabels)
 	if err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
@@ -98,7 +96,9 @@ func preLoadImages(ctx context.Context, job JobExecutor, clientSet kubernetes.In
 	if err := waitForImagePull(preloadCtx, clientSet, desired, len(imageList)); err != nil {
 		return fmt.Errorf("pre-load: %v", err)
 	}
-	util.CleanupNamespacesByLabel(preloadCtx, clientSet, fmt.Sprintf("%s=true", preLoadNs))
+	if err := util.CleanupNamespacesByLabel(preloadCtx, clientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", preLoadNs)); err != nil {
+		return fmt.Errorf("pre-load: %v", err)
+	}
 	return nil
 }
 
@@ -215,14 +215,8 @@ func extractImagesFromObject(uns *unstructured.Unstructured, renderedObj []byte)
 	return imageList
 }
 
-func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []string, namespaceLabels map[string]string, namespaceAnnotations map[string]string, nodeSelectorLabels map[string]string) (int, error) {
-	nsLabels := map[string]string{
-		preLoadNs: "true",
-	}
-	nsAnnotations := make(map[string]string)
-	maps.Copy(nsLabels, namespaceLabels)
-	maps.Copy(nsAnnotations, namespaceAnnotations)
-	if err := util.CreateNamespace(clientSet, preLoadNs, nsLabels, nsAnnotations); err != nil {
+func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []string, nodeSelectorLabels map[string]string) (int, error) {
+	if err := util.CreateNamespace(clientSet, preLoadNs, nil, nil); err != nil {
 		return 0, fmt.Errorf("creating namespace: %v", err)
 	}
 	dsName := "preload"
