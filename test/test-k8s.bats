@@ -285,3 +285,9 @@ teardown_file() {
   check_file_exists ${METRICS_FOLDER}/pprof/*.pprof
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
 }
+
+
+@test "cluster-density-v2 timeout check" {
+  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --timeout=2s
+  [ "$status" -eq 2 ]
+}
