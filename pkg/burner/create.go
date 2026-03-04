@@ -501,11 +501,11 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				delete(labelSelector, config.KubeBurnerLabelReplica)
 				log.Debugf("Listing %s with label selector: %s", obj.Kind, labels.FormatLabels(labelSelector))
 				objectList, err = ex.dynamicClient.Resource(obj.gvr).List(ctx, metav1.ListOptions{LabelSelector: labels.FormatLabels(labelSelector)})
-				log.Debugf("Total %s listed: %d, churning %d%%", obj.Kind, len(objectList.Items), ex.ChurnConfig.Percent)
 				if err != nil {
 					log.Errorf("Error listing objects: %v", err)
 					continue
 				}
+				log.Debugf("Total %s listed: %d, churning %d%%", obj.Kind, len(objectList.Items), ex.ChurnConfig.Percent)
 				numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
 				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
 				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
@@ -571,7 +571,11 @@ func (ex *JobExecutor) verifyDelete(ctx context.Context, deletedObjects []churnD
 	for _, obj := range deletedObjects {
 		log.Debugf("Verifying deletion of %s", obj.gvr.Resource)
 		wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
-			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(ctx, obj.object.GetName(), metav1.GetOptions{})
+			if obj.object.GetNamespace() != "" {
+				_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(ctx, obj.object.GetName(), metav1.GetOptions{})
+			} else {
+				_, err = ex.dynamicClient.Resource(obj.gvr).Get(ctx, obj.object.GetName(), metav1.GetOptions{})
+			}
 			if kerrors.IsNotFound(err) {
 				return true, nil
 			}

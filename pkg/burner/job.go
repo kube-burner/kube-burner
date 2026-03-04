@@ -473,7 +473,7 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
-	// We first delete the non-namespaced resources
+	// We first delete the non-namespaced resources and resources with predefined namespace
 	for _, obj := range ex.objects {
 		ex.limiter.Wait(ctx)
 		if !obj.namespaced {
