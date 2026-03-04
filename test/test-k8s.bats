@@ -287,7 +287,7 @@ teardown_file() {
 }
 
 
-@test "cluster-density-v2 timeout check" {
-  run_cmd ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --timeout=2s
+@test "rc timeout check" {
+  run ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --timeout=2s
   [ "$status" -eq 2 ]
 }
