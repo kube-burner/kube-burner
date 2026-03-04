@@ -40,13 +40,13 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 
 	// Build cluster clients once if we have a live cluster connection.
 	var mapper apimeta.RESTMapper
-	var clientset kubernetes.Interface
+	var clientSet kubernetes.Interface
 	if restCfg != nil {
 		mapper = newRESTMapper(restCfg)
 		if cs, err := kubernetes.NewForConfig(restCfg); err == nil {
-			clientset = cs
+			clientSet = cs
 		} else {
-			log.Debugf("Could not create clientset for RBAC check: %v", err)
+			log.Debugf("Could not create clientSet for RBAC check: %v", err)
 		}
 	}
 
@@ -69,7 +69,7 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 			}
 
 			// Render with sample data to catch Go-template errors
-			sampleData := map[string]any{
+			templateData := map[string]any{
 				jobName:      job.Name,
 				jobIteration: 0,
 				jobUUID:      configSpec.GlobalConfig.UUID,
@@ -79,7 +79,7 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 			// Merge in any per-object InputVars so user-defined template variables
 			// are also present during validation.
 			for k, v := range o.InputVars {
-				sampleData[k] = v
+				templateData[k] = v
 			}
 
 			templateOption := util.MissingKeyError
@@ -87,7 +87,7 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 				templateOption = util.MissingKeyZero
 			}
 
-			rendered, err := util.RenderTemplate(raw, sampleData, templateOption, functionTemplates)
+			rendered, err := util.RenderTemplate(raw, templateData, templateOption, functionTemplates)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("job %s, template %s: %w", job.Name, o.ObjectTemplate, err))
 				continue
@@ -111,10 +111,10 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 		}
 	}
 
-	if clientset != nil {
+	if clientSet != nil {
 		for _, measurement := range configSpec.GlobalConfig.Measurements {
 			if measurement.NodeAffinity != nil {
-				if err := checkDaemonSetCreateAccess(clientset, types.PprofNamespace); err != nil {
+				if err := checkDaemonSetCreateAccess(clientSet, types.PprofNamespace); err != nil {
 					errs = append(errs, fmt.Errorf("measurement %s RBAC check failed: %w", measurement.Name, err))
 				}
 			}
@@ -154,7 +154,7 @@ func validateGVK(mapper apimeta.RESTMapper, obj *unstructured.Unstructured, jobN
 // checkDaemonSetCreateAccess uses SelfSubjectAccessReview to verify that the
 // current service account / user has permission to create DaemonSets in the
 // given namespace.
-func checkDaemonSetCreateAccess(clientset kubernetes.Interface, namespace string) error {
+func checkDaemonSetCreateAccess(clientSet kubernetes.Interface, namespace string) error {
 	ssar := &authv1.SelfSubjectAccessReview{
 		Spec: authv1.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authv1.ResourceAttributes{
@@ -166,7 +166,7 @@ func checkDaemonSetCreateAccess(clientset kubernetes.Interface, namespace string
 		},
 	}
 
-	response, err := clientset.AuthorizationV1().
+	response, err := clientSet.AuthorizationV1().
 		SelfSubjectAccessReviews().
 		Create(context.Background(), ssar, metav1.CreateOptions{})
 	if err != nil {

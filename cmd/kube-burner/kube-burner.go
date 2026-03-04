@@ -159,7 +159,7 @@ func initCmd() *cobra.Command {
 					}
 					rc = 1
 				} else {
-					log.Info("✅ Dry-run validation passed , no errors found.")
+					log.Info("✅ Dry-run validation passed, no errors found.")
 				}
 				return
 			}
