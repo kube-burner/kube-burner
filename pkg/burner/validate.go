@@ -18,7 +18,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/itchyny/gojq"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
@@ -52,6 +54,9 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 
 	for _, job := range configSpec.Jobs {
 		log.Infof("🔍 Validating job: %s", job.Name)
+
+		// Job-level configuration checks
+		validateJobConfig(job, configSpec.GlobalConfig.Timeout, &errs)
 
 		for _, o := range job.Objects {
 			log.Debugf("  Checking template: %s", o.ObjectTemplate)
@@ -103,18 +108,23 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 
 			for _, obj := range objs {
 				validateUnstructured(obj, job.Name, o.ObjectTemplate, &errs)
-				// Validate GVK against the live cluster when connected.
 				if mapper != nil {
+					// Validate GVK against the live cluster.
 					validateGVK(mapper, obj, job.Name, o.ObjectTemplate, &errs)
+					// RBAC check for the verb implied by the job type.
+					if clientSet != nil {
+						validateRBAC(clientSet, mapper, obj, job, o.ObjectTemplate, &errs)
+					}
 				}
 			}
 		}
 	}
 
+	// Measurement-specific RBAC checks.
 	if clientSet != nil {
 		for _, measurement := range configSpec.GlobalConfig.Measurements {
 			if measurement.NodeAffinity != nil {
-				if err := checkDaemonSetCreateAccess(clientSet, types.PprofNamespace); err != nil {
+				if err := checkResourceAccess(clientSet, "apps", "daemonsets", "create", types.PprofNamespace); err != nil {
 					errs = append(errs, fmt.Errorf("measurement %s RBAC check failed: %w", measurement.Name, err))
 				}
 			}
@@ -122,6 +132,63 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 	}
 
 	return errs
+}
+
+// validateJobConfig checks job configuration for common issues that would
+// only surface at runtime (execution mode, QPS/burst, churn settings).
+func validateJobConfig(job config.Job, defaultTimeout time.Duration, errs *[]error) {
+	// Execution mode
+	if job.ExecutionMode != "" &&
+		job.ExecutionMode != config.ExecutionModeParallel &&
+		job.ExecutionMode != config.ExecutionModeSequential {
+		*errs = append(*errs, fmt.Errorf("job %s: unsupported executionMode %q (must be %q or %q)",
+			job.Name, job.ExecutionMode, config.ExecutionModeParallel, config.ExecutionModeSequential))
+	}
+
+	// QPS/Burst validation
+	verifyJobDefaults(&job, defaultTimeout)
+
+	// Job type validation
+	verifyJobType(&job, errs)
+
+	// Churn config sanity
+	if config.IsChurnEnabled(job) {
+		if job.ChurnConfig.Percent < 0 || job.ChurnConfig.Percent > 100 {
+			*errs = append(*errs, fmt.Errorf("job %s: churn percent %d is out of range (0-100)",
+				job.Name, job.ChurnConfig.Percent))
+		}
+		if job.JobType != config.CreationJob {
+			*errs = append(*errs, fmt.Errorf("job %s: churn is only supported for %q jobs, got %q",
+				job.Name, config.CreationJob, job.JobType))
+		}
+	}
+
+	// Wait condition field path validation
+	for _, o := range job.Objects {
+		for _, sp := range o.WaitOptions.CustomStatusPaths {
+			if _, err := gojq.Parse(sp.Key); err != nil {
+				*errs = append(*errs, fmt.Errorf("job %s, template %s: invalid jq path %q in customStatusPaths: %w",
+					job.Name, o.ObjectTemplate, sp.Key, err))
+			}
+		}
+	}
+}
+
+func verifyJobType(job *config.Job, errs *[]error) {
+	jobTypes := []config.JobType{
+		config.CreationJob,
+		config.DeletionJob,
+		config.PatchJob,
+		config.ReadJob,
+		config.KubeVirtJob,
+	}
+	for _, jobType := range jobTypes {
+		if job.JobType == jobType {
+			return
+		}
+	}
+	*errs = append(*errs, fmt.Errorf("job %s: unsupported jobType %q (must be %q, %q, %q, %q, or %q)",
+		job.Name, job.JobType, config.CreationJob, config.DeletionJob, config.PatchJob, config.ReadJob, config.KubeVirtJob))
 }
 
 // validateUnstructured checks that mandatory top-level fields are present.
@@ -151,17 +218,59 @@ func validateGVK(mapper apimeta.RESTMapper, obj *unstructured.Unstructured, jobN
 	}
 }
 
-// checkDaemonSetCreateAccess uses SelfSubjectAccessReview to verify that the
-// current service account / user has permission to create DaemonSets in the
-// given namespace.
-func checkDaemonSetCreateAccess(clientSet kubernetes.Interface, namespace string) error {
+// jobTypeToVerb maps each JobType to the Kubernetes RBAC verb it requires.
+func jobTypeToVerb(jt config.JobType) string {
+	jobTypeSlice := []config.JobType{
+		config.CreationJob,
+		config.DeletionJob,
+		config.PatchJob,
+		config.ReadJob,
+		config.KubeVirtJob,
+	}
+	for _, jobType := range jobTypeSlice {
+		if jt == jobType {
+			return string(jt)
+		}
+	}
+	return ""
+}
+
+// validateRBAC performs a SelfSubjectAccessReview for the verb implied by the
+// job type against the resource discovered from the object's GVK.
+func validateRBAC(clientSet kubernetes.Interface, mapper apimeta.RESTMapper, obj *unstructured.Unstructured, job config.Job, templateFile string, errs *[]error) {
+	gvk := obj.GroupVersionKind()
+	if gvk.Kind == "" || gvk.Version == "" {
+		return
+	}
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		// GVK not found — already reported by validateGVK.
+		return
+	}
+	gvr := mapping.Resource
+	verb := jobTypeToVerb(job.JobType)
+	namespace := job.Namespace
+	if namespace == "" {
+		namespace = "default"
+	}
+	if err := checkResourceAccess(clientSet, gvr.Group, gvr.Resource, verb, namespace); err != nil {
+		*errs = append(*errs, fmt.Errorf("job %s, template %s: RBAC check failed for %s %s/%s: %w",
+			job.Name, templateFile, verb, gvr.Group, gvr.Resource, err))
+	} else {
+		log.Debugf("  ✅ RBAC: %s %s/%s in namespace %s — allowed", verb, gvr.Group, gvr.Resource, namespace)
+	}
+}
+
+// checkResourceAccess uses SelfSubjectAccessReview to verify that the current
+// user / service account has the given verb on the specified resource.
+func checkResourceAccess(clientSet kubernetes.Interface, group, resource, verb, namespace string) error {
 	ssar := &authv1.SelfSubjectAccessReview{
 		Spec: authv1.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authv1.ResourceAttributes{
 				Namespace: namespace,
-				Verb:      "create",
-				Group:     "apps",
-				Resource:  "daemonsets",
+				Verb:      verb,
+				Group:     group,
+				Resource:  resource,
 			},
 		},
 	}
@@ -174,10 +283,8 @@ func checkDaemonSetCreateAccess(clientSet kubernetes.Interface, namespace string
 	}
 
 	if !response.Status.Allowed {
-		return fmt.Errorf("RBAC denied: cannot create daemonsets in namespace %s (reason: %s)",
-			namespace, response.Status.Reason)
+		return fmt.Errorf("RBAC denied: cannot %s %s/%s in namespace %s (reason: %s)",
+			verb, group, resource, namespace, response.Status.Reason)
 	}
-
-	log.Infof("✅ RBAC check passed: daemonset creation allowed in namespace %s", namespace)
 	return nil
 }
