@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/itchyny/gojq"
@@ -30,12 +31,13 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"kubevirt.io/client-go/kubecli"
 )
 
-// Validate performs a dry-run validation of the workload. It checks every job's
-// object templates for template rendering errors and structural problems.
+// Validate performs a dry-run validation of the workload.
 func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, restCfg *rest.Config) []error {
 	var errs []error
 	functionTemplates := configSpec.GlobalConfig.FunctionTemplates
@@ -56,7 +58,7 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 		log.Infof("🔍 Validating job: %s", job.Name)
 
 		// Job-level configuration checks
-		validateJobConfig(job, configSpec.GlobalConfig.Timeout, &errs)
+		validateJobConfig(job, configSpec.GlobalConfig.Timeout, restCfg, &errs)
 
 		for _, o := range job.Objects {
 			log.Debugf("  Checking template: %s", o.ObjectTemplate)
@@ -134,9 +136,9 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 	return errs
 }
 
-// validateJobConfig checks job configuration for common issues that would
-// only surface at runtime (execution mode, QPS/burst, churn settings).
-func validateJobConfig(job config.Job, defaultTimeout time.Duration, errs *[]error) {
+// validateJobConfig checks job configuration to ensure it is well-formed and supported by the burner, including execution mode, job type, QPS/Burst settings, and churn configuration.
+// It also performs KubeVirt-specific checks for KubeVirt jobs.
+func validateJobConfig(job config.Job, defaultTimeout time.Duration, restCfg *rest.Config, errs *[]error) {
 	// Execution mode
 	if job.ExecutionMode != "" &&
 		job.ExecutionMode != config.ExecutionModeParallel &&
@@ -172,8 +174,55 @@ func validateJobConfig(job config.Job, defaultTimeout time.Duration, errs *[]err
 			}
 		}
 	}
+
+	// Patch job checks
+	if job.JobType == config.PatchJob {
+		for _, o := range job.Objects {
+			if len(o.PatchType) == 0 {
+				*errs = append(*errs, fmt.Errorf("job %s, template %s: empty patchType not allowed for patch jobs",
+					job.Name, o.ObjectTemplate))
+			} else if o.PatchType == string(apitypes.ApplyPatchType) && strings.HasSuffix(o.ObjectTemplate, "json") {
+				*errs = append(*errs, fmt.Errorf("job %s, template %s: apply patch type requires YAML, not JSON",
+					job.Name, o.ObjectTemplate))
+			}
+		}
+	}
+
+	// Delete/Patch jobs require labelSelector on each object
+	if job.JobType == config.DeletionJob || job.JobType == config.PatchJob {
+		for _, o := range job.Objects {
+			if len(o.LabelSelector) == 0 {
+				*errs = append(*errs, fmt.Errorf("job %s, object kind %q: empty labelSelector not allowed for %s jobs",
+					job.Name, o.Kind, job.JobType))
+			}
+		}
+	}
+
+	// KubeVirt job checks
+	if job.JobType == config.KubeVirtJob {
+		validateKubeVirtJob(&job, restCfg, errs)
+	}
 }
 
+// validateKubeVirtJob checks KubeVirt job configuration
+func validateKubeVirtJob(job *config.Job, restCfg *rest.Config, errs *[]error) {
+	// Only check kubevirt client connectivity when a cluster is reachable.
+	if restCfg != nil {
+		if _, err := kubecli.GetKubevirtClientFromRESTConfig(restCfg); err != nil {
+			*errs = append(*errs, fmt.Errorf("job %s: failed to get kubevirt client: %w", job.Name, err))
+		}
+	}
+
+	for _, o := range job.Objects {
+		if len(o.KubeVirtOp) == 0 {
+			*errs = append(*errs, fmt.Errorf("job %s: empty kubeVirtOp not allowed", job.Name))
+		} else if _, ok := supportedOps[o.KubeVirtOp]; !ok {
+			*errs = append(*errs, fmt.Errorf("job %s: unsupported kubeVirtOp %q", job.Name, o.KubeVirtOp))
+		}
+	}
+}
+
+// verifyJobType checks job type configuration
 func verifyJobType(job *config.Job, errs *[]error) {
 	jobTypes := []config.JobType{
 		config.CreationJob,
@@ -235,8 +284,7 @@ func jobTypeToVerb(jt config.JobType) string {
 	return ""
 }
 
-// validateRBAC performs a SelfSubjectAccessReview for the verb implied by the
-// job type against the resource discovered from the object's GVK.
+// validateRBAC performs a SelfSubjectAccessReview for the verb implied by the job type against the resource discovered from the object's GVK.
 func validateRBAC(clientSet kubernetes.Interface, mapper apimeta.RESTMapper, obj *unstructured.Unstructured, job config.Job, templateFile string, errs *[]error) {
 	gvk := obj.GroupVersionKind()
 	if gvk.Kind == "" || gvk.Version == "" {
@@ -261,8 +309,7 @@ func validateRBAC(clientSet kubernetes.Interface, mapper apimeta.RESTMapper, obj
 	}
 }
 
-// checkResourceAccess uses SelfSubjectAccessReview to verify that the current
-// user / service account has the given verb on the specified resource.
+// checkResourceAccess uses SelfSubjectAccessReview to verify that the current user / service account has the given verb on the specified resource.
 func checkResourceAccess(clientSet kubernetes.Interface, group, resource, verb, namespace string) error {
 	ssar := &authv1.SelfSubjectAccessReview{
 		Spec: authv1.SelfSubjectAccessReviewSpec{
