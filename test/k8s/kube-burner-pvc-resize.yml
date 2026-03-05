@@ -25,11 +25,9 @@ jobs:
         inputVars:
           size: "1Gi"
           storageClassName: "{{ .STORAGE_CLASS_NAME }}"
-      - objectTemplate: objectTemplates/pod.yml
+      - objectTemplate: objectTemplates/pvc-pod.yml
         replicas: 2
         wait: true
-        inputVars:
-          mountPVC: true
 
   - name: pvc-patch
     jobType: patch

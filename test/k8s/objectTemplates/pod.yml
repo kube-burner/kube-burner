@@ -3,20 +3,10 @@ apiVersion: v1
 metadata:
   labels:
     app: pause
-  name: pod-{{.JobName}}-{{.Iteration}}-{{.Replica}}
+  name: {{ .JobName }}-{{.Iteration}}-{{.Replica}}
+  namespace: default
 spec:
   containers:
   - image: gcr.io/google_containers/pause:3.2
     name: pause
     imagePullPolicy: IfNotPresent
-    {{- if (index . "mountPVC") }}
-    volumeMounts:
-    - mountPath: /data
-      name: pvc-volume
-    {{- end }}
-  {{- if (index . "mountPVC") }}
-  volumes:
-  - name: pvc-volume
-    persistentVolumeClaim:
-      claimName: {{ .JobName }}-{{ .Iteration }}-{{ .Replica }}
-  {{- end }}

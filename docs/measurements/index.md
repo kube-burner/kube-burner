@@ -422,7 +422,7 @@ One document, such as the following, is indexed per each pvc created by the work
   "pendingLatency": 37,
   "bindingLatency": 4444,
   "lostLatency": 0,
-  "resizeLatency": 0,
+  "resizeLatency": 1234,
   "resizedCapacity": "2Gi",
   "uuid": "1f16ffd1-ac65-47c4-970f-a71d5f309cf5",
   "pvcName": "deployment-pvc-move-1",
@@ -432,8 +432,7 @@ One document, such as the following, is indexed per each pvc created by the work
   "size": "1Gi",
   "storageClass": "gp3-csi",
   "jobIteration": 0,
-  "replica": 1,
-  "metadata": null
+  "replica": 1
 }
 ```
 
@@ -480,10 +479,10 @@ PVC latency quantile sample:
     "avg": 37,
     "timestamp": "2025-01-10T02:51:04.611062824Z",
     "metricName": "pvcLatencyQuantilesMeasurement",
-    "jobName": "pvc-move",
+    "jobName": "pvc-move"
   },
   {
-    "quantileName": "Resized",
+    "quantileName": "Resize",
     "uuid": "1f16ffd1-ac65-47c4-970f-a71d5f309cf5",
     "P99": 0,
     "P95": 0,
@@ -503,7 +502,7 @@ Where `quantileName` matches with the pvc phases and can be:
 - `Pending`: Indicates that PVC is not yet bound.
 - `Bound`: Indicates that PVC is bound.
 - `Lost`: Indicates that the PVC has lost their underlying PersistentVolume.
-- `Resized`: Indicates that the PVC has been resized.
+- `Resize`: Indicates that the PVC has been resized.
 
 !!! info
     More information about the PVC phases can be found at the [kubernetes api documentation](https://pkg.go.dev/k8s.io/api/core/v1#PersistentVolumeClaimPhase).

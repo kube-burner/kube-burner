@@ -145,7 +145,7 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 
 	log.Tracef("handleUpdatePVC: PVC: [%s], Version: [%s], Phase: [%s]", pvc.Name, pvc.ResourceVersion, pvc.Status.Phase)
 	now := time.Now().UTC().UnixMilli()
-    // 1. Compute requested size first - needed to guard phase tracking
+	// 1. Compute requested size first - needed to guard phase tracking
 	requestedSize := pvc.Spec.Resources.Requests.Storage().String()
 
 	// 2. Phase Tracking (capture timestamps of first entry into each state)
