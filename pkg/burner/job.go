@@ -76,6 +76,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var executedJobs []prometheus.Job
 	var jobExecutors []JobExecutor
 	var msWg, gcWg sync.WaitGroup
+	var measurementsInstance *measurements.Measurements
+	var measurementsJobName string
 	errs := []error{}
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
@@ -89,12 +91,17 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
-		handlePreloadImages(ctx, jobExecutors, kubeClientProvider)
+		if err := handlePreloadImages(ctx, jobExecutors, kubeClientProvider); err != nil {
+			log.Error(err.Error())
+			return
+		}
+
 		// Iterate job list
 		var measurementsInstance *measurements.Measurements
 		var measurementsJobName string
 		for _, jobExecutor := range jobExecutors {
 			jobIdx := len(executedJobs) // Track the index where we're appending
+			startJobIdx := jobIdx       // Will work for both incremental and normal jobs
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
@@ -128,6 +135,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn duration: %v", jobExecutor.ChurnConfig.Duration)
 					log.Infof("Churn percent: %v", jobExecutor.ChurnConfig.Percent)
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
+					log.Infof("Churn delete delay: %v", jobExecutor.ChurnConfig.DeleteDelay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
 				if jobCreateErrs, stepJobs := runCreateOrIncremental(ctx, jobExecutor, measurementsFactory, kubeClientProvider, embedCfg, measurementsJobName, metricsScraper, configSpec); jobCreateErrs != nil {
@@ -199,7 +207,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if !globalConfig.WaitWhenFinished {
-				elapsedTime := jobEnd.Sub(executedJobs[jobIdx].Start).Round(time.Second)
+				elapsedTime := jobEnd.Sub(executedJobs[startJobIdx].Start).Round(time.Second)
 				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
 			}
 			if !jobExecutor.MetricsAggregate {
@@ -283,9 +291,19 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	case <-time.After(configSpec.GlobalConfig.Timeout):
 		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
 		log.Error(err.Error())
-		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		if len(executedJobs) > 0 {
+			executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		}
 		errs = append(errs, err)
 		rc = rcTimeout
+		if measurementsInstance != nil {
+			if err := measurementsInstance.Stop(); err != nil {
+				errs = append(errs, err)
+			}
+			if len(metricsScraper.IndexerList) > 0 {
+				measurementsInstance.Index(measurementsJobName, metricsScraper.IndexerList)
+			}
+		}
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	if globalConfig.GC {
@@ -317,15 +335,16 @@ func runCreateOrIncremental(ctx context.Context, jobExecutor JobExecutor, measur
 }
 
 // If requests, preload the images used in the test into the node
-func handlePreloadImages(ctx context.Context, executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
+func handlePreloadImages(ctx context.Context, executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) error {
 	clientSet, _ := kubeClientProvider.DefaultClientSet()
 	for _, executor := range executorList {
 		if executor.PreLoadImages && executor.JobType == config.CreationJob {
 			if err := preLoadImages(ctx, executor, clientSet); err != nil {
-				log.Fatal(err.Error())
+				return err
 			}
 		}
 	}
+	return nil
 }
 
 // indexMetrics indexes metrics for the executed jobs
@@ -343,7 +362,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 			if elapsedTime > 0 {
 				achievedQps = math.Round((float64(job.ObjectOperations)/elapsedTime)*1000) / 1000
 			}
-			if job.JobConfig.IncrementalLoad != nil && job.ParentUUID == "" {
+			if job.JobConfig.IncrementalLoad != nil && job.IncrementalLoadUUID == "" {
 				achievedQps = 0
 			}
 			jsUUID := uuid
@@ -352,7 +371,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 			}
 			jobSummaries = append(jobSummaries, JobSummary{
 				UUID:                jsUUID,
-				ParentUUID:          job.ParentUUID,
+				IncrementalLoadUUID: job.IncrementalLoadUUID,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,
 				ElapsedTime:         elapsedTime,
@@ -361,7 +380,6 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				ChurnEndTimestamp:   job.ChurnEnd,
 				JobConfig:           job.JobConfig,
 				Metadata:            metricsScraper.SummaryMetadata,
-				IncrementalRun:      job.JobConfig.IncrementalLoad != nil,
 				Passed:              innerRC,
 				ExecutionErrors:     executionErrors,
 				Version:             fmt.Sprintf("%v@%v", version.Version, version.GitCommit),
@@ -372,7 +390,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 	for _, indexer := range metricsScraper.IndexerList {
 		IndexJobSummary(jobSummaries, indexer)
 	}
-	// Only scrape prometheus metrics for jobs without parentUUID (skip step-level jobs)
+	// Scrape prometheus metrics for all executed jobs
 	for _, prometheusClient := range metricsScraper.PrometheusClients {
 		prometheusClient.ScrapeJobsMetrics(executedJobs...)
 	}

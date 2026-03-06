@@ -20,7 +20,8 @@ global:
   - name: jobLatency
 metricsEndpoints:
 {{ if .ES_INDEXING }}
-  - endpoint: http://localhost:9090
+  - endpoint: https://prometheus-k8s-openshift-monitoring.apps.quay-pp-ii.perfscale.devcluster.openshift.com
+    token: eyJhbGciOiJSUzI1NiIsImtpZCI6IkxLVngybmxhMWtKU0VlT2pOTkl6ZXdOS0doV3lmVHNEWWNCZV9CRExDMTAifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjIl0sImV4cCI6MTc3MjgyODI3MCwiaWF0IjoxNzcyODA2NjcwLCJpc3MiOiJodHRwczovL2t1YmVybmV0ZXMuZGVmYXVsdC5zdmMiLCJqdGkiOiJlOWI3YzQzZS1lOTllLTQyZjItOGIyNC1iNzkzYmI2MzlhMDMiLCJrdWJlcm5ldGVzLmlvIjp7Im5hbWVzcGFjZSI6Im9wZW5zaGlmdC1tb25pdG9yaW5nIiwic2VydmljZWFjY291bnQiOnsibmFtZSI6InByb21ldGhldXMtazhzIiwidWlkIjoiNTI2ODhlYzYtYjNhMC00MWRhLWFmOGUtMmY4ZDIzYmZjNmUzIn19LCJuYmYiOjE3NzI4MDY2NzAsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpvcGVuc2hpZnQtbW9uaXRvcmluZzpwcm9tZXRoZXVzLWs4cyJ9.Hej-Af5g1JtKyx_P70Ut4t2bMWyRxMJY326_OJl53k5q9zrEcMllDUyyC-j7QFhrYwZ9ZodFxb8ZkSsVf0pht2rhqtsfiU_SAORyRhv7yYxPkDi2Z2f3y8eUr_GRZDca8X9ntza8iuQ_sGHnO2sIbA_wcJwmKnW3SBCHs4BoC3Co_HZ180O456dytseMGOh9llOn6hx1GBrbcHAEm-4UWh8IUvTFYzedCYfAs2UgeZsZ6I0hOREt_9PL7g64LLITfoVgu6sJt4lLcw3Esnij5AAP62YqvmjdEMAhWOLiPwtbtK-EwMBX1smKMt--IUxzm16RvobTovoCGeaOhWHpfsX17IWmkMLgW6xpNK5lAeC45PYn4CHGP1zlcSAtL9fmGgmXFSdzQ9Gq6HGI_raAXAy1NWeoNA2Ol_XUEyzPQuyFCPKxw38BjK8qiCv3wqGpYGsyx6z8zD0XrApPY0rTXe2ZHsqVqhT_d__obbTkMAGxWGLyN4Q5ORllMEw4W8RY7i2WHr2HyLJDMTqpuk_T_CIhlGiDjYlw7HbaqUAnVcPRMkHmb21ywzZGwrg5U4R0zrjYB2ItWRUk7Vjlz4m8A_qycFrRflCmhJwjcYCw2m8rkzhig6Tf9aQDfGe9t18K2qDv-uf42Xr0cNW-fNUu6OLyq69FsCnv3_xiFW_pB-o
     indexer:
       type: opensearch
       esServers: ["{{ .ES_SERVER }}"]
@@ -31,7 +32,8 @@ metricsEndpoints:
 {{ end }}
 {{ end }}
 {{ if .LOCAL_INDEXING }}
-  - endpoint: http://localhost:9090
+  - endpoint: https://prometheus-k8s-openshift-monitoring.apps.quay-pp-ii.perfscale.devcluster.openshift.com
+    token: eyJhbGciOiJSUzI1NiIsImtpZCI6IkxLVngybmxhMWtKU0VlT2pOTkl6ZXdOS0doV3lmVHNEWWNCZV9CRExDMTAifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjIl0sImV4cCI6MTc3MjgyODI3MCwiaWF0IjoxNzcyODA2NjcwLCJpc3MiOiJodHRwczovL2t1YmVybmV0ZXMuZGVmYXVsdC5zdmMiLCJqdGkiOiJlOWI3YzQzZS1lOTllLTQyZjItOGIyNC1iNzkzYmI2MzlhMDMiLCJrdWJlcm5ldGVzLmlvIjp7Im5hbWVzcGFjZSI6Im9wZW5zaGlmdC1tb25pdG9yaW5nIiwic2VydmljZWFjY291bnQiOnsibmFtZSI6InByb21ldGhldXMtazhzIiwidWlkIjoiNTI2ODhlYzYtYjNhMC00MWRhLWFmOGUtMmY4ZDIzYmZjNmUzIn19LCJuYmYiOjE3NzI4MDY2NzAsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpvcGVuc2hpZnQtbW9uaXRvcmluZzpwcm9tZXRoZXVzLWs4cyJ9.Hej-Af5g1JtKyx_P70Ut4t2bMWyRxMJY326_OJl53k5q9zrEcMllDUyyC-j7QFhrYwZ9ZodFxb8ZkSsVf0pht2rhqtsfiU_SAORyRhv7yYxPkDi2Z2f3y8eUr_GRZDca8X9ntza8iuQ_sGHnO2sIbA_wcJwmKnW3SBCHs4BoC3Co_HZ180O456dytseMGOh9llOn6hx1GBrbcHAEm-4UWh8IUvTFYzedCYfAs2UgeZsZ6I0hOREt_9PL7g64LLITfoVgu6sJt4lLcw3Esnij5AAP62YqvmjdEMAhWOLiPwtbtK-EwMBX1smKMt--IUxzm16RvobTovoCGeaOhWHpfsX17IWmkMLgW6xpNK5lAeC45PYn4CHGP1zlcSAtL9fmGgmXFSdzQ9Gq6HGI_raAXAy1NWeoNA2Ol_XUEyzPQuyFCPKxw38BjK8qiCv3wqGpYGsyx6z8zD0XrApPY0rTXe2ZHsqVqhT_d__obbTkMAGxWGLyN4Q5ORllMEw4W8RY7i2WHr2HyLJDMTqpuk_T_CIhlGiDjYlw7HbaqUAnVcPRMkHmb21ywzZGwrg5U4R0zrjYB2ItWRUk7Vjlz4m8A_qycFrRflCmhJwjcYCw2m8rkzhig6Tf9aQDfGe9t18K2qDv-uf42Xr0cNW-fNUu6OLyq69FsCnv3_xiFW_pB-o
     indexer:
       type: local
       metricsDirectory: {{ .METRICS_FOLDER }}
@@ -60,7 +62,7 @@ jobs:
       replicas: 1
     namespacedIterations: true
     preLoadImages: {{ .PRELOAD_IMAGES }}
-    preLoadPeriod: 2s
+    preLoadPeriod: 5m
     cleanup: true
     namespace: {{ .JOB_NAME }}
     podWait: false

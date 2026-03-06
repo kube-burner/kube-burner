@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"path/filepath"
 	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
@@ -191,28 +190,24 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 
 		log.Infof("Running incremental cumulative step: total iterations = %d", end)
 
-		// Generate unique UUID for this incremental step; parent UUID is constant
-		stepUUID := uuid.New().String()
-		ex.uuid = stepUUID
-		configSpec.GlobalConfig.UUID = stepUUID
-		// Generate unique step-specific run_id for measurements
+		// Generate unique step-specific run_id for measurements and incremental load marker
 		stepRunID := uuid.New().String()
 		ex.runid = stepRunID
-		log.Infof("Step UUID: %s (Parent UUID: %s), Run_ID: %s", stepUUID, originalUUID, stepRunID)
+		log.Infof("Incremental Load UUID: %s (UUID: %s), Run_ID: %s", stepRunID, originalUUID, stepRunID)
 		ex.JobIterations = end
 
-		// create measurements specific for this incremental step using step UUID and run_id
-		labelSelector := fmt.Sprintf("%s=%s,%s=%s", config.KubeBurnerLabelRunID, stepRunID, config.KubeBurnerLabelUUID, stepUUID)
+		// create measurements specific for this incremental step using benchmark UUID and run_id
+		labelSelector := fmt.Sprintf("%s=%s,%s=%s", config.KubeBurnerLabelRunID, stepRunID, config.KubeBurnerLabelUUID, originalUUID)
 
-		// create step-specific metadata with only parentUUID in metadata section
+		// create step-specific metadata with incrementalLoadUUID marker
 		stepMetadata := make(map[string]any)
 		for k, v := range metricsScraper.SummaryMetadata {
 			stepMetadata[k] = v
 		}
-		stepMetadata["parentUUID"] = originalUUID
+		stepMetadata["incrementalLoadUUID"] = stepRunID
 		startOperations = ex.objectOperations
 
-		// create step-specific measurements factory with parentUUID in metadata
+		// create step-specific measurements factory with incrementalLoadUUID in metadata
 		stepMsFactory := measurements.NewMeasurementsFactory(configSpec, stepMetadata, nil)
 		msInstance := stepMsFactory.NewMeasurements(&ex.Job, kubeClientProvider, embedCfg, labelSelector)
 		msInstance.Start()
@@ -268,11 +263,9 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 			allErrs = append(allErrs, err)
 		}
 		if !ex.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
-			stepLocalIndexers := createUUIDScopedIndexers(configSpec, stepUUID)
-			remoteIndexers := getNonLocalIndexers(configSpec, metricsScraper.IndexerList)
-			log.Infof("%v", remoteIndexers)
-			if len(stepLocalIndexers) > 0 {
-				msInstance.Index(measurementsJobName, stepLocalIndexers)
+			localIndexers, remoteIndexers := splitIndexersByType(configSpec, metricsScraper.IndexerList)
+			if len(localIndexers) > 0 {
+				msInstance.Index(measurementsJobName, localIndexers)
 			}
 			if len(remoteIndexers) > 0 {
 				msInstance.Index(measurementsJobName, remoteIndexers)
@@ -285,12 +278,12 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 
 		stepEnd := time.Now().UTC()
 		stepJobs = append(stepJobs, prometheus.Job{
-			Start:            stepStart,
-			End:              stepEnd,
-			JobConfig:        ex.Job,
-			ObjectOperations: endOperations - startOperations,
-			UUID:             stepUUID,
-			ParentUUID:       originalUUID,
+			Start:               stepStart,
+			End:                 stepEnd,
+			JobConfig:           ex.Job,
+			ObjectOperations:    endOperations - startOperations,
+			UUID:                originalUUID,
+			IncrementalLoadUUID: stepRunID,
 		})
 
 		if stepDelay > 0 {
@@ -302,50 +295,23 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 	}
 }
 
-// createUUIDScopedIndexers creates new indexers with UUID-scoped directories for local indexers, returning a map of alias to indexer.
-func createUUIDScopedIndexers(configSpec config.Spec, stepUUID string) map[string]indexers.Indexer {
-	scopedIndexers := make(map[string]indexers.Indexer)
-	for i, endpoint := range configSpec.MetricsEndpoints {
-		if endpoint.Type == indexers.LocalIndexer {
-			// Create UUID-scoped directory for this step's metrics (RunID stays internal)
-			originalDir := endpoint.MetricsDirectory
-			if originalDir == "" {
-				originalDir = "collected-metrics"
-			}
-			// Create new indexer config with UUID-scoped directory
-			uuidDir := filepath.Join(originalDir, stepUUID)
-			scopedConfig := endpoint.IndexerConfig
-			scopedConfig.MetricsDirectory = uuidDir
-			indexer, err := indexers.NewIndexer(scopedConfig)
-			if err != nil {
-				log.Warnf("Failed to create UUID-scoped indexer: %v", err)
-				continue
-			}
-			// Use endpoint alias as key, or generate one
-			key := endpoint.Alias
-			if key == "" {
-				key = fmt.Sprintf("indexer-%d", i)
-			}
-			scopedIndexers[key] = *indexer
-		}
-	}
-	return scopedIndexers
-}
-
-// getNonLocalIndexers filters out local indexers and returns only remote indexers (ES, etc.)
-func getNonLocalIndexers(configSpec config.Spec, indexerList map[string]indexers.Indexer) map[string]indexers.Indexer {
+// splitIndexersByType splits the configured indexers into local and remote maps.
+func splitIndexersByType(configSpec config.Spec, indexerList map[string]indexers.Indexer) (map[string]indexers.Indexer, map[string]indexers.Indexer) {
+	localIndexers := make(map[string]indexers.Indexer)
 	remoteIndexers := make(map[string]indexers.Indexer)
-	// Build a set of non-local aliases from configuration
+	// Build sets of local and remote aliases from configuration
 	for i, endpoint := range configSpec.MetricsEndpoints {
-		if endpoint.Type != indexers.LocalIndexer {
-			alias := endpoint.Alias
-			if alias == "" {
-				alias = fmt.Sprintf("indexer-%d", i)
-			}
-			if indexer, exists := indexerList[alias]; exists {
+		alias := endpoint.Alias
+		if alias == "" {
+			alias = fmt.Sprintf("indexer-%d", i)
+		}
+		if indexer, exists := indexerList[alias]; exists {
+			if endpoint.Type == indexers.LocalIndexer {
+				localIndexers["collected-metrics"] = indexer
+			} else {
 				remoteIndexers[alias] = indexer
 			}
 		}
 	}
-	return remoteIndexers
+	return localIndexers, remoteIndexers
 }

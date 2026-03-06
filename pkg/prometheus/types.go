@@ -43,14 +43,14 @@ type Prometheus struct {
 }
 
 type Job struct {
-	Start            time.Time
-	End              time.Time
-	ChurnStart       *time.Time // A pointer to time.Time is required to skip this field when nil
-	ChurnEnd         *time.Time
-	JobConfig        config.Job
-	ObjectOperations int32
-	UUID             string
-	ParentUUID       string
+	Start               time.Time
+	End                 time.Time
+	ChurnStart          *time.Time // A pointer to time.Time is required to skip this field when nil
+	ChurnEnd            *time.Time
+	JobConfig           config.Job
+	ObjectOperations    int32
+	UUID                string
+	IncrementalLoadUUID string
 }
 
 type metricProfile struct {
