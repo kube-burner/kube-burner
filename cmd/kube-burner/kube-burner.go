@@ -184,7 +184,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.Flags().StringSliceVar(&setValues, "set", []string{}, "Set arbitrary key=value pairs to override values in the config file")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Do not create any resources, just validate the workload configuration")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Pre validate the workload configuration")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd

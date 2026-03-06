@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"text/template/parse"
 	"time"
 
 	"github.com/itchyny/gojq"
@@ -83,20 +84,19 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 				jobRunId:     configSpec.GlobalConfig.RUNID,
 				replica:      1,
 			}
-			// Merge in any per-object InputVars so user-defined template variables
-			// are also present during validation.
+			// Merge in any per-object InputVars so user-defined template variables are also present during validation.
 			for k, v := range o.InputVars {
 				templateData[k] = v
 			}
 
-			templateOption := util.MissingKeyError
-			if job.DefaultMissingKeysWithZero {
-				templateOption = util.MissingKeyZero
+			// Check ALL undefined template variables in one pass via AST analysis.
+			if !job.DefaultMissingKeysWithZero {
+				checkUndefinedVars(raw, templateData, job.Name, o.ObjectTemplate, functionTemplates, &errs)
 			}
 
-			rendered, err := util.RenderTemplate(raw, templateData, templateOption, functionTemplates)
+			rendered, err := util.RenderTemplate(raw, templateData, util.MissingKeyZero, functionTemplates)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("job %s, template %s: %w", job.Name, o.ObjectTemplate, err))
+				errs = append(errs, fmt.Errorf("job %s, template %s: rendering error: %w", job.Name, o.ObjectTemplate, err))
 				continue
 			}
 
@@ -219,6 +219,79 @@ func validateKubeVirtJob(job *config.Job, restCfg *rest.Config, errs *[]error) {
 		} else if _, ok := supportedOps[o.KubeVirtOp]; !ok {
 			*errs = append(*errs, fmt.Errorf("job %s: unsupported kubeVirtOp %q", job.Name, o.KubeVirtOp))
 		}
+	}
+}
+
+// checkUndefinedVars parses the template AST to find ALL undefined variable
+// references in one pass, rather than stopping at the first missing key.
+func checkUndefinedVars(raw []byte, knownVars map[string]any, jobName, templateFile string, funcTemplates []string, errs *[]error) {
+	// Stub functions to allow parsing field references.
+	funcMap := map[string]any{}
+	for _, ft := range funcTemplates {
+		// ft may be a path; use its base name stripped of extension as a stub.
+		funcMap[ft] = func() string { return "" }
+	}
+
+	trees, err := parse.Parse("tpl", string(raw), "", "", funcMap)
+	if err != nil {
+		// Parse errors are caught by the render step; skip here.
+		return
+	}
+
+	// Collect all top-level field names used in the template.
+	used := make(map[string]bool)
+	for _, tree := range trees {
+		collectFieldNames(tree.Root, used)
+	}
+
+	// Report every field that is not in knownVars.
+	for field := range used {
+		if _, ok := knownVars[field]; !ok {
+			*errs = append(*errs, fmt.Errorf("job %s, template %s: undefined variable {{.%s}}",
+				jobName, templateFile, field))
+		}
+	}
+}
+
+// collectFieldNames recursively walks a parse tree node and records every
+// top-level .FieldName reference (i.e. .Foo, not .Foo.Bar sub-fields).
+func collectFieldNames(node parse.Node, out map[string]bool) {
+	if node == nil {
+		return
+	}
+	switch n := node.(type) {
+	case *parse.FieldNode:
+		if len(n.Ident) > 0 {
+			out[n.Ident[0]] = true
+		}
+	case *parse.ListNode:
+		for _, child := range n.Nodes {
+			collectFieldNames(child, out)
+		}
+	case *parse.ActionNode:
+		collectFieldNames(n.Pipe, out)
+	case *parse.PipeNode:
+		for _, cmd := range n.Cmds {
+			collectFieldNames(cmd, out)
+		}
+	case *parse.CommandNode:
+		for _, arg := range n.Args {
+			collectFieldNames(arg, out)
+		}
+	case *parse.IfNode:
+		collectFieldNames(n.Pipe, out)
+		collectFieldNames(n.List, out)
+		collectFieldNames(n.ElseList, out)
+	case *parse.RangeNode:
+		collectFieldNames(n.Pipe, out)
+		collectFieldNames(n.List, out)
+		collectFieldNames(n.ElseList, out)
+	case *parse.WithNode:
+		collectFieldNames(n.Pipe, out)
+		collectFieldNames(n.List, out)
+		collectFieldNames(n.ElseList, out)
+	case *parse.TemplateNode:
+		collectFieldNames(n.Pipe, out)
 	}
 }
 
