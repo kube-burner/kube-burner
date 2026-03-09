@@ -287,6 +287,25 @@ teardown_file() {
 }
 
 
+# bats test_tags=subsystem:measurements
+@test "kube-burner-vm-snapshot-test.yml: volume snapshot latency via VirtualMachineSnapshot" {
+  if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
+    echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
+  if [[ -z "$STORAGE_CLASS_NAME" ]]; then
+    echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+
+  run_cmd ${KUBE_BURNER} init -c kube-burner-vm-snapshot-test.yml --uuid=${UUID} --log-level=debug
+
+  # Verify volumeSnapshotLatency metrics were collected for the snapshot-vm job
+  check_metric_recorded snapshot-vm volumeSnapshotLatency vsReadyLatency
+  check_quantile_recorded snapshot-vm volumeSnapshotLatency Ready
+}
+
 @test "rc timeout check" {
   run ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --timeout=2s
   [ "$status" -eq 2 ]

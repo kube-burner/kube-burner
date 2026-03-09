@@ -54,12 +54,13 @@ type BaseMeasurement struct {
 }
 
 type MeasurementWatcher struct {
-	dynamicClient dynamic.Interface
-	name          string
-	resource      schema.GroupVersionResource
-	labelSelector string
-	handlers      *cache.ResourceEventHandlerFuncs
-	transform     cache.TransformFunc
+	dynamicClient      dynamic.Interface
+	name               string
+	resource           schema.GroupVersionResource
+	labelSelector      string
+	skipGlobalSelector bool
+	handlers           *cache.ResourceEventHandlerFuncs
+	transform          cache.TransformFunc
 }
 
 func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWatcher) {
@@ -70,7 +71,7 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 	bm.watchers = make([]*watchers.Watcher, len(measurementWatchers))
 	for i, measurementWatcher := range measurementWatchers {
 		var selectors []string
-		if bm.LabelSelector != "" {
+		if bm.LabelSelector != "" && !measurementWatcher.skipGlobalSelector {
 			selectors = []string{bm.LabelSelector}
 		}
 		if measurementWatcher.labelSelector != "" {
