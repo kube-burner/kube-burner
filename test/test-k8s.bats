@@ -307,3 +307,8 @@ teardown_file() {
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
 }
 
+
+@test "rc timeout check" {
+  run ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --timeout=2s
+  [ "$status" -eq 2 ]
+}
