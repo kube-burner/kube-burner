@@ -80,6 +80,11 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 					continue
 				}
 				query := renderedQuery.String()
+				_, err := promql.ParseExpr(query)
+				if err != nil {
+					log.Warnf("Error parsing query: %v", err)
+					continue
+				}
 				renderedQuery.Reset()
 				if metric.Instant {
 					if metric.CaptureStart {
