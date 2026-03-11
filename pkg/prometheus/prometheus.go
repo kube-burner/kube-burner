@@ -80,8 +80,7 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 					continue
 				}
 				query := renderedQuery.String()
-				_, err := promql.ParseExpr(query)
-				if err != nil {
+				if _, err := promql.ParseExpr(query); err != nil {
 					log.Warnf("Error parsing query: %v", err)
 					continue
 				}
@@ -155,9 +154,6 @@ func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfi
 	for i, md := range metricProfile.metrics {
 		if md.Query == "" {
 			return fmt.Errorf("query not defined in query number %d", i+1)
-		}
-		if _, err := promql.ParseExpr(md.Query); err != nil {
-			return fmt.Errorf("error parsing query in metric number %d: %s", i+1, err)
 		}
 		if md.MetricName == "" {
 			return fmt.Errorf("metricName not defined in query number %d", i+1)
