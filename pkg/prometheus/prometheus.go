@@ -27,6 +27,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"github.com/prometheus/common/model"
+	promql "github.com/prometheus/prometheus/promql/parser"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -149,6 +150,9 @@ func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfi
 	for i, md := range metricProfile.metrics {
 		if md.Query == "" {
 			return fmt.Errorf("query not defined in query number %d", i+1)
+		}
+		if _, err := promql.ParseExpr(md.Query); err != nil {
+			return fmt.Errorf("error parsing query in metric number %d: %s", i+1, err)
 		}
 		if md.MetricName == "" {
 			return fmt.Errorf("metricName not defined in query number %d", i+1)
