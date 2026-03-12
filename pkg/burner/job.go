@@ -365,12 +365,8 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 			if job.JobConfig.IncrementalLoad != nil && job.IncrementalLoadUUID == "" {
 				achievedQps = 0
 			}
-			jsUUID := uuid
-			if job.UUID != "" {
-				jsUUID = job.UUID
-			}
 			jobSummaries = append(jobSummaries, JobSummary{
-				UUID:                jsUUID,
+				UUID:                uuid,
 				IncrementalLoadUUID: job.IncrementalLoadUUID,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,

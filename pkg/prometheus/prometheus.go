@@ -160,10 +160,6 @@ func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfi
 
 // Create metric creates metric to be indexed
 func (p *Prometheus) createMetric(query, metricName string, job Job, labels model.Metric, value model.SampleValue, timestamp time.Time, isInstant bool) metric {
-	uuid := p.UUID
-	if job.UUID != "" {
-		uuid = job.UUID
-	}
 	metadata := map[string]any{}
 	for k, v := range p.metadata {
 		metadata[k] = v
@@ -173,7 +169,7 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 	}
 	m := metric{
 		Labels:     make(map[string]string),
-		UUID:       uuid,
+		UUID:       p.UUID,
 		Query:      query,
 		MetricName: metricName,
 		Timestamp:  timestamp,
