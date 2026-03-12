@@ -96,6 +96,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			return
 		}
 
+		// Cleanup previous runs
+		for _, jobExecutor := range jobExecutors {
+			if jobExecutor.JobType == config.CreationJob && jobExecutor.Cleanup {
+				log.Infof("Cleaning up previous runs for job: %s", jobExecutor.Name)
+				jobExecutor.gc(ctx, nil)
+			}
+		}
+
 		// Iterate job list
 		var measurementsInstance *measurements.Measurements
 		var measurementsJobName string
@@ -125,10 +133,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
-				if jobExecutor.Cleanup {
-					log.Info("Cleaning up previous runs")
-					jobExecutor.gc(ctx, nil)
-				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					log.Info("Churning enabled")
 					log.Infof("Churn cycles: %v", jobExecutor.ChurnConfig.Cycles)
