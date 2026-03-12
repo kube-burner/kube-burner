@@ -96,7 +96,14 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			return
 		}
 
-		// Iterate job list
+		// Cleanup previous runs
+		for _, jobExecutor := range jobExecutors {
+			if jobExecutor.JobType == config.CreationJob && jobExecutor.Cleanup {
+				log.Infof("Cleaning up previous runs for job: %s", jobExecutor.Name)
+				jobExecutor.gc(ctx, nil)
+			}
+		}
+		// Run jobs
 		for jobExecutorIdx, jobExecutor := range jobExecutors {
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
