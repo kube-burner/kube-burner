@@ -509,7 +509,7 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 				numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
 				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
 				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
-				log.Debugf("Deleting %d %s", numToChurn, obj.Kind)
+				log.Infof("Deleting %d %s", numToChurn, obj.Kind)
 				for _, objToDelete := range objectsToDelete {
 					resource := ex.dynamicClient.Resource(obj.gvr)
 					var dr dynamic.ResourceInterface = resource
