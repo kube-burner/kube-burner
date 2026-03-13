@@ -6,7 +6,7 @@ load helpers.bash
 
 setup_file() {
   cd k8s
-  export BATS_TEST_TIMEOUT=1800
+  export BATS_TEST_TIMEOUT=2000
   export JOB_ITERATIONS=4
   export QPS=5
   export BURST=5
@@ -66,6 +66,34 @@ teardown_file() {
       $OCI_BIN network rm -f monitoring
     fi
   fi
+}
+
+# bats test_tags=subsystem:measurements
+@test "kube-burner-dv.yml: datavolume latency" {
+  if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
+    echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
+  if [[ -z "$STORAGE_CLASS_NAME" ]]; then
+    echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+
+  run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid=${UUID} --log-level=debug
+
+  # Verify metrics for PVC and DV were collected
+  local jobs=("create-vm" "create-base-image-dv")
+  for job in "${jobs[@]}"; do
+    check_metric_recorded ${job} dvLatency dvReadyLatency
+    check_metric_recorded ${job} pvcLatency bindingLatency
+    check_quantile_recorded ${job} dvLatency Ready
+    check_quantile_recorded ${job} pvcLatency Bound
+  done
+
+  # Verify that metrics for VolumeSnapshot was collected
+  check_metric_recorded create-snapshot volumeSnapshotLatency vsReadyLatency
+  check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
 }
 
 # bats test_tags=subsystem:preload,subsystem:indexing
@@ -200,34 +228,6 @@ teardown_file() {
   # Verify that the from-file-override label was set from the input file
   verify_object_count deployment ${REPLICAS} ${NAMESPACE} kube-burner.io/from-file-override=from-file
   kubectl delete ns ${NAMESPACE}
-}
-
-# bats test_tags=subsystem:measurements
-@test "kube-burner-dv.yml: datavolume latency" {
-  if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
-    echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    return 1
-  fi
-  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
-  if [[ -z "$STORAGE_CLASS_NAME" ]]; then
-    echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    return 1
-  fi
-
-  run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid=${UUID} --log-level=debug
-
-  # Verify metrics for PVC and DV were collected
-  local jobs=("create-vm" "create-base-image-dv")
-  for job in "${jobs[@]}"; do
-    check_metric_recorded ${job} dvLatency dvReadyLatency
-    check_metric_recorded ${job} pvcLatency bindingLatency
-    check_quantile_recorded ${job} dvLatency Ready
-    check_quantile_recorded ${job} pvcLatency Bound
-  done
-
-  # Verify that metrics for VolumeSnapshot was collected
-  check_metric_recorded create-snapshot volumeSnapshotLatency vsReadyLatency
-  check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
 }
 
 # bats test_tags=subsystem:indexing

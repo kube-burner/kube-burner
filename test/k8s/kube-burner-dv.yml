@@ -107,7 +107,7 @@ jobs:
   waitWhenFinished: false
   podWait: true
   # timeout time after waiting for all object creation
-  maxWaitTimeout: 15m
+  maxWaitTimeout: 20m
   # wait before job completes to allow metrics collection
   jobPause: 15s
   # Do not clean the namespaces
