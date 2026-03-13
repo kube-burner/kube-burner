@@ -54,12 +54,14 @@ type BaseMeasurement struct {
 }
 
 type MeasurementWatcher struct {
-	dynamicClient dynamic.Interface
-	name          string
-	resource      schema.GroupVersionResource
-	labelSelector string
-	handlers      *cache.ResourceEventHandlerFuncs
-	transform     cache.TransformFunc
+	dynamicClient      dynamic.Interface
+	name               string
+	resource           schema.GroupVersionResource
+	namespace          string
+	labelSelector      string
+	skipGlobalSelector bool
+	handlers           *cache.ResourceEventHandlerFuncs
+	transform          cache.TransformFunc
 }
 
 func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWatcher) {
@@ -70,18 +72,22 @@ func (bm *BaseMeasurement) startMeasurement(measurementWatchers []MeasurementWat
 	bm.watchers = make([]*watchers.Watcher, len(measurementWatchers))
 	for i, measurementWatcher := range measurementWatchers {
 		var selectors []string
-		if bm.LabelSelector != "" {
+		if bm.LabelSelector != "" && !measurementWatcher.skipGlobalSelector {
 			selectors = []string{bm.LabelSelector}
 		}
 		if measurementWatcher.labelSelector != "" {
 			selectors = append(selectors, measurementWatcher.labelSelector)
 		}
-		log.Infof("Creating %v latency watcher for %s using selector %s", measurementWatcher.resource, bm.JobConfig.Name, selectors)
+		watchNamespace := corev1.NamespaceAll
+		if measurementWatcher.namespace != "" {
+			watchNamespace = measurementWatcher.namespace
+		}
+		log.Infof("Creating %v latency watcher for %s in namespace %s using selector %s", measurementWatcher.resource, bm.JobConfig.Name, watchNamespace, selectors)
 		bm.watchers[i] = watchers.NewWatcher(
 			measurementWatcher.dynamicClient,
 			measurementWatcher.name,
 			measurementWatcher.resource,
-			corev1.NamespaceAll,
+			watchNamespace,
 			func(options *metav1.ListOptions) {
 				if len(selectors) > 0 {
 					options.LabelSelector = strings.Join(selectors, ",")
