@@ -231,6 +231,14 @@ teardown_file() {
   check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
 }
 
+# bats test_tags=subsystem:measurements
+@test "kube-burner-pvc-resize.yml: pvc resize latency" {
+  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
+  run_cmd ${KUBE_BURNER} init -c kube-burner-pvc-resize.yml --uuid=${UUID} --log-level=debug
+  check_metric_recorded pvc-patch pvcLatency resizeLatency
+  check_quantile_recorded pvc-patch pvcLatency Resize
+}
+
 # bats test_tags=subsystem:indexing
 @test "kube-burner-metrics-aggregate.yml: metrics aggregation" {
   export STORAGE_CLASS_NAME
