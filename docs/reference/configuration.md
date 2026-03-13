@@ -644,7 +644,7 @@ Churn supports the following options:
 - `duration`: Length of time that the job is churned for
 - `delay`: Length of time to wait between each churn period
 - `deleteDelay`: Length of time to wait after deletion and before recreation within a churn period. Defaults to `0s`
-- `mode`: Churning mode, either `namespaces`, to churn entire namespaces or `objects`, to churn individual objects of the job's namespaces. Defaults to `namespaces`.
+- `mode`: Churning mode, either `namespaces`, to churn entire namespaces or `objects`, to churn individual cluster-scoped and namespaced objects. Defaults to `namespaces`.
 
 !!! note
     In order to enable churning for a job, either `duration` or `cycles` must be set. It's possible to use both at the same time.
