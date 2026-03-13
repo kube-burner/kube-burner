@@ -91,13 +91,29 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
-		handlePreloadImages(ctx, jobExecutors, kubeClientProvider)
-		// Iterate job list
+		if err := handlePreloadImages(ctx, jobExecutors, kubeClientProvider); err != nil {
+			log.Error(err.Error())
+			return
+		}
 
-		for jobExecutorIdx, jobExecutor := range jobExecutors {
+		// Cleanup previous runs
+		for _, jobExecutor := range jobExecutors {
+			if jobExecutor.JobType == config.CreationJob && jobExecutor.Cleanup {
+				log.Infof("Cleaning up previous runs for job: %s", jobExecutor.Name)
+				jobExecutor.gc(ctx, nil)
+			}
+		}
+
+		// Iterate job list
+		var measurementsInstance *measurements.Measurements
+		var measurementsJobName string
+		for _, jobExecutor := range jobExecutors {
+			jobIdx := len(executedJobs) // Track the index where we're appending
+			startJobIdx := jobIdx       // Will work for both incremental and normal jobs
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
+				UUID:      jobExecutor.uuid,
 			})
 			watcherManager := watchers.NewWatcherManager(restConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
 			for idx, watcher := range jobExecutor.Watchers {
@@ -109,46 +125,57 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			errs = append(errs, watcherStartErrors...)
 			if measurementsInstance == nil {
 				measurementsJobName = jobExecutor.Name
-				measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg, fmt.Sprintf("%s=%s", config.KubeBurnerLabelRunID, globalConfig.RUNID))
-				measurementsInstance.Start()
+				// For incremental jobs we create runtime measurements per-step inside the incremental runner
+				if jobExecutor.IncrementalLoad == nil {
+					measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg, fmt.Sprintf("%s=%s", config.KubeBurnerLabelRunID, globalConfig.RUNID))
+					measurementsInstance.Start()
+				}
 			}
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
-				if jobExecutor.Cleanup {
-					log.Info("Cleaning up previous runs")
-					jobExecutor.gc(ctx, nil)
-				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					log.Info("Churning enabled")
 					log.Infof("Churn cycles: %v", jobExecutor.ChurnConfig.Cycles)
 					log.Infof("Churn duration: %v", jobExecutor.ChurnConfig.Duration)
 					log.Infof("Churn percent: %v", jobExecutor.ChurnConfig.Percent)
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
+					log.Infof("Churn delete delay: %v", jobExecutor.ChurnConfig.DeleteDelay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations); jobErrs != nil {
-					errs = append(errs, jobErrs...)
+				if jobCreateErrs, stepJobs := runCreateOrIncremental(ctx, jobExecutor, measurementsFactory, kubeClientProvider, embedCfg, measurementsJobName, metricsScraper, configSpec); jobCreateErrs != nil {
+					errs = append(errs, jobCreateErrs...)
 					innerRC = 1
+				} else if len(stepJobs) > 0 {
+					executedJobs = append(executedJobs, stepJobs...)
+					executedJobs[jobIdx].End = stepJobs[0].Start
+					jobIdx = len(executedJobs)
+					executedJobs = append(executedJobs, prometheus.Job{
+						Start:     stepJobs[len(stepJobs)-1].End,
+						JobConfig: jobExecutor.Job,
+						UUID:      jobExecutor.uuid,
+					})
 				}
 				if ctx.Err() != nil {
 					return
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					churnStart := time.Now().UTC()
-					executedJobs[jobExecutorIdx].ChurnStart = &churnStart
+					executedJobs[jobIdx].ChurnStart = &churnStart
 					jobExecutor.RunCreateJobWithChurn(ctx)
 					churnEnd := time.Now().UTC()
-					executedJobs[jobExecutorIdx].ChurnEnd = &churnEnd
+					executedJobs[jobIdx].ChurnEnd = &churnEnd
 				}
-				// If object verification is enabled
-				if jobExecutor.VerifyObjects && !jobExecutor.Verify(ctx) {
-					err := errors.New("object verification failed")
-					// If errorOnVerify is enabled. Set RC to 1 and append error
-					if jobExecutor.ErrorOnVerify {
-						innerRC = 1
-						errs = append(errs, err)
+				if jobExecutor.IncrementalLoad == nil {
+					// If object verification is enabled
+					if jobExecutor.VerifyObjects && !jobExecutor.Verify(ctx, nil) {
+						err := errors.New("object verification failed")
+						// If errorOnVerify is enabled. Set RC to 1 and append error
+						if jobExecutor.ErrorOnVerify {
+							innerRC = 1
+							errs = append(errs, err)
+						}
+						log.Error(err.Error())
 					}
-					log.Error(err.Error())
 				}
 			} else {
 				if jobErrs := jobExecutor.Run(ctx); len(jobErrs) > 0 {
@@ -172,40 +199,42 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
-				executedJobs[jobExecutorIdx].End = jobEnd
-				executedJobs[jobExecutorIdx].ObjectOperations = jobExecutor.objectOperations
+				executedJobs[jobIdx].End = jobEnd
+				executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if jobExecutor.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
 				time.Sleep(jobExecutor.JobPause)
 			}
 			if jobExecutor.MetricsClosing == config.AfterJobPause {
-				executedJobs[jobExecutorIdx].End = time.Now().UTC()
-				executedJobs[jobExecutorIdx].ObjectOperations = jobExecutor.objectOperations
+				executedJobs[jobIdx].End = time.Now().UTC()
+				executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if !globalConfig.WaitWhenFinished {
-				elapsedTime := jobEnd.Sub(executedJobs[jobExecutorIdx].Start).Round(time.Second)
+				elapsedTime := jobEnd.Sub(executedJobs[startJobIdx].Start).Round(time.Second)
 				log.Infof("Job %s took %v", jobExecutor.Name, elapsedTime)
 			}
 			if !jobExecutor.MetricsAggregate {
-				// We stop and index measurements per job
-				if err = measurementsInstance.Stop(); err != nil {
-					errs = append(errs, err)
-					log.Error(err.Error())
-					innerRC = rcMeasurement
+				// We stop and index measurements per job (skip for incremental jobs handled per-step)
+				if measurementsInstance != nil {
+					if err = measurementsInstance.Stop(); err != nil {
+						errs = append(errs, err)
+						log.Error(err.Error())
+						innerRC = rcMeasurement
+					}
+					if jobExecutor.MetricsClosing == config.AfterMeasurements {
+						executedJobs[jobIdx].End = time.Now().UTC()
+						executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
+					}
+					if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
+						msWg.Add(1)
+						go func(msi *measurements.Measurements, jobName string) {
+							defer msWg.Done()
+							msi.Index(jobName, metricsScraper.IndexerList)
+						}(measurementsInstance, measurementsJobName)
+					}
+					measurementsInstance = nil
 				}
-				if jobExecutor.MetricsClosing == config.AfterMeasurements {
-					executedJobs[jobExecutorIdx].End = time.Now().UTC()
-					executedJobs[jobExecutorIdx].ObjectOperations = jobExecutor.objectOperations
-				}
-				if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
-					msWg.Add(1)
-					go func(msi *measurements.Measurements, jobName string) {
-						defer msWg.Done()
-						msi.Index(jobName, metricsScraper.IndexerList)
-					}(measurementsInstance, measurementsJobName)
-				}
-				measurementsInstance = nil
 			}
 			watcherStopErrs := watcherManager.StopAll()
 			errs = append(errs, watcherStopErrs...)
@@ -266,7 +295,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	case <-time.After(configSpec.GlobalConfig.Timeout):
 		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
 		log.Error(err.Error())
-		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		if len(executedJobs) > 0 {
+			executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		}
 		errs = append(errs, err)
 		rc = rcTimeout
 		if measurementsInstance != nil {
@@ -298,21 +329,32 @@ func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *co
 	return nil
 }
 
+// runCreateOrIncremental depending on the job configuration.
+func runCreateOrIncremental(ctx context.Context, jobExecutor JobExecutor, measurementsFactory *measurements.MeasurementsFactory, kubeClientProvider *config.KubeClientProvider, embedCfg *fileutils.EmbedConfiguration, measurementsJobName string, metricsScraper metrics.Scraper, configSpec config.Spec) ([]error, []prometheus.Job) {
+	if jobExecutor.IncrementalLoad != nil {
+		calculator := NewIterationCalculator(jobExecutor)
+		return jobExecutor.RunIncrementalCreateJob(ctx, calculator, measurementsFactory, kubeClientProvider, embedCfg, measurementsJobName, metricsScraper, configSpec)
+	}
+	return jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations), nil
+}
+
 // If requests, preload the images used in the test into the node
-func handlePreloadImages(ctx context.Context, executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
+func handlePreloadImages(ctx context.Context, executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) error {
 	clientSet, _ := kubeClientProvider.DefaultClientSet()
 	for _, executor := range executorList {
 		if executor.PreLoadImages && executor.JobType == config.CreationJob {
 			if err := preLoadImages(ctx, executor, clientSet); err != nil {
-				log.Fatal(err.Error())
+				return err
 			}
 		}
 	}
+	return nil
 }
 
 // indexMetrics indexes metrics for the executed jobs
 func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[string]returnPair, metricsScraper metrics.Scraper, configSpec config.Spec, innerRC bool, executionErrors string, isTimeout bool) {
 	var jobSummaries []JobSummary
+
 	for _, job := range executedJobs {
 		if !job.JobConfig.SkipIndexing {
 			if value, exists := returnMap[job.JobConfig.Name]; exists && !isTimeout {
@@ -324,8 +366,12 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 			if elapsedTime > 0 {
 				achievedQps = math.Round((float64(job.ObjectOperations)/elapsedTime)*1000) / 1000
 			}
+			if job.JobConfig.IncrementalLoad != nil && job.IncrementalLoadUUID == "" {
+				achievedQps = 0
+			}
 			jobSummaries = append(jobSummaries, JobSummary{
 				UUID:                uuid,
+				IncrementalLoadUUID: job.IncrementalLoadUUID,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,
 				ElapsedTime:         elapsedTime,
@@ -344,6 +390,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 	for _, indexer := range metricsScraper.IndexerList {
 		IndexJobSummary(jobSummaries, indexer)
 	}
+	// Scrape prometheus metrics for all executed jobs
 	for _, prometheusClient := range metricsScraper.PrometheusClients {
 		prometheusClient.ScrapeJobsMetrics(executedJobs...)
 	}
@@ -434,6 +481,7 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 			namespacesToDelete := make([]string, 0, len(namespaces.Items))
 			for _, ns := range namespaces.Items {
 				namespacesToDelete = append(namespacesToDelete, ns.Name)
+				ex.createdNamespaces[ns.Name] = false
 			}
 			CleanupNamespacesUsingGVR(ctx, *ex, namespacesToDelete)
 			err := util.CleanupNamespacesByLabel(ctx, ex.clientSet, labelSelector)
@@ -442,7 +490,14 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 			}
 		}
 	} else {
-		err := util.CleanupNamespacesByLabel(ctx, ex.clientSet, labelSelector)
+		// List namespaces to mark them as not created before deletion
+		namespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err == nil {
+			for _, ns := range namespaces.Items {
+				ex.createdNamespaces[ns.Name] = false
+			}
+		}
+		err = util.CleanupNamespacesByLabel(ctx, ex.clientSet, labelSelector)
 		// Just report error and continue
 		if err != nil {
 			log.Error(err.Error())

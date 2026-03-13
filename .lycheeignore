@@ -1,0 +1,2 @@
+# External GitHub URLs that get rate-limited (429) during CI checks
+https://github.com/kubevirt/containerized-data-importer/blob/main/doc/datavolumes.md#conditions
