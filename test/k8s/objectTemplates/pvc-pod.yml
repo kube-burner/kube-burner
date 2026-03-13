@@ -6,7 +6,7 @@ metadata:
   name: pod-{{.JobName}}-{{.Iteration}}-{{.Replica}}
 spec:
   containers:
-  - image: gcr.io/google_containers/pause:3.2
+  - image: registry.k8s.io/pause:3.9
     name: pause
     imagePullPolicy: IfNotPresent
     volumeMounts:
