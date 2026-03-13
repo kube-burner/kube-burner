@@ -91,9 +91,19 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
-		handlePreloadImages(ctx, jobExecutors, kubeClientProvider)
-		// Iterate job list
+		if err := handlePreloadImages(ctx, jobExecutors, kubeClientProvider); err != nil {
+			log.Error(err.Error())
+			return
+		}
 
+		// Cleanup previous runs
+		for _, jobExecutor := range jobExecutors {
+			if jobExecutor.JobType == config.CreationJob && jobExecutor.Cleanup {
+				log.Infof("Cleaning up previous runs for job: %s", jobExecutor.Name)
+				jobExecutor.gc(ctx, nil)
+			}
+		}
+		// Run jobs
 		for jobExecutorIdx, jobExecutor := range jobExecutors {
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
@@ -114,16 +124,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
-				if jobExecutor.Cleanup {
-					log.Info("Cleaning up previous runs")
-					jobExecutor.gc(ctx, nil)
-				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					log.Info("Churning enabled")
 					log.Infof("Churn cycles: %v", jobExecutor.ChurnConfig.Cycles)
 					log.Infof("Churn duration: %v", jobExecutor.ChurnConfig.Duration)
 					log.Infof("Churn percent: %v", jobExecutor.ChurnConfig.Percent)
 					log.Infof("Churn delay: %v", jobExecutor.ChurnConfig.Delay)
+					log.Infof("Churn delete delay: %v", jobExecutor.ChurnConfig.DeleteDelay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
 				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations); jobErrs != nil {
@@ -266,7 +273,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	case <-time.After(configSpec.GlobalConfig.Timeout):
 		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
 		log.Error(err.Error())
-		executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		if len(executedJobs) > 0 {
+			executedJobs[len(executedJobs)-1].End = time.Now().UTC()
+		}
 		errs = append(errs, err)
 		rc = rcTimeout
 		if measurementsInstance != nil {
@@ -299,15 +308,16 @@ func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *co
 }
 
 // If requests, preload the images used in the test into the node
-func handlePreloadImages(ctx context.Context, executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) {
+func handlePreloadImages(ctx context.Context, executorList []JobExecutor, kubeClientProvider *config.KubeClientProvider) error {
 	clientSet, _ := kubeClientProvider.DefaultClientSet()
 	for _, executor := range executorList {
 		if executor.PreLoadImages && executor.JobType == config.CreationJob {
 			if err := preLoadImages(ctx, executor, clientSet); err != nil {
-				log.Fatal(err.Error())
+				return err
 			}
 		}
 	}
+	return nil
 }
 
 // indexMetrics indexes metrics for the executed jobs
