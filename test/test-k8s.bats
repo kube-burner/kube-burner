@@ -42,6 +42,7 @@ setup() {
   export CHURN_CYCLES=0
   export PRELOAD_IMAGES=false
   export GC=true
+  export INCREMENTAL_LOAD=""
   export JOBGC=false
   export LOCAL_INDEXING=""
   export ALERTING=""
@@ -230,6 +231,14 @@ teardown_file() {
   kubectl delete ns ${NAMESPACE}
 }
 
+# bats test_tags=subsystem:measurements
+@test "kube-burner-pvc-resize.yml: pvc resize latency" {
+  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
+  run_cmd ${KUBE_BURNER} init -c kube-burner-pvc-resize.yml --uuid=${UUID} --log-level=debug
+  check_metric_recorded pvc-patch pvcLatency resizeLatency
+  check_quantile_recorded pvc-patch pvcLatency Resize
+}
+
 # bats test_tags=subsystem:indexing
 @test "kube-burner-metrics-aggregate.yml: metrics aggregation" {
   export STORAGE_CLASS_NAME
@@ -286,6 +295,11 @@ teardown_file() {
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
 }
 
+@test "kube-burner.yml: incremental-load=true" {
+  export INCREMENTAL_LOAD=true LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
+}
 
 # bats test_tags=subsystem:measurements
 @test "kube-burner-vm-snapshot-test.yml: volume snapshot latency via VirtualMachineSnapshot" {
