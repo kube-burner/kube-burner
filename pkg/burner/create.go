@@ -301,7 +301,6 @@ func (ex *JobExecutor) waitForCompletion(iterationStart, iterationEnd int, ns st
 }
 
 func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
-	defer atomic.AddInt32(&ex.objectOperations, 1)
 	var uns *unstructured.Unstructured
 	var err error
 	if log.GetLevel() == log.TraceLevel {
@@ -312,6 +311,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ctx.Err() != nil {
 			return true, err
 		}
+		atomic.AddInt32(&ex.objectOperations, 1)
 		// When the object has a namespace already specified, use it
 		if objNs := obj.GetNamespace(); objNs != "" {
 			ns = objNs
