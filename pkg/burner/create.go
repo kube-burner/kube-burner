@@ -315,6 +315,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ctx.Err() != nil {
 			return true, err
 		}
+		atomic.AddInt32(&ex.objectOperations, 1)
 		// When the object has a namespace already specified, use it
 		if objNs := obj.GetNamespace(); objNs != "" {
 			ns = objNs
@@ -353,7 +354,6 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 			log.Error("Retrying object creation")
 			return false, nil
 		}
-		atomic.AddInt32(&ex.objectOperations, 1)
 		if ns != "" {
 			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		} else {
