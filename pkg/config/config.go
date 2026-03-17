@@ -64,7 +64,7 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 	indexer := rawIndexer{
 		IndexerConfig: indexers.IndexerConfig{
 			InsecureSkipVerify: false,
-			MetricsDirectory:   "collected-metrics",
+			MetricsDirectory:   "collected-metrics-{{.UUID}}",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
 		SkipTLSVerify: true,
@@ -261,6 +261,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 
 	inputData, err := getInputData(userDataFileReader, additionalVars)
 	inputData["UUID"] = uuid
+	configSpec.GlobalConfig.UUID = uuid
 	if err != nil {
 		return configSpec, err
 	}
@@ -316,7 +317,6 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		}
 	}
 	configSpec.GlobalConfig.Timeout = timeout
-	configSpec.GlobalConfig.UUID = uuid
 	configSpec.GlobalConfig.RUNID = uid.NewString()
 	return configSpec, nil
 }

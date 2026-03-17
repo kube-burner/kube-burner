@@ -7,7 +7,6 @@ global:
 metricsEndpoints:
 - indexer:
     type: local
-    metricsDirectory: {{ .METRICS_FOLDER }}
 
 jobs:
   # create a VM but do not wait for it to finish

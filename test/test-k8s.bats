@@ -36,7 +36,7 @@ setup_file() {
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  export METRICS_FOLDER="metrics-${UUID}"
+  export METRICS_FOLDER="collected-metrics-${UUID}"
   export ES_INDEXING=""
   export CHURN_MODE=""
   export CHURN_CYCLES=0

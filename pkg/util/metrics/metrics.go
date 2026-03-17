@@ -16,6 +16,7 @@ package metrics
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/v2/pkg/alerting"
@@ -55,6 +56,13 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	// MetricsEndpoint has preference over the configuration file
 	if scraperConfig.MetricsEndpoint != "" {
 		scraperConfig.ConfigSpec.MetricsEndpoints = DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint)
+	}
+	for i, ep := range scraperConfig.ConfigSpec.MetricsEndpoints {
+		if ep.Type == indexers.LocalIndexer && strings.Contains(ep.MetricsDirectory, "{{.UUID}}") {
+			scraperConfig.ConfigSpec.MetricsEndpoints[i].MetricsDirectory = strings.ReplaceAll(
+				ep.MetricsDirectory, "{{.UUID}}", scraperConfig.ConfigSpec.GlobalConfig.UUID,
+			)
+		}
 	}
 	for pos, metricsEndpoint := range scraperConfig.ConfigSpec.MetricsEndpoints {
 		indexer = nil
