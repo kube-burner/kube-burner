@@ -153,10 +153,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				jobExecutor.executeHooksForJobStage(config.HookBeforeDeployment, &errs, &innerRC)
 
-				if jobErrs := jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations); jobErrs != nil {
-					errs = append(errs, jobErrs...)
-					innerRC = 1
-				}
 				if jobCreateErrs, stepJobs := runCreateOrIncremental(ctx, jobExecutor, measurementsFactory, kubeClientProvider, embedCfg, measurementsJobName, metricsScraper, configSpec); jobCreateErrs != nil {
 					errs = append(errs, jobCreateErrs...)
 					innerRC = 1
