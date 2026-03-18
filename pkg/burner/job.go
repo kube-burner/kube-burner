@@ -147,7 +147,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delete delay: %v", jobExecutor.ChurnConfig.DeleteDelay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				jobExecutor.executeHooksForJobStage(config.HookBeforeDeployment, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.HookBeforeJobExecution, &errs, &innerRC)
 
 				if jobCreateErrs, stepJobs := runCreateOrIncremental(ctx, jobExecutor, measurementsFactory, kubeClientProvider, embedCfg, measurementsJobName, metricsScraper, configSpec); jobCreateErrs != nil {
 					errs = append(errs, jobCreateErrs...)
@@ -162,7 +162,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 						UUID:      jobExecutor.uuid,
 					})
 				}
-				jobExecutor.executeHooksForJobStage(config.HookAfterDeployment, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
 
 				if ctx.Err() != nil {
 					return
@@ -187,13 +187,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 				}
 			} else {
-				jobExecutor.executeHooksForJobStage(config.HookBeforeDeployment, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.HookBeforeJobExecution, &errs, &innerRC)
 
 				if jobErrs := jobExecutor.Run(ctx); len(jobErrs) > 0 {
 					errs = append(errs, jobErrs...)
 					innerRC = 1
 				}
-				jobExecutor.executeHooksForJobStage(config.HookAfterDeployment, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
 				if ctx.Err() != nil {
 					return
 				}

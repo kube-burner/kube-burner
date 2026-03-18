@@ -26,15 +26,15 @@ import (
 type JobHook string
 
 const (
-	HookBeforeDeployment JobHook = "beforeJobExecution"
-	HookAfterDeployment  JobHook = "afterJobExecution"
-	HookBeforeChurn      JobHook = "beforeChurn"
-	HookAfterChurn       JobHook = "afterChurn"
-	HookBeforeCleanup    JobHook = "beforeCleanup"
-	HookAfterCleanup     JobHook = "afterCleanup"
-	HookBeforeGC         JobHook = "beforeGC"
-	HookAfterGC          JobHook = "afterGC"
-	HookOnEachIteration  JobHook = "onEachIteration"
+	HookBeforeJobExecution JobHook = "beforeJobExecution"
+	HookAfterJobExecution  JobHook = "afterJobExecution"
+	HookBeforeChurn        JobHook = "beforeChurn"
+	HookAfterChurn         JobHook = "afterChurn"
+	HookBeforeCleanup      JobHook = "beforeCleanup"
+	HookAfterCleanup       JobHook = "afterCleanup"
+	HookBeforeGC           JobHook = "beforeGC"
+	HookAfterGC            JobHook = "afterGC"
+	HookOnEachIteration    JobHook = "onEachIteration"
 )
 
 // JobType type of job

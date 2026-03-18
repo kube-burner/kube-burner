@@ -429,15 +429,15 @@ func jobIsDuped() error {
 
 func HookBeforeWorkload() error {
 	validWhen := map[JobHook]bool{
-		HookBeforeDeployment: true,
-		HookAfterDeployment:  true,
-		HookBeforeChurn:      true,
-		HookAfterChurn:       true,
-		HookBeforeCleanup:    true,
-		HookAfterCleanup:     true,
-		HookBeforeGC:         true,
-		HookAfterGC:          true,
-		HookOnEachIteration:  true,
+		HookBeforeJobExecution: true,
+		HookAfterJobExecution:  true,
+		HookBeforeChurn:        true,
+		HookAfterChurn:         true,
+		HookBeforeCleanup:      true,
+		HookAfterCleanup:       true,
+		HookBeforeGC:           true,
+		HookAfterGC:            true,
+		HookOnEachIteration:    true,
 	}
 
 	for _, job := range configSpec.Jobs {

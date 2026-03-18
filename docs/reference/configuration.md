@@ -408,7 +408,7 @@ The `when` field specifies at which stage the hook should execute:
 | Stage                    | Description                                           |
 |--------------------------|-------------------------------------------------------|
 | `beforeJobExecution`     | Before job objects are created                        |
-| `afterJobExecution`      | After job objects are created                         |
+| `afterJobExecution`      | After job objects are created (before churning)       |
 | `onEachIteration`        | On each job iteration                                 |
 | `beforeChurn`            | Before churn operation starts                         |
 | `afterChurn`             | After churn operation completes                       |

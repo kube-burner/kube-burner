@@ -62,10 +62,6 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 			continue
 		}
 
-		if len(hook.Cmd) == 0 {
-			log.Warnf("Empty command for hook %s, skipping it", when)
-			continue
-		}
 		if hook.Background {
 			// Start in background, store process
 			if err := hm.executeBackgroundHook(hook); err != nil {
@@ -76,9 +72,6 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 	// Execute foreground hooks sequentially
 	for _, hook := range hooks {
 		if hook.When != when {
-			continue
-		}
-		if len(hook.Cmd) == 0 {
 			continue
 		}
 		if !hook.Background {
