@@ -647,10 +647,8 @@ func trimObject(obj *unstructured.Unstructured) {
 	unstructured.RemoveNestedField(obj.Object, "spec", "template", "metadata", "labels", "controller-uid")
 }
 
-// getRawKinds extracts the kind field values from raw template content.
-// Uses k8s.io/apimachinery/pkg/util/yaml.YAMLReader from client-go to split YAML documents,
-// then extracts kind fields using line scanning to handle Go template syntax safely.
-// Preserves template syntax like {{.Kind}} for detection.
+// getRawKinds extracts kind field values from YAML documents.
+// Handles Go template syntax like {{.Kind}} safely.
 // Returns an error if any document is missing a kind field.
 func getRawKinds(content []byte) ([]string, error) {
 	var kinds []string
@@ -685,11 +683,9 @@ func getRawKinds(content []byte) ([]string, error) {
 	return kinds, nil
 }
 
-// extractKindFromDocument extracts the kind field value from a YAML document using line scanning.
-// It looks for top-level "kind:" fields (no indentation) to handle Go template syntax safely.
-// This approach is necessary because templates may contain Go template syntax (e.g., {{.Kind}})
-// that would cause standard YAML parsers to fail.
-// Returns ErrKindNotFound if the document does not contain a kind field.
+// extractKindFromDocument extracts the kind field from a YAML document by line scanning.
+// It finds top-level "kind:" fields to safely handle Go template syntax (e.g., {{.Kind}}).
+// Returns ErrKindNotFound if kind is not present.
 func extractKindFromDocument(doc []byte) (string, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(doc))
 	var ErrKindNotFound = fmt.Errorf("kind field not found in YAML document")

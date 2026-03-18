@@ -38,9 +38,7 @@ type object struct {
 	ready         bool
 	documentIndex int
 	symbolicGVK   []*schema.GroupVersionKind
-	// resolvedGVRs tracks GVRs resolved at runtime for templated kinds.
-	// Key is the GVR string, value is the GVR itself.
-	// This is needed because templated kinds produce different GVRs per iteration.
+	// resolvedGVRs stores runtime-resolved GVRs for templated kinds (varies per iteration)
 	resolvedGVRs    sync.Map
 	IsKindTemplated bool
 }
