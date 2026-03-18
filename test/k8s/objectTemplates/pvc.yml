@@ -1,0 +1,11 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ .JobName }}-{{ .Iteration }}-{{ .Replica }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .storageClassName }}
+  resources:
+    requests:
+      storage: {{ .size }}

@@ -33,6 +33,7 @@ type JobSummary struct {
 	ElapsedTime         float64        `json:"elapsedTime"`
 	AchievedQps         float64        `json:"achievedQps,omitempty"`
 	UUID                string         `json:"uuid"`
+	IncrementalLoadUUID string         `json:"incrementalLoadUUID,omitempty"`
 	MetricName          string         `json:"metricName"`
 	JobConfig           config.Job     `json:"jobConfig"`
 	Version             string         `json:"version,omitempty"`

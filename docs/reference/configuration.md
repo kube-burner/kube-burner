@@ -143,12 +143,13 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `namespaceAnnotations`       | Add custom annotations to the namespaces created by kube-burner                                                                       | Object   | {}       |
 | `churnConfig`                | Configures job churning, only supported for create jobs, see [churning jobs section](#churning-jobs)                                  | Object   | {}       |
 | `defaultMissingKeysWithZero` | Stops templates from exiting with an error when a missing key is found, meaning users will have to ensure templates hand missing keys | Boolean  | false    |
-| `executionMode`              | Job execution mode. More details at [execution modes](#execution-modes)                                                               | String   | parallel |
+| `executionMode`              | Execution mode for processing objects within a job. Only applies to `patch` and `kubevirt` job types (`create`, `delete`, and `read` jobs ignore this setting). More details at [execution modes](#execution-modes) | String   | Varies by job type |
 | `objectDelay`                | How long to wait between each object in a job                                                                                         | Duration | 0s       |
 | `objectWait`                 | Wait for each object to complete before processing the next one - not for Create jobs                                                 | Boolean  | false    |
 | `metricsAggregate`           | Aggregate the metrics collected for this job with those of the next one                                                               | Boolean  | false    |
 | `metricsClosing`             | To define when the metrics collection should stop. More details at [MetricsClosing](#MetricsClosing)                                  | String   | afterJobPause |
 | `hooks`                      | List of hooks to execute at different job stages. See [hooks section](#hooks)                                                         | List     | []       |
+| `incrementalLoad`           | Enables incremental load behaviour for creation jobs. See [Incremental Load](#incremental-load).                                      | Object   | {}            |
 
 !!! note
     Both `churnCycles` and `churnDuration` serve as termination conditions, with the churn process halting when either condition is met first. If someone wishes to exclusively utilize `churnDuration` to control churn, they can achieve this by setting `churnCycles` to `0`. Conversely, to prioritize `churnCycles`, one should set a longer `churnDuration` accordingly.
@@ -157,12 +158,59 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
     When `jobType` is set to [Delete](#delete) the following settings are forced:
     `jobIterations` is set to `1`,
     `waitWhenFinished` is set to `false`,
-    `executionMode` is set to `sequential`
+    `executionMode` is set to `sequential`.
+    When `jobType` is set to [Read](#read), `executionMode` is forced to `sequential`.
+    Any user-specified `executionMode` value is ignored for these job types.
 
 Our configuration files strictly follow YAML syntax. To clarify on List and Object types usage, they are nothing but the [`Lists and Dictionaries`](https://gettaurus.org/docs/YAMLTutorial/#Lists-and-Dictionaries) in YAML syntax.
 
 Examples of valid configuration files can be found in the [examples folder](https://github.com/kube-burner/kube-burner/tree/master/examples).
 
+### Incremental Load
+
+`incrementalLoad` enables gradual increase in number of iterations for creation jobs. The runner performs create operations for each step window, then runs either a configured health-check script or a built-in cluster health-check, and finally waits `stepDelay` before the next step.
+
+| Option | Description | Type | Default |
+|--------|-------------|------|---------|
+| `startIterations` | Initial number of iterations to start with. If omitted, the job's `jobIterations` is used. | Integer | `jobIterations` |
+| `totalIterations` | Total number of iterations to reach. If omitted, no increase beyond `startIterations` is performed. | Integer | same as `startIterations` |
+| `stepDelay` | Delay between incremental steps (Go duration, e.g., `30s`). | Duration | `0s` |
+| `pattern.type` | Load pattern: `linear` or `exponential`. | String | `linear` |
+| `pattern.linear.minSteps` | Minimum number of steps for linear pattern. | Integer | `0` |
+| `pattern.linear.stepSize` | Fixed step size (iterations) for linear pattern. When set, steps will increment by this value. | Integer | `1` |
+| `pattern.exponential.base` | Base of the exponential increase. | Float | `2.0` |
+| `pattern.exponential.maxIncrease` | Maximum tolerable increase (absolute iterations) for an exponential bump. | Integer | `0` |
+| `pattern.exponential.warmupSteps` | Number of linear warmup steps before applying exponential increases. | Integer | `0` |
+| `healthCheckScript` | Optional shell script path (.i.e local/remote) executed after each incremental step. If omitted, a built-in API + node readiness check is used. | String | `""` |
+
+!!! note
+    Linear pattern falls back to a single step when `minSteps` is not provided and the implementation guards against division-by-zero when computing ranges. The runner will stop on any health-check error (script non-zero exit or built-in check failure).
+
+#### Incremental load behavior
+
+The incremental load feature increases the number of iterations from a configured start (`startIterations`) to a configured total (`totalIterations`) in cumulative fashion. Two growth patterns are supported:
+
+- Linear: iterations increase by a fixed amount each step (configured with `pattern.linear.stepSize`).
+- Exponential: iterations grow multiplicatively using `pattern.exponential.base`. An optional `pattern.exponential.warmupSteps` value can apply a few initial linear increases before exponential growth begins.
+
+After each increase the runner performs the configured health check and will stop early on failure. Between successful steps the runner waits the configured `stepDelay` before applying the next increase.
+
+Simple examples:
+- Linear example (`startIterations=10`, `totalIterations=50`, `pattern.linear.stepSize=10`):
+  - Step 1 runs 10 iterations, captures metircs and does GC preparing for the next step.
+  - Step 2 similarly runs the entrie cycle for 20 iterations and (+10).
+  - Step 3 runs 30 (+10).
+  - Step 4 runs 40 (+10).
+  - Step 5 runs 50 (+10, target reached).
+  - Progression: `10 → 20 → 30 → 40 → 50`.
+- Exponential example (`startIterations=5`, `totalIterations=100`, `pattern.exponential.base=2`):
+  - Step 1 runs 5 iterations, captures metircs and does GC preparing for the next step.
+  - Step 2 similarly runs the entire cycle for 10 iterations and (×2).
+  - Step 3 runs 20 (×2).
+  - Step 4 runs 40 (×2).
+  - Step 5 runs 80 (×2).
+  - Step 6 would be 160, but it is capped at the configured target, so it runs 100.
+  - Progression: `5 → 10 → 20 → 40 → 80 → 100`.
 
 ### Watchers
 
@@ -693,10 +741,54 @@ Wait is supported for the following operations:
 
 ## Execution Modes
 
-Patch jobs support different execution modes
+The `executionMode` parameter controls how objects are processed within a job. It is a **per-job setting** defined under each job entry in the configuration file. There is no global-level `executionMode` and no CLI flag to override it.
 
-- `parallel` - run all steps without any waiting between objects or iterations
-- `sequential` - Run for each object before moving to the next job iteration with an optional wait between objects and/or between iterations
+### Supported values
+
+- `parallel` — Process all objects across all iterations concurrently, without waiting between objects or iterations.
+- `sequential` — Process each object before moving to the next, with optional delays between objects (`objectDelay`) and/or between iterations (`jobIterationDelay`).
+
+### Per-job-type behavior
+
+| Job Type   | `executionMode` behavior | Default | User-configurable? |
+|------------|--------------------------|---------|---------------------|
+| `create`   | Not used. Create jobs have their own execution path and ignore this setting | N/A | No |
+| `patch`    | Fully supported | `parallel` | Yes |
+| `delete`   | Forced to `sequential`. User config is overridden | `sequential` | No |
+| `read`     | Forced to `sequential`. User config is overridden | `sequential` | No |
+| `kubevirt` | Fully supported | `sequential` | Yes |
+
+### Precedence rules
+
+1. For `delete` and `read` jobs, the implementation unconditionally sets `executionMode` to `sequential`, regardless of any user-specified value.
+2. For `patch` and `kubevirt` jobs, the user-specified value takes effect. If omitted, the default shown in the table above is used.
+3. There is no global `executionMode` setting and no CLI flag. The value is always resolved per job.
+
+### Example
+
+```yaml
+jobs:
+  - name: patch-deployments
+    jobType: patch
+    jobIterations: 5
+    executionMode: sequential   # User-configurable; default would be "parallel"
+    objectDelay: 2s              # Only effective when executionMode is "sequential"
+    objects:
+      - kind: Deployment
+        labelSelector: {kube-burner.io/job: create-deployments}
+        objectTemplate: templates/deployment_patch.json
+        patchType: "application/strategic-merge-patch+json"
+        apiVersion: apps/v1
+
+  - name: delete-objects
+    jobType: delete
+    # executionMode is forced to "sequential" for delete jobs;
+    # setting it here has no effect.
+    objects:
+      - kind: Deployment
+        labelSelector: {kube-burner.io/job: create-deployments}
+        apiVersion: apps/v1
+```
 
 ## Churning Jobs
 
@@ -735,7 +827,7 @@ Churn supports the following options:
 - `duration`: Length of time that the job is churned for
 - `delay`: Length of time to wait between each churn period
 - `deleteDelay`: Length of time to wait after deletion and before recreation within a churn period. Defaults to `0s`
-- `mode`: Churning mode, either `namespaces`, to churn entire namespaces or `objects`, to churn individual objects of the job's namespaces. Defaults to `namespaces`.
+- `mode`: Churning mode, either `namespaces`, to churn entire namespaces or `objects`, to churn individual cluster-scoped and namespaced objects. Defaults to `namespaces`.
 
 !!! note
     In order to enable churning for a job, either `duration` or `cycles` must be set. It's possible to use both at the same time.
