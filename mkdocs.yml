@@ -13,6 +13,7 @@ nav:
   - Alerting: observability/alerting.md
 - Contributing:
   - contributing/index.md
+  - AI Policy: contributing/ai-policy.md
   - GitHub Workflows:
     - contributing/pullrequest.md
     - contributing/release.md

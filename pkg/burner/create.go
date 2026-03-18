@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
 )
 
@@ -138,6 +139,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	var ns string
 	var waitErrors []error
 	var namespacesWaited = make(map[string]bool)
+	var hookErrors []error
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
@@ -146,7 +148,12 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
+
 	for i := iterationStart; i < iterationEnd; i++ {
+		// Execute onEachIteration hooks
+		if ex.executeHooksForJobStage(config.HookOnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
+			log.Errorf("%v", hookErrors)
+		}
 		if ctx.Err() != nil {
 			return []error{ctx.Err()}
 		}
@@ -349,6 +356,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ctx.Err() != nil {
 			return true, err
 		}
+		atomic.AddInt32(&ex.objectOperations, 1)
 		// When the object has a namespace already specified, use it
 		if objNs := obj.GetNamespace(); objNs != "" {
 			ns = objNs
@@ -387,7 +395,6 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 			log.Error("Retrying object creation")
 			return false, nil
 		}
-		atomic.AddInt32(&ex.objectOperations, 1)
 		if ns != "" {
 			log.Debugf("Created %s/%s in namespace %s", uns.GetKind(), uns.GetName(), ns)
 		} else {
@@ -412,6 +419,7 @@ func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[st
 func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	// Cleanup namespaces based on the labels we added to the objects
 	log.Infof("Churning mode: %s", ex.ChurnConfig.Mode)
+	var hookErrors []error
 	switch ex.ChurnConfig.Mode {
 	case config.ChurnNamespaces:
 		ex.nsChurning = true // Enable namespace churning flag to prevent non namespaced objects to be churned
@@ -422,6 +430,10 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 		return ex.churnNamespaces(ctx)
 	case config.ChurnObjects:
 		ex.churnObjects(ctx)
+	}
+	// Execute afterChurn hooks
+	if ex.executeHooksForJobStage(config.HookAfterChurn, &hookErrors, nil); len(hookErrors) > 0 {
+		log.Errorf("%v", hookErrors)
 	}
 	return nil
 }
@@ -487,6 +499,10 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		// 1 hour timeout to delete namespace
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
+		if ex.ChurnConfig.DeleteDelay > 0 {
+			log.Infof("Sleeping for %v after deletion", ex.ChurnConfig.DeleteDelay)
+			time.Sleep(ex.ChurnConfig.DeleteDelay)
+		}
 		// Re-create objects that were deleted
 		log.Infof("Re-creating %d deleted namespaces", numToChurn)
 		if jobErrs := ex.RunCreateJob(cleanupCtx, randStart, numToChurn+randStart); jobErrs != nil {
@@ -521,32 +537,38 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 			log.Infof("Reached specified number of churn cycles (%d), stopping churn job", ex.ChurnConfig.Cycles)
 			return
 		}
-		log.Infof("Deleting objects")
+		log.Infof("Deleting objects in churn cycle %d", cyclesCount)
 		for _, obj := range ex.objects {
-			// if churning is enabled in the object
+			// if churning is enabled for the object
 			if obj.Churn {
 				labelSelector := obj.LabelSelector
 				// Remove these labels to list all objects
 				delete(labelSelector, config.KubeBurnerLabelJobIteration)
 				delete(labelSelector, config.KubeBurnerLabelReplica)
-				objectList, err = ex.dynamicClient.Resource(obj.gvr).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
-					LabelSelector: labels.FormatLabels(labelSelector),
-				})
+				log.Debugf("Listing %s with label selector: %s", obj.Kind, labels.FormatLabels(labelSelector))
+				objectList, err = ex.dynamicClient.Resource(obj.gvr).List(ctx, metav1.ListOptions{LabelSelector: labels.FormatLabels(labelSelector)})
 				if err != nil {
 					log.Errorf("Error listing objects: %v", err)
 					continue
 				}
+				log.Debugf("Total %s listed: %d, churning %d%%", obj.Kind, len(objectList.Items), ex.ChurnConfig.Percent)
 				numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
 				randStart := rand.Intn(len(objectList.Items) - numToChurn + 1)
 				objectsToDelete := objectList.Items[randStart : numToChurn+randStart]
+				log.Infof("Deleting %d %s", numToChurn, obj.Kind)
 				for _, objToDelete := range objectsToDelete {
-					log.Debugf("Deleting %s/%s", objToDelete.GetKind(), objToDelete.GetName())
-					err = ex.dynamicClient.Resource(obj.gvr).Namespace(objToDelete.GetNamespace()).Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
+					resource := ex.dynamicClient.Resource(obj.gvr)
+					var dr dynamic.ResourceInterface = resource
+					if obj.namespaced {
+						dr = resource.Namespace(objToDelete.GetNamespace())
+					}
+					err = dr.Delete(ctx, objToDelete.GetName(), metav1.DeleteOptions{
 						PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 					})
 					if err != nil {
 						log.Errorf("Error deleting object %s/%s: %v", objToDelete.GetKind(), objToDelete.GetName(), err)
 					}
+
 					trimObject(&objToDelete)
 					// Store the deleted objects to re-create them later
 					deletedObjects = append(deletedObjects, churnDeletedObject{
@@ -557,6 +579,10 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 			}
 		}
 		ex.verifyDelete(ctx, deletedObjects)
+		if ex.ChurnConfig.DeleteDelay > 0 {
+			log.Infof("Sleeping for %v after deletion", ex.ChurnConfig.DeleteDelay)
+			time.Sleep(ex.ChurnConfig.DeleteDelay)
+		}
 		ex.reCreateDeletedObjects(ctx, deletedObjects)
 		log.Infof("Sleeping for %v", ex.ChurnConfig.Delay)
 		time.Sleep(ex.ChurnConfig.Delay)
@@ -589,8 +615,13 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 // verifyDelete verifies if the object has been deleted
 func (ex *JobExecutor) verifyDelete(ctx context.Context, deletedObjects []churnDeletedObject) {
 	for _, obj := range deletedObjects {
+		log.Debugf("Verifying deletion of %s", obj.gvr.Resource)
 		wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
-			_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(ctx, obj.object.GetName(), metav1.GetOptions{})
+			if obj.object.GetNamespace() != "" {
+				_, err = ex.dynamicClient.Resource(obj.gvr).Namespace(obj.object.GetNamespace()).Get(ctx, obj.object.GetName(), metav1.GetOptions{})
+			} else {
+				_, err = ex.dynamicClient.Resource(obj.gvr).Get(ctx, obj.object.GetName(), metav1.GetOptions{})
+			}
 			if kerrors.IsNotFound(err) {
 				return true, nil
 			}

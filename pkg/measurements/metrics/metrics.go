@@ -54,7 +54,7 @@ func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []any) error 
 				v := r.FieldByName(phase.Metric).Int()
 				if v > phase.Threshold.Milliseconds() {
 					latency := float32(v) / 1000
-					err := fmt.Errorf("podLatency: %s %s latency (%.2fs) higher than configured threshold: %v", phase.Metric, phase.ConditionType, latency, phase.Threshold)
+					err := fmt.Errorf("%s: %s %s latency (%.2fs) higher than configured threshold: %v", pq.(LatencyQuantiles).MetricName, phase.Metric, phase.ConditionType, latency, phase.Threshold)
 					errs = append(errs, err)
 				}
 			}

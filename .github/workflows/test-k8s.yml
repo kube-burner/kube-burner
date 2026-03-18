@@ -52,13 +52,13 @@ jobs:
       run: git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
 
     - name: Download kube-burner binary
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: kube-burner
         path: /tmp/
 
     - name: Install bats
-      uses: bats-core/bats-action@3.0.1
+      uses: bats-core/bats-action@4.0.0
       with:
         bats-version: 1.10.0
         support-install: false

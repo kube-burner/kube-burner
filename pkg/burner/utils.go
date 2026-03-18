@@ -155,7 +155,7 @@ func (ex *JobExecutor) resolveObjectMapping(obj *object) {
 }
 
 // Verify verifies the number of created objects
-func (ex *JobExecutor) Verify(ctx context.Context) bool {
+func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool {
 	var objList *unstructured.UnstructuredList
 	var replicas int
 	success := true
@@ -218,6 +218,8 @@ func (ex *JobExecutor) Verify(ctx context.Context) bool {
 		var objectsExpected int
 		if obj.RunOnce {
 			objectsExpected = obj.Replicas
+		} else if expectedIterations != nil {
+			objectsExpected = obj.Replicas * (*expectedIterations)
 		} else {
 			objectsExpected = obj.Replicas * ex.JobIterations
 		}
@@ -397,4 +399,20 @@ func (ex *JobExecutor) isLikelyNamespaced(kind string) bool {
 	}
 
 	return true
+}
+
+func (ex *JobExecutor) CollectAndLogBackgroundHookResults(errs []error, innerRC int) ([]error, int) {
+	if len(ex.Hooks) > 0 {
+		backgroundResults := ex.hookManager.WaitBackgroundHooks()
+		for _, result := range backgroundResults {
+			if result.err != nil {
+				log.Errorf("Background hook failed: %v (duration: %v)", result.err, result.duration)
+				errs = append(errs, result.err)
+				innerRC = 1
+			} else {
+				log.Infof("Background hook completed successfully (duration: %v)", result.duration)
+			}
+		}
+	}
+	return errs, innerRC
 }
