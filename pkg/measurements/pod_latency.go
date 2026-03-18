@@ -55,8 +55,6 @@ var (
 		config.PatchJob:    {},
 		config.DeletionJob: {},
 	}
-	// eventRetryDelays are backoff delays when event is not yet in the lister (high load).
-	eventRetryDelays = []time.Duration{200 * time.Millisecond, 500 * time.Millisecond, time.Second}
 )
 
 type podMetric struct {
@@ -176,23 +174,28 @@ func (p *podLatency) handleUpdatePod(obj any) {
 // getScheduledTimeFromEvent returns scheduled time in microseconds precision from event.
 // Retries with backoff when the event is not yet in the lister (e.g. under high load).
 func (p *podLatency) getScheduledTimeFromEvent(pod *corev1.Pod) time.Time {
-	for _, delay := range eventRetryDelays {
+	var timestamp time.Time
+	err := util.RetryWithExponentialBackOff(func() (bool, error) {
 		eventList, _ := p.eventLister.List(labels.Everything())
 		for _, event := range eventList {
 			if event.InvolvedObject.UID == pod.UID && event.Reason == "Scheduled" {
-				return event.EventTime.Time
+				timestamp = event.EventTime.Time
+				return true, nil
 			}
 		}
-		time.Sleep(delay)
+		return false, nil
+	}, 1*time.Second, 5, 0, 1*time.Minute)
+	if err != nil {
+		log.Warnf("failed to get scheduled of pod %s/%s time from event: %v", pod.Namespace, pod.Name, err)
 	}
-	return time.Time{}
+	return timestamp
 }
 
 // getStartedTimeFromEvent returns the timestamp of the latest container started event in the pod.
 // Retries with backoff when the event is not yet in the lister (e.g. under high load).
 func (p *podLatency) getStartedTimeFromEvent(pod *corev1.Pod) time.Time {
 	var timestamp time.Time
-	for _, delay := range eventRetryDelays {
+	err := util.RetryWithExponentialBackOff(func() (bool, error) {
 		eventList, _ := p.eventLister.List(labels.Everything())
 		for _, event := range eventList {
 			if event.InvolvedObject.UID == pod.UID && event.Reason == "Started" {
@@ -215,10 +218,12 @@ func (p *podLatency) getStartedTimeFromEvent(pod *corev1.Pod) time.Time {
 			}
 		}
 		if timestamp.IsZero() {
-			time.Sleep(delay)
-		} else {
-			break
+			return false, nil
 		}
+		return true, nil
+	}, time.Second, 5, 0, 1*time.Minute)
+	if err != nil {
+		log.Warnf("failed to get started of pod %s/%s time from event: %v", pod.Namespace, pod.Name, err)
 	}
 	return timestamp
 }
