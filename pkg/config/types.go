@@ -22,6 +22,21 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// JobHook type of hook command
+type JobHook string
+
+const (
+	HookBeforeJobExecution JobHook = "beforeJobExecution"
+	HookAfterJobExecution  JobHook = "afterJobExecution"
+	HookBeforeChurn        JobHook = "beforeChurn"
+	HookAfterChurn         JobHook = "afterChurn"
+	HookBeforeCleanup      JobHook = "beforeCleanup"
+	HookAfterCleanup       JobHook = "afterCleanup"
+	HookBeforeGC           JobHook = "beforeGC"
+	HookAfterGC            JobHook = "afterGC"
+	HookOnEachIteration    JobHook = "onEachIteration"
+)
+
 // JobType type of job
 type JobType string
 
@@ -204,6 +219,17 @@ type Job struct {
 	Measurements []mtypes.Measurement `yaml:"measurements" json:"measurements,omitempty"`
 	// IncrementalLoad enables incremental load behavior for creation jobs
 	IncrementalLoad *IncrementalLoad `yaml:"incrementalLoad" json:"incrementalLoad,omitempty"`
+	// Hooks to execute at different stages of the job
+	Hooks []Hook `yaml:"hooks" json:"hooks,omitempty"`
+}
+
+type Hook struct {
+	// CMD command to execute
+	Cmd []string `yaml:"cmd" json:"cmd,omitempty"`
+	// When specifies when to execute the command
+	When JobHook `yaml:"when" json:"when,omitempty"`
+	// Background indicates whether to run the command in background
+	Background bool `yaml:"background" json:"background,omitempty"`
 }
 
 type WaitOptions struct {

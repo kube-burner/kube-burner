@@ -120,6 +120,7 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	var ns string
 	var waitErrors []error
 	var namespacesWaited = make(map[string]bool)
+	var hookErrors []error
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	if ex.nsRequired && !ex.NamespacedIterations {
@@ -128,7 +129,12 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
+
 	for i := iterationStart; i < iterationEnd; i++ {
+		// Execute onEachIteration hooks
+		if ex.executeHooksForJobStage(config.HookOnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
+			log.Errorf("%v", hookErrors)
+		}
 		if ctx.Err() != nil {
 			return []error{ctx.Err()}
 		}
@@ -378,6 +384,7 @@ func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[st
 func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	// Cleanup namespaces based on the labels we added to the objects
 	log.Infof("Churning mode: %s", ex.ChurnConfig.Mode)
+	var hookErrors []error
 	switch ex.ChurnConfig.Mode {
 	case config.ChurnNamespaces:
 		ex.nsChurning = true // Enable namespace churning flag to prevent non namespaced objects to be churned
@@ -388,6 +395,10 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 		return ex.churnNamespaces(ctx)
 	case config.ChurnObjects:
 		ex.churnObjects(ctx)
+	}
+	// Execute afterChurn hooks
+	if ex.executeHooksForJobStage(config.HookAfterChurn, &hookErrors, nil); len(hookErrors) > 0 {
+		log.Errorf("%v", hookErrors)
 	}
 	return nil
 }

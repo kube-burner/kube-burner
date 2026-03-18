@@ -100,7 +100,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		for _, jobExecutor := range jobExecutors {
 			if jobExecutor.JobType == config.CreationJob && jobExecutor.Cleanup {
 				log.Infof("Cleaning up previous runs for job: %s", jobExecutor.Name)
+				// Before GC
+				jobExecutor.executeHooksForJobStage(config.HookBeforeGC, &errs, &innerRC)
 				jobExecutor.gc(ctx, nil)
+				// After GC
+				jobExecutor.executeHooksForJobStage(config.HookAfterGC, &errs, &innerRC)
+
 			}
 		}
 
@@ -142,6 +147,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delete delay: %v", jobExecutor.ChurnConfig.DeleteDelay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
+				jobExecutor.executeHooksForJobStage(config.HookBeforeJobExecution, &errs, &innerRC)
+
 				if jobCreateErrs, stepJobs := runCreateOrIncremental(ctx, jobExecutor, measurementsFactory, kubeClientProvider, embedCfg, measurementsJobName, metricsScraper, configSpec); jobCreateErrs != nil {
 					errs = append(errs, jobCreateErrs...)
 					innerRC = 1
@@ -155,6 +162,8 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 						UUID:      jobExecutor.uuid,
 					})
 				}
+				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
+
 				if ctx.Err() != nil {
 					return
 				}
@@ -178,24 +187,32 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 				}
 			} else {
+				jobExecutor.executeHooksForJobStage(config.HookBeforeJobExecution, &errs, &innerRC)
+
 				if jobErrs := jobExecutor.Run(ctx); len(jobErrs) > 0 {
 					errs = append(errs, jobErrs...)
 					innerRC = 1
 				}
+				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
 				if ctx.Err() != nil {
 					return
 				}
 			}
-			if jobExecutor.BeforeCleanup != "" {
-				log.Infof("Waiting for beforeCleanup command %s to finish", jobExecutor.BeforeCleanup)
-				stdOut, stdErr, err := util.RunShellCmd(jobExecutor.BeforeCleanup, jobExecutor.embedCfg)
-				if err != nil {
-					err = fmt.Errorf("BeforeCleanup failed: %v", err)
-					log.Error(err.Error())
-					errs = append(errs, err)
-					innerRC = 1
+			if jobExecutor.BeforeCleanup != "" || len(jobExecutor.Hooks) > 0 {
+				// Execute beforeCleanup hooks first
+				jobExecutor.executeHooksForJobStage(config.HookBeforeCleanup, &errs, &innerRC)
+
+				if jobExecutor.BeforeCleanup != "" {
+					log.Infof("Waiting for beforeCleanup command %s to finish", jobExecutor.BeforeCleanup)
+					stdOut, stdErr, err := util.RunShellCmd(jobExecutor.BeforeCleanup, jobExecutor.embedCfg)
+					if err != nil {
+						err = fmt.Errorf("BeforeCleanup failed: %v", err)
+						log.Error(err.Error())
+						errs = append(errs, err)
+						innerRC = 1
+					}
+					log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 				}
-				log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
 			}
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
@@ -240,7 +257,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			errs = append(errs, watcherStopErrs...)
 			if jobExecutor.GC {
 				jobExecutor.gc(ctx, nil)
+				jobExecutor.executeHooksForJobStage(config.HookAfterCleanup, &errs, &innerRC)
 			}
+			// Collect all background hook results once after all hook stages are complete for this job.
+			errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 		}
 		if globalConfig.WaitWhenFinished {
 			runWaitList(ctx, jobExecutors)
@@ -257,6 +277,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				log.Info("Garbage collection metrics on, waiting for GC")
 				// If gcMetrics is enabled, garbage collection must be blocker
 				gcWg.Wait()
+				for _, jobExecutor := range jobExecutors {
+					jobExecutor.executeHooksForJobStage(config.HookAfterCleanup, &errs, &innerRC)
+					// Collect background hook results from the global GC metrics phase.
+					errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
+				}
 				// We add an extra dummy job to executedJobs to index metrics from this stage
 				executedJobs = append(executedJobs, prometheus.Job{
 					Start: cleanupStart,
@@ -319,6 +344,15 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 	}
 	return rc, utilerrors.NewAggregate(errs)
+}
+
+func (ex *JobExecutor) executeHooksForJobStage(stage config.JobHook, errs *[]error, innerRC *int) {
+	if err := ex.hookManager.executeHooks(ex.Hooks, stage); err != nil {
+		log.Errorf("Error executing hooks for %s: %v", stage, err)
+		*errs = append(*errs, err)
+		*innerRC = 1
+		return
+	}
 }
 
 func Destroy(ctx context.Context, configSpec config.Spec, kubeClientProvider *config.KubeClientProvider) error {
