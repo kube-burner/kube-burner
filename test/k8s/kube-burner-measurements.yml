@@ -22,7 +22,7 @@ jobs:
     cleanup: true
     objects:
       - objectTemplate: objectTemplates/deployment.yml
-        replicas: 1
+        replicas: 3
         inputVars:
           containerImage: quay.io/cloud-bulldozer/sampleapp:latest
           envName: deployment-pod

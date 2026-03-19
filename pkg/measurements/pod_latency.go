@@ -86,7 +86,6 @@ type podLatency struct {
 	BaseMeasurement
 	eventLister     lcorev1.EventLister
 	eventInformerCh chan struct{}
-	handlerWg       sync.WaitGroup
 }
 
 type podLatencyMeasurementFactory struct {
@@ -109,8 +108,6 @@ func (plmf podLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 }
 
 func (p *podLatency) handleCreatePod(obj any) {
-	p.handlerWg.Add(1)
-	defer p.handlerWg.Done()
 	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
 	if err != nil {
 		log.Errorf("failed to convert to Pod: %v", err)
@@ -131,8 +128,6 @@ func (p *podLatency) handleCreatePod(obj any) {
 }
 
 func (p *podLatency) handleUpdatePod(obj any) {
-	p.handlerWg.Add(1)
-	defer p.handlerWg.Done()
 	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
 	if err != nil {
 		log.Errorf("failed to convert to Pod: %v", err)
@@ -189,7 +184,7 @@ func (p *podLatency) getScheduledTimeFromEvent(pod *corev1.Pod) time.Time {
 			}
 		}
 		return false, nil
-	}, 1*time.Second, 2, 0, 1*time.Minute)
+	}, 100*time.Millisecond, 2, 0, time.Minute)
 	if err != nil {
 		log.Warnf("failed to get scheduled of pod %s/%s time from event: %v", pod.Namespace, pod.Name, err)
 	}
@@ -226,7 +221,7 @@ func (p *podLatency) getStartedTimeFromEvent(pod *corev1.Pod) time.Time {
 			return false, nil
 		}
 		return true, nil
-	}, time.Second, 5, 0, 1*time.Minute)
+	}, 100*time.Millisecond, 5, 0, time.Minute)
 	if err != nil {
 		log.Warnf("failed to get started of pod %s/%s time from event: %v", pod.Namespace, pod.Name, err)
 	}
@@ -329,14 +324,8 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops podLatency measurement
 func (p *podLatency) Stop() error {
-	// Since handlers may still be querying the event lister,
-	// Close the event informer channel to prevent new items from being processed.
-	close(p.eventInformerCh)
-	// Wait for any in-flight handlers to finish.
-	p.handlerWg.Wait()
-	// StopMeasurement stops the watchers first, preventing new handler invocations.
-	err := p.StopMeasurement(p.normalizeMetrics, p.getLatency)
-	return err
+	defer close(p.eventInformerCh)
+	return p.StopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 
 func (p *podLatency) normalizeMetrics() float64 {
