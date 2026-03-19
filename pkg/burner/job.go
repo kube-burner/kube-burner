@@ -91,6 +91,17 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
+
+		// Execute global beforeAllJobs hooks
+		if len(globalConfig.Hooks) > 0 {
+			globalHookManager := NewHookManager(ctx, len(globalConfig.Hooks))
+			if err := globalHookManager.executeHooks(globalConfig.Hooks, config.HookBeforeAllJobs); err != nil {
+				log.Errorf("Error executing global beforeAllJobs hooks: %v", err)
+				errs = append(errs, err)
+				innerRC = 1
+			}
+		}
+
 		if err := handlePreloadImages(ctx, jobExecutors, kubeClientProvider); err != nil {
 			log.Error(err.Error())
 			return
@@ -311,6 +322,17 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			returnMap[job.JobConfig.Name] = returnPair{innerRC: innerRC, executionErrors: executionErrors}
 		}
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, true, "", false)
+
+		// Execute global afterAllJobs hooks (after metrics indexing)
+		if len(globalConfig.Hooks) > 0 {
+			globalHookManager := NewHookManager(ctx, len(globalConfig.Hooks))
+			if err := globalHookManager.executeHooks(globalConfig.Hooks, config.HookAfterAllJobs); err != nil {
+				log.Errorf("Error executing global afterAllJobs hooks: %v", err)
+				errs = append(errs, err)
+				innerRC = 1
+			}
+		}
+
 		log.Infof("Finished execution with UUID: %s", uuid)
 		res <- innerRC
 	}()
