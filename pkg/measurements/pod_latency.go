@@ -84,8 +84,9 @@ type podMetric struct {
 
 type podLatency struct {
 	BaseMeasurement
-	eventLister    lcorev1.EventLister
-	stopInformerCh chan struct{}
+	eventLister     lcorev1.EventLister
+	eventInformerCh chan struct{}
+	handlerWg       sync.WaitGroup
 }
 
 type podLatencyMeasurementFactory struct {
@@ -108,6 +109,8 @@ func (plmf podLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job, c
 }
 
 func (p *podLatency) handleCreatePod(obj any) {
+	p.handlerWg.Add(1)
+	defer p.handlerWg.Done()
 	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
 	if err != nil {
 		log.Errorf("failed to convert to Pod: %v", err)
@@ -128,6 +131,8 @@ func (p *podLatency) handleCreatePod(obj any) {
 }
 
 func (p *podLatency) handleUpdatePod(obj any) {
+	p.handlerWg.Add(1)
+	defer p.handlerWg.Done()
 	pod, err := util.ConvertAnyToTyped[corev1.Pod](obj)
 	if err != nil {
 		log.Errorf("failed to convert to Pod: %v", err)
@@ -248,9 +253,9 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err := eventInformer.SetTransform(eventTransformFunc()); err != nil {
 		log.Warnf("failed to set event transform: %v", err)
 	}
-	p.stopInformerCh = make(chan struct{})
-	go eventInformer.Run(p.stopInformerCh)
-	if !cache.WaitForCacheSync(p.stopInformerCh, eventInformer.HasSynced) {
+	p.eventInformerCh = make(chan struct{})
+	go eventInformer.Run(p.eventInformerCh)
+	if !cache.WaitForCacheSync(p.eventInformerCh, eventInformer.HasSynced) {
 		return fmt.Errorf("failed to sync event informer cache")
 	}
 	p.eventLister = lcorev1.NewEventLister(eventInformer.GetIndexer())
@@ -324,8 +329,14 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops podLatency measurement
 func (p *podLatency) Stop() error {
-	close(p.stopInformerCh)
-	return p.StopMeasurement(p.normalizeMetrics, p.getLatency)
+	// Since handlers may still be querying the event lister,
+	// Close the event informer channel to prevent new items from being processed.
+	close(p.eventInformerCh)
+	// Wait for any in-flight handlers to finish.
+	p.handlerWg.Wait()
+	// StopMeasurement stops the watchers first, preventing new handler invocations.
+	err := p.StopMeasurement(p.normalizeMetrics, p.getLatency)
+	return err
 }
 
 func (p *podLatency) normalizeMetrics() float64 {
