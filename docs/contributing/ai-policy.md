@@ -33,7 +33,7 @@ Using LLMs for coding is allowed, but responsibility remains with the contributo
 
 ### Requirements
 
-- Follow all project contribution guidance in [CONTRIBUTING.md](https://github.com/kube-burner/kube-burner/blob/main/CONTRIBUTING.md)
+- Follow all project contribution guidance in [CONTRIBUTING.md](../../CONTRIBUTING.md)
 - Keep changes focused, minimal, and easy to review
 - Match existing style, formatting, and structure
 - Remove unnecessary noise (unused files, generated metadata, unrelated edits)

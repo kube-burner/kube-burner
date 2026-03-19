@@ -201,7 +201,7 @@ A valid file provided to the `--metrics-endpoint` looks like this:
   token: <token> # Authentication token
   metrics: [metrics.yaml] # Metrics profiles to use for this endpoint
   indexer:
-    - type: local
+    type: local
 - endpoint: http://remotehost:9090 # Another Prometheus endpoint
   token: <token>
   alerts: [alerts.yaml] # Alert profile, when metrics is not defined, defining an indexer is optional

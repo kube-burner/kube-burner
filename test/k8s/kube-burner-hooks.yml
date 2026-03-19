@@ -1,0 +1,64 @@
+global:
+  gc: false
+  gcMetrics: false
+  waitWhenFinished: false
+
+jobs:
+  - name: basic-hook-test
+    jobType: create
+    jobIterations: 2
+    qps: 10
+    burst: 10
+    namespace: hook-test
+    namespacedIterations: true
+    verifyObjects: false
+    cleanup: true
+    podWait: false
+    waitForDeletion: false
+    waitWhenFinished: false
+    maxWaitTimeout: 5s
+    
+    hooks:
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeJobExecution"]
+        when: beforeJobExecution
+        background: true
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterJobExecution"]
+        when: afterJobExecution
+        background: true
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "onEachIteration"]
+        when: onEachIteration
+        background: true
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeChurn"]
+        when: beforeChurn
+        background: true
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterChurn"]
+        when: afterChurn
+        background: true
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeCleanup"]
+        when: beforeCleanup
+        background: false
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeGC"]
+        when: beforeGC
+        background: false
+      
+      - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterGC"]
+        when: afterGC
+        background: false
+    
+    churnConfig:
+      duration: 10s
+      percent: 50
+      delay: 2s
+      mode: namespaces
+    
+    objects:
+      - objectTemplate: objectTemplates/hooks-test.yaml
+        replicas: 1
+        inputVars:
+          containerImage: {{ .HOOKS_IMAGE }}

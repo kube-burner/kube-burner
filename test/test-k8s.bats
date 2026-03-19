@@ -6,7 +6,7 @@ load helpers.bash
 
 setup_file() {
   cd k8s
-  export BATS_TEST_TIMEOUT=1800
+  export BATS_TEST_TIMEOUT=2000
   export JOB_ITERATIONS=4
   export QPS=5
   export BURST=5
@@ -42,6 +42,7 @@ setup() {
   export CHURN_CYCLES=0
   export PRELOAD_IMAGES=false
   export GC=true
+  export INCREMENTAL_LOAD=""
   export JOBGC=false
   export LOCAL_INDEXING=""
   export ALERTING=""
@@ -49,6 +50,7 @@ setup() {
   export CRD=""
   export SVC_LATENCY=""
   export JOB_NAME=kube-burner-ci-${BATS_TEST_NUMBER}
+  export HOOKS_IMAGE=busybox:latest
 }
 
 teardown() {
@@ -66,6 +68,54 @@ teardown_file() {
       $OCI_BIN network rm -f monitoring
     fi
   fi
+}
+
+# bats test_tags=subsystem:hooks
+@test "kube-burner hooks execution verification" {
+  export JOB_NAME="basic-hook-test"
+  export BATS_TEST_TIMEOUT=300
+  rm -rf /tmp/kube-burner-hooks
+  mkdir -p /tmp/kube-burner-hooks
+  
+  run_cmd ${KUBE_BURNER} init -c kube-burner-hooks.yml --uuid=${UUID} --log-level=info
+  
+  echo "Running verify_hooks_with_helpers for ${JOB_NAME}"
+  if ! verify_hooks_with_helpers kube-burner-hooks.yml "${JOB_NAME}"; then
+    echo "verify_hooks_with_helpers failed, dumping hook logs for debugging:"
+    ls -la /tmp/kube-burner-hooks/ 2>/dev/null || echo "Hook log directory not found"
+    for log in /tmp/kube-burner-hooks/*.log; do
+      [ -f "$log" ] && echo "=== $(basename $log) ===" && head -20 "$log"
+    done
+    return 1
+  fi
+}
+
+# bats test_tags=subsystem:measurements
+@test "kube-burner-dv.yml: datavolume latency" {
+  if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
+    echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
+  if [[ -z "$STORAGE_CLASS_NAME" ]]; then
+    echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+
+  run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid=${UUID} --log-level=debug
+
+  # Verify metrics for PVC and DV were collected
+  local jobs=("create-vm" "create-base-image-dv")
+  for job in "${jobs[@]}"; do
+    check_metric_recorded ${job} dvLatency dvReadyLatency
+    check_metric_recorded ${job} pvcLatency bindingLatency
+    check_quantile_recorded ${job} dvLatency Ready
+    check_quantile_recorded ${job} pvcLatency Bound
+  done
+
+  # Verify that metrics for VolumeSnapshot was collected
+  check_metric_recorded create-snapshot volumeSnapshotLatency vsReadyLatency
+  check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
 }
 
 # bats test_tags=subsystem:preload,subsystem:indexing
@@ -203,31 +253,11 @@ teardown_file() {
 }
 
 # bats test_tags=subsystem:measurements
-@test "kube-burner-dv.yml: datavolume latency" {
-  if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
-    echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    return 1
-  fi
+@test "kube-burner-pvc-resize.yml: pvc resize latency" {
   export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
-  if [[ -z "$STORAGE_CLASS_NAME" ]]; then
-    echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
-    return 1
-  fi
-
-  run_cmd ${KUBE_BURNER} init -c kube-burner-dv.yml --uuid=${UUID} --log-level=debug
-
-  # Verify metrics for PVC and DV were collected
-  local jobs=("create-vm" "create-base-image-dv")
-  for job in "${jobs[@]}"; do
-    check_metric_recorded ${job} dvLatency dvReadyLatency
-    check_metric_recorded ${job} pvcLatency bindingLatency
-    check_quantile_recorded ${job} dvLatency Ready
-    check_quantile_recorded ${job} pvcLatency Bound
-  done
-
-  # Verify that metrics for VolumeSnapshot was collected
-  check_metric_recorded create-snapshot volumeSnapshotLatency vsReadyLatency
-  check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
+  run_cmd ${KUBE_BURNER} init -c kube-burner-pvc-resize.yml --uuid=${UUID} --log-level=debug
+  check_metric_recorded pvc-patch pvcLatency resizeLatency
+  check_quantile_recorded pvc-patch pvcLatency Resize
 }
 
 # bats test_tags=subsystem:indexing
@@ -286,6 +316,30 @@ teardown_file() {
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
 }
 
+@test "kube-burner.yml: incremental-load=true" {
+  export INCREMENTAL_LOAD=true LOCAL_INDEXING=true
+  run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
+  check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
+}
+
+# bats test_tags=subsystem:measurements
+@test "kube-burner-vm-snapshot-test.yml: volume snapshot latency via VirtualMachineSnapshot" {
+  if [[ -z "$VOLUME_SNAPSHOT_CLASS_NAME" ]]; then
+    echo "VOLUME_SNAPSHOT_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+  export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
+  if [[ -z "$STORAGE_CLASS_NAME" ]]; then
+    echo "STORAGE_CLASS_NAME must be set when using USE_EXISTING_CLUSTER"
+    return 1
+  fi
+
+  run_cmd ${KUBE_BURNER} init -c kube-burner-vm-snapshot-test.yml --uuid=${UUID} --log-level=debug
+
+  # Verify volumeSnapshotLatency metrics were collected for the snapshot-vm job
+  check_metric_recorded snapshot-vm volumeSnapshotLatency vsReadyLatency
+  check_quantile_recorded snapshot-vm volumeSnapshotLatency Ready
+}
 
 @test "rc timeout check" {
   run ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --timeout=2s

@@ -1,0 +1,66 @@
+{{- $testNameSpace := "vm-snapshot-test" -}}
+{{- $diskVolumeName := "base-vm-rootdisk" -}}
+{{- $osImage := "docker://quay.io/kubevirt/cirros-container-disk-demo:v1.6.3" -}}
+{{- $osImageSize := "1Gi" -}}
+---
+global:
+  measurements:
+  - name: volumeSnapshotLatency
+
+metricsEndpoints:
+- indexer:
+    type: local
+    metricsDirectory: {{ .METRICS_FOLDER }}
+
+jobs:
+
+# Step 1: Create a VM with a DataVolume disk
+- name: create-vm
+  jobType: create
+  jobIterations: 1
+  qps: 20
+  burst: 20
+  namespacedIterations: false
+  namespace: {{ $testNameSpace }}
+  verifyObjects: true
+  errorOnVerify: true
+  maxWaitTimeout: 1h
+  jobPause: 10s
+  cleanup: true
+  defaultMissingKeysWithZero: true
+  objects:
+  - objectTemplate: ./objectTemplates/vm-datavolume.yml
+    replicas: 1
+    inputVars:
+      vmName: base-vm
+      rootDiskVolumeName: {{ $diskVolumeName }}
+      storageClassName: {{ .STORAGE_CLASS_NAME }}
+      osImage: {{ $osImage }}
+      osImageSize: {{ $osImageSize }}
+
+# Step 2: Create VirtualMachineSnapshot (this indirectly creates VolumeSnapshots)
+# This is the job that triggers the bug in issue #1074
+- name: snapshot-vm
+  jobType: create
+  jobIterations: 1
+  qps: 20
+  burst: 20
+  namespacedIterations: false
+  namespace: {{ $testNameSpace }}
+  verifyObjects: true
+  errorOnVerify: true
+  waitWhenFinished: false
+  maxWaitTimeout: 15m
+  jobPause: 30s
+  cleanup: false
+  defaultMissingKeysWithZero: true
+  measurements:
+  - name: volumeSnapshotLatency
+  objects:
+  - objectTemplate: objectTemplates/vm-snapshot.yml
+    replicas: 1
+    waitOptions:
+      kind: VirtualMachineSnapshot
+      customStatusPaths:
+      - key: ".readyToUse | tostring | ascii_downcase"
+        value: "true"

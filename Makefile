@@ -22,6 +22,14 @@ SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
 KUBE_BURNER_VERSION= github.com/cloud-bulldozer/go-commons/v2/version
 
+define HARDENED_BUILD_CMD
+	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -trimpath $(HARDENED_FLAGS) \
+		-ldflags "-s -w $(HARDENED_LDFLAGS) -X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) \
+		-X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) \
+		-X $(KUBE_BURNER_VERSION).Version=$(VERSION)" \
+		-o $(BIN_PATH) ./cmd/kube-burner
+endef
+
 # Containers
 ENGINE ?= podman
 REGISTRY = quay.io
@@ -66,20 +74,12 @@ $(BIN_PATH): $(SOURCES)
 build-release: $(SOURCES)
 	@echo -e "\033[2mBuilding secure release binary $(BIN_PATH)\033[0m"
 	@echo "GOPATH=$(GOPATH)"
-	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -trimpath $(HARDENED_FLAGS) \
-		-ldflags "-s -w $(HARDENED_LDFLAGS) -X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) \
-		-X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) \
-		-X $(KUBE_BURNER_VERSION).Version=$(VERSION)" \
-		-o $(BIN_PATH) ./cmd/kube-burner
+	$(HARDENED_BUILD_CMD)
 
 build-hardened: $(SOURCES)
 	@echo -e "\033[2mBuilding hardened static $(BIN_PATH)\033[0m"
 	@echo "GOPATH=$(GOPATH)"
-	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -trimpath $(HARDENED_FLAGS) \
-		-ldflags "-s -w $(HARDENED_LDFLAGS) -X $(KUBE_BURNER_VERSION).GitCommit=$(GIT_COMMIT) \
-		-X $(KUBE_BURNER_VERSION).BuildDate=$(BUILD_DATE) \
-		-X $(KUBE_BURNER_VERSION).Version=$(VERSION)" \
-		-o $(BIN_PATH) ./cmd/kube-burner
+	$(HARDENED_BUILD_CMD)
 
 build-hardened-cgo: $(SOURCES)
 	@echo -e "\033[2mBuilding fully hardened $(BIN_PATH) with CGO\033[0m"

@@ -582,20 +582,12 @@ func (n *netpolLatency) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
-		n.stopWatchers()
 	}()
 	kutil.CleanupNamespacesByLabel(ctx, n.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", networkPolicyProxy))
-	n.normalizeMetrics()
-	for _, q := range n.LatencyQuantiles {
-		pq := q.(metrics.LatencyQuantiles)
-		// Divide nanoseconds by 1e6 to get milliseconds
-		log.Infof("%s: %s 50th: %d 99th: %d max: %d avg: %d", n.JobConfig.Name, pq.QuantileName, pq.P50, pq.P99, pq.Max, pq.Avg)
-
-	}
-	return nil
+	return n.StopMeasurement(n.normalizeMetrics, n.getLatency)
 }
 
-func (n *netpolLatency) normalizeMetrics() {
+func (n *netpolLatency) normalizeMetrics() float64 {
 	var latencies []float64
 	var minLatencies []float64
 	sLen := 0
@@ -607,18 +599,14 @@ func (n *netpolLatency) normalizeMetrics() {
 		n.NormLatencies = append(n.NormLatencies, metric)
 		return true
 	})
-	calcSummary := func(name string, inputLatencies []float64) metrics.LatencyQuantiles {
-		latencySummary := metrics.NewLatencySummary(inputLatencies, name)
-		latencySummary.UUID = n.Uuid
-		latencySummary.Timestamp = time.Now().UTC()
-		latencySummary.Metadata = n.Metadata
-		latencySummary.MetricName = netpolLatencyQuantilesMeasurement
-		latencySummary.JobName = n.JobConfig.Name
-		return latencySummary
-	}
-	if sLen > 0 {
-		n.LatencyQuantiles = append(n.LatencyQuantiles, calcSummary("Ready", latencies))
-		n.LatencyQuantiles = append(n.LatencyQuantiles, calcSummary("minReady", minLatencies))
+	return 0.0
+}
+
+func (n *netpolLatency) getLatency(normLatency any) map[string]float64 {
+	netpolMetric := normLatency.(netpolMetric)
+	return map[string]float64{
+		"Ready":    float64(netpolMetric.ReadyLatency),
+		"MinReady": float64(netpolMetric.MinReadyLatency),
 	}
 }
 
