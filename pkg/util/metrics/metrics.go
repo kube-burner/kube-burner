@@ -16,7 +16,6 @@ package metrics
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/v2/pkg/alerting"
@@ -54,15 +53,10 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 		}
 	}
 	// MetricsEndpoint has preference over the configuration file
+	// if --metrics-directory is set, retain the value that is overwritten by UnmarshalYAML default
+	passedMetricsDirectory := scraperConfig.ConfigSpec.MetricsEndpoints[0].IndexerConfig.MetricsDirectory
 	if scraperConfig.MetricsEndpoint != "" {
 		scraperConfig.ConfigSpec.MetricsEndpoints = DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint)
-	}
-	for i, ep := range scraperConfig.ConfigSpec.MetricsEndpoints {
-		if ep.Type == indexers.LocalIndexer && strings.Contains(ep.MetricsDirectory, "{{.UUID}}") {
-			scraperConfig.ConfigSpec.MetricsEndpoints[i].MetricsDirectory = strings.ReplaceAll(
-				ep.MetricsDirectory, "{{.UUID}}", scraperConfig.ConfigSpec.GlobalConfig.UUID,
-			)
-		}
 	}
 	for pos, metricsEndpoint := range scraperConfig.ConfigSpec.MetricsEndpoints {
 		indexer = nil
@@ -71,6 +65,12 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				indexerAlias = fmt.Sprintf("indexer-%d", pos)
 			} else {
 				indexerAlias = metricsEndpoint.Alias
+			}
+			if metricsEndpoint.IndexerConfig.Type == indexers.LocalIndexer {
+				metricsEndpoint.IndexerConfig.MetricsDirectory = passedMetricsDirectory
+				if metricsEndpoint.IndexerConfig.MetricsDirectory == "collected-metrics-{{.UUID}}" {
+					metricsEndpoint.IndexerConfig.MetricsDirectory = fmt.Sprintf("collected-metrics-%s", scraperConfig.ConfigSpec.GlobalConfig.UUID)
+				}
 			}
 			log.Infof("📁 Creating %s indexer: %s", metricsEndpoint.Type, indexerAlias)
 			indexer, err = indexers.NewIndexer(metricsEndpoint.IndexerConfig)
