@@ -184,7 +184,7 @@ func (p *podLatency) getScheduledTimeFromEvent(pod *corev1.Pod) time.Time {
 			}
 		}
 		return false, nil
-	}, 1*time.Second, 5, 0, 1*time.Minute)
+	}, 1*time.Second, 2, 0, 1*time.Minute)
 	if err != nil {
 		log.Warnf("failed to get scheduled of pod %s/%s time from event: %v", pod.Namespace, pod.Name, err)
 	}
