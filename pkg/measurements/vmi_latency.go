@@ -91,6 +91,7 @@ type vmiMetric struct {
 	Metadata                  any    `json:"metadata,omitempty"`
 	JobIteration              int    `json:"jobIteration"`
 	Replica                   int    `json:"replica"`
+	ChurnMetric               bool   `json:"churnMetric,omitempty"`
 }
 
 type vmiLatency struct {
@@ -380,6 +381,7 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 		m.UUID = vmi.Uuid
 		m.JobName = vmi.JobConfig.Name
 		m.Metadata = vmi.Metadata
+		m.ChurnMetric = vmi.IsChurnMetric(m.Timestamp)
 		vmi.NormLatencies = append(vmi.NormLatencies, m)
 		return true
 	})
