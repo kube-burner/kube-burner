@@ -54,7 +54,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	}
 	// MetricsEndpoint has preference over the configuration file
 	// if --metrics-directory is set, retain the value that is overwritten by UnmarshalYAML default
-	passedMetricsDirectory := scraperConfig.ConfigSpec.MetricsEndpoints[0].IndexerConfig.MetricsDirectory
+	passedMetricsDirectory := scraperConfig.ConfigSpec.MetricsEndpoints[0].MetricsDirectory
 	if scraperConfig.MetricsEndpoint != "" {
 		scraperConfig.ConfigSpec.MetricsEndpoints = DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint)
 	}
@@ -66,10 +66,10 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 			} else {
 				indexerAlias = metricsEndpoint.Alias
 			}
-			if metricsEndpoint.IndexerConfig.Type == indexers.LocalIndexer {
-				metricsEndpoint.IndexerConfig.MetricsDirectory = passedMetricsDirectory
-				if metricsEndpoint.IndexerConfig.MetricsDirectory == "collected-metrics-{{.UUID}}" {
-					metricsEndpoint.IndexerConfig.MetricsDirectory = fmt.Sprintf("collected-metrics-%s", scraperConfig.ConfigSpec.GlobalConfig.UUID)
+			if metricsEndpoint.Type == indexers.LocalIndexer {
+				metricsEndpoint.MetricsDirectory = passedMetricsDirectory
+				if metricsEndpoint.MetricsDirectory == "collected-metrics-{{.UUID}}" {
+					metricsEndpoint.MetricsDirectory = fmt.Sprintf("collected-metrics-%s", scraperConfig.ConfigSpec.GlobalConfig.UUID)
 				}
 			}
 			log.Infof("📁 Creating %s indexer: %s", metricsEndpoint.Type, indexerAlias)
