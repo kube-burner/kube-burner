@@ -377,11 +377,11 @@ func indexCmd() *cobra.Command {
 				}
 			} else {
 				indexer.IndexerConfig = indexers.IndexerConfig{
-					Type:             indexers.LocalIndexer,
-					MetricsDirectory: metricsDirectory,
-					TarballName:      tarballName,
+					Type:        indexers.LocalIndexer,
+					TarballName: tarballName,
 				}
 			}
+			indexer.MetricsDirectory = metricsDirectory
 			configSpec.MetricsEndpoints = append(configSpec.MetricsEndpoints, indexer)
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      &configSpec,
