@@ -316,6 +316,17 @@ teardown_file() {
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
 }
 
+# bats test_tags=subsystem:core
+@test "test-symbolic-gvk-config.yaml: symbolic GVK resolution" {
+  run_cmd ${KUBE_BURNER} init -c test-symbolic-gvk-config.yaml --uuid=${UUID} --log-level=debug --set global.gc=false
+  verify_object_count CustomResourceDefinition 3 "" kube-burner.io/job=create-crds,kube-burner.io/uuid=${UUID}
+  
+  # Verify each templated kind
+  verify_object_count TestResource0 2 symbolic-gvk-test kube-burner.io/job=create-crs,kube-burner.io/uuid=${UUID}
+  verify_object_count TestResource1 2 symbolic-gvk-test kube-burner.io/job=create-crs,kube-burner.io/uuid=${UUID}
+  verify_object_count TestResource2 2 symbolic-gvk-test kube-burner.io/job=create-crs,kube-burner.io/uuid=${UUID}
+}
+
 @test "kube-burner.yml: incremental-load=true" {
   export INCREMENTAL_LOAD=true LOCAL_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"

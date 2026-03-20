@@ -16,6 +16,7 @@ package burner
 
 import (
 	"io"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,6 +37,10 @@ type object struct {
 	namespaced    bool
 	ready         bool
 	documentIndex int
+	symbolicGVK   []*schema.GroupVersionKind
+	// resolvedGVRs stores runtime-resolved GVRs for templated kinds (varies per iteration)
+	resolvedGVRs    sync.Map
+	IsKindTemplated bool
 }
 
 func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
@@ -48,9 +53,31 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 	}
 
 	gvk := schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
-	mapping, err := mapper.RESTMapping(gvk.GroupKind())
+	var symbolicGVKs []*schema.GroupVersionKind
+
+	mappings, err := mapper.RESTMappings(gvk.GroupKind())
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if len(mappings) == 0 {
+		log.Fatalf("No Resources found for kind: %s", obj.Kind)
+	}
+
+	var mapping *meta.RESTMapping
+
+	if len(mappings) == 1 {
+		mapping = mappings[0]
+	} else {
+		log.Debugf("Found %d mappings for %s", len(mappings), obj.Kind)
+
+		for _, m := range mappings {
+			gv := m.Resource.GroupVersion()
+			symbolicGVKs = append(symbolicGVKs, &schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: obj.Kind})
+			if gv.String() == obj.APIVersion {
+				mapping = m
+			}
+		}
 	}
 
 	var waitGVR *schema.GroupVersionResource
@@ -67,10 +94,12 @@ func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper
 	}
 
 	o := object{
-		Object:     obj,
-		gvr:        mapping.Resource,
-		waitGVR:    waitGVR,
-		namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		Object:      obj,
+		gvr:         mapping.Resource,
+		waitGVR:     waitGVR,
+		namespaced:  mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		gvk:         &gvk,
+		symbolicGVK: symbolicGVKs,
 	}
 
 	if obj.ObjectTemplate != "" {
