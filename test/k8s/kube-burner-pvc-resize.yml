@@ -6,7 +6,6 @@ global:
 metricsEndpoints:
   - indexer:
       type: local
-      metricsDirectory: {{ .METRICS_FOLDER }}
 
 jobs:
   - name: pvc-resize
