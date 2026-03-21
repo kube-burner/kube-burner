@@ -221,6 +221,10 @@ type Job struct {
 	IncrementalLoad *IncrementalLoad `yaml:"incrementalLoad" json:"incrementalLoad,omitempty"`
 	// Hooks to execute at different stages of the job
 	Hooks []Hook `yaml:"hooks" json:"hooks,omitempty"`
+	// ChurnStart marks when the churn phase started, set at runtime
+	ChurnStart *time.Time `yaml:"-" json:"-"`
+	// ChurnEnd marks when the churn phase ended, set at runtime
+	ChurnEnd *time.Time `yaml:"-" json:"-"`
 }
 
 type Hook struct {

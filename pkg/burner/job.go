@@ -169,10 +169,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					churnStart := time.Now().UTC()
-					executedJobs[jobIdx].ChurnStart = &churnStart
+					jobExecutor.Job.ChurnStart = &churnStart
+					executedJobs[jobIdx].JobConfig.ChurnStart = &churnStart
 					jobExecutor.RunCreateJobWithChurn(ctx)
 					churnEnd := time.Now().UTC()
-					executedJobs[jobIdx].ChurnEnd = &churnEnd
+					jobExecutor.Job.ChurnEnd = &churnEnd
+					executedJobs[jobIdx].JobConfig.ChurnEnd = &churnEnd
 				}
 				if jobExecutor.IncrementalLoad == nil {
 					// If object verification is enabled
@@ -410,8 +412,8 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				EndTimestamp:        job.End,
 				ElapsedTime:         elapsedTime,
 				AchievedQps:         achievedQps,
-				ChurnStartTimestamp: job.ChurnStart,
-				ChurnEndTimestamp:   job.ChurnEnd,
+				ChurnStartTimestamp: job.JobConfig.ChurnStart,
+				ChurnEndTimestamp:   job.JobConfig.ChurnEnd,
 				JobConfig:           job.JobConfig,
 				Metadata:            metricsScraper.SummaryMetadata,
 				Passed:              innerRC,
