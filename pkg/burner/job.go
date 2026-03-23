@@ -169,11 +169,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
 					churnStart := time.Now().UTC()
-					jobExecutor.Job.ChurnStart = &churnStart
+					jobExecutor.ChurnStart = &churnStart
 					executedJobs[jobIdx].JobConfig.ChurnStart = &churnStart
 					jobExecutor.RunCreateJobWithChurn(ctx)
 					churnEnd := time.Now().UTC()
-					jobExecutor.Job.ChurnEnd = &churnEnd
+					jobExecutor.ChurnEnd = &churnEnd
 					executedJobs[jobIdx].JobConfig.ChurnEnd = &churnEnd
 				}
 				if jobExecutor.IncrementalLoad == nil {
