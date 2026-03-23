@@ -546,7 +546,7 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 						}
 						log.Debugf("Deleting %s/%s/%s", object.GetKind(), object.GetNamespace(), object.GetName())
 						err = dr.Delete(ctx, object.GetName(), metav1.DeleteOptions{
-							PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+							PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 						})
 						if err != nil {
 							log.Errorf("Error deleting object %s/%s: %v", object.GetKind(), object.GetName(), err)
