@@ -517,8 +517,7 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 					log.Errorf("Error listing objects: %v", err)
 					continue
 				}
-				// Sort objects by creation timestamp to make sure we delete the same subset of objects each time
-				// so their potential inter-dependencies are met, i.e readiness probes
+				// Sort objects by creation timestamp so that always the oldest are deleted first during churn
 				sort.Slice(objectList.Items, func(i, j int) bool {
 					timeI := objectList.Items[i].GetCreationTimestamp()
 					timeJ := objectList.Items[j].GetCreationTimestamp()
