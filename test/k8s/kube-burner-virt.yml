@@ -27,7 +27,6 @@ metricsEndpoints:
   - endpoint: http://localhost:9090
     indexer: 
       type: local
-      metricsDirectory: {{ .METRICS_FOLDER }}
     metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
     alerts: [alerts.yml]
