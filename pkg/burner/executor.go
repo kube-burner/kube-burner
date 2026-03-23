@@ -58,6 +58,7 @@ type JobExecutor struct {
 	mapper            *restmapper.DeferredDiscoveryRESTMapper
 	deletionStrategy  string
 	objectOperations  int32
+	nsChurning        bool
 	hookManager       *HookManager
 }
 

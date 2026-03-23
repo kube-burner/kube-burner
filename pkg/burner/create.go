@@ -329,7 +329,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ns != "" {
 			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(ctx, obj, metav1.CreateOptions{})
 		} else {
-			if ex.ChurnConfig.Mode == config.ChurnNamespaces {
+			if !ex.nsChurning {
 				uns, err = ex.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
 			} else {
 				// Skip non-namespaced objects during namespace churning - they won't be deleted with the namespace
@@ -387,6 +387,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	var hookErrors []error
 	switch ex.ChurnConfig.Mode {
 	case config.ChurnNamespaces:
+		ex.nsChurning = true // Enable namespace churning flag to prevent non namespaced objects to be churned
 		if !ex.nsRequired {
 			log.Info("No namespaces were created in this job, skipping churning stage")
 			return nil
