@@ -15,10 +15,12 @@
 package burner
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"strings"
+	"text/template"
 	"text/template/parse"
 	"time"
 
@@ -27,7 +29,9 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
+	promql "github.com/prometheus/prometheus/promql/parser"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 	authv1 "k8s.io/api/authorization/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,6 +56,47 @@ func Validate(configSpec config.Spec, embedCfg *fileutils.EmbedConfiguration, re
 			clientSet = cs
 		} else {
 			log.Debugf("Could not create clientSet for RBAC check: %v", err)
+		}
+	}
+
+	// Validate metrics endpoints
+	if len(configSpec.MetricsEndpoints) > 0 {
+		vars := util.EnvToMap()
+		vars["elapsed"] = "5m"
+		var renderedQuery bytes.Buffer
+		for _, metricsEndpoint := range configSpec.MetricsEndpoints {
+			for _, metricsFile := range metricsEndpoint.Metrics {
+				f, err := fileutils.GetMetricsReader(metricsFile, embedCfg)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("metrics profile %s: cannot read: %w", metricsFile, err))
+					continue
+				}
+				type metricDef struct {
+					Query      string `yaml:"query"`
+					MetricName string `yaml:"metricName"`
+					Instant    bool   `yaml:"instant"`
+				}
+				var metrics []metricDef
+				decErr := yaml.NewDecoder(f).Decode(&metrics)
+				f.Close()
+				if decErr != nil {
+					errs = append(errs, fmt.Errorf("metrics profile %s: decode error: %w", metricsFile, decErr))
+					continue
+				}
+				for _, metric := range metrics {
+					t, _ := template.New("").Parse(metric.Query)
+					if err := t.Execute(&renderedQuery, vars); err != nil {
+						log.Warnf("Error rendering query: %v", err)
+						renderedQuery.Reset()
+						continue
+					}
+					query := renderedQuery.String()
+					renderedQuery.Reset()
+					if _, err := promql.ParseExpr(query); err != nil {
+						errs = append(errs, fmt.Errorf("metrics profile %s, %s: invalid PromQL %q: %w", metricsFile, metric.MetricName, query, err))
+					}
+				}
+			}
 		}
 	}
 

@@ -129,22 +129,11 @@ func initCmd() *cobra.Command {
 				}
 				defer userDataFileReader.Close()
 			}
-			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil, setVars)
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys || dryRun, nil, setVars)
 			if err != nil {
 				log.Error("Config error")
 				fmt.Printf("%s", err.Error())
 				os.Exit(1)
-			}
-			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
-				ConfigSpec:      &configSpec,
-				MetricsEndpoint: metricsEndpoint,
-				UserMetaData:    userMetadata,
-				AlertProfile:    alertProfile,
-				MetricsProfile:  metricsProfile,
-			})
-			if configSpec.GlobalConfig.ClusterHealth {
-				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
-				util.ClusterHealthCheck(clientSet)
 			}
 			if dryRun {
 				if restCfg != nil {
@@ -162,6 +151,17 @@ func initCmd() *cobra.Command {
 					log.Info("✅ Dry-run validation passed, no errors found.")
 				}
 				return
+			}
+			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
+				ConfigSpec:      &configSpec,
+				MetricsEndpoint: metricsEndpoint,
+				UserMetaData:    userMetadata,
+				AlertProfile:    alertProfile,
+				MetricsProfile:  metricsProfile,
+			})
+			if configSpec.GlobalConfig.ClusterHealth {
+				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
+				util.ClusterHealthCheck(clientSet)
 			}
 			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil, nil)
 			if err != nil {
