@@ -10,6 +10,7 @@ spec:
     developerConfiguration:
       featureGates:
         - Root
+        - Snapshot
   customizeComponents: {}
   imagePullPolicy: IfNotPresent
   workloadUpdateStrategy: {}

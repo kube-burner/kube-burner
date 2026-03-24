@@ -1,0 +1,18 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  labels:
+    app: pause
+  name: pod-{{.JobName}}-{{.Iteration}}-{{.Replica}}
+spec:
+  containers:
+  - image: registry.k8s.io/pause:3.9
+    name: pause
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - mountPath: /data
+      name: pvc-volume
+  volumes:
+  - name: pvc-volume
+    persistentVolumeClaim:
+      claimName: {{ .JobName }}-{{ .Iteration }}-{{ .Replica }}

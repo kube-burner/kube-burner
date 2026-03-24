@@ -64,7 +64,7 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 	indexer := rawIndexer{
 		IndexerConfig: indexers.IndexerConfig{
 			InsecureSkipVerify: false,
-			MetricsDirectory:   "collected-metrics",
+			MetricsDirectory:   "collected-metrics-{{.UUID}}",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
 		SkipTLSVerify: true,
@@ -261,6 +261,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 
 	inputData, err := getInputData(userDataFileReader, additionalVars)
 	inputData["UUID"] = uuid
+	configSpec.GlobalConfig.UUID = uuid
 	if err != nil {
 		return configSpec, err
 	}
@@ -297,6 +298,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
+	if err := HookBeforeWorkload(); err != nil {
+		return configSpec, err
+	}
 	for i, job := range configSpec.Jobs {
 		if len(job.Namespace) > 62 {
 			log.Warnf("Namespace %s length has > 62 characters, truncating it", job.Namespace)
@@ -313,7 +317,6 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		}
 	}
 	configSpec.GlobalConfig.Timeout = timeout
-	configSpec.GlobalConfig.UUID = uuid
 	configSpec.GlobalConfig.RUNID = uid.NewString()
 	return configSpec, nil
 }
@@ -421,6 +424,33 @@ func jobIsDuped() error {
 			return fmt.Errorf("Job names must be unique")
 		}
 	}
+	return nil
+}
+
+func HookBeforeWorkload() error {
+	validWhen := map[JobHook]bool{
+		HookBeforeJobExecution: true,
+		HookAfterJobExecution:  true,
+		HookBeforeChurn:        true,
+		HookAfterChurn:         true,
+		HookBeforeCleanup:      true,
+		HookAfterCleanup:       true,
+		HookBeforeGC:           true,
+		HookAfterGC:            true,
+		HookOnEachIteration:    true,
+	}
+
+	for _, job := range configSpec.Jobs {
+		for i, hook := range job.Hooks {
+			if !validWhen[hook.When] {
+				return fmt.Errorf("unsupported when value in %s hook %d: %s, (supported: %v)", job.Name, i, hook.When, maps.Keys(validWhen))
+			}
+			if len(hook.Cmd) == 0 {
+				return fmt.Errorf("hook %d in job %s has empty command", i, job.Name)
+			}
+		}
+	}
+
 	return nil
 }
 

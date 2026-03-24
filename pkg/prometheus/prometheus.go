@@ -165,6 +165,13 @@ func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfi
 
 // Create metric creates metric to be indexed
 func (p *Prometheus) createMetric(query, metricName string, job Job, labels model.Metric, value model.SampleValue, timestamp time.Time, isInstant bool) metric {
+	metadata := map[string]any{}
+	for k, v := range p.metadata {
+		metadata[k] = v
+	}
+	if job.IncrementalLoadUUID != "" {
+		metadata["incrementalLoadUUID"] = job.IncrementalLoadUUID
+	}
 	m := metric{
 		Labels:     make(map[string]string),
 		UUID:       p.UUID,
@@ -172,7 +179,7 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 		MetricName: metricName,
 		Timestamp:  timestamp,
 		JobName:    job.JobConfig.Name,
-		Metadata:   p.metadata,
+		Metadata:   metadata,
 	}
 	for k, v := range labels {
 		if k != model.MetricNameLabel {

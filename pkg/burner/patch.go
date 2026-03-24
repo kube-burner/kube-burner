@@ -59,7 +59,7 @@ func patchHandler(ctx context.Context, ex *JobExecutor, obj *object, originalIte
 		if obj.PatchType == string(types.ApplyPatchType) {
 			log.Fatalf("Apply patch type requires YAML")
 		}
-		data = obj.objectSpec
+		data = ex.renderTemplateForObject(obj, iteration, 0, false)
 	} else {
 		var asJson bool
 		if obj.PatchType == string(types.ApplyPatchType) {

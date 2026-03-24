@@ -77,11 +77,11 @@ This indexer writes collected metrics to local files.
 
 The `local` indexer can be configured by the parameters below:
 
-| Option             | Description                           | Type    | Default                 |
-| ------------------ | ------------------------------------- | ------- | ----------------------- |
-| `metricsDirectory` | Collected metric will be dumped here. | String  | collected-metrics       |
-| `createTarball`    | Create metrics tarball                | Boolean | false                   |
-| `tarballName`      | Name of the metrics tarball           | String  | kube-burner-metrics.tgz |
+| Option             | Description                           | Type    | Default                     |
+| ------------------ | ------------------------------------- | ------- | --------------------------- |
+| `metricsDirectory` | Collected metric will be dumped here. | String  | collected-metrics-{{.UUID}} |
+| `createTarball`    | Create metrics tarball                | Boolean | false                       |
+| `tarballName`      | Name of the metrics tarball           | String  | kube-burner-metrics.tgz     |
 
 ## Job Summary
 
@@ -174,7 +174,7 @@ A valid file provided to the `--metrics-endpoint` looks like this:
   token: <token> # Authentication token
   metrics: [metrics.yaml] # Metrics profiles to use for this endpoint
   indexer:
-    - type: local
+    type: local
 - endpoint: http://remotehost:9090 # Another Prometheus endpoint
   token: <token>
   alerts: [alerts.yaml] # Alert profile, when metrics is not defined, defining an indexer is optional

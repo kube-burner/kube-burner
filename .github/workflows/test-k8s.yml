@@ -52,7 +52,7 @@ jobs:
       run: git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
 
     - name: Download kube-burner binary
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: kube-burner
         path: /tmp/
