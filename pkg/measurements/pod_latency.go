@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -118,10 +119,6 @@ func (p *podLatency) handleCreatePod(obj any) {
 		Timestamp:    pod.CreationTimestamp.UTC(),
 		Namespace:    pod.Namespace,
 		Name:         pod.Name,
-		MetricName:   podLatencyMeasurement,
-		UUID:         p.Uuid,
-		JobName:      p.JobConfig.Name,
-		Metadata:     p.Metadata,
 		JobIteration: getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
 		Replica:      getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
 	})
@@ -287,15 +284,12 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 			Timestamp:              pod.CreationTimestamp.UTC(),
 			Namespace:              pod.Namespace,
 			Name:                   pod.Name,
-			MetricName:             podLatencyMeasurement,
 			NodeName:               pod.Spec.NodeName,
-			UUID:                   p.Uuid,
 			scheduled:              scheduled,
 			readyToStartContainers: readyToStartContainers,
 			initialized:            initialized,
 			containersReady:        containersReady,
 			podReady:               podReady,
-			JobName:                p.JobConfig.Name,
 		})
 	}
 }
@@ -362,7 +356,40 @@ func (p *podLatency) normalizeMetrics() float64 {
 		}
 		totalPods++
 		erroredPods += errorFlag
-		p.NormLatencies = append(p.NormLatencies, m)
+
+		// Build base labels shared by all per-condition documents for this pod.
+		baseLabels := map[string]any{
+			"namespace":    m.Namespace,
+			"pod":          m.Name,
+			"node":         m.NodeName,
+			"jobIteration": m.JobIteration,
+			"replica":      m.Replica,
+		}
+		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
+			lbls := make(map[string]any, len(baseLabels)+1)
+			for k, v := range baseLabels {
+				lbls[k] = v
+			}
+			lbls["condition"] = condition
+			return metrics.LatencyDocument{
+				Timestamp:  m.Timestamp,
+				Labels:     lbls,
+				Value:      float64(valueMs),
+				MetricName: podLatencyMeasurement,
+				UUID:       p.Uuid,
+				JobName:    p.JobConfig.Name,
+				Metadata:   p.Metadata,
+			}
+		}
+		// Emit one document per condition.
+		p.NormLatencies = append(p.NormLatencies,
+			makeDoc(string(corev1.PodScheduled), m.SchedulingLatency),
+			makeDoc(string(corev1.PodInitialized), m.InitializedLatency),
+			makeDoc(string(corev1.ContainersReady), m.ContainersReadyLatency),
+			makeDoc(string(corev1.PodReady), m.PodReadyLatency),
+			makeDoc(string(corev1.PodReadyToStartContainers), m.ReadyToStartContainersLatency),
+			makeDoc(containersStarted, m.ContainersStartedLatency),
+		)
 		return true
 	})
 	if totalPods == 0 {
@@ -372,15 +399,9 @@ func (p *podLatency) normalizeMetrics() float64 {
 }
 
 func (p *podLatency) getLatency(normLatency any) map[string]float64 {
-	podMetric := normLatency.(podMetric)
-	return map[string]float64{
-		string(corev1.PodScheduled):              float64(podMetric.SchedulingLatency),
-		string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
-		string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
-		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
-		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
-		containersStarted:                        float64(podMetric.ContainersStartedLatency),
-	}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition, _ := doc.Labels["condition"].(string)
+	return map[string]float64{condition: doc.Value}
 }
 
 func (p *podLatency) IsCompatible() bool {
