@@ -96,17 +96,20 @@ type netpolLatency struct {
 	BaseMeasurement
 }
 
+type netpolLatencyLabels struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"netpol"`
+	Condition string `json:"condition"`
+}
+
+func (l *netpolLatencyLabels) SetCondition(c string)       { l.Condition = c }
+func (l *netpolLatencyLabels) Clone() *netpolLatencyLabels { c := *l; return &c }
+
 type netpolMetric struct {
-	Timestamp       time.Time     `json:"timestamp"`
-	MinReadyLatency time.Duration `json:"minReady"`
-	ReadyLatency    time.Duration `json:"ready"`
-	MetricName      string        `json:"metricName"`
-	UUID            string        `json:"uuid"`
-	Namespace       string        `json:"namespace"`
-	Name            string        `json:"netpol"`
-	Metadata        any           `json:"metadata,omitempty"`
-	JobName         string        `json:"jobName,omitempty"`
-	ChurnMetric     bool          `json:"churnMetric,omitempty"`
+	metrics.LatencyDocument
+	MinReadyLatency time.Duration       `json:"minReady"`
+	ReadyLatency    time.Duration       `json:"ready"`
+	NetpolLabels    netpolLatencyLabels `json:"labels"`
 }
 
 type netpolLatencyMeasurementFactory struct {
@@ -458,14 +461,18 @@ func (n *netpolLatency) processResults() {
 		// Use minVal for reporting as ping test tool might have delayed initiating ping tests from some remote addresses.
 		// This can happen when remote pod was busy pinging other pods before trying our network policy pod
 		n.Metrics.Store(name, netpolMetric{
-			Name:            name,
-			Timestamp:       npCreationTime[name],
-			MetricName:      netpolLatencyMeasurement,
-			MinReadyLatency: time.Duration(latencySummary.Min),
-			ReadyLatency:    time.Duration(latencySummary.Max),
-			UUID:            n.Uuid,
-			Metadata:        n.Metadata,
-			JobName:         n.JobConfig.Name,
+			LatencyDocument: metrics.LatencyDocument{
+				Timestamp:  npCreationTime[name],
+				MetricName: netpolLatencyMeasurement,
+				UUID:       n.Uuid,
+				Metadata:   n.Metadata,
+				JobName:    n.JobConfig.Name,
+			},
+			NetpolLabels: netpolLatencyLabels{
+				Name: name,
+			},
+			MinReadyLatency: time.Duration(latencySummary.Min) * time.Millisecond,
+			ReadyLatency:    time.Duration(latencySummary.Max) * time.Millisecond,
 		})
 	}
 }
@@ -589,27 +596,25 @@ func (n *netpolLatency) Stop() error {
 }
 
 func (n *netpolLatency) normalizeMetrics() float64 {
-	var latencies []float64
-	var minLatencies []float64
 	sLen := 0
 	n.Metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(netpolMetric)
 		metric.ChurnMetric = n.IsChurnMetric(metric.Timestamp)
-		latencies = append(latencies, float64(metric.ReadyLatency))
-		minLatencies = append(minLatencies, float64(metric.MinReadyLatency))
-		n.NormLatencies = append(n.NormLatencies, metric)
+		makeDoc := GenericLatencyDocFactory[float64, *netpolLatencyLabels](&metric.NetpolLabels, metric.LatencyDocument)
+		n.NormLatencies = append(n.NormLatencies,
+			makeDoc("Ready", float64(metric.ReadyLatency.Milliseconds())),
+			makeDoc("MinReady", float64(metric.MinReadyLatency.Milliseconds())),
+		)
 		return true
 	})
 	return 0.0
 }
 
 func (n *netpolLatency) getLatency(normLatency any) map[string]float64 {
-	netpolMetric := normLatency.(netpolMetric)
-	return map[string]float64{
-		"Ready":    float64(netpolMetric.ReadyLatency),
-		"MinReady": float64(netpolMetric.MinReadyLatency),
-	}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels.(*netpolLatencyLabels).Condition
+	return map[string]float64{condition: doc.Value}
 }
 
 func (n *netpolLatency) Collect(measurementWg *sync.WaitGroup) {

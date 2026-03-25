@@ -60,18 +60,21 @@ type serviceLatency struct {
 	svcLatencyChecker *mutil.SvcLatencyChecker
 }
 
+type svcLatencyLabels struct {
+	Name        string             `json:"service"`
+	Namespace   string             `json:"namespace"`
+	ServiceType corev1.ServiceType `json:"type"`
+	Condition   string             `json:"condition"`
+}
+
+func (l *svcLatencyLabels) SetCondition(c string)    { l.Condition = c }
+func (l *svcLatencyLabels) Clone() *svcLatencyLabels { c := *l; return &c }
+
 type svcMetric struct {
-	Timestamp         time.Time          `json:"timestamp"`
-	IPAssignedLatency time.Duration      `json:"ipAssigned,omitempty"`
-	ReadyLatency      time.Duration      `json:"ready"`
-	MetricName        string             `json:"metricName"`
-	UUID              string             `json:"uuid"`
-	Namespace         string             `json:"namespace"`
-	Name              string             `json:"service"`
-	ServiceType       corev1.ServiceType `json:"type"`
-	JobName           string             `json:"jobName,omitempty"`
-	ChurnMetric       bool               `json:"churnMetric,omitempty"`
-	Metadata          any                `json:"metadata,omitempty"`
+	metrics.LatencyDocument
+	IPAssignedLatency time.Duration    `json:"ipAssigned,omitempty"`
+	ReadyLatency      time.Duration    `json:"ready"`
+	SvcLatencyLabels  svcLatencyLabels `json:"labels"`
 }
 
 type serviceLatencyMeasurementFactory struct {
@@ -163,16 +166,20 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		svcLatency := time.Since(endpointsReadyTs)
 		log.Debugf("Service %v/%v latency was: %vms", svc.Namespace, svc.Name, svcLatency.Milliseconds())
 		s.Metrics.Store(string(svc.UID), svcMetric{
-			Name:              svc.Name,
-			Namespace:         svc.Namespace,
-			Timestamp:         svc.CreationTimestamp.UTC(),
-			MetricName:        svcLatencyMeasurement,
-			ServiceType:       svc.Spec.Type,
+			LatencyDocument: metrics.LatencyDocument{
+				Timestamp:  svc.CreationTimestamp.UTC(),
+				MetricName: svcLatencyMeasurement,
+				UUID:       s.Uuid,
+				JobName:    s.JobConfig.Name,
+				Metadata:   s.Metadata,
+			},
+			SvcLatencyLabels: svcLatencyLabels{
+				Name:        svc.Name,
+				Namespace:   svc.Namespace,
+				ServiceType: svc.Spec.Type,
+			},
 			ReadyLatency:      svcLatency,
-			UUID:              s.Uuid,
 			IPAssignedLatency: ipAssignedLatency,
-			JobName:           s.JobConfig.Name,
-			Metadata:          s.Metadata,
 		})
 	}(svc)
 }
@@ -270,9 +277,18 @@ func (s *serviceLatency) normalizeMetrics() {
 		metric := value.(svcMetric)
 		metric.ChurnMetric = s.IsChurnMetric(metric.Timestamp)
 		latencies = append(latencies, float64(metric.ReadyLatency))
-		s.NormLatencies = append(s.NormLatencies, metric)
+		// s.NormLatencies = append(s.NormLatencies, metric)
+
+		makeDoc := GenericLatencyDocFactory[float64, *svcLatencyLabels](&metric.SvcLatencyLabels, metric.LatencyDocument)
+
+		s.NormLatencies = append(s.NormLatencies,
+			makeDoc("ready", float64(metric.ReadyLatency.Milliseconds())),
+		)
 		if metric.IPAssignedLatency != 0 {
 			ipAssignedLatencies = append(ipAssignedLatencies, float64(metric.IPAssignedLatency))
+			s.NormLatencies = append(s.NormLatencies,
+				makeDoc("ipAssigned", float64(metric.IPAssignedLatency.Milliseconds())),
+			)
 		}
 		return true
 	})
