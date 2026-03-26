@@ -53,6 +53,14 @@ var (
 	}
 )
 
+type pvcLatencyLabels struct {
+	JobIteration int    `json:"jobIteration"`
+	Replica      int    `json:"replica"`
+	Namespace    string `json:"namespace"`
+	Name         string `json:"pvcName"`
+	Size         string `json:"size"`
+	StorageClass string `json:"storageClass"`
+}
 type pvcMetric struct {
 	Timestamp       time.Time `json:"timestamp"`
 	pending         int64
@@ -65,15 +73,10 @@ type pvcMetric struct {
 	ResizeLatency   int    `json:"resizeLatency"`
 	ResizedCapacity string `json:"resizedCapacity,omitempty"`
 	UUID            string `json:"uuid"`
-	Name            string `json:"pvcName"`
 	JobName         string `json:"jobName,omitempty"`
-	Namespace       string `json:"namespace"`
 	MetricName      string `json:"metricName"`
-	Size            string `json:"size"`
-	StorageClass    string `json:"storageClass"`
-	JobIteration    int    `json:"jobIteration"`
-	Replica         int    `json:"replica"`
-	Metadata        any    `json:"metadata,omitempty"`
+	Labels          pvcLatencyLabels
+	Metadata        any `json:"metadata,omitempty"`
 }
 
 type pvcLatency struct {
@@ -115,17 +118,19 @@ func (p *pvcLatency) handleCreatePVC(obj any) {
 	pvcLabels := pvc.GetLabels()
 
 	p.Metrics.LoadOrStore(string(pvc.UID), pvcMetric{
-		Timestamp:    time.Now().UTC(),
-		Namespace:    pvc.Namespace,
-		Name:         pvc.Name,
-		StorageClass: getStorageClassName(*pvc),
-		Size:         pvc.Spec.Resources.Requests.Storage().String(),
-		MetricName:   pvcLatencyMeasurement,
-		UUID:         p.Uuid,
-		JobName:      p.JobConfig.Name,
-		Metadata:     p.Metadata,
-		JobIteration: getIntFromLabels(pvcLabels, config.KubeBurnerLabelJobIteration),
-		Replica:      getIntFromLabels(pvcLabels, config.KubeBurnerLabelReplica),
+		Timestamp: time.Now().UTC(),
+		Labels: pvcLatencyLabels{
+			Namespace:    pvc.Namespace,
+			Name:         pvc.Name,
+			Size:         pvc.Spec.Resources.Requests.Storage().String(),
+			StorageClass: getStorageClassName(*pvc),
+			JobIteration: getIntFromLabels(pvcLabels, config.KubeBurnerLabelJobIteration),
+			Replica:      getIntFromLabels(pvcLabels, config.KubeBurnerLabelReplica),
+		},
+		MetricName: pvcLatencyMeasurement,
+		UUID:       p.Uuid,
+		JobName:    p.JobConfig.Name,
+		Metadata:   p.Metadata,
 	})
 }
 
@@ -149,7 +154,7 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 	requestedSize := pvc.Spec.Resources.Requests.Storage().String()
 
 	// 2. Phase Tracking (capture timestamps of first entry into each state)
-	if requestedSize == pm.Size && (pm.bound == 0 || pm.lost == 0) {
+	if requestedSize == pm.Labels.Size && (pm.bound == 0 || pm.lost == 0) {
 		switch pvc.Status.Phase {
 		case corev1.ClaimPending:
 			if pm.pending == 0 {
@@ -168,13 +173,13 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 			}
 		}
 	} else {
-		log.Tracef("Skipping phase tracking for PVC %s (phase=%s, sizeChanged=%v)", pvc.Name, pvc.Status.Phase, requestedSize != pm.Size)
+		log.Tracef("Skipping phase tracking for PVC %s (phase=%s, sizeChanged=%v)", pvc.Name, pvc.Status.Phase, requestedSize != pm.Labels.Size)
 	}
 
 	// Detect resize start by spec change (works for all provisioners)
-	if requestedSize != pm.Size && pm.resizeStarted == 0 {
+	if requestedSize != pm.Labels.Size && pm.resizeStarted == 0 {
 		pm.resizeStarted = now
-		log.Debugf("PVC %s resize started: %s -> %s", pvc.Name, pm.Size, requestedSize)
+		log.Debugf("PVC %s resize started: %s -> %s", pvc.Name, pm.Labels.Size, requestedSize)
 	}
 
 	// Check if resize completed by comparing capacity
@@ -185,7 +190,7 @@ func (p *pvcLatency) handleUpdatePVC(obj any) {
 			pm.ResizeLatency = int(now - pm.resizeStarted)
 			pm.ResizedCapacity = currentCapacity
 			log.Debugf("PVC %s resize completed (capacity update): %s -> %s in %dms",
-				pvc.Name, pm.Size, currentCapacity, pm.ResizeLatency)
+				pvc.Name, pm.Labels.Size, currentCapacity, pm.ResizeLatency)
 		}
 	}
 
@@ -256,13 +261,13 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 	p.Metrics.Range(func(key, value any) bool {
 		m := value.(pvcMetric)
 		if m.resizeStarted == 0 && m.bound == 0 && m.lost == 0 {
-			log.Tracef("PVC %v latency ignored as it did not reach a stable state", m.Name)
+			log.Tracef("PVC %v latency ignored as it did not reach a stable state", m.Labels.Name)
 			return true
 		}
 		errorFlag := 0
 		m.PendingLatency = int(m.pending - m.Timestamp.UnixMilli())
 		if m.PendingLatency < 0 {
-			log.Tracef("PendingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("PendingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
 			if m.pending < 0 {
 				errorFlag = 1
 			}
@@ -271,7 +276,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 		if m.bound > 0 {
 			m.BindingLatency = int(m.bound - m.Timestamp.UnixMilli())
 			if m.BindingLatency < 0 {
-				log.Tracef("BindingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+				log.Tracef("BindingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
 				errorFlag = 1
 				m.BindingLatency = 0
 			}
@@ -279,14 +284,14 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 		if m.lost > 0 {
 			m.LostLatency = int(m.lost - m.Timestamp.UnixMilli())
 			if m.LostLatency < 0 {
-				log.Tracef("LostLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+				log.Tracef("LostLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
 				m.LostLatency = 0
 			}
 		}
 
 		// ResizeLatency is already calculated in handleUpdatePVC, just validate
 		if m.ResizeLatency < 0 {
-			log.Tracef("ResizeLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("ResizeLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
 			m.ResizeLatency = 0
 		}
 
