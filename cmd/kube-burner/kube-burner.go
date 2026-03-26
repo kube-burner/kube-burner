@@ -36,6 +36,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -73,6 +74,7 @@ To configure your bash shell to load completions for each session execute:
 func initCmd() *cobra.Command {
 	var err error
 	var clientSet kubernetes.Interface
+	var restCfg *rest.Config
 	var kubeConfig, kubeContext string
 	var metricsEndpoint, configFile, configMap, metricsProfile, alertProfile string
 	var uuid, userMetadata, namespace string
@@ -82,6 +84,7 @@ func initCmd() *cobra.Command {
 	var allowMissingKeys bool
 	var rc int
 	var setValues []string
+	var dryRun bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Launch benchmark",
@@ -112,7 +115,7 @@ func initCmd() *cobra.Command {
 				log.Fatal(err.Error())
 			}
 			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
-			clientSet, _ = kubeClientProvider.DefaultClientSet()
+			clientSet, restCfg = kubeClientProvider.DefaultClientSet()
 			configFileReader, err := fileutils.GetWorkloadReader(configFile, nil)
 			if err != nil {
 				log.Fatalf("Error reading configuration file %s: %s", configFile, err)
@@ -126,11 +129,28 @@ func initCmd() *cobra.Command {
 				}
 				defer userDataFileReader.Close()
 			}
-			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys, nil, setVars)
+			configSpec, err := config.ParseWithUserdata(uuid, timeout, configFileReader, userDataFileReader, allowMissingKeys || dryRun, nil, setVars)
 			if err != nil {
 				log.Error("Config error")
 				fmt.Printf("%s", err.Error())
 				os.Exit(1)
+			}
+			if dryRun {
+				if restCfg != nil {
+					log.Info("🔗 Connected to cluster — GVK + RBAC validation enabled")
+				} else {
+					log.Info("ℹ️  No cluster connection — GVK/RBAC validation skipped")
+				}
+				errs := burner.Validate(configSpec, nil, restCfg)
+				if len(errs) > 0 {
+					for _, e := range errs {
+						log.Errorf("❌ Dry-run validation errors: %s", e.Error())
+					}
+					rc = 1
+				} else {
+					log.Info("✅ Dry-run validation passed, no errors found.")
+				}
+				return
 			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      &configSpec,
@@ -143,7 +163,6 @@ func initCmd() *cobra.Command {
 				clientSet, _ = kubeClientProvider.ClientSet(0, 0)
 				util.ClusterHealthCheck(clientSet)
 			}
-
 			rc, err = burner.Run(configSpec, kubeClientProvider, metricsScraper, nil, nil)
 			if err != nil {
 				log.Error(err.Error())
@@ -165,6 +184,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&allowMissingKeys, "allow-missing", false, "Do not fail on missing values in the config file")
 	cmd.Flags().BoolVar(&skipLogFile, "skip-log-file", false, "Skip writing to a log file")
 	cmd.Flags().StringSliceVar(&setValues, "set", []string{}, "Set arbitrary key=value pairs to override values in the config file")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Pre validate the workload configuration")
 	cmd.Flags().SortFlags = false
 	cmd.MarkFlagsMutuallyExclusive("config", "configmap")
 	return cmd

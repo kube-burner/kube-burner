@@ -27,6 +27,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"github.com/prometheus/common/model"
+	promql "github.com/prometheus/prometheus/promql/parser"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -79,6 +80,10 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 					continue
 				}
 				query := renderedQuery.String()
+				if _, err := promql.ParseExpr(query); err != nil {
+					log.Warnf("Error parsing query: %v", err)
+					continue
+				}
 				renderedQuery.Reset()
 				if metric.Instant {
 					if metric.CaptureStart {
