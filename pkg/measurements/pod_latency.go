@@ -415,9 +415,9 @@ func (p *podLatency) normalizeMetrics() float64 {
 }
 
 func (p *podLatency) getLatency(normLatency any) map[string]float64 {
-	doc := normLatency.(metrics.LatencyDocument)
-	condition, _ := doc.Labels["condition"].(string)
-	return map[string]float64{condition: doc.Value}
+	podMetric := normLatency.(metrics.LatencyDocument)
+	condition, _ := podMetric.Labels["condition"].(string)
+	return map[string]float64{condition: podMetric.Value}
 }
 
 func (p *podLatency) IsCompatible() bool {
