@@ -70,13 +70,13 @@ type pvcMetric struct {
 	lost            int64
 	LostLatency     int `json:"lostLatency"`
 	resizeStarted   int64
-	ResizeLatency   int    `json:"resizeLatency"`
-	ResizedCapacity string `json:"resizedCapacity,omitempty"`
-	UUID            string `json:"uuid"`
-	JobName         string `json:"jobName,omitempty"`
-	MetricName      string `json:"metricName"`
-	Labels          pvcLatencyLabels
-	Metadata        any `json:"metadata,omitempty"`
+	ResizeLatency   int              `json:"resizeLatency"`
+	ResizedCapacity string           `json:"resizedCapacity,omitempty"`
+	UUID            string           `json:"uuid"`
+	JobName         string           `json:"jobName,omitempty"`
+	MetricName      string           `json:"metricName"`
+	Labels          pvcLatencyLabels `json:"labels"`
+	Metadata        any              `json:"metadata,omitempty"`
 }
 
 type pvcLatency struct {
