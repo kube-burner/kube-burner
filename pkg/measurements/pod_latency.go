@@ -384,7 +384,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 			Replica:      m.PodLatencyLabels.Replica,
 		}
 		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]any
+			var lbls map[string]string
 			b, _ := json.Marshal(baseLabels)
 			_ = json.Unmarshal(b, &lbls)
 			lbls["condition"] = condition
@@ -416,7 +416,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 
 func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 	podMetric := normLatency.(metrics.LatencyDocument)
-	condition, _ := podMetric.Labels["condition"].(string)
+	condition := podMetric.Labels["condition"]
 	return map[string]float64{condition: podMetric.Value}
 }
 

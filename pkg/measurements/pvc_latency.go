@@ -306,7 +306,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 			StorageClass: m.PvcLatencyLabels.StorageClass,
 		}
 		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]any
+			var lbls map[string]string
 			b, _ := json.Marshal(baseLabels)
 			_ = json.Unmarshal(b, &lbls)
 			lbls["condition"] = condition
@@ -336,7 +336,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 
 func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
 	pvcMetric := normLatency.(pvcMetric)
-	condition, _ := pvcMetric.Labels["condition"].(string)
+	condition := pvcMetric.Labels["condition"]
 	return map[string]float64{condition: pvcMetric.Value}
 }
 
