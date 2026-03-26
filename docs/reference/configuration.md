@@ -413,8 +413,8 @@ The `when` field specifies at which stage the hook should execute:
 
 | Stage                    | Description                                           |
 |--------------------------|-------------------------------------------------------|
-| `beforeAllJobs`          | Before any job starts (after image preloading)        |
-| `afterAllJobs`           | After all jobs complete and metrics are indexed       |
+| `setup`          | Before any job or measurement starts        |
+| `teardown`           | Called after the benchmark execution regardless of test success or failure       |
 
 **Job-Level Hook Stages** (configured in `jobs[].hooks`):
 
