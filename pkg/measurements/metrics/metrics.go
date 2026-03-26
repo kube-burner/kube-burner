@@ -41,16 +41,6 @@ type LatencyQuantiles struct {
 	Metadata     any       `json:"metadata,omitempty"`
 }
 
-type LatencyDocument struct {
-	Timestamp  time.Time      `json:"timestamp"`
-	Labels     map[string]any `json:"labels"`
-	Value      float64        `json:"value"`
-	MetricName string         `json:"metricName"`
-	UUID       string         `json:"uuid"`
-	JobName    string         `json:"jobName,omitempty"`
-	Metadata   any            `json:"metadata,omitempty"`
-}
-
 // CheckThreshold checks latency thresholds
 // returns a concatenated list of error strings with a new line between each string
 func CheckThreshold(thresholds []types.LatencyThreshold, quantiles []any) error {

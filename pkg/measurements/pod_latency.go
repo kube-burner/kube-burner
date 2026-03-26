@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
-	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -58,17 +57,8 @@ var (
 	}
 )
 
-type podLatencyLabels struct {
-	JobIteration int    `json:"jobIteration"`
-	Namespace    string `json:"namespace"`
-	NodeName     string `json:"nodeName"`
-	Replica      int    `json:"replica"`
-	Name         string `json:"podName"`
-}
-
 type podMetric struct {
 	Timestamp                     time.Time `json:"timestamp"`
-	Labels                        podLatencyLabels
 	scheduled                     time.Time
 	SchedulingLatency             int `json:"schedulingLatency"`
 	initialized                   time.Time
@@ -84,6 +74,11 @@ type podMetric struct {
 	MetricName                    string `json:"metricName"`
 	UUID                          string `json:"uuid"`
 	JobName                       string `json:"jobName,omitempty"`
+	JobIteration                  int    `json:"jobIteration"`
+	Replica                       int    `json:"replica"`
+	Namespace                     string `json:"namespace"`
+	Name                          string `json:"podName"`
+	NodeName                      string `json:"nodeName"`
 	Metadata                      any    `json:"metadata,omitempty"`
 }
 
@@ -119,15 +114,16 @@ func (p *podLatency) handleCreatePod(obj any) {
 		return
 	}
 	podLabels := pod.GetLabels()
-	podLatencyLabels := podLatencyLabels{
-		JobIteration: getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
-		Namespace:    pod.Namespace,
-		NodeName:     pod.Spec.NodeName,
-		Replica:      getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
-	}
 	p.Metrics.LoadOrStore(string(pod.UID), podMetric{
-		Timestamp: pod.CreationTimestamp.UTC(),
-		Labels:    podLatencyLabels,
+		Timestamp:    pod.CreationTimestamp.UTC(),
+		Namespace:    pod.Namespace,
+		Name:         pod.Name,
+		MetricName:   podLatencyMeasurement,
+		UUID:         p.Uuid,
+		JobName:      p.JobConfig.Name,
+		Metadata:     p.Metadata,
+		JobIteration: getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
+		Replica:      getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
 	})
 }
 
@@ -150,7 +146,7 @@ func (p *podLatency) handleUpdatePod(obj any) {
 							if pm.scheduled.IsZero() {
 								pm.scheduled = c.LastTransitionTime.UTC()
 							}
-							pm.Labels.NodeName = pod.Spec.NodeName
+							pm.NodeName = pod.Spec.NodeName
 						}
 					case corev1.PodReadyToStartContainers:
 						if pm.readyToStartContainers.IsZero() {
@@ -287,20 +283,19 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 				podReady = c.LastTransitionTime.UTC()
 			}
 		}
-		podLatencyLabels := podLatencyLabels{
-			JobIteration: getIntFromLabels(pod.Labels, config.KubeBurnerLabelJobIteration),
-			Namespace:    pod.Namespace,
-			NodeName:     pod.Spec.NodeName,
-			Replica:      getIntFromLabels(pod.Labels, config.KubeBurnerLabelReplica),
-		}
 		p.Metrics.Store(string(pod.UID), podMetric{
 			Timestamp:              pod.CreationTimestamp.UTC(),
-			Labels:                 podLatencyLabels,
+			Namespace:              pod.Namespace,
+			Name:                   pod.Name,
+			MetricName:             podLatencyMeasurement,
+			NodeName:               pod.Spec.NodeName,
+			UUID:                   p.Uuid,
 			scheduled:              scheduled,
 			readyToStartContainers: readyToStartContainers,
 			initialized:            initialized,
 			containersReady:        containersReady,
 			podReady:               podReady,
+			JobName:                p.JobConfig.Name,
 		})
 	}
 }
@@ -319,7 +314,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 		m := value.(podMetric)
 		// If a pod does not reach the Running state (this timestamp isn't set), we skip that pod
 		if m.podReady.IsZero() {
-			log.Tracef("Pod %v latency ignored as it did not reach Ready state", m.Labels.Name)
+			log.Tracef("Pod %v latency ignored as it did not reach Ready state", m.Name)
 			return true
 		}
 		// latencyTime should be always larger than zero, however, in some cases, it might be a
@@ -327,80 +322,47 @@ func (p *podLatency) normalizeMetrics() float64 {
 		errorFlag := 0
 		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
 		if m.ContainersReadyLatency < 0 {
-			log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
+			log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.ContainersReadyLatency = 0
 		}
 
 		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
 		if m.SchedulingLatency < 0 {
-			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
+			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.SchedulingLatency = 0
 		}
 
 		m.ReadyToStartContainersLatency = int(m.readyToStartContainers.Sub(m.Timestamp).Milliseconds())
 		if m.ReadyToStartContainersLatency < 0 {
-			log.Tracef("ReadyToStartContainersLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
+			log.Tracef("ReadyToStartContainersLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.ReadyToStartContainersLatency = 0
 		}
 
 		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
 		if m.InitializedLatency < 0 {
-			log.Tracef("InitializedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
+			log.Tracef("InitializedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.InitializedLatency = 0
 		}
 
 		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
 		if m.PodReadyLatency < 0 {
-			log.Tracef("PodReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
+			log.Tracef("PodReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.PodReadyLatency = 0
 		}
 		m.ContainersStartedLatency = int(m.containersStarted.Sub(m.Timestamp).Milliseconds())
 		if m.ContainersStartedLatency < 0 {
-			log.Tracef("ContainersStartedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Labels.Name)
+			log.Tracef("ContainersStartedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
 			errorFlag = 1
 			m.ContainersStartedLatency = 0
 		}
 		totalPods++
 		erroredPods += errorFlag
-
-		// Build base labels shared by all per-condition documents for this pod.
-		baseLabels := map[string]any{
-			"namespace":    m.Labels.Namespace,
-			"pod":          m.Labels.Name,
-			"node":         m.Labels.NodeName,
-			"jobIteration": m.Labels.JobIteration,
-			"replica":      m.Labels.Replica,
-		}
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			lbls := make(map[string]any, len(baseLabels)+1)
-			for k, v := range baseLabels {
-				lbls[k] = v
-			}
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-				MetricName: podLatencyMeasurement,
-				UUID:       p.Uuid,
-				JobName:    p.JobConfig.Name,
-				Metadata:   p.Metadata,
-			}
-		}
-		// Emit one document per condition.
-		p.NormLatencies = append(p.NormLatencies,
-			makeDoc(string(corev1.PodScheduled), m.SchedulingLatency),
-			makeDoc(string(corev1.PodInitialized), m.InitializedLatency),
-			makeDoc(string(corev1.ContainersReady), m.ContainersReadyLatency),
-			makeDoc(string(corev1.PodReady), m.PodReadyLatency),
-			makeDoc(string(corev1.PodReadyToStartContainers), m.ReadyToStartContainersLatency),
-			makeDoc(containersStarted, m.ContainersStartedLatency),
-		)
+		p.NormLatencies = append(p.NormLatencies, m)
 		return true
 	})
 	if totalPods == 0 {
@@ -410,9 +372,15 @@ func (p *podLatency) normalizeMetrics() float64 {
 }
 
 func (p *podLatency) getLatency(normLatency any) map[string]float64 {
-	doc := normLatency.(metrics.LatencyDocument)
-	condition, _ := doc.Labels["condition"].(string)
-	return map[string]float64{condition: doc.Value}
+	podMetric := normLatency.(podMetric)
+	return map[string]float64{
+		string(corev1.PodScheduled):              float64(podMetric.SchedulingLatency),
+		string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
+		string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
+		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
+		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
+		containersStarted:                        float64(podMetric.ContainersStartedLatency),
+	}
 }
 
 func (p *podLatency) IsCompatible() bool {
