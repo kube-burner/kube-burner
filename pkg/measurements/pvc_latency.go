@@ -335,9 +335,9 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 }
 
 func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
-	pvcMetric := normLatency.(pvcMetric)
-	condition := pvcMetric.Labels["condition"]
-	return map[string]float64{condition: pvcMetric.Value}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels["condition"]
+	return map[string]float64{condition: doc.Value}
 }
 
 func (p *pvcLatency) IsCompatible() bool {

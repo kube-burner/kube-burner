@@ -274,9 +274,9 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 }
 
 func (n *nodeLatency) getLatency(normLatency any) map[string]float64 {
-	nodeMetric := normLatency.(NodeMetric)
-	condition := nodeMetric.Labels["condition"]
-	return map[string]float64{condition: nodeMetric.Value}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels["condition"]
+	return map[string]float64{condition: doc.Value}
 }
 
 func (n *nodeLatency) IsCompatible() bool {
