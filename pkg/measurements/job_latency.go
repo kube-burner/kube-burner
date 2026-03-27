@@ -66,6 +66,7 @@ type jobMetric struct {
 	Replica           int    `json:"replica"`
 	Namespace         string `json:"namespace"`
 	Name              string `json:"k8sJobName"`
+	ChurnMetric       bool   `json:"churnMetric,omitempty"`
 	Metadata          any    `json:"metadata,omitempty"`
 }
 
@@ -222,6 +223,7 @@ func (j *jobLatency) normalizeMetrics() float64 {
 			m.StartTimeLatency = 0
 		}
 		m.CompletionLatency = int(m.jobComplete.Sub(m.Timestamp).Milliseconds())
+		m.ChurnMetric = j.IsChurnMetric(m.Timestamp)
 		j.NormLatencies = append(j.NormLatencies, m)
 		return true
 	})
