@@ -260,7 +260,7 @@ check_metric_recorded() {
     echo "metric file ${metric_file} not present"
     return 1
   fi
-  if ! jq -e .[0].${metric} ${metric_file}; then
+    if jq -e --arg cond "${metric}" '[.[] | select(.labels.condition == $cond)] | length > 0' ${metric_file} | grep -q true; then
       echo "metric ${type}/${metric} was not recorded for ${job}"
       echo "Content of ${METRICS_FOLDER}/${type}Measurement-${job}.json"
       cat ${METRICS_FOLDER}/${type}Measurement-${job}.json

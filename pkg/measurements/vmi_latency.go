@@ -15,11 +15,13 @@
 package measurements
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -41,10 +43,17 @@ const (
 
 var (
 	supportedVMIConditions map[string]struct{} = map[string]struct{}{
-		"VMI" + string(kvv1.Pending):    {},
-		"VMI" + string(kvv1.Scheduling): {},
-		"VMI" + string(kvv1.Scheduled):  {},
-		"VMI" + string(kvv1.Running):    {},
+		"VM" + string(kvv1.VirtualMachineReady): {},
+		"VMICreated":                            {},
+		"VMI" + string(kvv1.Pending):            {},
+		"VMI" + string(kvv1.Scheduling):         {},
+		"VMI" + string(kvv1.Scheduled):          {},
+		"VMI" + string(kvv1.Running):            {},
+		"PodCreated":                            {},
+		"Pod" + string(corev1.PodScheduled):     {},
+		"Pod" + string(corev1.PodInitialized):   {},
+		"Pod" + string(corev1.ContainersReady):  {},
+		"Pod" + string(corev1.PodReady):         {},
 	}
 	supportedVMILatencyJobTypes = map[config.JobType]struct{}{
 		config.CreationJob: {},
@@ -53,11 +62,20 @@ var (
 	}
 )
 
+type vmiLatencyLabels struct {
+	PodName      string `json:"podName,omitempty"`
+	VMName       string `json:"vmName,omitempty"`
+	VMIName      string `json:"vmiName,omitempty"`
+	NodeName     string `json:"nodeName"`
+	Replica      int    `json:"replica"`
+	JobIteration int    `json:"jobIteration"`
+	Namespace    string `json:"namespace"`
+}
+
 // vmiMetric holds both pod and vmi metrics
 type vmiMetric struct {
 	// Timestamp filed is very important the the elasticsearch indexing and represents the first creation time that we track (i.e., vm or vmi)
-	Timestamp time.Time `json:"timestamp"`
-
+	metrics.LatencyDocument
 	podCreated                time.Time
 	PodCreatedLatency         int64 `json:"podCreatedLatency"`
 	podScheduled              time.Time
@@ -79,18 +97,8 @@ type vmiMetric struct {
 	vmiRunning                time.Time
 	VMIRunningLatency         int64 `json:"vmiRunningLatency"`
 	vmReady                   time.Time
-	VMReadyLatency            int64  `json:"vmReadyLatency"`
-	MetricName                string `json:"metricName"`
-	UUID                      string `json:"uuid"`
-	Namespace                 string `json:"namespace"`
-	PodName                   string `json:"podName,omitempty"`
-	VMName                    string `json:"vmName,omitempty"`
-	VMIName                   string `json:"vmiName,omitempty"`
-	NodeName                  string `json:"nodeName"`
-	JobName                   string `json:"jobName,omitempty"`
-	Metadata                  any    `json:"metadata,omitempty"`
-	JobIteration              int    `json:"jobIteration"`
-	Replica                   int    `json:"replica"`
+	VMReadyLatency            int64 `json:"vmReadyLatency"`
+	vmiLatencyLabels          vmiLatencyLabels
 }
 
 type vmiLatency struct {
@@ -124,12 +132,16 @@ func (vmi *vmiLatency) handleCreateVM(obj any) {
 	}
 	vmLabels := vm.GetLabels()
 	vmi.Metrics.LoadOrStore(string(vm.UID), vmiMetric{
-		Namespace:    vm.Namespace,
-		MetricName:   vmiLatencyMeasurement,
-		VMName:       vm.Name,
-		JobIteration: getIntFromLabels(vmLabels, config.KubeBurnerLabelJobIteration),
-		Replica:      getIntFromLabels(vmLabels, config.KubeBurnerLabelReplica),
-		Timestamp:    vm.CreationTimestamp.UTC(),
+		LatencyDocument: metrics.LatencyDocument{
+			MetricName: vmiLatencyMeasurement,
+			Timestamp:  vm.CreationTimestamp.UTC(),
+		},
+		vmiLatencyLabels: vmiLatencyLabels{
+			VMName:       vm.Name,
+			Replica:      getIntFromLabels(vmLabels, config.KubeBurnerLabelReplica),
+			Namespace:    vm.Namespace,
+			JobIteration: getIntFromLabels(vmLabels, config.KubeBurnerLabelJobIteration),
+		},
 	})
 }
 
@@ -168,18 +180,22 @@ func (vmi *vmiLatency) handleCreateVMI(obj any) {
 			vmiMetric := vmiM.(vmiMetric)
 			if vmiMetric.vmiCreated.IsZero() {
 				vmiMetric.vmiCreated = now
-				vmiMetric.VMIName = vmiObj.Name
+				vmiMetric.vmiLatencyLabels.VMIName = vmiObj.Name
 				vmi.Metrics.Store(parentVMID, vmiMetric)
 			}
 		}
 	} else {
 		vmiLabels := vmiObj.GetLabels()
 		vmi.Metrics.Store(string(vmiObj.UID), vmiMetric{
-			vmiCreated:   now,
-			VMIName:      vmiObj.Name,
-			JobIteration: getIntFromLabels(vmiLabels, config.KubeBurnerLabelJobIteration),
-			Replica:      getIntFromLabels(vmiLabels, config.KubeBurnerLabelReplica),
-			Timestamp:    now, // Timestamp only needs to be set when there's not a parent VM
+			LatencyDocument: metrics.LatencyDocument{
+				Timestamp: now, // Timestamp only needs to be set when there's not a parent VM
+			},
+			vmiLatencyLabels: vmiLatencyLabels{
+				VMIName:      vmiObj.Name,
+				JobIteration: getIntFromLabels(vmiLabels, config.KubeBurnerLabelJobIteration),
+				Replica:      getIntFromLabels(vmiLabels, config.KubeBurnerLabelReplica),
+			},
+			vmiCreated: now,
 		})
 	}
 }
@@ -235,8 +251,8 @@ func (vmi *vmiLatency) handleCreateVMIPod(obj any) {
 	// Iterate over all vmi metrics to get the one with the same VMI name
 	vmi.Metrics.Range(func(k, v any) bool {
 		vmiMetric := v.(vmiMetric)
-		if vmiMetric.VMIName == vmiName {
-			vmiMetric.PodName = pod.Name
+		if vmiMetric.vmiLatencyLabels.VMIName == vmiName {
+			vmiMetric.vmiLatencyLabels.PodName = pod.Name
 			vmiMetric.podCreated = time.Now().UTC()
 			vmi.Metrics.Store(k, vmiMetric)
 		}
@@ -258,7 +274,7 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
 	// Iterate over all vmi metrics to get the one with the same VMI name
 	vmi.Metrics.Range(func(k, v any) bool {
 		vmiMetric := v.(vmiMetric)
-		if vmiMetric.VMIName == vmiName {
+		if vmiMetric.vmiLatencyLabels.VMIName == vmiName {
 			if vmiMetric.podReady.IsZero() {
 				for _, c := range pod.Status.Conditions {
 					if c.Status == corev1.ConditionTrue {
@@ -266,7 +282,7 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
 						case corev1.PodScheduled:
 							if vmiMetric.podScheduled.IsZero() {
 								vmiMetric.podScheduled = time.Now().UTC()
-								vmiMetric.NodeName = pod.Spec.NodeName
+								vmiMetric.vmiLatencyLabels.NodeName = pod.Spec.NodeName
 							}
 						case corev1.PodInitialized:
 							if vmiMetric.podInitialized.IsZero() {
@@ -360,46 +376,146 @@ func (vmi *vmiLatency) Stop() error {
 }
 
 func (vmi *vmiLatency) normalizeMetrics() float64 {
+	totalVMIs := 0
+	erroredVMIs := 0
+
 	vmi.Metrics.Range(func(key, value any) bool {
 		m := value.(vmiMetric)
 		if m.vmiRunning.IsZero() {
-			log.Tracef("VMI %v latency ignored as it did not reach Running state", m.VMIName)
+			log.Tracef("VMI %v latency ignored as it did not reach Running state", m.vmiLatencyLabels.VMIName)
 			return true
 		}
+		errorFlag := 0
+
 		m.VMReadyLatency = m.vmReady.Sub(m.Timestamp).Milliseconds()
+		if m.VMReadyLatency < 0 {
+			log.Tracef("VMReadyLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.VMReadyLatency = 0
+		}
+
 		m.VMICreatedLatency = m.vmiCreated.Sub(m.Timestamp).Milliseconds()
+		if m.VMICreatedLatency < 0 {
+			log.Tracef("VMICreatedLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.VMICreatedLatency = 0
+		}
+
 		m.VMIPendingLatency = m.vmiPending.Sub(m.Timestamp).Milliseconds()
+		if m.VMIPendingLatency < 0 {
+			log.Tracef("VMIPendingLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.VMIPendingLatency = 0
+		}
+
 		m.VMISchedulingLatency = m.vmiScheduling.Sub(m.Timestamp).Milliseconds()
+		if m.VMISchedulingLatency < 0 {
+			log.Tracef("VMISchedulingLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.VMISchedulingLatency = 0
+		}
+
 		m.VMIScheduledLatency = m.vmiScheduled.Sub(m.Timestamp).Milliseconds()
+		if m.VMIScheduledLatency < 0 {
+			log.Tracef("VMIScheduledLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.VMIScheduledLatency = 0
+		}
+
 		m.VMIRunningLatency = m.vmiRunning.Sub(m.Timestamp).Milliseconds()
+		if m.VMIRunningLatency < 0 {
+			log.Tracef("VMIRunningLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.VMIRunningLatency = 0
+		}
+
 		m.PodCreatedLatency = m.podCreated.Sub(m.Timestamp).Milliseconds()
+		if m.PodCreatedLatency < 0 {
+			log.Tracef("PodCreatedLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.PodCreatedLatency = 0
+		}
+
 		m.PodScheduledLatency = m.podScheduled.Sub(m.Timestamp).Milliseconds()
+		if m.PodScheduledLatency < 0 {
+			log.Tracef("PodScheduledLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.PodScheduledLatency = 0
+		}
+
 		m.PodInitializedLatency = m.podInitialized.Sub(m.Timestamp).Milliseconds()
+		if m.PodInitializedLatency < 0 {
+			log.Tracef("PodInitializedLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.PodInitializedLatency = 0
+		}
+
 		m.PodContainersReadyLatency = m.podContainersReady.Sub(m.Timestamp).Milliseconds()
+		if m.PodContainersReadyLatency < 0 {
+			log.Tracef("PodContainersReadyLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.PodContainersReadyLatency = 0
+		}
+
 		m.PodReadyLatency = m.podReady.Sub(m.Timestamp).Milliseconds()
-		m.UUID = vmi.Uuid
-		m.JobName = vmi.JobConfig.Name
-		m.Metadata = vmi.Metadata
-		vmi.NormLatencies = append(vmi.NormLatencies, m)
+		if m.PodReadyLatency < 0 {
+			log.Tracef("PodReadyLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
+			errorFlag = 1
+			m.PodReadyLatency = 0
+		}
+
+		totalVMIs++
+		erroredVMIs += errorFlag
+
+		baseLabels := vmiLatencyLabels{
+			PodName:      m.vmiLatencyLabels.PodName,
+			VMName:       m.vmiLatencyLabels.VMName,
+			VMIName:      m.vmiLatencyLabels.VMIName,
+			NodeName:     m.vmiLatencyLabels.NodeName,
+			Replica:      m.vmiLatencyLabels.Replica,
+			JobIteration: m.vmiLatencyLabels.JobIteration,
+			Namespace:    m.vmiLatencyLabels.Namespace,
+		}
+		makeDoc := func(condition string, valueMs int64) metrics.LatencyDocument {
+			var lbls map[string]string
+			b, _ := json.Marshal(baseLabels)
+			_ = json.Unmarshal(b, &lbls)
+			lbls["condition"] = condition
+			return metrics.LatencyDocument{
+				Timestamp:  m.Timestamp,
+				MetricName: vmiLatencyMeasurement,
+				UUID:       vmi.Uuid,
+				JobName:    vmi.JobConfig.Name,
+				Metadata:   vmi.Metadata,
+				Labels:     lbls,
+				Value:      float64(valueMs),
+			}
+		}
+		vmi.NormLatencies = append(vmi.NormLatencies,
+			makeDoc("VM"+string(kvv1.VirtualMachineReady), m.VMReadyLatency),
+			makeDoc("VMICreated", m.VMICreatedLatency),
+			makeDoc("VMI"+string(kvv1.Pending), m.VMIPendingLatency),
+			makeDoc("VMI"+string(kvv1.Scheduling), m.VMISchedulingLatency),
+			makeDoc("VMI"+string(kvv1.Scheduled), m.VMIScheduledLatency),
+			makeDoc("VMI"+string(kvv1.Running), m.VMIRunningLatency),
+			makeDoc("PodCreated", m.PodCreatedLatency),
+			makeDoc("Pod"+string(corev1.PodScheduled), m.PodScheduledLatency),
+			makeDoc("Pod"+string(corev1.PodInitialized), m.PodInitializedLatency),
+			makeDoc("Pod"+string(corev1.ContainersReady), m.PodContainersReadyLatency),
+			makeDoc("Pod"+string(corev1.PodReady), m.PodReadyLatency),
+		)
 		return true
 	})
-	return 0
+	if totalVMIs == 0 {
+		return 0.0
+	}
+	return float64(erroredVMIs) / float64(totalVMIs) * 100.0
 }
 
 func (vmi *vmiLatency) getLatency(normLatency any) map[string]float64 {
-	vmiMetric := normLatency.(vmiMetric)
-	return map[string]float64{
-		"VM" + string(kvv1.VirtualMachineReady): float64(vmiMetric.VMReadyLatency),
-		"VMICreated":                            float64(vmiMetric.VMICreatedLatency),
-		"VMI" + string(kvv1.Pending):            float64(vmiMetric.VMIPendingLatency),
-		"VMI" + string(kvv1.Scheduling):         float64(vmiMetric.VMISchedulingLatency),
-		"VMI" + string(kvv1.Scheduled):          float64(vmiMetric.VMIScheduledLatency),
-		"VMI" + string(kvv1.Running):            float64(vmiMetric.VMIRunningLatency),
-		"PodCreated":                            float64(vmiMetric.PodCreatedLatency),
-		"Pod" + string(corev1.PodScheduled):     float64(vmiMetric.PodScheduledLatency),
-		"Pod" + string(corev1.PodInitialized):   float64(vmiMetric.PodInitializedLatency),
-		"Pod" + string(corev1.ContainersReady):  float64(vmiMetric.PodContainersReadyLatency),
-	}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels["condition"]
+	return map[string]float64{condition: doc.Value}
 }
 
 // Returns the parent VM UID if there is one
