@@ -385,87 +385,25 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 			log.Tracef("VMI %v latency ignored as it did not reach Running state", m.vmiLatencyLabels.VMIName)
 			return true
 		}
+		if m.Timestamp.IsZero() {
+			log.Tracef("VMI %v latency ignored as timestamp is not set", m.vmiLatencyLabels.VMIName)
+			return true
+		}
 		errorFlag := 0
 
-		m.VMReadyLatency = m.vmReady.Sub(m.Timestamp).Milliseconds()
-		if m.VMReadyLatency < 0 {
-			log.Tracef("VMReadyLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.VMReadyLatency = 0
+		computeLatency := func(timestamp time.Time, latencyName string) (int64, bool) {
+			if timestamp.IsZero() {
+				// Some phases may never be observed for objects picked up after watcher startup (e.g. delete jobs).
+				return 0, false
+			}
+			latency := timestamp.Sub(m.Timestamp).Milliseconds()
+			if latency < 0 {
+				log.Tracef("%s for VMI %v falling under negative case. So explicitly setting it to 0", latencyName, m.vmiLatencyLabels.VMIName)
+				errorFlag = 1
+				return 0, true
+			}
+			return latency, true
 		}
-
-		m.VMICreatedLatency = m.vmiCreated.Sub(m.Timestamp).Milliseconds()
-		if m.VMICreatedLatency < 0 {
-			log.Tracef("VMICreatedLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.VMICreatedLatency = 0
-		}
-
-		m.VMIPendingLatency = m.vmiPending.Sub(m.Timestamp).Milliseconds()
-		if m.VMIPendingLatency < 0 {
-			log.Tracef("VMIPendingLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.VMIPendingLatency = 0
-		}
-
-		m.VMISchedulingLatency = m.vmiScheduling.Sub(m.Timestamp).Milliseconds()
-		if m.VMISchedulingLatency < 0 {
-			log.Tracef("VMISchedulingLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.VMISchedulingLatency = 0
-		}
-
-		m.VMIScheduledLatency = m.vmiScheduled.Sub(m.Timestamp).Milliseconds()
-		if m.VMIScheduledLatency < 0 {
-			log.Tracef("VMIScheduledLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.VMIScheduledLatency = 0
-		}
-
-		m.VMIRunningLatency = m.vmiRunning.Sub(m.Timestamp).Milliseconds()
-		if m.VMIRunningLatency < 0 {
-			log.Tracef("VMIRunningLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.VMIRunningLatency = 0
-		}
-
-		m.PodCreatedLatency = m.podCreated.Sub(m.Timestamp).Milliseconds()
-		if m.PodCreatedLatency < 0 {
-			log.Tracef("PodCreatedLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.PodCreatedLatency = 0
-		}
-
-		m.PodScheduledLatency = m.podScheduled.Sub(m.Timestamp).Milliseconds()
-		if m.PodScheduledLatency < 0 {
-			log.Tracef("PodScheduledLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.PodScheduledLatency = 0
-		}
-
-		m.PodInitializedLatency = m.podInitialized.Sub(m.Timestamp).Milliseconds()
-		if m.PodInitializedLatency < 0 {
-			log.Tracef("PodInitializedLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.PodInitializedLatency = 0
-		}
-
-		m.PodContainersReadyLatency = m.podContainersReady.Sub(m.Timestamp).Milliseconds()
-		if m.PodContainersReadyLatency < 0 {
-			log.Tracef("PodContainersReadyLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.PodContainersReadyLatency = 0
-		}
-
-		m.PodReadyLatency = m.podReady.Sub(m.Timestamp).Milliseconds()
-		if m.PodReadyLatency < 0 {
-			log.Tracef("PodReadyLatency for VMI %v falling under negative case. So explicitly setting it to 0", m.vmiLatencyLabels.VMIName)
-			errorFlag = 1
-			m.PodReadyLatency = 0
-		}
-
-		totalVMIs++
-		erroredVMIs += errorFlag
 
 		baseLabels := vmiLatencyLabels{
 			PodName:      m.vmiLatencyLabels.PodName,
@@ -491,19 +429,53 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 				Value:      float64(valueMs),
 			}
 		}
-		vmi.NormLatencies = append(vmi.NormLatencies,
-			makeDoc("VM"+string(kvv1.VirtualMachineReady), m.VMReadyLatency),
-			makeDoc("VMICreated", m.VMICreatedLatency),
-			makeDoc("VMI"+string(kvv1.Pending), m.VMIPendingLatency),
-			makeDoc("VMI"+string(kvv1.Scheduling), m.VMISchedulingLatency),
-			makeDoc("VMI"+string(kvv1.Scheduled), m.VMIScheduledLatency),
-			makeDoc("VMI"+string(kvv1.Running), m.VMIRunningLatency),
-			makeDoc("PodCreated", m.PodCreatedLatency),
-			makeDoc("Pod"+string(corev1.PodScheduled), m.PodScheduledLatency),
-			makeDoc("Pod"+string(corev1.PodInitialized), m.PodInitializedLatency),
-			makeDoc("Pod"+string(corev1.ContainersReady), m.PodContainersReadyLatency),
-			makeDoc("Pod"+string(corev1.PodReady), m.PodReadyLatency),
-		)
+		if latency, ok := computeLatency(m.vmReady, "VMReadyLatency"); ok {
+			m.VMReadyLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("VM"+string(kvv1.VirtualMachineReady), m.VMReadyLatency))
+		}
+		if latency, ok := computeLatency(m.vmiCreated, "VMICreatedLatency"); ok {
+			m.VMICreatedLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("VMICreated", m.VMICreatedLatency))
+		}
+		if latency, ok := computeLatency(m.vmiPending, "VMIPendingLatency"); ok {
+			m.VMIPendingLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("VMI"+string(kvv1.Pending), m.VMIPendingLatency))
+		}
+		if latency, ok := computeLatency(m.vmiScheduling, "VMISchedulingLatency"); ok {
+			m.VMISchedulingLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("VMI"+string(kvv1.Scheduling), m.VMISchedulingLatency))
+		}
+		if latency, ok := computeLatency(m.vmiScheduled, "VMIScheduledLatency"); ok {
+			m.VMIScheduledLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("VMI"+string(kvv1.Scheduled), m.VMIScheduledLatency))
+		}
+		if latency, ok := computeLatency(m.vmiRunning, "VMIRunningLatency"); ok {
+			m.VMIRunningLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("VMI"+string(kvv1.Running), m.VMIRunningLatency))
+		}
+		if latency, ok := computeLatency(m.podCreated, "PodCreatedLatency"); ok {
+			m.PodCreatedLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("PodCreated", m.PodCreatedLatency))
+		}
+		if latency, ok := computeLatency(m.podScheduled, "PodScheduledLatency"); ok {
+			m.PodScheduledLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("Pod"+string(corev1.PodScheduled), m.PodScheduledLatency))
+		}
+		if latency, ok := computeLatency(m.podInitialized, "PodInitializedLatency"); ok {
+			m.PodInitializedLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("Pod"+string(corev1.PodInitialized), m.PodInitializedLatency))
+		}
+		if latency, ok := computeLatency(m.podContainersReady, "PodContainersReadyLatency"); ok {
+			m.PodContainersReadyLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("Pod"+string(corev1.ContainersReady), m.PodContainersReadyLatency))
+		}
+		if latency, ok := computeLatency(m.podReady, "PodReadyLatency"); ok {
+			m.PodReadyLatency = latency
+			vmi.NormLatencies = append(vmi.NormLatencies, makeDoc("Pod"+string(corev1.PodReady), m.PodReadyLatency))
+		}
+
+		totalVMIs++
+		erroredVMIs += errorFlag
 		return true
 	})
 	if totalVMIs == 0 {
