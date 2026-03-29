@@ -106,7 +106,7 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 			select {
 			case <-tickerC:
 				// Copy certificates only in the first iteration
-				p.getPProf(&wg, time.Now().Format(time.RFC3339))
+				p.getPProf(&wg, time.Now().Format("2006-01-02T15_04_05Z"))
 				wg.Wait()
 			case <-p.stopChannel:
 				if ticker != nil {
