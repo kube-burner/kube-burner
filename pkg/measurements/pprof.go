@@ -88,7 +88,7 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	if err := p.copyCerts(); err != nil {
 		return fmt.Errorf("error copying certificates: %v", err)
 	}
-	p.getPProf(&wg, "start")
+	p.getPProf(&wg, fmt.Sprintf("%s-start", p.JobConfig.Name))
 	wg.Wait()
 	go func() {
 		defer close(p.stopChannel)
@@ -274,7 +274,7 @@ func (p *pprof) Collect(measurementWg *sync.WaitGroup) {
 func (p *pprof) Stop() error {
 	p.stopChannel <- true
 	var wg sync.WaitGroup
-	p.getPProf(&wg, "end")
+	p.getPProf(&wg, fmt.Sprintf("%s-end", p.JobConfig.Name))
 	wg.Wait()
 	if p.needsDaemonSet() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
