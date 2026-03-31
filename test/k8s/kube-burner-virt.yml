@@ -49,7 +49,7 @@ jobs:
     podWait: false
     maxWaitTimeout: 1h   
     cleanup: true
-    preLoadImages: true
+    preLoadImages: false
     preLoadPeriod: 5m
     objects:
 
