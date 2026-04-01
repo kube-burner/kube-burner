@@ -16,11 +16,13 @@ package measurements
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -48,22 +50,21 @@ var (
 	}
 )
 
+type nodeLatencyLabels struct {
+	Name string `json:"nodeName"`
+}
+
 type NodeMetric struct {
-	Timestamp                 time.Time         `json:"timestamp"`
-	NodeMemoryPressure        time.Time         `json:"-"`
-	NodeMemoryPressureLatency int               `json:"nodeMemoryPressureLatency"`
-	NodeDiskPressure          time.Time         `json:"-"`
-	NodeDiskPressureLatency   int               `json:"nodeDiskPressureLatency"`
-	NodePIDPressure           time.Time         `json:"-"`
-	NodePIDPressureLatency    int               `json:"nodePIDPressureLatency"`
-	NodeReady                 time.Time         `json:"-"`
-	NodeReadyLatency          int               `json:"nodeReadyLatency"`
-	MetricName                string            `json:"metricName"`
-	UUID                      string            `json:"uuid"`
-	JobName                   string            `json:"jobName,omitempty"`
-	Name                      string            `json:"nodeName"`
-	Labels                    map[string]string `json:"labels"`
-	Metadata                  any               `json:"metadata,omitempty"`
+	metrics.LatencyDocument
+	NodeMemoryPressure        time.Time `json:"-"`
+	NodeMemoryPressureLatency int       `json:"nodeMemoryPressureLatency"`
+	NodeDiskPressure          time.Time `json:"-"`
+	NodeDiskPressureLatency   int       `json:"nodeDiskPressureLatency"`
+	NodePIDPressure           time.Time `json:"-"`
+	NodePIDPressureLatency    int       `json:"nodePIDPressureLatency"`
+	NodeReady                 time.Time `json:"-"`
+	NodeReadyLatency          int       `json:"nodeReadyLatency"`
+	NodeLatencyLabels         nodeLatencyLabels
 }
 
 type nodeLatency struct {
@@ -96,13 +97,17 @@ func (n *nodeLatency) handleCreateNode(obj any) {
 		return
 	}
 	n.Metrics.LoadOrStore(string(node.UID), NodeMetric{
-		Timestamp:  node.CreationTimestamp.UTC(),
-		Name:       node.Name,
-		MetricName: nodeLatencyMeasurement,
-		UUID:       n.Uuid,
-		JobName:    n.JobConfig.Name,
-		Labels:     util.NormalizeLabels(node.Labels),
-		Metadata:   n.Metadata,
+		NodeLatencyLabels: nodeLatencyLabels{
+			Name: node.Name,
+		},
+		LatencyDocument: metrics.LatencyDocument{
+			Timestamp:  node.CreationTimestamp.UTC(),
+			MetricName: nodeLatencyMeasurement,
+			UUID:       n.Uuid,
+			JobName:    n.JobConfig.Name,
+			Labels:     util.NormalizeLabels(node.Labels),
+			Metadata:   n.Metadata,
+		},
 	})
 }
 
@@ -194,16 +199,20 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 			}
 		}
 		n.Metrics.Store(string(node.UID), NodeMetric{
-			Timestamp:          node.CreationTimestamp.UTC(),
-			Name:               node.Name,
-			MetricName:         nodeLatencyMeasurement,
-			UUID:               n.Uuid,
+			LatencyDocument: metrics.LatencyDocument{
+				Timestamp:  node.CreationTimestamp.UTC(),
+				MetricName: nodeLatencyMeasurement,
+				UUID:       n.Uuid,
+				JobName:    n.JobConfig.Name,
+				Labels:     util.NormalizeLabels(node.Labels),
+			},
+			NodeLatencyLabels: nodeLatencyLabels{
+				Name: node.Name,
+			},
 			NodeMemoryPressure: nodeMemoryPressure,
 			NodeDiskPressure:   nodeDiskPressure,
 			NodePIDPressure:    nodePIDPressure,
 			NodeReady:          nodeReady,
-			JobName:            n.JobConfig.Name,
-			Labels:             util.NormalizeLabels(node.Labels),
 		})
 	}
 }
@@ -217,7 +226,7 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 		m := value.(NodeMetric)
 		// If a node does not reach the Ready state, we skip that node
 		if m.NodeReady.IsZero() {
-			log.Tracef("Node %v latency ignored as it did not reach Ready state", m.Name)
+			log.Tracef("Node %v latency ignored as it did not reach Ready state", m.NodeLatencyLabels.Name)
 			return true
 		}
 		earliest := m.Timestamp
@@ -234,20 +243,40 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 		m.NodeDiskPressureLatency = int(m.NodeDiskPressure.Sub(earliest).Milliseconds())
 		m.NodePIDPressureLatency = int(m.NodePIDPressure.Sub(earliest).Milliseconds())
 		m.NodeReadyLatency = int(m.NodeReady.Sub(earliest).Milliseconds())
-		n.NormLatencies = append(n.NormLatencies, m)
+
+		baseLabels := nodeLatencyLabels{
+			Name: m.NodeLatencyLabels.Name,
+		}
+		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
+			var lbls map[string]string
+			b, _ := json.Marshal(baseLabels)
+			_ = json.Unmarshal(b, &lbls)
+			lbls["condition"] = condition
+			return metrics.LatencyDocument{
+				Timestamp:  m.Timestamp,
+				MetricName: nodeLatencyMeasurement,
+				UUID:       n.Uuid,
+				JobName:    n.JobConfig.Name,
+				Metadata:   n.Metadata,
+				Labels:     lbls,
+				Value:      float64(valueMs),
+			}
+		}
+		n.NormLatencies = append(n.NormLatencies,
+			makeDoc(string(corev1.NodeMemoryPressure), m.NodeMemoryPressureLatency),
+			makeDoc(string(corev1.NodeDiskPressure), m.NodeDiskPressureLatency),
+			makeDoc(string(corev1.NodePIDPressure), m.NodePIDPressureLatency),
+			makeDoc(string(corev1.NodeReady), m.NodeReadyLatency),
+		)
 		return true
 	})
 	return 0
 }
 
 func (n *nodeLatency) getLatency(normLatency any) map[string]float64 {
-	nodeMetric := normLatency.(NodeMetric)
-	return map[string]float64{
-		string(corev1.NodeMemoryPressure): float64(nodeMetric.NodeMemoryPressureLatency),
-		string(corev1.NodeDiskPressure):   float64(nodeMetric.NodeDiskPressureLatency),
-		string(corev1.NodePIDPressure):    float64(nodeMetric.NodePIDPressureLatency),
-		string(corev1.NodeReady):          float64(nodeMetric.NodeReadyLatency),
-	}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels["condition"]
+	return map[string]float64{condition: doc.Value}
 }
 
 func (n *nodeLatency) IsCompatible() bool {

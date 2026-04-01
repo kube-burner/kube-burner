@@ -108,7 +108,7 @@ teardown_file() {
   local jobs=("create-vm" "create-base-image-dv")
   for job in "${jobs[@]}"; do
     check_metric_recorded ${job} dvLatency dvReadyLatency
-    check_metric_recorded ${job} pvcLatency bindingLatency
+    check_metric_recorded ${job} pvcLatency Bound
     check_quantile_recorded ${job} dvLatency Ready
     check_quantile_recorded ${job} pvcLatency Bound
   done
@@ -256,7 +256,7 @@ teardown_file() {
 @test "kube-burner-pvc-resize.yml: pvc resize latency" {
   export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
   run_cmd ${KUBE_BURNER} init -c kube-burner-pvc-resize.yml --uuid=${UUID} --log-level=debug
-  check_metric_recorded pvc-patch pvcLatency resizeLatency
+  check_metric_recorded pvc-patch pvcLatency Resize
   check_quantile_recorded pvc-patch pvcLatency Resize
 }
 
@@ -286,7 +286,7 @@ teardown_file() {
   # Verify all jobs have podLatency
   local jobs_with_pod=("precedence-measurements" "merge-measurements")
   for job in "${jobs_with_pod[@]}"; do
-    check_metric_recorded ${job} podLatency podReadyLatency
+    check_metric_recorded ${job} podLatency Ready
     check_quantile_recorded ${job} podLatency Ready
   done
 
