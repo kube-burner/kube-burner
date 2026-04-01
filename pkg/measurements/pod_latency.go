@@ -79,6 +79,7 @@ type podMetric struct {
 	Namespace                     string `json:"namespace"`
 	Name                          string `json:"podName"`
 	NodeName                      string `json:"nodeName"`
+	ChurnMetric                   bool   `json:"churnMetric,omitempty"`
 	Metadata                      any    `json:"metadata,omitempty"`
 }
 
@@ -360,6 +361,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 			errorFlag = 1
 			m.ContainersStartedLatency = 0
 		}
+		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPods++
 		erroredPods += errorFlag
 		p.NormLatencies = append(p.NormLatencies, m)
