@@ -440,6 +440,26 @@ The `when` field specifies at which stage the hook should execute:
 2. Foreground hooks execute sequentially after background hooks start
 3. Background hooks are waited on before proceeding to the next major phase
 
+#### Embedded Script Support
+
+When using kube-burner-ocp or any application with an embedded filesystem, hooks can reference scripts stored in the embedded `scripts` directory. When a hook command invokes `bash` or `sh` with a script file (e.g., `["bash", "my-script.sh", "arg1"]`), kube-burner will:
+
+1. If the script path is absolute, execute it directly
+2. If the script exists in the current working directory, execute it directly
+3. If not found locally, look for it in the embedded filesystem's scripts directory
+
+This allows workload authors to bundle scripts with their configurations without requiring users to manually extract or copy them. Local scripts always take precedence over embedded scripts.
+
+Example using an embedded script:
+
+```yaml
+jobs:
+  - name: my-workload
+    hooks:
+      - cmd: ["bash", "setup-environment.sh", "--config", "production"]
+        when: beforeJobExecution
+```
+
 #### Example Configuration
 
 ```yaml
