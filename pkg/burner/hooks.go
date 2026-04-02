@@ -19,11 +19,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -37,16 +41,18 @@ type HookManager struct {
 	cancel      context.CancelFunc
 	resultChan  chan hookResult
 	backgrounWg sync.WaitGroup
+	embedCfg    *fileutils.EmbedConfiguration
 }
 
 // NewHookManager creates a new HookManager
-func NewHookManager(ctx context.Context, hookCount int) *HookManager {
+func NewHookManager(ctx context.Context, hookCount int, embedCfg *fileutils.EmbedConfiguration) *HookManager {
 	ctx, cancel := context.WithCancel(ctx)
 	return &HookManager{
 		ctx:         ctx,
 		cancel:      cancel,
 		resultChan:  make(chan hookResult, hookCount),
 		backgrounWg: sync.WaitGroup{},
+		embedCfg:    embedCfg,
 	}
 }
 
@@ -83,9 +89,83 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 	return nil
 }
 
+// isShellScript checks if the command is invoking a shell with a script file
+// Returns the script path if it should be read from embedded FS, empty string otherwise
+func isShellScript(cmd []string) string {
+	if len(cmd) < 2 {
+		return ""
+	}
+	shell := filepath.Base(cmd[0])
+	if shell != "bash" && shell != "sh" {
+		return ""
+	}
+	script := cmd[1]
+	// Check if it's a script file (not a flag like -c)
+	if len(script) > 0 && script[0] == '-' {
+		return ""
+	}
+	// Check for common script extensions or assume it's a script if no extension
+	ext := filepath.Ext(script)
+	if ext == ".sh" || ext == "" {
+		return script
+	}
+	return ""
+}
+
+// prepareCommand creates an exec.Cmd, potentially reading the script from embedded FS
+// It first checks if the script exists locally or is an absolute path, and only falls back
+// to embedded FS if the script is not found
+func (hm *HookManager) prepareCommand(hook config.Hook) (*exec.Cmd, io.ReadCloser, error) {
+	var scriptReader io.ReadCloser
+	var cmd *exec.Cmd
+
+	scriptPath := isShellScript(hook.Cmd)
+	if scriptPath != "" {
+		// Check if script exists locally or is an absolute path
+		useEmbedded := false
+		if !filepath.IsAbs(scriptPath) {
+			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+				// Script not found locally, try embedded FS
+				useEmbedded = true
+			}
+		}
+
+		if useEmbedded && hm.embedCfg != nil {
+			// Try to read script from embedded FS
+			reader, err := fileutils.GetScriptsReader(scriptPath, hm.embedCfg)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to read script %s: %w", scriptPath, err)
+			}
+			scriptReader = reader
+
+			// Build command: shell -s - <args>
+			// -s tells shell to read from stdin, - marks end of options
+			args := []string{"-s", "-"}
+			if len(hook.Cmd) > 2 {
+				args = append(args, hook.Cmd[2:]...)
+			}
+			cmd = exec.CommandContext(hm.ctx, hook.Cmd[0], args...)
+			cmd.Stdin = scriptReader
+			log.Debugf("Reading script %s from embedded filesystem", scriptPath)
+		} else {
+			// Execute command directly (script exists locally or is absolute path)
+			cmd = exec.CommandContext(hm.ctx, hook.Cmd[0], hook.Cmd[1:]...)
+		}
+	} else {
+		// Not a shell script invocation, execute command directly
+		cmd = exec.CommandContext(hm.ctx, hook.Cmd[0], hook.Cmd[1:]...)
+	}
+
+	return cmd, scriptReader, nil
+}
+
 func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 	log.Infof("Starting Background hook at %s , %v", hook.When, hook.Cmd)
-	cmd := exec.CommandContext(hm.ctx, hook.Cmd[0], hook.Cmd[1:]...)
+
+	cmd, scriptReader, err := hm.prepareCommand(hook)
+	if err != nil {
+		return err
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -95,17 +175,25 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 	setSysProcAttr(cmd)
 
 	if err := cmd.Start(); err != nil {
+		if scriptReader != nil {
+			scriptReader.Close()
+		}
 		return fmt.Errorf("failed to start background hook: %w", err)
 	}
 	hm.backgrounWg.Add(1)
-	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr)
+	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr, scriptReader)
 
 	return nil
 }
 
 // monitorBackgroundHook monitors a background hook with proper error handling
-func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer) {
+func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer, scriptReader io.ReadCloser) {
 	defer hm.backgrounWg.Done()
+	defer func() {
+		if scriptReader != nil {
+			scriptReader.Close()
+		}
+	}()
 	// Wait for process with timeout context
 	errChan := make(chan error, 1)
 	go func() {
@@ -145,14 +233,21 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 
 func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 	log.Infof("Executing foreground hook: %v", hook.Cmd)
-	cmd := exec.CommandContext(hm.ctx, hook.Cmd[0], hook.Cmd[1:]...)
+
+	cmd, scriptReader, err := hm.prepareCommand(hook)
+	if err != nil {
+		return err
+	}
+	if scriptReader != nil {
+		defer scriptReader.Close()
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	start := time.Now()
-	err := cmd.Run()
+	err = cmd.Run()
 	duration := time.Since(start)
 
 	if stdout.Len() > 0 {
