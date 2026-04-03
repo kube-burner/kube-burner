@@ -7,7 +7,6 @@ global:
 metricsEndpoints:
 - indexer:
     type: local
-    metricsDirectory: {{ .METRICS_FOLDER }}
 
 jobs:
   # create a VM but do not wait for it to finish
@@ -19,6 +18,7 @@ jobs:
     namespace: metrics-aggregate
     verifyObjects: false
     waitWhenFinished: false
+    preLoadImages: false
     # cleanup cleans previous execution (not deleted or failed)
     cleanup: true
     metricsAggregate: true

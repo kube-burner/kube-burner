@@ -77,11 +77,11 @@ This indexer writes collected metrics to local files.
 
 The `local` indexer can be configured by the parameters below:
 
-| Option             | Description                           | Type    | Default                 |
-| ------------------ | ------------------------------------- | ------- | ----------------------- |
-| `metricsDirectory` | Collected metric will be dumped here. | String  | collected-metrics       |
-| `createTarball`    | Create metrics tarball                | Boolean | false                   |
-| `tarballName`      | Name of the metrics tarball           | String  | kube-burner-metrics.tgz |
+| Option             | Description                           | Type    | Default                     |
+| ------------------ | ------------------------------------- | ------- | --------------------------- |
+| `metricsDirectory` | Collected metric will be dumped here. | String  | collected-metrics-{{.UUID}} |
+| `createTarball`    | Create metrics tarball                | Boolean | false                       |
+| `tarballName`      | Name of the metrics tarball           | String  | kube-burner-metrics.tgz     |
 
 ### TSDB
 

@@ -11,6 +11,7 @@ jobs:
     errorOnVerify: true
     waitWhenFinished: true
     jobPause: 10s
+    preLoadImages: false
     # cleanup cleans previous execution (not deleted or failed)
     cleanup: true
     objects:

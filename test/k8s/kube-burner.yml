@@ -33,6 +33,12 @@ metricsEndpoints:
 {{ if .LOCAL_INDEXING }}
   - endpoint: http://localhost:9090
     indexer:
+      type: local
+    metrics: [metrics-profile.yaml]
+{{ end }}
+{{ if .TSDB_INDEXING }}
+  - endpoint: http://localhost:9090
+    indexer:
       type: tsdb
       metricsDirectory: {{ .METRICS_FOLDER }}
       createTarball: true
