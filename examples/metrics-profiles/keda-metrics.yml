@@ -1,0 +1,94 @@
+# KEDA metrics profile for kube-burner
+#
+# Collects KEDA operator internal metrics, API server impact,
+# and scaling behavior during density tests.
+#
+# Usage: kube-burner init -c keda-density.yml -m keda-metrics.yml --uuid $(uuidgen)
+#
+# Prerequisites:
+#   - Prometheus must be scraping the KEDA operator metrics endpoint (:8080)
+#   - kube-state-metrics must be deployed for HPA/Deployment state metrics
+
+# ── KEDA Operator Internal Metrics ────────────────────────────────────────────
+# Source: github.com/kedacore/keda/pkg/metricscollector/prommetrics.go
+
+# Whether each scaler is active (1) or not (0)
+- query: keda_scaler_active
+  metricName: kedaScalerActive
+  instant: true
+
+# Current metric value as KEDA sees it (per scaler/trigger)
+- query: keda_scaler_metrics_value
+  metricName: kedaScalerMetricsValue
+
+# Latency of retrieving metrics from each scaler (seconds)
+- query: keda_scaler_metrics_latency_seconds
+  metricName: kedaScalerMetricsLatency
+
+# Scaler-level error rate
+- query: rate(keda_scaler_detail_errors_total[2m])
+  metricName: kedaScalerErrorRate
+
+# ScaledObject-level error rate
+- query: rate(keda_scaled_object_errors_total[2m])
+  metricName: kedaScaledObjectErrorRate
+
+# Internal scale loop latency — primary bottleneck indicator
+# Shows deviation between expected and actual reconciliation execution time
+- query: keda_internal_scale_loop_latency_seconds
+  metricName: kedaInternalScaleLoopLatency
+
+# Total KEDA CRDs registered per namespace
+- query: keda_resource_registered_total
+  metricName: kedaResourceRegistered
+  instant: true
+
+# Total triggers registered by type
+- query: keda_trigger_registered_total
+  metricName: kedaTriggerRegistered
+  instant: true
+
+# ScaledObject paused status
+- query: keda_scaled_object_paused
+  metricName: kedaScaledObjectPaused
+  instant: true
+
+# ── KEDA Internal gRPC Metrics (operator ↔ metrics adapter) ──────────────────
+
+# gRPC request handling time between operator and metrics adapter
+- query: histogram_quantile(0.99, rate(keda_internal_metricsservice_server_handling_seconds_bucket[5m]))
+  metricName: kedaGRPCHandlingLatencyP99
+
+# ── API Server Impact ─────────────────────────────────────────────────────────
+
+# API requests from KEDA CRD group
+- query: rate(apiserver_request_total{group="keda.sh"}[2m])
+  metricName: kedaAPIServerRequests
+
+# HPA-related API requests (KEDA creates/updates HPAs)
+- query: rate(apiserver_request_total{group="autoscaling",resource="horizontalpodautoscalers"}[2m])
+  metricName: hpaAPIServerRequests
+
+# API server overall latency (to detect throttling impact)
+- query: histogram_quantile(0.99, rate(apiserver_request_duration_seconds_bucket{verb!~"WATCH|LIST"}[5m]))
+  metricName: apiserverRequestLatencyP99
+
+# ── Cluster Health ────────────────────────────────────────────────────────────
+
+# etcd request latency (KEDA puts pressure on etcd at scale)
+- query: histogram_quantile(0.99, rate(etcd_request_duration_seconds_bucket[5m]))
+  metricName: etcdRequestLatencyP99
+
+# ── Scaling Behavior ──────────────────────────────────────────────────────────
+
+# Deployment ready replica count over time (observe scale-out/in)
+- query: kube_deployment_status_replicas_ready{namespace=~"keda-density.*"}
+  metricName: kedaTargetReplicasReady
+
+# HPA desired replicas (KEDA's desired state)
+- query: kube_horizontalpodautoscaler_status_desired_replicas{namespace=~"keda-density.*"}
+  metricName: kedaHPADesiredReplicas
+
+# HPA current replicas
+- query: kube_horizontalpodautoscaler_status_current_replicas{namespace=~"keda-density.*"}
+  metricName: kedaHPACurrentReplicas

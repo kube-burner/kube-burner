@@ -1,0 +1,120 @@
+# KEDA Density Performance Test
+# kube-burner workload configuration
+#
+# Purpose: Measure KEDA ScaledObject lifecycle performance at scale.
+#          Tracks ScaledObject activation, HPA creation, and target
+#          deployment scaling latencies.
+#
+# Usage:
+#   kube-burner init -c examples/workloads/keda-density/keda-density.yml --uuid $(uuidgen)
+#
+# Prerequisites:
+#   - KEDA installed (namespace: keda)
+#   - Prometheus installed (kube-prometheus-stack or similar)
+#   - A metric source that produces values above the activation threshold
+#     (e.g., fake-metrics-exporter or any Prometheus-scrapeable endpoint)
+#
+# Optional: Enable KEDA operator pprof profiling for deep analysis:
+#   kubectl -n keda patch deployment keda-operator --type=json \
+#     -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--profiling-bind-address=:8082"}]'
+#
+# What this workload does:
+#   1. idle-job: Delete leftover resources from previous runs
+#   2. keda-density: Create N Deployment + ScaledObject pairs; measure latencies
+#   3. delete-job: Clean up all resources
+
+global:
+  measurements:
+    - name: scaledObjectLatency
+      thresholds:
+        - conditionType: ScaledObjectActive
+          metric: P99
+          value: 60000      # 60s max p99 for ScaledObject to become Active
+        - conditionType: HPACreated
+          metric: P99
+          value: 60000      # 60s max p99 for KEDA to create the HPA
+        - conditionType: DeploymentReady
+          metric: P99
+          value: 120000     # 2min max p99 for target deployment to have ready replicas
+
+jobs:
+  # ─── Job 0: Cleanup previous runs ──────────────────────────────────
+  - name: idle-job
+    jobType: delete
+    waitForDeletion: true
+    qps: 10
+    burst: 20
+    jobPause: 30s
+    objects:
+      - kind: ScaledObject
+        labelSelector: {kube-burner.io/job: keda-density}
+        apiVersion: keda.sh/v1alpha1
+
+      - kind: Deployment
+        labelSelector: {kube-burner.io/job: keda-density}
+        apiVersion: apps/v1
+
+      - kind: Namespace
+        labelSelector: {kube-burner.io/job: keda-density}
+
+  # ─── Job 1: Create N Deployments + N ScaledObjects ─────────────────
+  - name: keda-density
+    jobType: create
+
+    # Number of (Deployment + ScaledObject) pairs to create.
+    # Start small (10) for initial testing, then scale up (100, 500, 1000).
+    jobIterations: 10
+
+    qps: 20
+    burst: 20
+
+    # Each iteration gets its own namespace (keda-density-0, keda-density-1, ...)
+    namespacedIterations: true
+    namespace: keda-density
+
+    verifyObjects: true
+    errorOnVerify: true
+    waitWhenFinished: true
+    podWait: true
+    maxWaitTimeout: 30m
+    jobPause: 5m
+    cleanup: true
+
+    objects:
+      # First create the target Deployment (what KEDA will scale)
+      - objectTemplate: templates/deployment.yml
+        replicas: 1
+
+      # Then create the ScaledObject targeting the Deployment
+      - objectTemplate: templates/scaledobject.yml
+        replicas: 1
+        inputVars:
+          # Prometheus server address — adjust for your cluster
+          prometheusAddr: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+          # The metric query — should return a value > activationThreshold to trigger scale-out
+          metricQuery: "fake_http_requests_total{job=\"fake-metrics-exporter\"}"
+          threshold: "100"
+          activationThreshold: "5"
+          minReplicas: 0
+          maxReplicas: 10
+          pollingInterval: 15
+          cooldownPeriod: 60
+
+  # ─── Job 2: Cleanup ─────────────────────────────────────────────────
+  - name: delete-job
+    jobType: delete
+    waitForDeletion: true
+    qps: 10
+    burst: 20
+    jobPause: 10s
+    objects:
+      - kind: ScaledObject
+        labelSelector: {kube-burner.io/job: keda-density}
+        apiVersion: keda.sh/v1alpha1
+
+      - kind: Deployment
+        labelSelector: {kube-burner.io/job: keda-density}
+        apiVersion: apps/v1
+
+      - kind: Namespace
+        labelSelector: {kube-burner.io/job: keda-density}

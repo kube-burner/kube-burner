@@ -1,0 +1,42 @@
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: web-app-so-{{.Iteration}}-{{.Replica}}
+  labels:
+    app: web-app-{{.Iteration}}-{{.Replica}}
+spec:
+  # Target the Deployment created in the same iteration
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-app-{{.Iteration}}-{{.Replica}}
+
+  # Replica bounds
+  minReplicaCount: {{.minReplicas}}     # 0 = scale-to-zero
+  maxReplicaCount: {{.maxReplicas}}
+
+  # Timing
+  pollingInterval: {{.pollingInterval}}   # seconds
+  cooldownPeriod:  {{.cooldownPeriod}}    # seconds
+
+  # Advanced HPA tuning for fast response during tests
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{.prometheusAddr}}
+        query: {{.metricQuery}}
+        threshold: "{{.threshold}}"
+        activationThreshold: "{{.activationThreshold}}"
+        unsafeSsl: "true"
+        ignoreNullValues: "false"
