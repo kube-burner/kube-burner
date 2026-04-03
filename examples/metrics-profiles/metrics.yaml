@@ -9,10 +9,10 @@
   metricName: APIInflightRequests
 
 # Containers & pod metrics
-- query: sum(irate(container_cpu_usage_seconds_total{name!="",namespace=~"openshift-(etcd|oauth-apiserver|.*apiserver|ovn-kubernetes|sdn|ingress|authentication|.*controller-manager|.*scheduler|monitoring|logging|image-registry)"}[2m]) * 100) by (pod, namespace, node)
+- query: sum(irate(container_cpu_usage_seconds_total{name!="",namespace=~"kube-system"}[2m]) * 100) by (pod, namespace, node)
   metricName: podCPU
 
-- query: sum(container_memory_rss{name!="",namespace=~"openshift-(etcd|oauth-apiserver|.*apiserver|ovn-kubernetes|sdn|ingress|authentication|.*controller-manager|.*scheduler|monitoring|logging|image-registry)"}) by (pod, namespace, node)
+- query: sum(container_memory_rss{name!="",namespace=~"kube-system"}) by (pod, namespace, node)
   metricName: podMemory
 
 - query: (sum(rate(container_fs_writes_bytes_total{container!="",device!~".+dm.+"}[5m])) by (device, container, node) and on (node) kube_node_role{role="master"}) > 0
@@ -104,8 +104,8 @@
 - query: count(kube_service_info{})
   metricName: serviceCount
 
-- query: count(openshift_route_created{})
-  metricName: routeCount
+- query: count(kube_ingress_info{})
+  metricName: ingressCount
   instant: true
 
 - query: kube_node_role
@@ -115,6 +115,6 @@
 - query: sum(kube_node_status_condition{status="true"}) by (condition)
   metricName: nodeStatus
 
-- query: cluster_version{type="completed"}
-  metricName: clusterVersion
+- query: kubernetes_build_info
+  metricName: kubernetesVersion
   instant: true
