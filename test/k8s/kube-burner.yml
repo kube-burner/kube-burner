@@ -35,6 +35,15 @@ metricsEndpoints:
     indexer:
       type: local
     metrics: [metrics-profile.yaml]
+{{ end }}
+{{ if .TSDB_INDEXING }}
+  - endpoint: http://localhost:9090
+    indexer:
+      type: tsdb
+      metricsDirectory: {{ .METRICS_FOLDER }}
+      createTarball: true
+      tarballName: collected-metrics.tar.gz
+    metrics: [metrics-profile.yaml]
 {{ if .ALERTING }}
     alerts: [alerts.yml]
 {{ end }}
