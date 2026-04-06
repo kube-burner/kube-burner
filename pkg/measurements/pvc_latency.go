@@ -73,6 +73,7 @@ type pvcMetric struct {
 	StorageClass    string `json:"storageClass"`
 	JobIteration    int    `json:"jobIteration"`
 	Replica         int    `json:"replica"`
+	ChurnMetric     bool   `json:"churnMetric,omitempty"`
 	Metadata        any    `json:"metadata,omitempty"`
 }
 
@@ -290,6 +291,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 			m.ResizeLatency = 0
 		}
 
+		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPVCs++
 		erroredPVCs += errorFlag
 		p.NormLatencies = append(p.NormLatencies, m)
