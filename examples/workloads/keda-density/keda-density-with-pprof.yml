@@ -18,7 +18,7 @@ global:
     # 2. KEDA Operator pprof — CPU + heap profiles
     - name: pprof
       pprofInterval: 30s
-      pprofDirectory: pprof-keda
+      pprofDirectory: /tmp/pprof-keda
       nodeAffinity:
         node-role.kubernetes.io/control-plane: ""
       pprofTargets:
@@ -60,13 +60,13 @@ jobs:
   # Job 2: Create ScaledObjects at scale
   - name: keda-density
     jobType: create
-    jobIterations: 300
-    qps: 10
-    burst: 20
+    jobIterations: 100 
+    qps: 50
+    burst: 100
     namespacedIterations: false
     cleanup: true
     namespace: keda-density
-    waitWhenFinished: true
+    waitWhenFinished: false
     jobPause: 120s
     objects:
       - objectTemplate: examples/workloads/keda-density/templates/deployment.yml
@@ -91,4 +91,4 @@ jobs:
     objects:
       - kind: ScaledObject
         apiVersion: keda.sh/v1alpha1
-        labelSelector: {kube-burner-job: keda-density}
+        labelSelector: {kube-burner.io/job: keda-density}
