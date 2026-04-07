@@ -63,6 +63,7 @@ type NodeMetric struct {
 	JobName                   string            `json:"jobName,omitempty"`
 	Name                      string            `json:"nodeName"`
 	Labels                    map[string]string `json:"labels"`
+	ChurnMetric               bool              `json:"churnMetric,omitempty"`
 	Metadata                  any               `json:"metadata,omitempty"`
 }
 
@@ -234,6 +235,7 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 		m.NodeDiskPressureLatency = int(m.NodeDiskPressure.Sub(earliest).Milliseconds())
 		m.NodePIDPressureLatency = int(m.NodePIDPressure.Sub(earliest).Milliseconds())
 		m.NodeReadyLatency = int(m.NodeReady.Sub(earliest).Milliseconds())
+		m.ChurnMetric = n.IsChurnMetric(m.Timestamp)
 		n.NormLatencies = append(n.NormLatencies, m)
 		return true
 	})

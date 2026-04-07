@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
@@ -135,6 +136,14 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 
 func (bm *BaseMeasurement) GetMetrics() *sync.Map {
 	return &bm.Metrics
+}
+
+// IsChurnMetric returns true if the given timestamp falls within the churn window
+func (bm *BaseMeasurement) IsChurnMetric(timestamp time.Time) bool {
+	if bm.JobConfig.ChurnStart != nil && bm.JobConfig.ChurnEnd != nil {
+		return timestamp.After(*bm.JobConfig.ChurnStart) && timestamp.Before(*bm.JobConfig.ChurnEnd)
+	}
+	return false
 }
 
 func (bm *BaseMeasurement) Index(jobName string, indexerList map[string]indexers.Indexer) {
