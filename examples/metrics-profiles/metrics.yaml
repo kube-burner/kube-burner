@@ -12,7 +12,7 @@
 - query: sum(irate(container_cpu_usage_seconds_total{name!="",namespace=~"kube-system"}[2m]) * 100) by (pod, namespace, node)
   metricName: podCPU
 
-- query: sum(container_memory_rss{name!="",namespace=~"kube-system"}) by (pod, namespace, node)
+- query: sum(container_memory_rss{name!=""}) by (pod, namespace, node)
   metricName: podMemory
 
 - query: (sum(rate(container_fs_writes_bytes_total{container!="",device!~".+dm.+"}[5m])) by (device, container, node) and on (node) kube_node_role{role="master"}) > 0
