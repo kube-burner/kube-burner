@@ -89,8 +89,9 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 	return nil
 }
 
-// isShellScript checks if the command is invoking a shell with a script file
-// Returns the script path if it should be read from embedded FS, empty string otherwise
+// isShellScript checks whether the command invokes sh or bash with a script file argument.
+// It returns the script path for shell script invocations, or an empty string otherwise.
+// Whether that script should be read from the embedded FS is determined later in prepareCommand().
 func isShellScript(cmd []string) string {
 	if len(cmd) < 2 {
 		return ""
