@@ -260,11 +260,6 @@ check_metric_recorded() {
     echo "metric file ${metric_file} not present"
     return 1
   fi
-  # Try old flat format first (e.g. .[0].podReadyLatency)
-  if jq -e ".[0].${metric}" ${metric_file} > /dev/null 2>&1; then
-    echo "metric ${type}/${metric} was recorded for ${job} (old format)"
-    return 0
-  fi
   # Try new {labels: {condition: X}, value: Y} format
   if jq -e --arg cond "${metric}" '[.[] | select(.labels.condition == $cond)] | length > 0' ${metric_file} | grep -q true; then
     echo "metric ${type}/${metric} was recorded for ${job} (new format)"
