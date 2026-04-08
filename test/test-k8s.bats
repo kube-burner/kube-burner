@@ -268,7 +268,7 @@ teardown_file() {
 
   local aggr_job="create-vms"
   local metric="vmiLatency"
-  check_metric_recorded ${aggr_job} ${metric} vmReadyLatency
+  check_metric_recorded ${aggr_job} ${metric} VMReady
   check_quantile_recorded ${aggr_job} ${metric} VMReady
 
   local skipped_jobs=("start-vm" "wait-running")
