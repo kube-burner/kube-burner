@@ -64,18 +64,17 @@ func (p *Prometheus) ScrapeJobsMetrics(jobList ...Job) error {
 			continue
 		}
 		for _, metricProfile := range p.MetricProfiles {
-			log.Infof("🔍 Endpoint: %v; profile: %v start: %v end: %v; job: %v, metricsClosing: %v", p.Endpoint,
-				metricProfile.name,
+			log.Infof("🔍 Collecting prometheus metrics for job %s; endpoint: %v; profile: %v ", eachJob.JobConfig.Name, p.Endpoint, metricProfile.name)
+			log.Infof("start: %v; end: %v; metrics closing: %v",
 				jobStart.Format(time.RFC3339),
 				jobEnd.Format(time.RFC3339),
-				eachJob.JobConfig.Name,
 				eachJob.JobConfig.MetricsClosing)
 			for _, metric := range metricProfile.metrics {
 				docsToIndex := make(map[string][]any, 2)
 				requiresInstant := false
 				t, _ := template.New("").Parse(metric.Query)
 				if err := t.Execute(&renderedQuery, vars); err != nil {
-					log.Warnf("Error rendering query: %v", err)
+					log.Warnf("Error rendering query from metric %s: %v", metric.MetricName, err)
 					continue
 				}
 				query := renderedQuery.String()
@@ -207,6 +206,9 @@ func (p *Prometheus) runInstantQuery(query, metricName string, timestamp time.Ti
 	if err = p.parseVector(metricName, query, job, v, &datapoints); err != nil {
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
 	}
+	if len(datapoints) == 0 {
+		log.Warnf("No datapoints returned from metric %s", metricName)
+	}
 	return datapoints
 }
 
@@ -224,18 +226,21 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 	if err = p.parseMatrix(metricName, query, job, v, &datapoints); err != nil {
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
 	}
+	if len(datapoints) == 0 {
+		log.Warnf("No datapoints returned from metric %s", metricName)
+	}
 	return datapoints
 }
 
 // Indexes datapoints to a specified indexer.
 func (p *Prometheus) indexDatapoints(docsToIndex map[string][]any) {
 	for metricName, docs := range docsToIndex {
-		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
+		log.Debugf("Indexing [%d] documents from metric %s", len(docs), metricName)
 		resp, err := (*p.indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
 		if err != nil {
 			log.Error(err.Error())
 		} else {
-			log.Info(resp)
+			log.Debug(resp)
 		}
 	}
 }
