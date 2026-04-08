@@ -207,7 +207,7 @@ func (p *Prometheus) runInstantQuery(query, metricName string, timestamp time.Ti
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
 	}
 	if len(datapoints) == 0 {
-		log.Warnf("No datapoints returned from metric %s", metricName)
+		log.Warnf("No datapoints returned from metric %s for job %s at %s with query %q", metricName, job.JobConfig.Name, timestamp.Format(time.RFC3339), query)
 	}
 	return datapoints
 }
