@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -347,22 +346,8 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = vmiml.IsChurnMetric(m.Timestamp)
 		count++
 		errored += errorFlag
-		// vmiml.NormLatencies = append(vmiml.NormLatencies, m)
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(m.VMIMLatencyLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-				MetricName: vmimLatencyMeasurement,
-				UUID:       vmiml.Uuid,
-				JobName:    vmiml.JobConfig.Name,
-				Metadata:   vmiml.Metadata,
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int](m.Timestamp, m.VMIMLatencyLabels, &vmiml.BaseMeasurement, vmimLatencyMeasurement)
+
 		vmiml.NormLatencies = append(vmiml.NormLatencies,
 			makeDoc(string(kvv1.MigrationPending), m.PendingLatency),
 			makeDoc(string(kvv1.MigrationScheduling), m.SchedulingLatency),

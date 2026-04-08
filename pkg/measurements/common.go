@@ -16,9 +16,11 @@ package measurements
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"time"
 
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	kutil "github.com/kube-burner/kube-burner/v2/pkg/util"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -88,4 +90,24 @@ func DeployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, im
 		return true, nil
 	})
 	return err
+}
+
+// GenericLatencyDocFactory creates a reusable closure to generate standard metrics.LatencyDocument outputs organically
+func GenericLatencyDocFactory[T int | int64 | float64](timestamp time.Time, metadataLabels any, base *BaseMeasurement, metricName string) func(condition string, valueMs T) metrics.LatencyDocument {
+	return func(condition string, valueMs T) metrics.LatencyDocument {
+		var lbls map[string]string
+		b, _ := json.Marshal(metadataLabels)
+		_ = json.Unmarshal(b, &lbls)
+		lbls["condition"] = condition
+
+		return metrics.LatencyDocument{
+			Timestamp:  timestamp,
+			Labels:     lbls,
+			Value:      float64(valueMs),
+			MetricName: metricName,
+			UUID:       base.Uuid,
+			JobName:    base.JobConfig.Name,
+			Metadata:   base.Metadata,
+		}
+	}
 }
