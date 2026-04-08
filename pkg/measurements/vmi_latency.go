@@ -291,27 +291,6 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
 							vmiMetric.podReady = c.LastTransitionTime.UTC()
 						}
 					}
-
-					if c.Status == corev1.ConditionTrue {
-						switch c.Type {
-						case corev1.PodScheduled:
-							if vmiMetric.podScheduled.IsZero() {
-								vmiMetric.podScheduled = time.Now().UTC()
-								vmiMetric.NodeName = pod.Spec.NodeName
-							}
-						case corev1.PodInitialized:
-							if vmiMetric.podInitialized.IsZero() {
-								vmiMetric.podInitialized = time.Now().UTC()
-							}
-						case corev1.ContainersReady:
-							if vmiMetric.podContainersReady.IsZero() {
-								vmiMetric.podContainersReady = time.Now().UTC()
-							}
-						case corev1.PodReady:
-							log.Debugf("VMI pod %s is running", pod.Name)
-							vmiMetric.podReady = time.Now().UTC()
-						}
-					}
 				}
 			}
 			vmi.Metrics.Store(k, vmiMetric)
@@ -469,7 +448,7 @@ func (vmi *vmiLatency) IsCompatible() bool {
 // - metadata: name, namespace, uid, creationTimestamp, labels
 // - status: conditions
 func virtualMachineTransformFunc() cache.TransformFunc {
-	return func(obj interface{}) (interface{}, error) {
+	return func(obj any) (any, error) {
 		u, ok := obj.(*unstructured.Unstructured)
 		if !ok {
 			return obj, nil
@@ -489,7 +468,7 @@ func virtualMachineTransformFunc() cache.TransformFunc {
 // - metadata: name, namespace, uid, creationTimestamp, labels, ownerReferences
 // - status: phase
 func virtualMachineInstanceTransformFunc() cache.TransformFunc {
-	return func(obj interface{}) (interface{}, error) {
+	return func(obj any) (any, error) {
 		u, ok := obj.(*unstructured.Unstructured)
 		if !ok {
 			return obj, nil
@@ -503,6 +482,9 @@ func virtualMachineInstanceTransformFunc() cache.TransformFunc {
 
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
+		}
+		if phaseTransitionTimestamps, found, _ := unstructured.NestedSlice(u.Object, "status", "phaseTransitionTimestamps"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, phaseTransitionTimestamps, "status", "phaseTransitionTimestamps")
 		}
 
 		return minimal, nil
