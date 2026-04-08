@@ -186,8 +186,8 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 	} else {
 		m.Value = float64(value)
 	}
-	if job.ChurnStart != nil && job.ChurnEnd != nil {
-		if !isInstant && timestamp.After(*job.ChurnStart) && timestamp.Before(*job.ChurnEnd) {
+	if job.JobConfig.ChurnStart != nil && job.JobConfig.ChurnEnd != nil {
+		if !isInstant && timestamp.After(*job.JobConfig.ChurnStart) && timestamp.Before(*job.JobConfig.ChurnEnd) {
 			m.ChurnMetric = true
 		}
 	}
