@@ -114,7 +114,7 @@ teardown_file() {
   done
 
   # Verify that metrics for VolumeSnapshot was collected
-  check_metric_recorded create-snapshot volumeSnapshotLatency vsReadyLatency
+  check_metric_recorded create-snapshot volumeSnapshotLatency Ready
   check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
 }
 
@@ -337,7 +337,7 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c kube-burner-vm-snapshot-test.yml --uuid=${UUID} --log-level=debug
 
   # Verify volumeSnapshotLatency metrics were collected for the snapshot-vm job
-  check_metric_recorded snapshot-vm volumeSnapshotLatency vsReadyLatency
+  check_metric_recorded snapshot-vm volumeSnapshotLatency Ready
   check_quantile_recorded snapshot-vm volumeSnapshotLatency Ready
 }
 

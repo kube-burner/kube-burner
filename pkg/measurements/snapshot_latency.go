@@ -16,6 +16,7 @@ package measurements
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -35,6 +36,7 @@ import (
 	"kubevirt.io/client-go/kubecli"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 )
@@ -55,23 +57,22 @@ var (
 	}
 )
 
+type volumeSnapshotLabels struct {
+	Namespace    string `json:"namespace"`
+	Name         string `json:"vsName"`
+	JobIteration int    `json:"jobIteration"`
+	Replica      int    `json:"replica"`
+}
+
 // volumeSnapshotMetric holds data about VolumeSnapshot creation process
 type volumeSnapshotMetric struct {
 	// Timestamp filed is very important the the elasticsearch indexing and represents the first creation time that we track (i.e., vm or vmi)
-	Timestamp time.Time `json:"timestamp"`
+	metrics.LatencyDocument
 
 	vsReady        time.Time
 	VSReadyLatency int `json:"vsReadyLatency"`
 
-	MetricName   string `json:"metricName"`
-	UUID         string `json:"uuid"`
-	Namespace    string `json:"namespace"`
-	Name         string `json:"vsName"`
-	JobName      string `json:"jobName,omitempty"`
-	JobIteration int    `json:"jobIteration"`
-	Replica      int    `json:"replica"`
-	ChurnMetric  bool   `json:"churnMetric,omitempty"`
-	Metadata     any    `json:"metadata,omitempty"`
+	VolumeSnapshotLabels volumeSnapshotLabels `json:"labels"`
 }
 
 type volumeSnapshotLatency struct {
@@ -109,15 +110,19 @@ func (vsl *volumeSnapshotLatency) handleCreateVolumeSnapshot(obj any) {
 	}
 	vsLabels := volumeSnapshot.GetLabels()
 	vsl.Metrics.LoadOrStore(string(volumeSnapshot.UID), volumeSnapshotMetric{
-		Timestamp:    volumeSnapshot.CreationTimestamp.UTC(),
-		Namespace:    volumeSnapshot.Namespace,
-		Name:         volumeSnapshot.Name,
-		MetricName:   volumeSnapshotLatencyMeasurement,
-		UUID:         vsl.Uuid,
-		JobName:      vsl.JobConfig.Name,
-		Metadata:     vsl.Metadata,
-		JobIteration: getIntFromLabels(vsLabels, config.KubeBurnerLabelJobIteration),
-		Replica:      getIntFromLabels(vsLabels, config.KubeBurnerLabelReplica),
+		LatencyDocument: metrics.LatencyDocument{
+			Timestamp:  volumeSnapshot.CreationTimestamp.UTC(),
+			MetricName: volumeSnapshotLatencyMeasurement,
+			UUID:       vsl.Uuid,
+			JobName:    vsl.JobConfig.Name,
+			Metadata:   vsl.Metadata,
+		},
+		VolumeSnapshotLabels: volumeSnapshotLabels{
+			Namespace:    volumeSnapshot.Namespace,
+			Name:         volumeSnapshot.Name,
+			JobIteration: getIntFromLabels(vsLabels, config.KubeBurnerLabelJobIteration),
+			Replica:      getIntFromLabels(vsLabels, config.KubeBurnerLabelReplica),
+		},
 	})
 }
 
@@ -194,13 +199,17 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 	vsl.Metrics = sync.Map{}
 	for _, volumeSnapshot := range volumeSnapshots {
 		vsl.Metrics.Store(string(volumeSnapshot.UID), volumeSnapshotMetric{
-			Timestamp:  volumeSnapshot.CreationTimestamp.UTC(),
-			Namespace:  volumeSnapshot.Namespace,
-			Name:       volumeSnapshot.Name,
-			MetricName: volumeSnapshotLatencyMeasurement,
-			UUID:       vsl.Uuid,
-			vsReady:    volumeSnapshot.Status.CreationTime.Time,
-			JobName:    vsl.JobConfig.Name,
+			LatencyDocument: metrics.LatencyDocument{
+				Timestamp:  volumeSnapshot.CreationTimestamp.UTC(),
+				MetricName: volumeSnapshotLatencyMeasurement,
+				UUID:       vsl.Uuid,
+				JobName:    vsl.JobConfig.Name,
+			},
+			VolumeSnapshotLabels: volumeSnapshotLabels{
+				Namespace: volumeSnapshot.Namespace,
+				Name:      volumeSnapshot.Name,
+			},
+			vsReady: volumeSnapshot.Status.CreationTime.Time,
 		})
 	}
 }
@@ -213,7 +222,7 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 		m := value.(volumeSnapshotMetric)
 		// Skip VolumeSnapshot if it did not reach the Ready state (this timestamp isn't set)
 		if m.vsReady.IsZero() {
-			log.Warningf("VolumeSnapshot %v latency ignored as it did not reach Ready state", m.Name)
+			log.Warningf("VolumeSnapshot %v latency ignored as it did not reach Ready state", m.VolumeSnapshotLabels.Name)
 			return true
 		}
 		// latencyTime should be always larger than zero, however, in some cases, it might be a
@@ -226,14 +235,32 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 		errorFlag := 0
 		m.VSReadyLatency = int(m.vsReady.Sub(m.Timestamp).Milliseconds())
 		if m.VSReadyLatency < 0 {
-			log.Tracef("VSReadyLatency for VolumeSnapshot %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("VSReadyLatency for VolumeSnapshot %v falling under negative case. So explicitly setting it to 0", m.VolumeSnapshotLabels.Name)
 			errorFlag = 1
 			m.VSReadyLatency = 0
 		}
 		m.ChurnMetric = vsl.IsChurnMetric(m.Timestamp)
 		volumeSnapshotCount++
 		erroredVolumeSnapshots += errorFlag
-		vsl.NormLatencies = append(vsl.NormLatencies, m)
+		// vsl.NormLatencies = append(vsl.NormLatencies, m)
+		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
+			var lbls map[string]string
+			b, _ := json.Marshal(m.VolumeSnapshotLabels)
+			_ = json.Unmarshal(b, &lbls)
+			lbls["condition"] = condition
+			return metrics.LatencyDocument{
+				Timestamp:  m.Timestamp,
+				MetricName: volumeSnapshotLatencyMeasurement,
+				UUID:       vsl.Uuid,
+				JobName:    vsl.JobConfig.Name,
+				Metadata:   vsl.Metadata,
+				Labels:     lbls,
+				Value:      float64(valueMs),
+			}
+		}
+		vsl.NormLatencies = append(vsl.NormLatencies,
+			makeDoc("Ready", m.VSReadyLatency),
+		)
 		return true
 	})
 	if volumeSnapshotCount == 0 {
@@ -243,10 +270,9 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 }
 
 func (vsl *volumeSnapshotLatency) getLatency(normLatency any) map[string]float64 {
-	volumeSnapshotMetric := normLatency.(volumeSnapshotMetric)
-	return map[string]float64{
-		"Ready": float64(volumeSnapshotMetric.VSReadyLatency),
-	}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels["condition"]
+	return map[string]float64{condition: doc.Value}
 }
 
 func (vsl *volumeSnapshotLatency) IsCompatible() bool {
