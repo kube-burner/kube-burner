@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -60,6 +59,11 @@ type jobLatencyLabels struct {
 	Replica      int    `json:"replica"`
 	Namespace    string `json:"namespace"`
 	Name         string `json:"k8sJobName"`
+	Condition    string `json:"condition"`
+}
+
+func (l *jobLatencyLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 type jobMetric struct {
@@ -234,21 +238,7 @@ func (j *jobLatency) normalizeMetrics() float64 {
 		m.CompletionLatency = int(m.jobComplete.Sub(m.Timestamp).Milliseconds())
 		m.ChurnMetric = j.IsChurnMetric(m.Timestamp)
 		// j.NormLatencies = append(j.NormLatencies, m)
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(m.JobLatencyLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				MetricName: jobLatencyMeasurement,
-				UUID:       j.Uuid,
-				JobName:    j.JobConfig.Name,
-				Metadata:   j.Metadata,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int, *jobLatencyLabels](m.Timestamp, &m.JobLatencyLabels, &j.BaseMeasurement, jobLatencyMeasurement)
 		j.NormLatencies = append(j.NormLatencies,
 			makeDoc(jobStartTimeMeasurement, m.StartTimeLatency),
 			makeDoc(string(batchv1.JobComplete), m.CompletionLatency),

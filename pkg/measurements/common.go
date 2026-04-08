@@ -92,13 +92,19 @@ func DeployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, im
 	return err
 }
 
-// GenericLatencyDocFactory creates a reusable closure to generate standard metrics.LatencyDocument outputs organically
-func GenericLatencyDocFactory[T int | int64 | float64](timestamp time.Time, metadataLabels any, base *BaseMeasurement, metricName string) func(condition string, valueMs T) metrics.LatencyDocument {
+// ConditionSetter is implemented by labels structs that carry a condition field.
+type ConditionSetter interface {
+	SetCondition(string)
+}
+
+// GenericLatencyDocFactory creates a reusable closure to generate standard metrics.LatencyDocument outputs.
+// metadataLabels must be a pointer to a struct that implements ConditionSetter.
+func GenericLatencyDocFactory[T int | int64 | float64, L ConditionSetter](timestamp time.Time, metadataLabels L, base *BaseMeasurement, metricName string) func(condition string, valueMs T) metrics.LatencyDocument {
 	return func(condition string, valueMs T) metrics.LatencyDocument {
+		metadataLabels.SetCondition(condition)
 		var lbls map[string]string
 		b, _ := json.Marshal(metadataLabels)
 		_ = json.Unmarshal(b, &lbls)
-		lbls["condition"] = condition
 
 		return metrics.LatencyDocument{
 			Timestamp:  timestamp,

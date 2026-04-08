@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -65,6 +64,11 @@ type svcLatencyLabels struct {
 	Name        string             `json:"service"`
 	Namespace   string             `json:"namespace"`
 	ServiceType corev1.ServiceType `json:"type"`
+	Condition   string             `json:"condition"`
+}
+
+func (l *svcLatencyLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 type svcMetric struct {
@@ -275,21 +279,9 @@ func (s *serviceLatency) normalizeMetrics() {
 		metric.ChurnMetric = s.IsChurnMetric(metric.Timestamp)
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		// s.NormLatencies = append(s.NormLatencies, metric)
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(metric.SvcLatencyLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  metric.Timestamp,
-				MetricName: svcLatencyMeasurement,
-				UUID:       s.Uuid,
-				JobName:    s.JobConfig.Name,
-				Metadata:   s.Metadata,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-			}
-		}
+
+		makeDoc := GenericLatencyDocFactory[int, *svcLatencyLabels](metric.Timestamp, &metric.SvcLatencyLabels, &s.BaseMeasurement, svcLatencyMeasurement)
+
 		s.NormLatencies = append(s.NormLatencies,
 			makeDoc("ready", int(metric.ReadyLatency.Milliseconds())),
 			makeDoc("ipAssigned", int(metric.IPAssignedLatency.Milliseconds())),

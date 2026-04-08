@@ -15,7 +15,6 @@
 package measurements
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -63,6 +62,11 @@ type vmiLatencyLabels struct {
 	NodeName     string `json:"nodeName"`
 	JobIteration int    `json:"jobIteration"`
 	Replica      int    `json:"replica"`
+	Condition    string `json:"condition"`
+}
+
+func (l *vmiLatencyLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 // vmiMetric holds both pod and vmi metrics
@@ -392,33 +396,19 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 		m.Metadata = vmi.Metadata
 		m.ChurnMetric = vmi.IsChurnMetric(m.Timestamp)
 		// vmi.NormLatencies = append(vmi.NormLatencies, m)
-		makeDoc := func(condition string, valueMs float64) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(m.VMILatencyLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				Labels:     lbls,
-				Value:      valueMs,
-				MetricName: vmiLatencyMeasurement,
-				UUID:       vmi.Uuid,
-				JobName:    vmi.JobConfig.Name,
-				Metadata:   vmi.Metadata,
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int64, *vmiLatencyLabels](m.Timestamp, &m.VMILatencyLabels, &vmi.BaseMeasurement, vmiLatencyMeasurement)
 		vmi.NormLatencies = append(vmi.NormLatencies,
-			makeDoc("VM"+string(kvv1.VirtualMachineReady), float64(m.VMReadyLatency)),
-			makeDoc("VMICreated", float64(m.VMICreatedLatency)),
-			makeDoc("VMI"+string(kvv1.Pending), float64(m.VMIPendingLatency)),
-			makeDoc("VMI"+string(kvv1.Scheduling), float64(m.VMISchedulingLatency)),
-			makeDoc("VMI"+string(kvv1.Scheduled), float64(m.VMIScheduledLatency)),
-			makeDoc("VMI"+string(kvv1.Running), float64(m.VMIRunningLatency)),
-			makeDoc("PodCreated", float64(m.PodCreatedLatency)),
-			makeDoc("Pod"+string(corev1.PodScheduled), float64(m.PodScheduledLatency)),
-			makeDoc("Pod"+string(corev1.PodInitialized), float64(m.PodInitializedLatency)),
-			makeDoc("Pod"+string(corev1.ContainersReady), float64(m.PodContainersReadyLatency)),
-			makeDoc("Pod"+string(corev1.PodReady), float64(m.PodReadyLatency)),
+			makeDoc("VM"+string(kvv1.VirtualMachineReady), m.VMReadyLatency),
+			makeDoc("VMICreated", m.VMICreatedLatency),
+			makeDoc("VMI"+string(kvv1.Pending), m.VMIPendingLatency),
+			makeDoc("VMI"+string(kvv1.Scheduling), m.VMISchedulingLatency),
+			makeDoc("VMI"+string(kvv1.Scheduled), m.VMIScheduledLatency),
+			makeDoc("VMI"+string(kvv1.Running), m.VMIRunningLatency),
+			makeDoc("PodCreated", m.PodCreatedLatency),
+			makeDoc("Pod"+string(corev1.PodScheduled), m.PodScheduledLatency),
+			makeDoc("Pod"+string(corev1.PodInitialized), m.PodInitializedLatency),
+			makeDoc("Pod"+string(corev1.ContainersReady), m.PodContainersReadyLatency),
+			makeDoc("Pod"+string(corev1.PodReady), m.PodReadyLatency),
 		)
 		return true
 	})

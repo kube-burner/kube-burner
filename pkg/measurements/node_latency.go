@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -51,7 +50,12 @@ var (
 )
 
 type nodeLatencyLabels struct {
-	Name string `json:"nodeName"`
+	Name      string `json:"nodeName"`
+	Condition string `json:"condition"`
+}
+
+func (l *nodeLatencyLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 type NodeMetric struct {
@@ -245,21 +249,8 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 		m.NodeReadyLatency = int(m.NodeReady.Sub(earliest).Milliseconds())
 		m.ChurnMetric = n.IsChurnMetric(m.Timestamp)
 
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(m.NodeLatencyLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				MetricName: nodeLatencyMeasurement,
-				UUID:       n.Uuid,
-				JobName:    n.JobConfig.Name,
-				Metadata:   n.Metadata,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int, *nodeLatencyLabels](m.Timestamp, &m.NodeLatencyLabels, &n.BaseMeasurement, nodeLatencyMeasurement)
+
 		n.NormLatencies = append(n.NormLatencies,
 			makeDoc(string(corev1.NodeMemoryPressure), m.NodeMemoryPressureLatency),
 			makeDoc(string(corev1.NodeDiskPressure), m.NodeDiskPressureLatency),

@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -65,6 +64,11 @@ type podLatencyLabels struct {
 	Namespace    string `json:"namespace"`
 	Name         string `json:"podName"`
 	NodeName     string `json:"nodeName"`
+	Condition    string `json:"condition"`
+}
+
+func (l *podLatencyLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 type podMetric struct {
@@ -377,21 +381,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPods++
 		erroredPods += errorFlag
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(m.PodLatencyLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-				MetricName: podLatencyMeasurement,
-				UUID:       p.Uuid,
-				JobName:    p.JobConfig.Name,
-				Metadata:   p.Metadata,
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int, *podLatencyLabels](m.Timestamp, &m.PodLatencyLabels, &p.BaseMeasurement, podLatencyMeasurement)
 		p.NormLatencies = append(p.NormLatencies,
 			makeDoc(string(corev1.PodScheduled), m.SchedulingLatency),
 			makeDoc(string(corev1.PodInitialized), m.InitializedLatency),

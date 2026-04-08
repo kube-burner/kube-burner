@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -62,7 +61,13 @@ type pvcLatencyLabels struct {
 	Name         string `json:"pvcName"`
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass"`
+	Condition    string `json:"condition"`
 }
+
+func (l *pvcLatencyLabels) SetCondition(c string) {
+	l.Condition = c
+}
+
 type pvcMetric struct {
 	metrics.LatencyDocument
 	pending          int64
@@ -298,21 +303,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPVCs++
 		erroredPVCs += errorFlag
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(m.PvcLatencyLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				MetricName: pvcLatencyMeasurement,
-				UUID:       p.Uuid,
-				JobName:    p.JobConfig.Name,
-				Metadata:   p.Metadata,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int, *pvcLatencyLabels](m.Timestamp, &m.PvcLatencyLabels, &p.BaseMeasurement, pvcLatencyMeasurement)
 		p.NormLatencies = append(p.NormLatencies,
 			makeDoc(string(corev1.ClaimPending), m.PendingLatency),
 			makeDoc(string(corev1.ClaimBound), m.BindingLatency),

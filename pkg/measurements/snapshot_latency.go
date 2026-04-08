@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -62,6 +61,11 @@ type volumeSnapshotLabels struct {
 	Name         string `json:"vsName"`
 	JobIteration int    `json:"jobIteration"`
 	Replica      int    `json:"replica"`
+	Condition    string `json:"condition"`
+}
+
+func (l *volumeSnapshotLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 // volumeSnapshotMetric holds data about VolumeSnapshot creation process
@@ -243,21 +247,7 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 		volumeSnapshotCount++
 		erroredVolumeSnapshots += errorFlag
 		// vsl.NormLatencies = append(vsl.NormLatencies, m)
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(m.VolumeSnapshotLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				MetricName: volumeSnapshotLatencyMeasurement,
-				UUID:       vsl.Uuid,
-				JobName:    vsl.JobConfig.Name,
-				Metadata:   vsl.Metadata,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int, *volumeSnapshotLabels](m.Timestamp, &m.VolumeSnapshotLabels, &vsl.BaseMeasurement, volumeSnapshotLatencyMeasurement)
 		vsl.NormLatencies = append(vsl.NormLatencies,
 			makeDoc("Ready", m.VSReadyLatency),
 		)

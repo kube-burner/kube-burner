@@ -66,6 +66,11 @@ type vmimLatencyLabels struct {
 	JobIteration int    `json:"jobIteration"`
 	Replica      int    `json:"replica"`
 	Namespace    string `json:"namespace"`
+	Condition    string `json:"condition"`
+}
+
+func (l *vmimLatencyLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 // vmimMetric holds VirtualMachineInstanceMigration metrics
@@ -346,7 +351,7 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = vmiml.IsChurnMetric(m.Timestamp)
 		count++
 		errored += errorFlag
-		makeDoc := GenericLatencyDocFactory[int](m.Timestamp, m.VMIMLatencyLabels, &vmiml.BaseMeasurement, vmimLatencyMeasurement)
+		makeDoc := GenericLatencyDocFactory[int, *vmimLatencyLabels](m.Timestamp, &m.VMIMLatencyLabels, &vmiml.BaseMeasurement, vmimLatencyMeasurement)
 
 		vmiml.NormLatencies = append(vmiml.NormLatencies,
 			makeDoc(string(kvv1.MigrationPending), m.PendingLatency),

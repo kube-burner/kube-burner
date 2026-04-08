@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -65,6 +64,11 @@ type dvLatencyLabels struct {
 	Name         string `json:"dvName"`
 	JobIteration int    `json:"jobIteration"`
 	Replica      int    `json:"replica"`
+	Condition    string `json:"condition"`
+}
+
+func (l *dvLatencyLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 // dvMetric holds data about DataVolume creation process
@@ -296,21 +300,8 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 		dataVolumeCount++
 		erroredDataVolumes += errorFlag
 		// dv.NormLatencies = append(dv.NormLatencies, m)
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(m.DVLatencyLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  m.Timestamp,
-				MetricName: dvLatencyMeasurement,
-				UUID:       dv.Uuid,
-				JobName:    dv.JobConfig.Name,
-				Metadata:   dv.Metadata,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int, *dvLatencyLabels](m.Timestamp, &m.DVLatencyLabels, &dv.BaseMeasurement, dvLatencyMeasurement)
+
 		dv.NormLatencies = append(dv.NormLatencies,
 			makeDoc(string(cdiv1beta1.DataVolumeBound), m.DVBoundLatency),
 			makeDoc(string(cdiv1beta1.DataVolumeRunning), m.DVRunningLatency),

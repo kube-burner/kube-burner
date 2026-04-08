@@ -99,6 +99,11 @@ type netpolLatency struct {
 type netpolLatencyLabels struct {
 	Namespace string `json:"namespace"`
 	Name      string `json:"netpol"`
+	Condition string `json:"condition"`
+}
+
+func (l *netpolLatencyLabels) SetCondition(c string) {
+	l.Condition = c
 }
 
 type netpolMetric struct {
@@ -601,21 +606,7 @@ func (n *netpolLatency) normalizeMetrics() float64 {
 		metric.ChurnMetric = n.IsChurnMetric(metric.Timestamp)
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		minLatencies = append(minLatencies, float64(metric.MinReadyLatency))
-		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
-			var lbls map[string]string
-			b, _ := json.Marshal(metric.NetpolLabels)
-			_ = json.Unmarshal(b, &lbls)
-			lbls["condition"] = condition
-			return metrics.LatencyDocument{
-				Timestamp:  metric.Timestamp,
-				MetricName: netpolLatencyMeasurement,
-				UUID:       n.Uuid,
-				JobName:    n.JobConfig.Name,
-				Metadata:   n.Metadata,
-				Labels:     lbls,
-				Value:      float64(valueMs),
-			}
-		}
+		makeDoc := GenericLatencyDocFactory[int, *netpolLatencyLabels](metric.Timestamp, &metric.NetpolLabels, &n.BaseMeasurement, netpolLatencyMeasurement)
 		n.NormLatencies = append(n.NormLatencies,
 			makeDoc("Ready", int(metric.ReadyLatency)),
 			makeDoc("MinReady", int(metric.MinReadyLatency)),
