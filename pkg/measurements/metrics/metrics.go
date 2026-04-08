@@ -42,13 +42,14 @@ type LatencyQuantiles struct {
 }
 
 type LatencyDocument struct {
-	Timestamp  time.Time         `json:"timestamp"`
-	Labels     map[string]string `json:"labels"`
-	Value      float64           `json:"value"`
-	MetricName string            `json:"metricName"`
-	UUID       string            `json:"uuid"`
-	JobName    string            `json:"jobName,omitempty"`
-	Metadata   any               `json:"metadata,omitempty"`
+	Timestamp   time.Time         `json:"timestamp"`
+	Labels      map[string]string `json:"labels"`
+	Value       float64           `json:"value"`
+	MetricName  string            `json:"metricName"`
+	UUID        string            `json:"uuid"`
+	JobName     string            `json:"jobName,omitempty"`
+	Metadata    any               `json:"metadata,omitempty"`
+	ChurnMetric bool              `json:"churnMetric,omitempty"`
 }
 
 // CheckThreshold checks latency thresholds

@@ -62,7 +62,6 @@ type pvcLatencyLabels struct {
 	Name         string `json:"pvcName"`
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass"`
-	ChurnMetric  bool   `json:"churnMetric,omitempty"`
 }
 type pvcMetric struct {
 	metrics.LatencyDocument
@@ -296,7 +295,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 			m.ResizeLatency = 0
 		}
 
-		m.PvcLatencyLabels.ChurnMetric = p.IsChurnMetric(m.Timestamp)
+		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPVCs++
 		erroredPVCs += errorFlag
 		baseLabels := pvcLatencyLabels{

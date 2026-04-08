@@ -65,7 +65,6 @@ type podLatencyLabels struct {
 	Namespace    string `json:"namespace"`
 	Name         string `json:"podName"`
 	NodeName     string `json:"nodeName"`
-	ChurnMetric  bool   `json:"churnMetric,omitempty"`
 }
 
 type podMetric struct {
@@ -375,7 +374,7 @@ func (p *podLatency) normalizeMetrics() float64 {
 			errorFlag = 1
 			m.ContainersStartedLatency = 0
 		}
-		m.PodLatencyLabels.ChurnMetric = p.IsChurnMetric(m.Timestamp)
+		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPods++
 		erroredPods += errorFlag
 		baseLabels := podLatencyLabels{
