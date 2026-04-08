@@ -317,7 +317,7 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 
 func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
 	doc := normLatency.(metrics.LatencyDocument)
-	condition := doc.Labels["condition"]
+	condition := doc.Labels.(*dvLatencyLabels).Condition
 	return map[string]float64{condition: doc.Value}
 }
 

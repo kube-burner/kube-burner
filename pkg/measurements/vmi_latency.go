@@ -417,7 +417,7 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 
 func (vmi *vmiLatency) getLatency(normLatency any) map[string]float64 {
 	doc := normLatency.(metrics.LatencyDocument)
-	condition := doc.Labels["condition"]
+	condition := doc.Labels.(*vmiLatencyLabels).Condition
 	return map[string]float64{condition: doc.Value}
 }
 

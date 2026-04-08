@@ -16,7 +16,6 @@ package measurements
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 	"time"
 
@@ -102,13 +101,10 @@ type ConditionSetter interface {
 func GenericLatencyDocFactory[T int | int64 | float64, L ConditionSetter](timestamp time.Time, metadataLabels L, base *BaseMeasurement, metricName string) func(condition string, valueMs T) metrics.LatencyDocument {
 	return func(condition string, valueMs T) metrics.LatencyDocument {
 		metadataLabels.SetCondition(condition)
-		var lbls map[string]string
-		b, _ := json.Marshal(metadataLabels)
-		_ = json.Unmarshal(b, &lbls)
 
 		return metrics.LatencyDocument{
 			Timestamp:  timestamp,
-			Labels:     lbls,
+			Labels:     metadataLabels,
 			Value:      float64(valueMs),
 			MetricName: metricName,
 			UUID:       base.Uuid,
