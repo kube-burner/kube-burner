@@ -298,17 +298,9 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPVCs++
 		erroredPVCs += errorFlag
-		baseLabels := pvcLatencyLabels{
-			Namespace:    m.PvcLatencyLabels.Namespace,
-			JobIteration: m.PvcLatencyLabels.JobIteration,
-			Replica:      m.PvcLatencyLabels.Replica,
-			Name:         m.PvcLatencyLabels.Name,
-			Size:         m.PvcLatencyLabels.Size,
-			StorageClass: m.PvcLatencyLabels.StorageClass,
-		}
 		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
 			var lbls map[string]string
-			b, _ := json.Marshal(baseLabels)
+			b, _ := json.Marshal(m.PvcLatencyLabels)
 			_ = json.Unmarshal(b, &lbls)
 			lbls["condition"] = condition
 			return metrics.LatencyDocument{

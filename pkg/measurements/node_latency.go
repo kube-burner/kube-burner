@@ -245,12 +245,9 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 		m.NodeReadyLatency = int(m.NodeReady.Sub(earliest).Milliseconds())
 		m.ChurnMetric = n.IsChurnMetric(m.Timestamp)
 
-		baseLabels := nodeLatencyLabels{
-			Name: m.NodeLatencyLabels.Name,
-		}
 		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
 			var lbls map[string]string
-			b, _ := json.Marshal(baseLabels)
+			b, _ := json.Marshal(m.NodeLatencyLabels)
 			_ = json.Unmarshal(b, &lbls)
 			lbls["condition"] = condition
 			return metrics.LatencyDocument{

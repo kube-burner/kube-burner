@@ -107,7 +107,7 @@ teardown_file() {
   # Verify metrics for PVC and DV were collected
   local jobs=("create-vm" "create-base-image-dv")
   for job in "${jobs[@]}"; do
-    check_metric_recorded ${job} dvLatency dvReadyLatency
+    check_metric_recorded ${job} dvLatency Ready
     check_metric_recorded ${job} pvcLatency Bound
     check_quantile_recorded ${job} dvLatency Ready
     check_quantile_recorded ${job} pvcLatency Bound

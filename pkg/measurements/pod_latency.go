@@ -377,16 +377,9 @@ func (p *podLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPods++
 		erroredPods += errorFlag
-		baseLabels := podLatencyLabels{
-			Namespace:    m.PodLatencyLabels.Namespace,
-			Name:         m.PodLatencyLabels.Name,
-			NodeName:     m.PodLatencyLabels.NodeName,
-			JobIteration: m.PodLatencyLabels.JobIteration,
-			Replica:      m.PodLatencyLabels.Replica,
-		}
 		makeDoc := func(condition string, valueMs int) metrics.LatencyDocument {
 			var lbls map[string]string
-			b, _ := json.Marshal(baseLabels)
+			b, _ := json.Marshal(m.PodLatencyLabels)
 			_ = json.Unmarshal(b, &lbls)
 			lbls["condition"] = condition
 			return metrics.LatencyDocument{
