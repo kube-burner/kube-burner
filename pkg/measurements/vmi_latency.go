@@ -74,29 +74,31 @@ type vmiMetric struct {
 	// Timestamp filed is very important the the elasticsearch indexing and represents the first creation time that we track (i.e., vm or vmi)
 	metrics.LatencyDocument
 
-	podCreated                time.Time
-	PodCreatedLatency         int64 `json:"podCreatedLatency"`
-	podScheduled              time.Time
-	PodScheduledLatency       int64 `json:"podScheduledLatency"`
-	podInitialized            time.Time
-	PodInitializedLatency     int64 `json:"podInitializedLatency"`
-	podContainersReady        time.Time
-	PodContainersReadyLatency int64 `json:"podContainersReadyLatency"`
-	podReady                  time.Time
-	PodReadyLatency           int64 `json:"podReadyLatency"`
-	vmiCreated                time.Time
-	VMICreatedLatency         int64 `json:"vmiCreatedLatency"`
-	vmiPending                time.Time
-	VMIPendingLatency         int64 `json:"vmiPendingLatency"`
-	vmiScheduling             time.Time
-	VMISchedulingLatency      int64 `json:"vmiSchedulingLatency"`
-	vmiScheduled              time.Time
-	VMIScheduledLatency       int64 `json:"vmiScheduledLatency"`
-	vmiRunning                time.Time
-	VMIRunningLatency         int64 `json:"vmiRunningLatency"`
-	vmReady                   time.Time
-	VMReadyLatency            int64            `json:"vmReadyLatency"`
-	VMILatencyLabels          vmiLatencyLabels `json:"labels"`
+	podCreated                       time.Time
+	PodCreatedLatency                int64 `json:"podCreatedLatency"`
+	podScheduled                     time.Time
+	PodScheduledLatency              int64 `json:"podScheduledLatency"`
+	podInitialized                   time.Time
+	PodInitializedLatency            int64 `json:"podInitializedLatency"`
+	podContainersReady               time.Time
+	PodContainersReadyLatency        int64 `json:"podContainersReadyLatency"`
+	podReady                         time.Time
+	PodReadyLatency                  int64 `json:"podReadyLatency"`
+	podReadyToStartContainers        time.Time
+	PodReadyToStartContainersLatency int64 `json:"podReadyToStartContainersLatency"`
+	vmiCreated                       time.Time
+	VMICreatedLatency                int64 `json:"vmiCreatedLatency"`
+	vmiPending                       time.Time
+	VMIPendingLatency                int64 `json:"vmiPendingLatency"`
+	vmiScheduling                    time.Time
+	VMISchedulingLatency             int64 `json:"vmiSchedulingLatency"`
+	vmiScheduled                     time.Time
+	VMIScheduledLatency              int64 `json:"vmiScheduledLatency"`
+	vmiRunning                       time.Time
+	VMIRunningLatency                int64 `json:"vmiRunningLatency"`
+	vmReady                          time.Time
+	VMReadyLatency                   int64            `json:"vmReadyLatency"`
+	VMILatencyLabels                 vmiLatencyLabels `json:"labels"`
 }
 
 type vmiLatency struct {
@@ -213,25 +215,27 @@ func (vmi *vmiLatency) handleUpdateVMI(obj any) {
 	if vmiM, ok := vmi.Metrics.Load(mapID); ok {
 		vmiMetric := vmiM.(vmiMetric)
 		if vmiMetric.vmiRunning.IsZero() {
-			switch vmiObj.Status.Phase {
-			case kvv1.Pending:
-				if vmiMetric.vmiPending.IsZero() {
-					vmiMetric.vmiPending = time.Now().UTC()
+			for _, phase := range vmiObj.Status.PhaseTransitionTimestamps {
+				switch phase.Phase {
+				case kvv1.Pending:
+					if vmiMetric.vmiPending.IsZero() {
+						vmiMetric.vmiPending = phase.PhaseTransitionTimestamp.UTC()
+					}
+				case kvv1.Scheduling:
+					if vmiMetric.vmiScheduling.IsZero() {
+						vmiMetric.vmiScheduling = phase.PhaseTransitionTimestamp.UTC()
+					}
+				case kvv1.Scheduled:
+					if vmiMetric.vmiScheduled.IsZero() {
+						vmiMetric.vmiScheduled = phase.PhaseTransitionTimestamp.UTC()
+					}
+				case kvv1.Running:
+					log.Debugf("VMI %s is running", vmiObj.Name)
+					vmiMetric.vmiRunning = phase.PhaseTransitionTimestamp.UTC()
 				}
-			case kvv1.Scheduling:
-				if vmiMetric.vmiScheduling.IsZero() {
-					vmiMetric.vmiScheduling = time.Now().UTC()
-				}
-			case kvv1.Scheduled:
-				if vmiMetric.vmiScheduled.IsZero() {
-					vmiMetric.vmiScheduled = time.Now().UTC()
-				}
-			case kvv1.Running:
-				log.Debugf("VMI %s is running", vmiObj.Name)
-				vmiMetric.vmiRunning = time.Now().UTC()
 			}
-			vmi.Metrics.Store(mapID, vmiMetric)
 		}
+		vmi.Metrics.Store(mapID, vmiMetric)
 	}
 }
 
@@ -251,7 +255,7 @@ func (vmi *vmiLatency) handleCreateVMIPod(obj any) {
 		vmiMetric := v.(vmiMetric)
 		if vmiMetric.VMILatencyLabels.VMIName == vmiName {
 			vmiMetric.VMILatencyLabels.PodName = pod.Name
-			vmiMetric.podCreated = time.Now().UTC()
+			vmiMetric.podCreated = pod.CreationTimestamp.UTC()
 			vmi.Metrics.Store(k, vmiMetric)
 		}
 		return true
@@ -276,23 +280,28 @@ func (vmi *vmiLatency) handleUpdateVMIPod(obj any) {
 			if vmiMetric.podReady.IsZero() {
 				for _, c := range pod.Status.Conditions {
 					if c.Status == corev1.ConditionTrue {
+						// https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
 						switch c.Type {
 						case corev1.PodScheduled:
 							if vmiMetric.podScheduled.IsZero() {
-								vmiMetric.podScheduled = time.Now().UTC()
+								vmiMetric.podScheduled = c.LastTransitionTime.UTC()
 								vmiMetric.VMILatencyLabels.NodeName = pod.Spec.NodeName
+							}
+						case corev1.PodReadyToStartContainers:
+							if vmiMetric.podReadyToStartContainers.IsZero() {
+								vmiMetric.podReadyToStartContainers = c.LastTransitionTime.UTC()
 							}
 						case corev1.PodInitialized:
 							if vmiMetric.podInitialized.IsZero() {
-								vmiMetric.podInitialized = time.Now().UTC()
+								vmiMetric.podInitialized = c.LastTransitionTime.UTC()
 							}
 						case corev1.ContainersReady:
 							if vmiMetric.podContainersReady.IsZero() {
-								vmiMetric.podContainersReady = time.Now().UTC()
+								vmiMetric.podContainersReady = c.LastTransitionTime.UTC()
 							}
 						case corev1.PodReady:
 							log.Debugf("VMI pod %s is running", pod.Name)
-							vmiMetric.podReady = time.Now().UTC()
+							vmiMetric.podReady = c.LastTransitionTime.UTC()
 						}
 					}
 				}
@@ -391,11 +400,11 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 		m.PodInitializedLatency = m.podInitialized.Sub(m.Timestamp).Milliseconds()
 		m.PodContainersReadyLatency = m.podContainersReady.Sub(m.Timestamp).Milliseconds()
 		m.PodReadyLatency = m.podReady.Sub(m.Timestamp).Milliseconds()
+		m.PodReadyToStartContainersLatency = m.podReadyToStartContainers.Sub(m.Timestamp).Milliseconds()
 		m.UUID = vmi.Uuid
 		m.JobName = vmi.JobConfig.Name
 		m.Metadata = vmi.Metadata
 		m.ChurnMetric = vmi.IsChurnMetric(m.Timestamp)
-		// vmi.NormLatencies = append(vmi.NormLatencies, m)
 		makeDoc := GenericLatencyDocFactory[int64, *vmiLatencyLabels](m.Timestamp, &m.VMILatencyLabels, &vmi.BaseMeasurement, vmiLatencyMeasurement)
 		vmi.NormLatencies = append(vmi.NormLatencies,
 			makeDoc("VM"+string(kvv1.VirtualMachineReady), m.VMReadyLatency),
@@ -409,6 +418,7 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 			makeDoc("Pod"+string(corev1.PodInitialized), m.PodInitializedLatency),
 			makeDoc("Pod"+string(corev1.ContainersReady), m.PodContainersReadyLatency),
 			makeDoc("Pod"+string(corev1.PodReady), m.PodReadyLatency),
+			makeDoc("Pod"+string(corev1.PodReadyToStartContainers), m.PodReadyToStartContainersLatency),
 		)
 		return true
 	})
@@ -454,7 +464,7 @@ func (vmi *vmiLatency) IsCompatible() bool {
 // - metadata: name, namespace, uid, creationTimestamp, labels
 // - status: conditions
 func virtualMachineTransformFunc() cache.TransformFunc {
-	return func(obj interface{}) (interface{}, error) {
+	return func(obj any) (any, error) {
 		u, ok := obj.(*unstructured.Unstructured)
 		if !ok {
 			return obj, nil
@@ -474,7 +484,7 @@ func virtualMachineTransformFunc() cache.TransformFunc {
 // - metadata: name, namespace, uid, creationTimestamp, labels, ownerReferences
 // - status: phase
 func virtualMachineInstanceTransformFunc() cache.TransformFunc {
-	return func(obj interface{}) (interface{}, error) {
+	return func(obj any) (any, error) {
 		u, ok := obj.(*unstructured.Unstructured)
 		if !ok {
 			return obj, nil
@@ -488,6 +498,9 @@ func virtualMachineInstanceTransformFunc() cache.TransformFunc {
 
 		if phase, found, _ := unstructured.NestedString(u.Object, "status", "phase"); found {
 			_ = unstructured.SetNestedField(minimal.Object, phase, "status", "phase")
+		}
+		if phaseTransitionTimestamps, found, _ := unstructured.NestedSlice(u.Object, "status", "phaseTransitionTimestamps"); found {
+			_ = unstructured.SetNestedSlice(minimal.Object, phaseTransitionTimestamps, "status", "phaseTransitionTimestamps")
 		}
 
 		return minimal, nil
