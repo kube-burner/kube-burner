@@ -227,7 +227,7 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 		log.Warnf("Error found parsing result from query %s: %s", query, err)
 	}
 	if len(datapoints) == 0 {
-		log.Warnf("No datapoints returned from metric %s for job %s in range %s - %s with query %q", metricName, job.Name, jobStart.Format(time.RFC3339), jobEnd.Format(time.RFC3339), query)
+		log.Warnf("No datapoints returned from metric %s for job %s in range %s - %s with query %q", metricName, job.JobConfig.Name, jobStart.Format(time.RFC3339), jobEnd.Format(time.RFC3339), query)
 	}
 	return datapoints
 }
