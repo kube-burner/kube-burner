@@ -153,7 +153,7 @@ func countPulledImages(ctx context.Context, clientSet kubernetes.Interface, seen
 				continue
 			}
 			pullCount++
-			if status.ImageID != "" {
+			if status.Image != "" {
 				seen[podName+"/"+status.Name] = struct{}{}
 				pulledCount++
 			}
@@ -270,6 +270,7 @@ func createDSs(ctx context.Context, clientSet kubernetes.Interface, imageList []
 		ds.Spec.Template.Spec.Containers = append(ds.Spec.Template.Spec.Containers, corev1.Container{
 			Name:            fmt.Sprintf("pull-%d", i),
 			Image:           image,
+			Command:         []string{"override", "command"},
 			ImagePullPolicy: corev1.PullAlways,
 		})
 	}
