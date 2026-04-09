@@ -102,9 +102,8 @@ type netpolLatencyLabels struct {
 	Condition string `json:"condition"`
 }
 
-func (l *netpolLatencyLabels) SetCondition(c string) {
-	l.Condition = c
-}
+func (l *netpolLatencyLabels) SetCondition(c string)       { l.Condition = c }
+func (l *netpolLatencyLabels) Clone() *netpolLatencyLabels { c := *l; return &c }
 
 type netpolMetric struct {
 	metrics.LatencyDocument
@@ -606,7 +605,7 @@ func (n *netpolLatency) normalizeMetrics() float64 {
 		metric.ChurnMetric = n.IsChurnMetric(metric.Timestamp)
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		minLatencies = append(minLatencies, float64(metric.MinReadyLatency))
-		makeDoc := GenericLatencyDocFactory[int, *netpolLatencyLabels](metric.Timestamp, &metric.NetpolLabels, &n.BaseMeasurement, netpolLatencyMeasurement)
+		makeDoc := GenericLatencyDocFactory[int, *netpolLatencyLabels](&metric.NetpolLabels, metric.LatencyDocument)
 		n.NormLatencies = append(n.NormLatencies,
 			makeDoc("Ready", int(metric.ReadyLatency)),
 			makeDoc("MinReady", int(metric.MinReadyLatency)),

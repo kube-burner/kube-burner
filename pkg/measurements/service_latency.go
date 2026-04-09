@@ -67,9 +67,8 @@ type svcLatencyLabels struct {
 	Condition   string             `json:"condition"`
 }
 
-func (l *svcLatencyLabels) SetCondition(c string) {
-	l.Condition = c
-}
+func (l *svcLatencyLabels) SetCondition(c string)    { l.Condition = c }
+func (l *svcLatencyLabels) Clone() *svcLatencyLabels { c := *l; return &c }
 
 type svcMetric struct {
 	metrics.LatencyDocument
@@ -280,7 +279,7 @@ func (s *serviceLatency) normalizeMetrics() {
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		// s.NormLatencies = append(s.NormLatencies, metric)
 
-		makeDoc := GenericLatencyDocFactory[int, *svcLatencyLabels](metric.Timestamp, &metric.SvcLatencyLabels, &s.BaseMeasurement, svcLatencyMeasurement)
+		makeDoc := GenericLatencyDocFactory[int, *svcLatencyLabels](&metric.SvcLatencyLabels, metric.LatencyDocument)
 
 		s.NormLatencies = append(s.NormLatencies,
 			makeDoc("ready", int(metric.ReadyLatency.Milliseconds())),

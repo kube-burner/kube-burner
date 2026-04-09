@@ -64,9 +64,8 @@ type volumeSnapshotLabels struct {
 	Condition    string `json:"condition"`
 }
 
-func (l *volumeSnapshotLabels) SetCondition(c string) {
-	l.Condition = c
-}
+func (l *volumeSnapshotLabels) SetCondition(c string)        { l.Condition = c }
+func (l *volumeSnapshotLabels) Clone() *volumeSnapshotLabels { c := *l; return &c }
 
 // volumeSnapshotMetric holds data about VolumeSnapshot creation process
 type volumeSnapshotMetric struct {
@@ -247,7 +246,7 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 		volumeSnapshotCount++
 		erroredVolumeSnapshots += errorFlag
 		// vsl.NormLatencies = append(vsl.NormLatencies, m)
-		makeDoc := GenericLatencyDocFactory[int, *volumeSnapshotLabels](m.Timestamp, &m.VolumeSnapshotLabels, &vsl.BaseMeasurement, volumeSnapshotLatencyMeasurement)
+		makeDoc := GenericLatencyDocFactory[int, *volumeSnapshotLabels](&m.VolumeSnapshotLabels, m.LatencyDocument)
 		vsl.NormLatencies = append(vsl.NormLatencies,
 			makeDoc("Ready", m.VSReadyLatency),
 		)

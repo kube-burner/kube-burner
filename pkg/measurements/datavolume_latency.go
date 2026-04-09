@@ -67,9 +67,8 @@ type dvLatencyLabels struct {
 	Condition    string `json:"condition"`
 }
 
-func (l *dvLatencyLabels) SetCondition(c string) {
-	l.Condition = c
-}
+func (l *dvLatencyLabels) SetCondition(c string)   { l.Condition = c }
+func (l *dvLatencyLabels) Clone() *dvLatencyLabels { c := *l; return &c }
 
 // dvMetric holds data about DataVolume creation process
 type dvMetric struct {
@@ -300,7 +299,7 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 		dataVolumeCount++
 		erroredDataVolumes += errorFlag
 		// dv.NormLatencies = append(dv.NormLatencies, m)
-		makeDoc := GenericLatencyDocFactory[int, *dvLatencyLabels](m.Timestamp, &m.DVLatencyLabels, &dv.BaseMeasurement, dvLatencyMeasurement)
+		makeDoc := GenericLatencyDocFactory[int, *dvLatencyLabels](&m.DVLatencyLabels, m.LatencyDocument)
 
 		dv.NormLatencies = append(dv.NormLatencies,
 			makeDoc(string(cdiv1beta1.DataVolumeBound), m.DVBoundLatency),

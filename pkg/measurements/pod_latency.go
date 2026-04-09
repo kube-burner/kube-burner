@@ -67,9 +67,8 @@ type podLatencyLabels struct {
 	Condition    string `json:"condition"`
 }
 
-func (l *podLatencyLabels) SetCondition(c string) {
-	l.Condition = c
-}
+func (l *podLatencyLabels) SetCondition(c string)    { l.Condition = c }
+func (l *podLatencyLabels) Clone() *podLatencyLabels { c := *l; return &c }
 
 type podMetric struct {
 	metrics.LatencyDocument
@@ -131,7 +130,6 @@ func (p *podLatency) handleCreatePod(obj any) {
 		PodLatencyLabels: podLatencyLabels{
 			Namespace:    pod.Namespace,
 			Name:         pod.Name,
-			NodeName:     pod.Spec.NodeName,
 			JobIteration: getIntFromLabels(podLabels, config.KubeBurnerLabelJobIteration),
 			Replica:      getIntFromLabels(podLabels, config.KubeBurnerLabelReplica),
 		},
@@ -303,11 +301,8 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 				Metadata:   p.Metadata,
 			},
 			PodLatencyLabels: podLatencyLabels{
-				Namespace:    pod.Namespace,
-				Name:         pod.Name,
-				NodeName:     pod.Spec.NodeName,
-				JobIteration: getIntFromLabels(pod.Labels, config.KubeBurnerLabelJobIteration),
-				Replica:      getIntFromLabels(pod.Labels, config.KubeBurnerLabelReplica),
+				Namespace: pod.Namespace,
+				Name:      pod.Name,
 			},
 			scheduled:              scheduled,
 			readyToStartContainers: readyToStartContainers,
@@ -381,11 +376,11 @@ func (p *podLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPods++
 		erroredPods += errorFlag
-		makeDoc := GenericLatencyDocFactory[int, *podLatencyLabels](m.Timestamp, &m.PodLatencyLabels, &p.BaseMeasurement, podLatencyMeasurement)
+		makeDoc := GenericLatencyDocFactory[int, *podLatencyLabels](&m.PodLatencyLabels, m.LatencyDocument)
 		p.NormLatencies = append(p.NormLatencies,
 			makeDoc(string(corev1.PodScheduled), m.SchedulingLatency),
-			makeDoc(string(corev1.PodInitialized), m.InitializedLatency),
 			makeDoc(string(corev1.ContainersReady), m.ContainersReadyLatency),
+			makeDoc(string(corev1.PodInitialized), m.InitializedLatency),
 			makeDoc(string(corev1.PodReady), m.PodReadyLatency),
 			makeDoc(string(corev1.PodReadyToStartContainers), m.ReadyToStartContainersLatency),
 			makeDoc(containersStarted, m.ContainersStartedLatency),

@@ -62,9 +62,8 @@ type jobLatencyLabels struct {
 	Condition    string `json:"condition"`
 }
 
-func (l *jobLatencyLabels) SetCondition(c string) {
-	l.Condition = c
-}
+func (l *jobLatencyLabels) SetCondition(c string)    { l.Condition = c }
+func (l *jobLatencyLabels) Clone() *jobLatencyLabels { c := *l; return &c }
 
 type jobMetric struct {
 	metrics.LatencyDocument
@@ -238,7 +237,7 @@ func (j *jobLatency) normalizeMetrics() float64 {
 		m.CompletionLatency = int(m.jobComplete.Sub(m.Timestamp).Milliseconds())
 		m.ChurnMetric = j.IsChurnMetric(m.Timestamp)
 		// j.NormLatencies = append(j.NormLatencies, m)
-		makeDoc := GenericLatencyDocFactory[int, *jobLatencyLabels](m.Timestamp, &m.JobLatencyLabels, &j.BaseMeasurement, jobLatencyMeasurement)
+		makeDoc := GenericLatencyDocFactory[int, *jobLatencyLabels](&m.JobLatencyLabels, m.LatencyDocument)
 		j.NormLatencies = append(j.NormLatencies,
 			makeDoc(jobStartTimeMeasurement, m.StartTimeLatency),
 			makeDoc(string(batchv1.JobComplete), m.CompletionLatency),
