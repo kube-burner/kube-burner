@@ -431,7 +431,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 		prometheusClient.ScrapeJobsMetrics(executedJobs...)
 	}
 	for _, indexer := range configSpec.MetricsEndpoints {
-		if indexer.Type == indexers.LocalIndexer && indexer.CreateTarball {
+		if (indexer.Type == indexers.LocalIndexer || indexer.Type == indexers.TSDBIndexer) && indexer.CreateTarball {
 			metrics.CreateTarball(indexer.IndexerConfig)
 		}
 	}

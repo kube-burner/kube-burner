@@ -89,8 +89,8 @@ type podMetric struct {
 
 type podLatency struct {
 	BaseMeasurement
-	eventLister    lcorev1.EventLister
-	stopInformerCh chan struct{}
+	eventLister     lcorev1.EventLister
+	eventInformerCh chan struct{}
 }
 
 type podLatencyMeasurementFactory struct {
@@ -180,37 +180,59 @@ func (p *podLatency) handleUpdatePod(obj any) {
 	}
 }
 
-// getScheduledTimeFromEvent returns scheduled time in microseconds precission from event
+// getScheduledTimeFromEvent returns scheduled time in microseconds precision from event.
+// Retries with backoff when the event is not yet in the lister (e.g. under high load).
 func (p *podLatency) getScheduledTimeFromEvent(pod *corev1.Pod) time.Time {
-	eventList, _ := p.eventLister.List(labels.Everything())
-	for _, event := range eventList {
-		if event.InvolvedObject.UID == pod.UID && event.Reason == "Scheduled" {
-			return event.EventTime.Time
+	var timestamp time.Time
+	err := util.RetryWithExponentialBackOff(func() (bool, error) {
+		eventList, _ := p.eventLister.List(labels.Everything())
+		for _, event := range eventList {
+			if event.InvolvedObject.UID == pod.UID && event.Reason == "Scheduled" {
+				timestamp = event.EventTime.Time
+				return true, nil
+			}
 		}
+		return false, nil
+	}, 100*time.Millisecond, 2, 0, time.Minute)
+	if err != nil {
+		log.Warnf("failed to get scheduled of pod %s/%s time from event: %v", pod.Namespace, pod.Name, err)
 	}
-	return time.Time{}
+	return timestamp
 }
 
-// getStartedTimeFromEvent returns the timestamp of the latest container started event in the pod
+// getStartedTimeFromEvent returns the timestamp of the latest container started event in the pod.
+// Retries with backoff when the event is not yet in the lister (e.g. under high load).
 func (p *podLatency) getStartedTimeFromEvent(pod *corev1.Pod) time.Time {
 	var timestamp time.Time
-	eventList, _ := p.eventLister.List(labels.Everything())
-	for _, event := range eventList {
-		if event.InvolvedObject.UID == pod.UID && event.Reason == "Started" {
-			// The event name is in the format "podName.timestamp", where timestamp in hexadecimal format
-			// https://github.com/kubernetes/client-go/blob/v0.34.2/tools/record/event.go#L492
-			eventName := strings.Split(event.Name, ".")
-			eventTsInt, err := strconv.ParseInt(eventName[1], 16, 64)
-			if err != nil {
-				log.Warnf("failed to parse event timestamp: %v", err)
-				continue
-			}
-			eventTs := time.Unix(0, eventTsInt)
-			// In pods with multiple containers, pick the timestamp of the latest "Started" event observed
-			if timestamp.Before(eventTs) {
-				timestamp = eventTs
+	err := util.RetryWithExponentialBackOff(func() (bool, error) {
+		eventList, _ := p.eventLister.List(labels.Everything())
+		for _, event := range eventList {
+			if event.InvolvedObject.UID == pod.UID && event.Reason == "Started" {
+				// The event name is in the format "podName.timestamp", where timestamp is in hexadecimal format
+				// https://github.com/kubernetes/client-go/blob/v0.34.2/tools/record/event.go#L492
+				eventName := strings.Split(event.Name, ".")
+				if len(eventName) < 2 {
+					continue
+				}
+				eventTsInt, err := strconv.ParseInt(eventName[1], 16, 64)
+				if err != nil {
+					log.Warnf("failed to parse event timestamp: %v", err)
+					continue
+				}
+				eventTs := time.Unix(0, eventTsInt)
+				// In pods with multiple containers, pick the timestamp of the latest "Started" event observed
+				if timestamp.Before(eventTs) {
+					timestamp = eventTs
+				}
 			}
 		}
+		if timestamp.IsZero() {
+			return false, nil
+		}
+		return true, nil
+	}, 100*time.Millisecond, 5, 0, time.Minute)
+	if err != nil {
+		log.Warnf("failed to get started of pod %s/%s time from event: %v", pod.Namespace, pod.Name, err)
 	}
 	return timestamp
 }
@@ -235,9 +257,9 @@ func (p *podLatency) Start(measurementWg *sync.WaitGroup) error {
 	if err := eventInformer.SetTransform(eventTransformFunc()); err != nil {
 		log.Warnf("failed to set event transform: %v", err)
 	}
-	p.stopInformerCh = make(chan struct{})
-	go eventInformer.Run(p.stopInformerCh)
-	if !cache.WaitForCacheSync(p.stopInformerCh, eventInformer.HasSynced) {
+	p.eventInformerCh = make(chan struct{})
+	go eventInformer.Run(p.eventInformerCh)
+	if !cache.WaitForCacheSync(p.eventInformerCh, eventInformer.HasSynced) {
 		return fmt.Errorf("failed to sync event informer cache")
 	}
 	p.eventLister = lcorev1.NewEventLister(eventInformer.GetIndexer())
@@ -315,13 +337,14 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 
 // Stop stops podLatency measurement
 func (p *podLatency) Stop() error {
-	close(p.stopInformerCh)
+	defer close(p.eventInformerCh)
 	return p.StopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 
 func (p *podLatency) normalizeMetrics() float64 {
 	totalPods := 0
 	erroredPods := 0
+	warningPods := 0
 
 	p.Metrics.Range(func(key, value any) bool {
 		m := value.(podMetric)
@@ -333,18 +356,12 @@ func (p *podLatency) normalizeMetrics() float64 {
 		// latencyTime should be always larger than zero, however, in some cases, it might be a
 		// negative value due to the precision of timestamp can only get to the level of second
 		errorFlag := 0
+		warningFlag := 0
 		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
 		if m.ContainersReadyLatency < 0 {
 			log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.PodLatencyLabels.Name)
 			errorFlag = 1
 			m.ContainersReadyLatency = 0
-		}
-
-		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
-		if m.SchedulingLatency < 0 {
-			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.PodLatencyLabels.Name)
-			errorFlag = 1
-			m.SchedulingLatency = 0
 		}
 
 		m.ReadyToStartContainersLatency = int(m.readyToStartContainers.Sub(m.Timestamp).Milliseconds())
@@ -367,15 +384,25 @@ func (p *podLatency) normalizeMetrics() float64 {
 			errorFlag = 1
 			m.PodReadyLatency = 0
 		}
+		// Both scheduling and containersStarted latencies are calculated from the event time, in high load scenarios,
+		// there might be a delay in the event time, so we print a warning message flag rather than returning an error
+		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
+		if m.SchedulingLatency < 0 {
+			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.PodLatencyLabels.Name)
+			warningFlag = 1
+			m.SchedulingLatency = 0
+		}
 		m.ContainersStartedLatency = int(m.containersStarted.Sub(m.Timestamp).Milliseconds())
 		if m.ContainersStartedLatency < 0 {
 			log.Tracef("ContainersStartedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.PodLatencyLabels.Name)
-			errorFlag = 1
+			warningFlag = 1
 			m.ContainersStartedLatency = 0
 		}
 		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPods++
 		erroredPods += errorFlag
+		warningPods += warningFlag
+		p.NormLatencies = append(p.NormLatencies, m)
 		makeDoc := GenericLatencyDocFactory[int, *podLatencyLabels](&m.PodLatencyLabels, m.LatencyDocument)
 		p.NormLatencies = append(p.NormLatencies,
 			makeDoc(string(corev1.PodScheduled), m.SchedulingLatency),
@@ -387,6 +414,9 @@ func (p *podLatency) normalizeMetrics() float64 {
 		)
 		return true
 	})
+	if rate := float64(warningPods) / float64(totalPods); rate > 10 {
+		log.Warnf("something is wrong with system under test. containersStarted and scheduling latencies error rate was: %.2f", rate*100.0)
+	}
 	if totalPods == 0 {
 		return 0.0
 	}
