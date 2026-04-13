@@ -17,6 +17,7 @@ package prometheus
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"math"
 	"text/template"
 	"time"
@@ -160,9 +161,7 @@ func (p *Prometheus) ReadProfile(location string, embedCfg *fileutils.EmbedConfi
 // Create metric creates metric to be indexed
 func (p *Prometheus) createMetric(query, metricName string, job Job, labels model.Metric, value model.SampleValue, timestamp time.Time, isInstant bool) metric {
 	metadata := map[string]any{}
-	for k, v := range p.metadata {
-		metadata[k] = v
-	}
+	maps.Copy(metadata, p.metadata)
 	if job.IncrementalLoadUUID != "" {
 		metadata["incrementalLoadUUID"] = job.IncrementalLoadUUID
 	}
@@ -235,7 +234,7 @@ func (p *Prometheus) runRangeQuery(query, metricName string, jobStart, jobEnd ti
 // Indexes datapoints to a specified indexer.
 func (p *Prometheus) indexDatapoints(docsToIndex map[string][]any) {
 	for metricName, docs := range docsToIndex {
-		log.Debugf("Indexing [%d] documents from metric %s", len(docs), metricName)
+		log.Infof("Indexing [%d] documents from metric %s", len(docs), metricName)
 		resp, err := (*p.indexer).Index(docs, indexers.IndexingOpts{MetricName: metricName})
 		if err != nil {
 			log.Error(err.Error())
