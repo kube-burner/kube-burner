@@ -29,7 +29,7 @@ Depending on the indexer, different configuration parameters need to be specifie
 
 | Option    | Description     | Supported values   |
 | --------- | --------------- | ------- |
-| `type`    | Type of indexer | `elastic`, `opensearch`, `local`|
+| `type`    | Type of indexer | `elastic`, `opensearch`, `local`, `tsdb`|
 
 ## Example
 
@@ -82,6 +82,33 @@ The `local` indexer can be configured by the parameters below:
 | `metricsDirectory` | Collected metric will be dumped here. | String  | collected-metrics-{{.UUID}} |
 | `createTarball`    | Create metrics tarball                | Boolean | false                       |
 | `tarballName`      | Name of the metrics tarball           | String  | kube-burner-metrics.tgz     |
+
+### TSDB
+
+This indexer writes collected metrics as Prometheus TSDB blocks in local files.
+
+The `tsdb` indexer can be configured by the parameters below:
+
+| Option             | Description                                     | Type    | Default                 |
+| ------------------ | ----------------------------------------------- | ------- | ----------------------- |
+| `metricsDirectory` | Directory where TSDB blocks are stored          | String  | collected-metrics       |
+| `createTarball`    | Create a tarball from collected TSDB data       | Boolean | false                   |
+| `tarballName`      | Name of the metrics tarball                     | String  | kube-burner-metrics.tgz |
+
+Example `tsdb` indexer configuration:
+
+```yaml
+metricsEndpoints:
+  - endpoint: https://remote-endpoint:9090
+    token: <token>
+    metrics:
+    - metrics-profile.yaml
+    indexer:
+      type: tsdb
+      metricsDirectory: collected-metrics
+      createTarball: true
+      tarballName: collected-metrics.tar.gz
+```
 
 ## Job Summary
 
@@ -150,7 +177,7 @@ Example job summary document:
 
 ## Metric exporting & importing
 
-When using the `local` indexer, it is possible to dump all of the collected metrics into a tarball, which you can import later. This is useful in disconnected environments, where kube-burner does not have direct access to an Elasticsearch instance. Metrics exporting can be configured by `createTarball` field of the indexer config as noted in the [local indexer](#local).
+When using the `local` or `tsdb` indexer, it is possible to dump all of the collected metrics into a tarball, which you can import later. This is useful in disconnected environments, where kube-burner does not have direct access to an Elasticsearch instance. Metrics exporting can be configured by `createTarball` field of the indexer config as noted in the [local indexer](#local) and [tsdb indexer](#tsdb).
 
 The metric exporting feature is available through the `init` and `index` subcommands. Once you enabled it, a tarball (`kube-burner-metrics-<timestamp>.tgz`) containing all metrics is generated in the current working directory. This tarball can be imported and indexed by kube-burner with the `import` subcommand. For example:
 
