@@ -45,6 +45,7 @@ setup() {
   export INCREMENTAL_LOAD=""
   export JOBGC=false
   export LOCAL_INDEXING=""
+  export TSDB_INDEXING=""
   export ALERTING=""
   export TIMESERIES_INDEXER=""
   export CRD=""
@@ -150,9 +151,9 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
-# bats test_tags=subsystem:preload,subsystem:indexing
-@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true; set-preload=true" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
+# bats test_tags=subsystem:indexing
+@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
   verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
@@ -317,7 +318,7 @@ teardown_file() {
 }
 
 @test "kube-burner.yml: incremental-load=true" {
-  export INCREMENTAL_LOAD=true LOCAL_INDEXING=true
+  export INCREMENTAL_LOAD=true LOCAL_INDEXING=true TSDB_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
 }

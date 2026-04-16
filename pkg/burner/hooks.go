@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os/exec"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
@@ -92,10 +91,8 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	// Set process group for proper cleanup
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
+	// Set process group for proper cleanup on Unix systems
+	setSysProcAttr(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start background hook: %w", err)
