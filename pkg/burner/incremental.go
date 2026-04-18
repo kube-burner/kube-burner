@@ -53,24 +53,29 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 	}
 	if cfg.Pattern.Type == config.ExponentialPattern {
 		base := 2.0
-		maxInc := cfg.Pattern.Exponential.MaxIncrease
-		warmup := cfg.Pattern.Exponential.WarmupSteps
-		if cfg.Pattern.Exponential != nil && cfg.Pattern.Exponential.Base > 0 {
-			base = cfg.Pattern.Exponential.Base
+		var maxInc, warmup int
+		if cfg.Pattern.Exponential != nil {
+			maxInc = cfg.Pattern.Exponential.MaxIncrease
+			warmup = cfg.Pattern.Exponential.WarmupSteps
+			if cfg.Pattern.Exponential.Base > 0 {
+				base = cfg.Pattern.Exponential.Base
+			}
 		}
 		return &exponentialCalculator{start: startIt, total: totalIt, base: base, maxIncrease: maxInc, warmup: warmup, stepNo: 0}
 	} else {
 		step := 1
+		var minSteps int
 		if cfg.Pattern.Linear != nil {
 			step = cfg.Pattern.Linear.StepSize
+			minSteps = cfg.Pattern.Linear.MinSteps
 		}
 		totalSteps := int(math.Ceil(float64(totalIt-startIt) / float64(step)))
-		if cfg.Pattern.Linear.MinSteps > 0 && totalSteps < cfg.Pattern.Linear.MinSteps {
+		if minSteps > 0 && totalSteps < minSteps {
 			remaining := totalIt - startIt
 			if remaining <= 0 {
 				step = totalIt
 			} else {
-				step = int(math.Ceil(float64(remaining) / float64(cfg.Pattern.Linear.MinSteps)))
+				step = int(math.Ceil(float64(remaining) / float64(minSteps)))
 			}
 		}
 		if step <= 0 {
