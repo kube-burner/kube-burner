@@ -15,3 +15,7 @@ test/k8s/collected-metrics/
 test/k8s/*/alert.json
 .vscode/
 *.log
+
+
+test/k8s/collected-metrics*
+# research/*
