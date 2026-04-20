@@ -94,7 +94,7 @@ func CleanupNamespaceResourcesByLabel(ctx context.Context, ex JobExecutor, obj *
 		log.Debugf("Deleting %d %ss labeled with %s in %s", len(resources.Items), obj.Kind, labelSelector, namespace)
 	}
 	for _, item := range resources.Items {
-		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
+		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationForeground)}); err != nil {
 			if !errors.IsNotFound(err) {
 				log.Errorf("Error deleting %v/%v in %v: %v", item.GetKind(), item.GetName(), namespace, err)
 			}
