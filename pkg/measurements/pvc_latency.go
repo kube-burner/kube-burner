@@ -294,9 +294,7 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 		}
 
 		// ResizeLatency is already calculated in handleUpdatePVC, just validate
-		if m.ResizedCapacity == "" {
-			m.ResizeLatency = -1
-		} else if m.ResizeLatency < 0 {
+		if m.ResizeLatency < 0 {
 			log.Tracef("ResizeLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
 			m.ResizeLatency = 0
 		}
@@ -325,9 +323,7 @@ func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
 	if pvcMetric.LostLatency != -1 {
 		res[string(corev1.ClaimLost)] = float64(pvcMetric.LostLatency)
 	}
-	if pvcMetric.ResizeLatency != -1 {
-		res["Resize"] = float64(pvcMetric.ResizeLatency)
-	}
+	res["Resize"] = float64(pvcMetric.ResizeLatency)
 	return res
 }
 
