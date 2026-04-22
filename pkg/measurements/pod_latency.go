@@ -345,46 +345,70 @@ func (p *podLatency) normalizeMetrics() float64 {
 		// negative value due to the precision of timestamp can only get to the level of second
 		errorFlag := 0
 		warningFlag := 0
-		m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
-		if m.ContainersReadyLatency < 0 {
-			log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.ContainersReadyLatency = 0
+		if m.containersReady.IsZero() {
+			m.ContainersReadyLatency = -1
+		} else {
+			m.ContainersReadyLatency = int(m.containersReady.Sub(m.Timestamp).Milliseconds())
+			if m.ContainersReadyLatency < 0 {
+				log.Tracef("ContainersReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.ContainersReadyLatency = 0
+			}
 		}
 
-		m.ReadyToStartContainersLatency = int(m.readyToStartContainers.Sub(m.Timestamp).Milliseconds())
-		if m.ReadyToStartContainersLatency < 0 {
-			log.Tracef("ReadyToStartContainersLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.ReadyToStartContainersLatency = 0
+		if m.readyToStartContainers.IsZero() {
+			m.ReadyToStartContainersLatency = -1
+		} else {
+			m.ReadyToStartContainersLatency = int(m.readyToStartContainers.Sub(m.Timestamp).Milliseconds())
+			if m.ReadyToStartContainersLatency < 0 {
+				log.Tracef("ReadyToStartContainersLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.ReadyToStartContainersLatency = 0
+			}
 		}
 
-		m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
-		if m.InitializedLatency < 0 {
-			log.Tracef("InitializedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.InitializedLatency = 0
+		if m.initialized.IsZero() {
+			m.InitializedLatency = -1
+		} else {
+			m.InitializedLatency = int(m.initialized.Sub(m.Timestamp).Milliseconds())
+			if m.InitializedLatency < 0 {
+				log.Tracef("InitializedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.InitializedLatency = 0
+			}
 		}
 
-		m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
-		if m.PodReadyLatency < 0 {
-			log.Tracef("PodReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.PodReadyLatency = 0
+		if m.podReady.IsZero() {
+			m.PodReadyLatency = -1
+		} else {
+			m.PodReadyLatency = int(m.podReady.Sub(m.Timestamp).Milliseconds())
+			if m.PodReadyLatency < 0 {
+				log.Tracef("PodReadyLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.PodReadyLatency = 0
+			}
 		}
 		// Both scheduling and containersStarted latencies are calculated from the event time, in high load scenarios,
 		// there might be a delay in the event time, so we print a warning message flag rather than returning an error
-		m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
-		if m.SchedulingLatency < 0 {
-			log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			warningFlag = 1
-			m.SchedulingLatency = 0
+		if m.scheduled.IsZero() {
+			m.SchedulingLatency = -1
+		} else {
+			m.SchedulingLatency = int(m.scheduled.Sub(m.Timestamp).Milliseconds())
+			if m.SchedulingLatency < 0 {
+				log.Tracef("SchedulingLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+				warningFlag = 1
+				m.SchedulingLatency = 0
+			}
 		}
-		m.ContainersStartedLatency = int(m.containersStarted.Sub(m.Timestamp).Milliseconds())
-		if m.ContainersStartedLatency < 0 {
-			log.Tracef("ContainersStartedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
-			warningFlag = 1
-			m.ContainersStartedLatency = 0
+		if m.containersStarted.IsZero() {
+			m.ContainersStartedLatency = -1
+		} else {
+			m.ContainersStartedLatency = int(m.containersStarted.Sub(m.Timestamp).Milliseconds())
+			if m.ContainersStartedLatency < 0 {
+				log.Tracef("ContainersStartedLatency for pod %v falling under negative case. So explicitly setting it to 0", m.Name)
+				warningFlag = 1
+				m.ContainersStartedLatency = 0
+			}
 		}
 		m.ChurnMetric = p.IsChurnMetric(m.Timestamp)
 		totalPods++
@@ -404,14 +428,26 @@ func (p *podLatency) normalizeMetrics() float64 {
 
 func (p *podLatency) getLatency(normLatency any) map[string]float64 {
 	podMetric := normLatency.(podMetric)
-	return map[string]float64{
-		string(corev1.PodScheduled):              float64(podMetric.SchedulingLatency),
-		string(corev1.ContainersReady):           float64(podMetric.ContainersReadyLatency),
-		string(corev1.PodInitialized):            float64(podMetric.InitializedLatency),
-		string(corev1.PodReady):                  float64(podMetric.PodReadyLatency),
-		string(corev1.PodReadyToStartContainers): float64(podMetric.ReadyToStartContainersLatency),
-		containersStarted:                        float64(podMetric.ContainersStartedLatency),
+	res := make(map[string]float64)
+	if podMetric.SchedulingLatency != -1 {
+		res[string(corev1.PodScheduled)] = float64(podMetric.SchedulingLatency)
 	}
+	if podMetric.ContainersReadyLatency != -1 {
+		res[string(corev1.ContainersReady)] = float64(podMetric.ContainersReadyLatency)
+	}
+	if podMetric.InitializedLatency != -1 {
+		res[string(corev1.PodInitialized)] = float64(podMetric.InitializedLatency)
+	}
+	if podMetric.PodReadyLatency != -1 {
+		res[string(corev1.PodReady)] = float64(podMetric.PodReadyLatency)
+	}
+	if podMetric.ReadyToStartContainersLatency != -1 {
+		res[string(corev1.PodReadyToStartContainers)] = float64(podMetric.ReadyToStartContainersLatency)
+	}
+	if podMetric.ContainersStartedLatency != -1 {
+		res[containersStarted] = float64(podMetric.ContainersStartedLatency)
+	}
+	return res
 }
 
 func (p *podLatency) IsCompatible() bool {
