@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	kutil "github.com/kube-burner/kube-burner/v2/pkg/util"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -88,4 +89,25 @@ func DeployPodInNamespace(clientSet kubernetes.Interface, namespace, podName, im
 		return true, nil
 	})
 	return err
+}
+
+// ConditionSetter is implemented by labels structs that carry a condition field.
+// L must be a pointer to a struct; Clone() returns a fresh copy of the struct as L.
+type ConditionSetter[L any] interface {
+	SetCondition(string)
+	Clone() L
+}
+
+// GenericLatencyDocFactory creates a reusable closure to generate standard metrics.LatencyDocument outputs.
+// Each closure call clones the labels struct so every returned document carries its own
+// independent condition field instead of all sharing the same mutated pointer.
+func GenericLatencyDocFactory[T int | int64, L ConditionSetter[L]](metadataLabels L, doc metrics.LatencyDocument) func(condition string, valueMs T) metrics.LatencyDocument {
+	return func(condition string, valueMs T) metrics.LatencyDocument {
+		labelsCopy := metadataLabels.Clone()
+		labelsCopy.SetCondition(condition)
+		docCopy := doc
+		docCopy.Labels = labelsCopy
+		docCopy.Value = float64(valueMs)
+		return docCopy
+	}
 }

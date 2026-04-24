@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -53,21 +54,24 @@ var (
 	}
 )
 
+type jobLatencyLabels struct {
+	JobIteration int    `json:"jobIteration"`
+	Replica      int    `json:"replica"`
+	Namespace    string `json:"namespace"`
+	Name         string `json:"k8sJobName"`
+	Condition    string `json:"condition"`
+}
+
+func (l *jobLatencyLabels) SetCondition(c string)    { l.Condition = c }
+func (l *jobLatencyLabels) Clone() *jobLatencyLabels { c := *l; return &c }
+
 type jobMetric struct {
-	Timestamp         time.Time `json:"timestamp"`
+	metrics.LatencyDocument
 	startTime         time.Time
 	jobComplete       time.Time
-	StartTimeLatency  int    `json:"startTimeLatency"`
-	CompletionLatency int    `json:"completionLatency"`
-	MetricName        string `json:"metricName"`
-	UUID              string `json:"uuid"`
-	JobName           string `json:"jobName,omitempty"`
-	JobIteration      int    `json:"jobIteration"`
-	Replica           int    `json:"replica"`
-	Namespace         string `json:"namespace"`
-	Name              string `json:"k8sJobName"`
-	ChurnMetric       bool   `json:"churnMetric,omitempty"`
-	Metadata          any    `json:"metadata,omitempty"`
+	StartTimeLatency  int              `json:"startTimeLatency"`
+	CompletionLatency int              `json:"completionLatency"`
+	JobLatencyLabels  jobLatencyLabels `json:"labels"`
 }
 
 type jobLatency struct {
@@ -101,15 +105,19 @@ func (j *jobLatency) handleCreateJob(obj any) {
 	}
 	jobLabels := job.GetLabels()
 	j.Metrics.LoadOrStore(string(job.UID), jobMetric{
-		Timestamp:    job.CreationTimestamp.UTC(),
-		Namespace:    job.Namespace,
-		Name:         job.Name,
-		MetricName:   jobLatencyMeasurement,
-		UUID:         j.Uuid,
-		JobName:      j.JobConfig.Name,
-		Metadata:     j.Metadata,
-		JobIteration: getIntFromLabels(jobLabels, config.KubeBurnerLabelJobIteration),
-		Replica:      getIntFromLabels(jobLabels, config.KubeBurnerLabelReplica),
+		LatencyDocument: metrics.LatencyDocument{
+			Timestamp:  job.CreationTimestamp.UTC(),
+			MetricName: jobLatencyMeasurement,
+			UUID:       j.Uuid,
+			JobName:    j.JobConfig.Name,
+			Metadata:   j.Metadata,
+		},
+		JobLatencyLabels: jobLatencyLabels{
+			Namespace:    job.Namespace,
+			Name:         job.Name,
+			JobIteration: getIntFromLabels(jobLabels, config.KubeBurnerLabelJobIteration),
+			Replica:      getIntFromLabels(jobLabels, config.KubeBurnerLabelReplica),
+		},
 	})
 }
 
@@ -188,14 +196,18 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 			}
 		}
 		j.Metrics.Store(string(job.UID), jobMetric{
-			Timestamp:   job.Status.StartTime.UTC(),
-			Namespace:   job.Namespace,
-			Name:        job.Name,
-			MetricName:  jobLatencyMeasurement,
-			UUID:        j.Uuid,
+			LatencyDocument: metrics.LatencyDocument{
+				Timestamp:  job.Status.StartTime.UTC(),
+				MetricName: jobLatencyMeasurement,
+				UUID:       j.Uuid,
+				JobName:    j.JobConfig.Name,
+			},
+			JobLatencyLabels: jobLatencyLabels{
+				Namespace: job.Namespace,
+				Name:      job.Name,
+			},
 			jobComplete: completed,
 			startTime:   startTime,
-			JobName:     j.JobConfig.Name,
 		})
 	}
 }
@@ -214,28 +226,31 @@ func (j *jobLatency) normalizeMetrics() float64 {
 		m := value.(jobMetric)
 		// If a job does not reach the Complete state (this timestamp isn't set), we skip that job
 		if m.jobComplete.IsZero() {
-			log.Tracef("Job %v latency ignored as it did not reach Ready state", m.Name)
+			log.Tracef("Job %v latency ignored as it did not reach Ready state", m.JobLatencyLabels.Name)
 			return true
 		}
 		m.StartTimeLatency = int(m.startTime.Sub(m.Timestamp).Milliseconds())
 		if m.StartTimeLatency < 0 {
-			log.Tracef("StartTimeLatency for job %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("StartTimeLatency for job %v falling under negative case. So explicitly setting it to 0", m.JobLatencyLabels.Name)
 			m.StartTimeLatency = 0
 		}
 		m.CompletionLatency = int(m.jobComplete.Sub(m.Timestamp).Milliseconds())
 		m.ChurnMetric = j.IsChurnMetric(m.Timestamp)
-		j.NormLatencies = append(j.NormLatencies, m)
+		// j.NormLatencies = append(j.NormLatencies, m)
+		makeDoc := GenericLatencyDocFactory[int, *jobLatencyLabels](&m.JobLatencyLabels, m.LatencyDocument)
+		j.NormLatencies = append(j.NormLatencies,
+			makeDoc(jobStartTimeMeasurement, m.StartTimeLatency),
+			makeDoc(string(batchv1.JobComplete), m.CompletionLatency),
+		)
 		return true
 	})
 	return 0
 }
 
 func (j *jobLatency) getLatency(normLatency any) map[string]float64 {
-	jobMetric := normLatency.(jobMetric)
-	return map[string]float64{
-		jobStartTimeMeasurement:     float64(jobMetric.StartTimeLatency),
-		string(batchv1.JobComplete): float64(jobMetric.CompletionLatency),
-	}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels.(*jobLatencyLabels).Condition
+	return map[string]float64{condition: doc.Value}
 }
 
 func (j *jobLatency) IsCompatible() bool {

@@ -108,14 +108,14 @@ teardown_file() {
   # Verify metrics for PVC and DV were collected
   local jobs=("create-vm" "create-base-image-dv")
   for job in "${jobs[@]}"; do
-    check_metric_recorded ${job} dvLatency dvReadyLatency
-    check_metric_recorded ${job} pvcLatency bindingLatency
+    check_metric_recorded ${job} dvLatency Ready
+    check_metric_recorded ${job} pvcLatency Bound
     check_quantile_recorded ${job} dvLatency Ready
     check_quantile_recorded ${job} pvcLatency Bound
   done
 
   # Verify that metrics for VolumeSnapshot was collected
-  check_metric_recorded create-snapshot volumeSnapshotLatency vsReadyLatency
+  check_metric_recorded create-snapshot volumeSnapshotLatency Ready
   check_quantile_recorded create-snapshot volumeSnapshotLatency Ready
 }
 
@@ -257,7 +257,7 @@ teardown_file() {
 @test "kube-burner-pvc-resize.yml: pvc resize latency" {
   export STORAGE_CLASS_NAME=${STORAGE_CLASS_NAME:-$STORAGE_CLASS_WITH_SNAPSHOT_NAME}
   run_cmd ${KUBE_BURNER} init -c kube-burner-pvc-resize.yml --uuid=${UUID} --log-level=debug
-  check_metric_recorded pvc-patch pvcLatency resizeLatency
+  check_metric_recorded pvc-patch pvcLatency Resize
   check_quantile_recorded pvc-patch pvcLatency Resize
 }
 
@@ -269,7 +269,7 @@ teardown_file() {
 
   local aggr_job="create-vms"
   local metric="vmiLatency"
-  check_metric_recorded ${aggr_job} ${metric} vmReadyLatency
+  check_metric_recorded ${aggr_job} ${metric} VMReady
   check_quantile_recorded ${aggr_job} ${metric} VMReady
 
   local skipped_jobs=("start-vm" "wait-running")
@@ -287,7 +287,7 @@ teardown_file() {
   # Verify all jobs have podLatency
   local jobs_with_pod=("precedence-measurements" "merge-measurements")
   for job in "${jobs_with_pod[@]}"; do
-    check_metric_recorded ${job} podLatency podReadyLatency
+    check_metric_recorded ${job} podLatency Ready
     check_quantile_recorded ${job} podLatency Ready
   done
 
@@ -338,7 +338,7 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c kube-burner-vm-snapshot-test.yml --uuid=${UUID} --log-level=debug
 
   # Verify volumeSnapshotLatency metrics were collected for the snapshot-vm job
-  check_metric_recorded snapshot-vm volumeSnapshotLatency vsReadyLatency
+  check_metric_recorded snapshot-vm volumeSnapshotLatency Ready
   check_quantile_recorded snapshot-vm volumeSnapshotLatency Ready
 }
 

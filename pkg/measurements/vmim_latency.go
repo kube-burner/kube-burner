@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -59,10 +60,22 @@ var (
 	}
 )
 
+type vmimLatencyLabels struct {
+	Name         string `json:"vmimName"`
+	VMIName      string `json:"vmiName"`
+	JobIteration int    `json:"jobIteration"`
+	Replica      int    `json:"replica"`
+	Namespace    string `json:"namespace"`
+	Condition    string `json:"condition"`
+}
+
+func (l *vmimLatencyLabels) SetCondition(c string)     { l.Condition = c }
+func (l *vmimLatencyLabels) Clone() *vmimLatencyLabels { c := *l; return &c }
+
 // vmimMetric holds VirtualMachineInstanceMigration metrics
 type vmimMetric struct {
 	// Timestamp field is very important for elasticsearch indexing and represents the creation time
-	Timestamp time.Time `json:"timestamp"`
+	metrics.LatencyDocument
 
 	pendingTime            time.Time
 	PendingLatency         int `json:"pendingLatency"`
@@ -79,16 +92,7 @@ type vmimMetric struct {
 	succeededTime          time.Time
 	SucceededLatency       int `json:"succeededLatency"`
 
-	MetricName   string `json:"metricName"`
-	UUID         string `json:"uuid"`
-	Namespace    string `json:"namespace"`
-	Name         string `json:"vmimName"`
-	VMIName      string `json:"vmiName"`
-	JobName      string `json:"jobName,omitempty"`
-	JobIteration int    `json:"jobIteration"`
-	Replica      int    `json:"replica"`
-	ChurnMetric  bool   `json:"churnMetric,omitempty"`
-	Metadata     any    `json:"metadata,omitempty"`
+	VMIMLatencyLabels vmimLatencyLabels `json:"labels"`
 }
 
 type vmimLatency struct {
@@ -122,15 +126,19 @@ func (vmiml *vmimLatency) handleCreateVMIM(obj any) {
 	}
 	migrationLabels := migration.GetLabels()
 	vmiml.Metrics.LoadOrStore(string(migration.GetUID()), vmimMetric{
-		Namespace:    migration.GetNamespace(),
-		MetricName:   vmimLatencyMeasurement,
-		UUID:         vmiml.Uuid,
-		Name:         migration.GetName(),
-		VMIName:      migration.Spec.VMIName,
-		JobName:      vmiml.JobConfig.Name,
-		JobIteration: getIntFromLabels(migrationLabels, config.KubeBurnerLabelJobIteration),
-		Replica:      getIntFromLabels(migrationLabels, config.KubeBurnerLabelReplica),
-		Timestamp:    migration.GetCreationTimestamp().UTC(),
+		LatencyDocument: metrics.LatencyDocument{
+			MetricName: vmimLatencyMeasurement,
+			JobName:    vmiml.JobConfig.Name,
+			UUID:       vmiml.Uuid,
+			Timestamp:  migration.GetCreationTimestamp().UTC(),
+		},
+		VMIMLatencyLabels: vmimLatencyLabels{
+			Namespace:    migration.GetNamespace(),
+			Name:         migration.GetName(),
+			VMIName:      migration.Spec.VMIName,
+			JobIteration: getIntFromLabels(migrationLabels, config.KubeBurnerLabelJobIteration),
+			Replica:      getIntFromLabels(migrationLabels, config.KubeBurnerLabelReplica),
+		},
 	})
 }
 
@@ -247,15 +255,19 @@ func (vmiml *vmimLatency) Collect(measurementWg *sync.WaitGroup) {
 			}
 		}
 		vmiml.Metrics.Store(string(vmim.GetUID()), vmimMetric{
-			MetricName:          vmimLatencyMeasurement,
-			UUID:                vmiml.Uuid,
-			Namespace:           vmim.GetNamespace(),
-			Name:                vmim.GetName(),
-			VMIName:             vmim.Spec.VMIName,
-			JobName:             vmiml.JobConfig.Name,
-			JobIteration:        getIntFromLabels(vmim.GetLabels(), config.KubeBurnerLabelJobIteration),
-			Replica:             getIntFromLabels(vmim.GetLabels(), config.KubeBurnerLabelReplica),
-			Timestamp:           vmim.GetCreationTimestamp().UTC(),
+			LatencyDocument: metrics.LatencyDocument{
+				MetricName: vmimLatencyMeasurement,
+				UUID:       vmiml.Uuid,
+				JobName:    vmiml.JobConfig.Name,
+				Timestamp:  vmim.GetCreationTimestamp().UTC(),
+			},
+			VMIMLatencyLabels: vmimLatencyLabels{
+				Namespace:    vmim.GetNamespace(),
+				Name:         vmim.GetName(),
+				VMIName:      vmim.Spec.VMIName,
+				JobIteration: getIntFromLabels(vmim.GetLabels(), config.KubeBurnerLabelJobIteration),
+				Replica:      getIntFromLabels(vmim.GetLabels(), config.KubeBurnerLabelReplica),
+			},
 			pendingTime:         pending,
 			schedulingTime:      scheduling,
 			scheduledTime:       scheduled,
@@ -280,7 +292,7 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 		m := value.(vmimMetric)
 
 		if m.succeededTime.IsZero() {
-			log.Tracef("VirtualMachineInstanceMigration %v latency ignored as it did not reach Succeeded state", m.Name)
+			log.Tracef("VirtualMachineInstanceMigration %v latency ignored as it did not reach Succeeded state", m.VMIMLatencyLabels.Name)
 			return true
 		}
 
@@ -288,49 +300,49 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 		// Calculate latencies from the timestamp (creation time)
 		m.PendingLatency = int(m.pendingTime.Sub(m.Timestamp).Milliseconds())
 		if m.PendingLatency < 0 {
-			log.Tracef("PendingLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("PendingLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.VMIMLatencyLabels.Name)
 			errorFlag = 1
 			m.PendingLatency = 0
 		}
 
 		m.SchedulingLatency = int(m.schedulingTime.Sub(m.Timestamp).Milliseconds())
 		if m.SchedulingLatency < 0 {
-			log.Tracef("SchedulingLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("SchedulingLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.VMIMLatencyLabels.Name)
 			errorFlag = 1
 			m.SchedulingLatency = 0
 		}
 
 		m.ScheduledLatency = int(m.scheduledTime.Sub(m.Timestamp).Milliseconds())
 		if m.ScheduledLatency < 0 {
-			log.Tracef("ScheduledLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("ScheduledLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.VMIMLatencyLabels.Name)
 			errorFlag = 1
 			m.ScheduledLatency = 0
 		}
 
 		m.PreparingTargetLatency = int(m.preparingTargetTime.Sub(m.Timestamp).Milliseconds())
 		if m.PreparingTargetLatency < 0 {
-			log.Tracef("PreparingTargetLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("PreparingTargetLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.VMIMLatencyLabels.Name)
 			errorFlag = 1
 			m.PreparingTargetLatency = 0
 		}
 
 		m.TargetReadyLatency = int(m.targetReadyTime.Sub(m.Timestamp).Milliseconds())
 		if m.TargetReadyLatency < 0 {
-			log.Tracef("TargetReadyLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("TargetReadyLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.VMIMLatencyLabels.Name)
 			errorFlag = 1
 			m.TargetReadyLatency = 0
 		}
 
 		m.RunningLatency = int(m.runningTime.Sub(m.Timestamp).Milliseconds())
 		if m.RunningLatency < 0 {
-			log.Tracef("RunningLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("RunningLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.VMIMLatencyLabels.Name)
 			errorFlag = 1
 			m.RunningLatency = 0
 		}
 
 		m.SucceededLatency = int(m.succeededTime.Sub(m.Timestamp).Milliseconds())
 		if m.SucceededLatency < 0 {
-			log.Tracef("SucceededLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("SucceededLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.VMIMLatencyLabels.Name)
 			errorFlag = 1
 			m.SucceededLatency = 0
 		}
@@ -338,7 +350,17 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = vmiml.IsChurnMetric(m.Timestamp)
 		count++
 		errored += errorFlag
-		vmiml.NormLatencies = append(vmiml.NormLatencies, m)
+		makeDoc := GenericLatencyDocFactory[int, *vmimLatencyLabels](&m.VMIMLatencyLabels, m.LatencyDocument)
+
+		vmiml.NormLatencies = append(vmiml.NormLatencies,
+			makeDoc(string(kvv1.MigrationPending), m.PendingLatency),
+			makeDoc(string(kvv1.MigrationScheduling), m.SchedulingLatency),
+			makeDoc(string(kvv1.MigrationScheduled), m.ScheduledLatency),
+			makeDoc(string(kvv1.MigrationPreparingTarget), m.PreparingTargetLatency),
+			makeDoc(string(kvv1.MigrationTargetReady), m.TargetReadyLatency),
+			makeDoc(string(kvv1.MigrationRunning), m.RunningLatency),
+			makeDoc(string(kvv1.MigrationSucceeded), m.SucceededLatency),
+		)
 		return true
 	})
 
@@ -349,16 +371,9 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 }
 
 func (vmiml *vmimLatency) getLatency(normLatency any) map[string]float64 {
-	vmimMetric := normLatency.(vmimMetric)
-	return map[string]float64{
-		string(kvv1.MigrationPending):         float64(vmimMetric.PendingLatency),
-		string(kvv1.MigrationScheduling):      float64(vmimMetric.SchedulingLatency),
-		string(kvv1.MigrationScheduled):       float64(vmimMetric.ScheduledLatency),
-		string(kvv1.MigrationPreparingTarget): float64(vmimMetric.PreparingTargetLatency),
-		string(kvv1.MigrationTargetReady):     float64(vmimMetric.TargetReadyLatency),
-		string(kvv1.MigrationRunning):         float64(vmimMetric.RunningLatency),
-		string(kvv1.MigrationSucceeded):       float64(vmimMetric.SucceededLatency),
-	}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels.(*vmimLatencyLabels).Condition
+	return map[string]float64{condition: doc.Value}
 }
 
 func (vmiml *vmimLatency) IsCompatible() bool {

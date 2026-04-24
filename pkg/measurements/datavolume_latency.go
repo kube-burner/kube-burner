@@ -32,6 +32,7 @@ import (
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -58,27 +59,28 @@ var supportedDvLatencyJobTypes = map[config.JobType]struct{}{
 	config.KubeVirtJob: {},
 }
 
+type dvLatencyLabels struct {
+	Namespace    string `json:"namespace"`
+	Name         string `json:"dvName"`
+	JobIteration int    `json:"jobIteration"`
+	Replica      int    `json:"replica"`
+	Condition    string `json:"condition"`
+}
+
+func (l *dvLatencyLabels) SetCondition(c string)   { l.Condition = c }
+func (l *dvLatencyLabels) Clone() *dvLatencyLabels { c := *l; return &c }
+
 // dvMetric holds data about DataVolume creation process
 type dvMetric struct {
 	// Timestamp filed is very important the the elasticsearch indexing and represents the first creation time that we track (i.e., vm or vmi)
-	Timestamp time.Time `json:"timestamp"`
-
+	metrics.LatencyDocument
 	dvBound          time.Time
 	DVBoundLatency   int `json:"dvBoundLatency"`
 	dvRunning        time.Time
 	DVRunningLatency int `json:"dvRunningLatency"`
 	dvReady          time.Time
-	DVReadyLatency   int `json:"dvReadyLatency"`
-
-	MetricName   string `json:"metricName"`
-	UUID         string `json:"uuid"`
-	Namespace    string `json:"namespace"`
-	Name         string `json:"dvName"`
-	JobName      string `json:"jobName,omitempty"`
-	JobIteration int    `json:"jobIteration"`
-	Replica      int    `json:"replica"`
-	ChurnMetric  bool   `json:"churnMetric,omitempty"`
-	Metadata     any    `json:"metadata,omitempty"`
+	DVReadyLatency   int             `json:"dvReadyLatency"`
+	DVLatencyLabels  dvLatencyLabels `json:"labels"`
 }
 
 type dvLatency struct {
@@ -112,15 +114,19 @@ func (dv *dvLatency) handleCreateDV(obj any) {
 	}
 	dvLabels := dataVolume.GetLabels()
 	dv.Metrics.LoadOrStore(string(dataVolume.UID), dvMetric{
-		Timestamp:    dataVolume.CreationTimestamp.UTC(),
-		Namespace:    dataVolume.Namespace,
-		Name:         dataVolume.Name,
-		MetricName:   dvLatencyMeasurement,
-		UUID:         dv.Uuid,
-		JobName:      dv.JobConfig.Name,
-		Metadata:     dv.Metadata,
-		JobIteration: getIntFromLabels(dvLabels, config.KubeBurnerLabelJobIteration),
-		Replica:      getIntFromLabels(dvLabels, config.KubeBurnerLabelReplica),
+		LatencyDocument: metrics.LatencyDocument{
+			Timestamp:  dataVolume.CreationTimestamp.UTC(),
+			MetricName: dvLatencyMeasurement,
+			JobName:    dv.JobConfig.Name,
+			UUID:       dv.Uuid,
+			Metadata:   dv.Metadata,
+		},
+		DVLatencyLabels: dvLatencyLabels{
+			Namespace:    dataVolume.Namespace,
+			Name:         dataVolume.Name,
+			JobIteration: getIntFromLabels(dvLabels, config.KubeBurnerLabelJobIteration),
+			Replica:      getIntFromLabels(dvLabels, config.KubeBurnerLabelReplica),
+		},
 	})
 }
 
@@ -232,15 +238,19 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 			}
 		}
 		dv.Metrics.Store(string(dataVolume.UID), dvMetric{
-			Timestamp:  dataVolume.CreationTimestamp.UTC(),
-			Namespace:  dataVolume.Namespace,
-			Name:       dataVolume.Name,
-			MetricName: dvLatencyMeasurement,
-			UUID:       dv.Uuid,
-			dvBound:    bound,
-			dvRunning:  running,
-			dvReady:    ready,
-			JobName:    dv.JobConfig.Name,
+			LatencyDocument: metrics.LatencyDocument{
+				Timestamp:  dataVolume.CreationTimestamp.UTC(),
+				JobName:    dv.JobConfig.Name,
+				MetricName: dvLatencyMeasurement,
+				UUID:       dv.Uuid,
+			},
+			DVLatencyLabels: dvLatencyLabels{
+				Namespace: dataVolume.Namespace,
+				Name:      dataVolume.Name,
+			},
+			dvBound:   bound,
+			dvRunning: running,
+			dvReady:   ready,
 		})
 	}
 }
@@ -253,7 +263,7 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 		m := value.(dvMetric)
 		// Skip DataVolume if it did not reach the Ready state (this timestamp isn't set)
 		if m.dvReady.IsZero() {
-			log.Warningf("DataVolume %v latency ignored as it did not reach Ready state", m.Name)
+			log.Warningf("DataVolume %v latency ignored as it did not reach Ready state", m.DVLatencyLabels.Name)
 			return true
 		}
 		// latencyTime should be always larger than zero, however, in some cases, it might be a
@@ -266,7 +276,7 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 		errorFlag := 0
 		m.DVBoundLatency = int(m.dvBound.Sub(m.Timestamp).Milliseconds())
 		if m.DVBoundLatency < 0 {
-			log.Tracef("DVBoundLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("DVBoundLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.DVLatencyLabels.Name)
 			errorFlag = 1
 			m.DVBoundLatency = 0
 		}
@@ -275,20 +285,27 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 		if m.DVRunningLatency < 0 {
 			// Running condition may be missed when creating empty volumes.
 			// Since we validated that the volume is Ready, assume the Running latency is 0 and don't report an error
-			log.Tracef("DVRunningLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("DVRunningLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.DVLatencyLabels.Name)
 			m.DVRunningLatency = 0
 		}
 
 		m.DVReadyLatency = int(m.dvReady.Sub(m.Timestamp).Milliseconds())
 		if m.DVReadyLatency < 0 {
-			log.Tracef("DVReadyLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
+			log.Tracef("DVReadyLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.DVLatencyLabels.Name)
 			errorFlag = 1
 			m.DVReadyLatency = 0
 		}
 		m.ChurnMetric = dv.IsChurnMetric(m.Timestamp)
 		dataVolumeCount++
 		erroredDataVolumes += errorFlag
-		dv.NormLatencies = append(dv.NormLatencies, m)
+		// dv.NormLatencies = append(dv.NormLatencies, m)
+		makeDoc := GenericLatencyDocFactory[int, *dvLatencyLabels](&m.DVLatencyLabels, m.LatencyDocument)
+
+		dv.NormLatencies = append(dv.NormLatencies,
+			makeDoc(string(cdiv1beta1.DataVolumeBound), m.DVBoundLatency),
+			makeDoc(string(cdiv1beta1.DataVolumeRunning), m.DVRunningLatency),
+			makeDoc(string(cdiv1beta1.DataVolumeReady), m.DVReadyLatency),
+		)
 		return true
 	})
 	if dataVolumeCount == 0 {
@@ -298,12 +315,9 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 }
 
 func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
-	dataVolumeMetric := normLatency.(dvMetric)
-	return map[string]float64{
-		string(cdiv1beta1.DataVolumeBound):   float64(dataVolumeMetric.DVBoundLatency),
-		string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
-		string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
-	}
+	doc := normLatency.(metrics.LatencyDocument)
+	condition := doc.Labels.(*dvLatencyLabels).Condition
+	return map[string]float64{condition: doc.Value}
 }
 
 func (dv *dvLatency) IsCompatible() bool {
