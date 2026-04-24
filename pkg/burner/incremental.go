@@ -52,32 +52,49 @@ func NewIterationCalculator(ex JobExecutor) IterationCalculator {
 		return &linearCalculator{start: 0, total: 0, step: 0}
 	}
 	if cfg.Pattern.Type == config.ExponentialPattern {
+		// Default to sensible zero values; only read the Exponential
+		// block if the caller actually provided it. A job config that
+		// sets pattern.type=exponential but omits the exponential
+		// sub-block used to crash here on a nil dereference
+		// (#1217 / #1220).
 		base := 2.0
-		maxInc := cfg.Pattern.Exponential.MaxIncrease
-		warmup := cfg.Pattern.Exponential.WarmupSteps
-		if cfg.Pattern.Exponential != nil && cfg.Pattern.Exponential.Base > 0 {
-			base = cfg.Pattern.Exponential.Base
-		}
-		return &exponentialCalculator{start: startIt, total: totalIt, base: base, maxIncrease: maxInc, warmup: warmup, stepNo: 0}
-	} else {
-		step := 1
-		if cfg.Pattern.Linear != nil {
-			step = cfg.Pattern.Linear.StepSize
-		}
-		totalSteps := int(math.Ceil(float64(totalIt-startIt) / float64(step)))
-		if cfg.Pattern.Linear.MinSteps > 0 && totalSteps < cfg.Pattern.Linear.MinSteps {
-			remaining := totalIt - startIt
-			if remaining <= 0 {
-				step = totalIt
-			} else {
-				step = int(math.Ceil(float64(remaining) / float64(cfg.Pattern.Linear.MinSteps)))
+		var (
+			maxInc int
+			warmup int
+		)
+		if cfg.Pattern.Exponential != nil {
+			maxInc = cfg.Pattern.Exponential.MaxIncrease
+			warmup = cfg.Pattern.Exponential.WarmupSteps
+			if cfg.Pattern.Exponential.Base > 0 {
+				base = cfg.Pattern.Exponential.Base
 			}
 		}
-		if step <= 0 {
-			step = 1
-		}
-		return &linearCalculator{start: startIt, total: totalIt, step: step}
+		return &exponentialCalculator{start: startIt, total: totalIt, base: base, maxIncrease: maxInc, warmup: warmup, stepNo: 0}
 	}
+
+	// Linear pattern: treat a missing Linear block the same way we treat
+	// an empty one rather than dereferencing it blindly.
+	step := 1
+	minSteps := 0
+	if cfg.Pattern.Linear != nil {
+		if cfg.Pattern.Linear.StepSize > 0 {
+			step = cfg.Pattern.Linear.StepSize
+		}
+		minSteps = cfg.Pattern.Linear.MinSteps
+	}
+	totalSteps := int(math.Ceil(float64(totalIt-startIt) / float64(step)))
+	if minSteps > 0 && totalSteps < minSteps {
+		remaining := totalIt - startIt
+		if remaining <= 0 {
+			step = totalIt
+		} else {
+			step = int(math.Ceil(float64(remaining) / float64(minSteps)))
+		}
+	}
+	if step <= 0 {
+		step = 1
+	}
+	return &linearCalculator{start: startIt, total: totalIt, step: step}
 }
 
 // linearCalculator increments iterations by a fixed step until total is reached.
