@@ -1,0 +1,9 @@
+---
+# CR template that creates instances of the TestResource{{.Iteration}} kind
+apiVersion: testresource.example.com/v1
+kind: TestResource{{.Iteration}}
+metadata:
+  name: test-instance-{{.Replica}}
+spec:
+  workload: "{{randAlphaNum 10}}"
+  iterations: {{.Iteration}}
