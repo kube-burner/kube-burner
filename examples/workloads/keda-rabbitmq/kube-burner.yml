@@ -2,6 +2,7 @@ metricsEndpoints:
   - indexer:
       type: local
       metricsDirectory: collected-metrics
+    metrics: [../../metrics-profiles/keda-metrics.yml]
 global:
   gc: false
   timeout: 40m
@@ -28,7 +29,6 @@ global:
       svcTimeout: 5s
     - name: nodeLatency
 
-
     # # 2. KEDA Operator pprof — CPU + heap profiles
     # - name: pprof
     #   pprofInterval: 30s
@@ -53,7 +53,7 @@ global:
     #       # url: http://keda-webhooks.keda.svc.cluster.local:8084/debug/pprof/profile?seconds=30
     #     - name: keda-webhooks-heap
     #       url: http://10.43.151.88:8084/debug/pprof/heap
-    #       # url: http://keda-webhooks.keda.svc.cluster.local:8084/debug/pprof/heap 
+    #       # url: http://keda-webhooks.keda.svc.cluster.local:8084/debug/pprof/heap
 
 jobs:
   - name: create-queue
@@ -118,7 +118,6 @@ jobs:
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/scaledobject.yml
         replicas: 1
 
-
   # Job 3: Delete ScaledObjects and collect final metrics
   - name: rabbitmq-delete
     jobType: delete
@@ -127,7 +126,7 @@ jobs:
     objects:
       - kind: ScaledObject
         apiVersion: keda.sh/v1alpha1
-        labelSelector: {kube-burner.io/job: rabbitmq-consumers}
+        labelSelector: { kube-burner.io/job: rabbitmq-consumers }
 
   # Job 4: Delete the RabbitMQ queues we created
   - name: delete-queues
