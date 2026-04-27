@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rmq-producer-ramp-up-{{.Iteration}}
+spec:
+  # Do not retry if the pod completes or fails
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: rmq-producer-ramp-up-{{.Iteration}}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: perf-test-producer
+          image: pivotalrabbitmq/perf-test:dev
+          # We use --variable-rate to step up the traffic and --time to stop after all phases finish.
+          # Phase 1: 2000 msg/s for 300s (5m)
+          # Phase 2: 5000 msg/s for 300s (5m)
+          # Phase 3: 10000 msg/s for 300s (5m)
+          # Phase 4: 20000 msg/s for 300s (5m)
+          # Phase 5: 30000 msg/s for 300s (5m)
+          # Phase 6: 40000 msg/s for 300s (5m)
+          # Total time: 1800s (30 minutes)
+          args: 
+            - "--uri"
+            - "$(RABBITMQ_URL)"
+            - "--producers"
+            - "10"
+            - "--consumers"
+            - "0"
+            - "--queue"
+            - "perf-queue-{{.Iteration}}"
+            - "--auto-delete"
+            - "false"
+            - "--variable-rate"
+            - "2000:300"
+            - "--variable-rate"
+            - "5000:300"
+            - "--variable-rate"
+            - "10000:300"
+            - "--variable-rate"
+            - "20000:300"
+            - "--variable-rate"
+            - "30000:300"
+            - "--variable-rate"
+            - "40000:300"
+            - "--time"
+            - "1800"
+          env:
+            - name: RABBITMQ_URL
+              value: "amqp://user:password@rabbitmq.rabbitmq.svc.cluster.local:5672"

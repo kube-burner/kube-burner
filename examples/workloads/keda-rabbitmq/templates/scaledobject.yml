@@ -1,0 +1,17 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: rmq-consumer-so-{{.Iteration}}
+spec:
+  scaleTargetRef:
+    name: rmq-consumer-{{.Iteration}}
+  pollingInterval: 15
+  cooldownPeriod: 30
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  triggers:
+    - type: rabbitmq
+      metadata:
+        queueName: perf-queue-{{.Iteration}}
+        queueLength: "50"
+        hostFromEnv: RABBITMQ_URL

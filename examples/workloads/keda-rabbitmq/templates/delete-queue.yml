@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: delete-queue-{{.Iteration}}
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: delete-queue-{{.Iteration}}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: delete-queue
+          image: rabbitmq:3-management
+          # We add "|| true" so it doesn't fail if the queue is already gone.
+          command: ["sh", "-c", "rabbitmqadmin -u user -p password -H rabbitmq.rabbitmq.svc.cluster.local delete queue name=perf-queue-{{.Iteration}} || true"]

@@ -18,18 +18,23 @@ global:
     # 2. KEDA Operator pprof — CPU + heap profiles
     - name: pprof
       pprofInterval: 30s
-      pprofDirectory: /tmp/pprof-keda
+      pprofDirectory: /tmp/pprof-keda/2
       nodeAffinity:
-        node-role.kubernetes.io/control-plane: ""
+        kubernetes.io/hostname: "myrke2-worker-1.karmalabs.corp"
       pprofTargets:
         - name: keda-operator
-          url: http://keda-operator.keda.svc.cluster.local:8082/debug/pprof/profile?seconds=30
+          url: http://10.43.2.60:8082/debug/pprof/profile?seconds=30
         - name: keda-operator-heap
-          url: http://keda-operator.keda.svc.cluster.local:8082/debug/pprof/heap
+          url: http://10.43.2.60:8082/debug/pprof/heap
         - name: keda-metrics-apiserver
-          url: http://keda-operator-metrics-apiserver.keda.svc.cluster.local:8083/debug/pprof/profile?seconds=30
+          url: http://10.43.137.209:8083/debug/pprof/profile?seconds=30
         - name: keda-metrics-apiserver-heap
-          url: http://keda-operator-metrics-apiserver.keda.svc.cluster.local:8083/debug/pprof/heap
+          url: http://10.43.137.209:8083/debug/pprof/heap
+        - name: keda-webhooks
+          url: http://10.43.243.161:8084/debug/pprof/profile?seconds=30
+        - name: keda-webhooks-heap
+          url: http://10.43.243.161:8084/debug/pprof/heap
+
 
 
 
@@ -79,7 +84,7 @@ jobs:
           threshold: "100"
           activationThreshold: "5"
           minReplicas: 0
-          maxReplicas: 10
+          maxReplicas: 200
           pollingInterval: 15
           cooldownPeriod: 60
 
