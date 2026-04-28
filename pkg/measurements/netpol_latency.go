@@ -471,8 +471,8 @@ func (n *netpolLatency) processResults() {
 			NetpolLabels: netpolLatencyLabels{
 				Name: name,
 			},
-			MinReadyLatency: time.Duration(latencySummary.Min),
-			ReadyLatency:    time.Duration(latencySummary.Max),
+			MinReadyLatency: time.Duration(latencySummary.Min) * time.Millisecond,
+			ReadyLatency:    time.Duration(latencySummary.Max) * time.Millisecond,
 		})
 	}
 }
@@ -603,8 +603,8 @@ func (n *netpolLatency) normalizeMetrics() float64 {
 		metric.ChurnMetric = n.IsChurnMetric(metric.Timestamp)
 		makeDoc := GenericLatencyDocFactory[float64, *netpolLatencyLabels](&metric.NetpolLabels, metric.LatencyDocument)
 		n.NormLatencies = append(n.NormLatencies,
-			makeDoc("Ready", float64(metric.ReadyLatency)),
-			makeDoc("MinReady", float64(metric.MinReadyLatency)),
+			makeDoc("Ready", float64(metric.ReadyLatency.Milliseconds())),
+			makeDoc("MinReady", float64(metric.MinReadyLatency.Milliseconds())),
 		)
 		return true
 	})
