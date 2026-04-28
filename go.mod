@@ -166,3 +166,5 @@ replace (
 	k8s.io/client-go => k8s.io/client-go v0.34.3
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b
 )
+
+replace github.com/elastic/go-elasticsearch/v7 => github.com/elastic/go-elasticsearch/v7 v7.13.1
