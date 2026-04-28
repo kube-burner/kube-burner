@@ -116,10 +116,6 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 	var err error
 	bm.stopWatchers()
 	errorRate := normalizeMetrics()
-	if errorRate > 10.00 {
-		log.Error("Latency errors beyond 10%. Hence invalidating the results")
-		return fmt.Errorf("something is wrong with system under test. %v latencies error rate was: %.2f", bm.MeasurementName, errorRate)
-	}
 	bm.calculateQuantiles(getLatency)
 	if len(bm.Config.LatencyThresholds) > 0 {
 		err = metrics.CheckThreshold(bm.Config.LatencyThresholds, bm.LatencyQuantiles)
@@ -128,7 +124,9 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 		pq := q.(metrics.LatencyQuantiles)
 		log.Infof("%s: %v 99th: %v ms max: %v ms avg: %v ms", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
-	if errorRate > 0 {
+	if errorRate > 10.00 {
+		return fmt.Errorf("something is wrong with system under test. %v latencies error rate was: %.2f", bm.MeasurementName, errorRate)
+	} else if errorRate > 0 {
 		log.Infof("%v error rate was: %.2f", bm.MeasurementName, errorRate)
 	}
 	return err
