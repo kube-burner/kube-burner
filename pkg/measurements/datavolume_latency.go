@@ -243,6 +243,7 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 				JobName:    dv.JobConfig.Name,
 				MetricName: dvLatencyMeasurement,
 				UUID:       dv.Uuid,
+				Metadata:   dv.Metadata,
 			},
 			DVLatencyLabels: dvLatencyLabels{
 				Namespace: dataVolume.Namespace,

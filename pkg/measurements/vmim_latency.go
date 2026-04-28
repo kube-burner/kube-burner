@@ -131,6 +131,7 @@ func (vmiml *vmimLatency) handleCreateVMIM(obj any) {
 			JobName:    vmiml.JobConfig.Name,
 			UUID:       vmiml.Uuid,
 			Timestamp:  migration.GetCreationTimestamp().UTC(),
+			Metadata:   vmiml.Metadata,
 		},
 		VMIMLatencyLabels: vmimLatencyLabels{
 			Namespace:    migration.GetNamespace(),
@@ -260,6 +261,7 @@ func (vmiml *vmimLatency) Collect(measurementWg *sync.WaitGroup) {
 				UUID:       vmiml.Uuid,
 				JobName:    vmiml.JobConfig.Name,
 				Timestamp:  vmim.GetCreationTimestamp().UTC(),
+				Metadata:   vmiml.Metadata,
 			},
 			VMIMLatencyLabels: vmimLatencyLabels{
 				Namespace:    vmim.GetNamespace(),

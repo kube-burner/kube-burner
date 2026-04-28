@@ -134,6 +134,7 @@ func (vmi *vmiLatency) handleCreateVM(obj any) {
 		LatencyDocument: metrics.LatencyDocument{
 			MetricName: vmiLatencyMeasurement,
 			Timestamp:  vm.CreationTimestamp.UTC(),
+			Metadata:   vmi.Metadata,
 		},
 		VMILatencyLabels: vmiLatencyLabels{
 			Namespace:    vm.Namespace,
@@ -189,6 +190,7 @@ func (vmi *vmiLatency) handleCreateVMI(obj any) {
 			vmiCreated: now,
 			LatencyDocument: metrics.LatencyDocument{
 				Timestamp: now, // Timestamp only needs to be set when there's not a parent VM
+				Metadata:  vmi.Metadata,
 			},
 			VMILatencyLabels: vmiLatencyLabels{
 				VMIName:      vmiObj.Name,

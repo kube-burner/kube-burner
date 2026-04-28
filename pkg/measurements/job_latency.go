@@ -201,6 +201,7 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 				MetricName: jobLatencyMeasurement,
 				UUID:       j.Uuid,
 				JobName:    j.JobConfig.Name,
+				Metadata:   j.Metadata,
 			},
 			JobLatencyLabels: jobLatencyLabels{
 				Namespace: job.Namespace,

@@ -207,6 +207,7 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 				MetricName: volumeSnapshotLatencyMeasurement,
 				UUID:       vsl.Uuid,
 				JobName:    vsl.JobConfig.Name,
+				Metadata:   vsl.Metadata,
 			},
 			VolumeSnapshotLabels: volumeSnapshotLabels{
 				Namespace: volumeSnapshot.Namespace,

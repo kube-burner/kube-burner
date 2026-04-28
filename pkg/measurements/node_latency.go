@@ -208,6 +208,7 @@ func (n *nodeLatency) Collect(measurementWg *sync.WaitGroup) {
 				UUID:       n.Uuid,
 				JobName:    n.JobConfig.Name,
 				Labels:     util.NormalizeLabels(node.Labels),
+				Metadata:   n.Metadata,
 			},
 			NodeLatencyLabels: nodeLatencyLabels{
 				Name: node.Name,
