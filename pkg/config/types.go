@@ -35,6 +35,9 @@ const (
 	HookBeforeGC           JobHook = "beforeGC"
 	HookAfterGC            JobHook = "afterGC"
 	HookOnEachIteration    JobHook = "onEachIteration"
+	// Global hooks - not tied to any specific job
+	HookBeforeAllJobs JobHook = "beforeAllJobs"
+	HookAfterAllJobs  JobHook = "afterAllJobs"
 )
 
 // JobType type of job
@@ -115,6 +118,8 @@ type GlobalConfig struct {
 	FunctionTemplates []string `yaml:"functionTemplates"`
 	// DeletionStrategy global deletion strategy for all created objects
 	DeletionStrategy string `yaml:"deletionStrategy" json:"deletionStrategy,omitempty"`
+	// Hooks global hooks to execute before/after all jobs
+	Hooks []Hook `yaml:"hooks" json:"hooks,omitempty"`
 }
 
 // Object defines an object that kube-burner will create

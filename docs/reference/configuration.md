@@ -44,6 +44,7 @@ In this section is described global job configuration, it holds the following pa
 | `timeout` | Global benchmark timeout                                             | Duration        | 4hr      |
 | `functionTemplates` | Function template files to render at runtime                                             | List        | []      |
 | `deletionStrategy` | Global deletion strategy to apply, `default` or `gvr` (where `default` deletes entire namespaces and `gvr` deletes objects within namespaces)   | String   | default  |
+| `hooks`            | List of global hooks to execute before/after all jobs. See [hooks section](#hooks)                      | List     | []       |
 
 !!! note
     The precedence order to wait on resources is Global.waitWhenFinished > Job.waitWhenFinished > Job.podWait
@@ -389,11 +390,14 @@ This will create both the Gateway and VirtualService for each iteration, with pr
 
 ### Hooks
 
-Hooks allow you to execute external commands at various stages of job execution. They support both foreground (blocking) and background (non-blocking) execution modes.
+Hooks allow you to execute external commands at various stages of execution. They support both foreground (blocking) and background (non-blocking) execution modes. Kube-burner supports two types of hooks:
+
+- **Global hooks**: Run before/after all jobs, configured in the `global` section
+- **Job-level hooks**: Run at specific stages of individual job execution
 
 #### Hook Configuration
 
-Hooks are configured as a list under the `hooks` field in a job:
+Hooks are configured as a list under the `hooks` field:
 
 | Option       | Description                                             | Type     | Default |
 |--------------|---------------------------------------------------------|----------|---------|
@@ -404,6 +408,15 @@ Hooks are configured as a list under the `hooks` field in a job:
 #### Supported Hook Stages
 
 The `when` field specifies at which stage the hook should execute:
+
+**Global Hook Stages** (configured in `global.hooks`):
+
+| Stage                    | Description                                           |
+|--------------------------|-------------------------------------------------------|
+| `setup`          | Before any job or measurement starts        |
+| `teardown`           | Called after the benchmark execution regardless of test success or failure       |
+
+**Job-Level Hook Stages** (configured in `jobs[].hooks`):
 
 | Stage                    | Description                                           |
 |--------------------------|-------------------------------------------------------|
@@ -442,40 +455,79 @@ The `when` field specifies at which stage the hook should execute:
 
 #### Example Configuration
 
+**Global hooks example:**
+
+```yaml
+global:
+  hooks:
+    # Run setup script before any job starts
+    - cmd: ["/scripts/cluster-setup.sh"]
+      when: beforeAllJobs
+      background: false
+
+    # Start monitoring in background for entire benchmark
+    - cmd: ["/scripts/collect-metrics.sh", "--output=/data"]
+      when: beforeAllJobs
+      background: true
+
+    # Run cleanup after all jobs complete
+    - cmd: ["/scripts/final-cleanup.sh"]
+      when: afterAllJobs
+      background: false
+
+jobs:
+  - name: job-1
+    # ...
+  - name: job-2
+    # ...
+```
+
+**Job-level hooks example:**
+
 ```yaml
 jobs:
   - name: my-workload
     jobType: create
     jobIterations: 100
     namespace: workload-ns
-    
+
     hooks:
       # Background monitoring hook - runs throughout deployment
       - cmd: ["/bin/bash", "/scripts/monitor-resources.sh"]
         when: beforeJobExecution
         background: true
-      
+
       # Foreground setup hook - blocks until complete
       - cmd: ["/usr/bin/setup-environment.sh", "--mode=production"]
         when: beforeJobExecution
         background: false
-      
+
       # Per-iteration hook
       - cmd: ["/bin/bash", "/scripts/log-iteration.sh"]
         when: onEachIteration
         background: false
-      
+
       # Cleanup verification
       - cmd: ["/scripts/verify-cleanup.sh"]
         when: afterCleanup
         background: false
-    
+
     objects:
       - objectTemplate: deployment.yml
         replicas: 10
 ```
 
 #### Use Cases
+
+**Global benchmark setup and teardown:**
+```yaml
+global:
+  hooks:
+    - cmd: ["/scripts/prepare-cluster.sh"]
+      when: beforeAllJobs
+    - cmd: ["/scripts/generate-report.sh"]
+      when: afterAllJobs
+```
 
 **Long-running background monitoring:**
 ```yaml
