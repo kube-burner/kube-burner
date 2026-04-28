@@ -404,11 +404,11 @@ func (p *podLatency) normalizeMetrics() float64 {
 		warningPods += warningFlag
 		makeDoc := GenericLatencyDocFactory[int, *podLatencyLabels](&m.PodLatencyLabels, m.LatencyDocument)
 		p.NormLatencies = append(p.NormLatencies,
-			makeDoc(string(corev1.PodScheduled), m.SchedulingLatency),
 			makeDoc(string(corev1.ContainersReady), m.ContainersReadyLatency),
+			makeDoc(string(corev1.PodReadyToStartContainers), m.ReadyToStartContainersLatency),
 			makeDoc(string(corev1.PodInitialized), m.InitializedLatency),
 			makeDoc(string(corev1.PodReady), m.PodReadyLatency),
-			makeDoc(string(corev1.PodReadyToStartContainers), m.ReadyToStartContainersLatency),
+			makeDoc(string(corev1.PodScheduled), m.SchedulingLatency),
 			makeDoc(containersStarted, m.ContainersStartedLatency),
 		)
 		return true

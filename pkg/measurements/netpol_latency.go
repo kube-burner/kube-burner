@@ -596,19 +596,15 @@ func (n *netpolLatency) Stop() error {
 }
 
 func (n *netpolLatency) normalizeMetrics() float64 {
-	var latencies []float64
-	var minLatencies []float64
 	sLen := 0
 	n.Metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(netpolMetric)
 		metric.ChurnMetric = n.IsChurnMetric(metric.Timestamp)
-		latencies = append(latencies, float64(metric.ReadyLatency))
-		minLatencies = append(minLatencies, float64(metric.MinReadyLatency))
-		makeDoc := GenericLatencyDocFactory[int, *netpolLatencyLabels](&metric.NetpolLabels, metric.LatencyDocument)
+		makeDoc := GenericLatencyDocFactory[float64, *netpolLatencyLabels](&metric.NetpolLabels, metric.LatencyDocument)
 		n.NormLatencies = append(n.NormLatencies,
-			makeDoc("Ready", int(metric.ReadyLatency)),
-			makeDoc("MinReady", int(metric.MinReadyLatency)),
+			makeDoc("Ready", float64(metric.ReadyLatency)),
+			makeDoc("MinReady", float64(metric.MinReadyLatency)),
 		)
 		return true
 	})

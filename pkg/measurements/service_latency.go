@@ -279,14 +279,16 @@ func (s *serviceLatency) normalizeMetrics() {
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		// s.NormLatencies = append(s.NormLatencies, metric)
 
-		makeDoc := GenericLatencyDocFactory[int, *svcLatencyLabels](&metric.SvcLatencyLabels, metric.LatencyDocument)
+		makeDoc := GenericLatencyDocFactory[float64, *svcLatencyLabels](&metric.SvcLatencyLabels, metric.LatencyDocument)
 
 		s.NormLatencies = append(s.NormLatencies,
-			makeDoc("ready", int(metric.ReadyLatency.Milliseconds())),
-			makeDoc("ipAssigned", int(metric.IPAssignedLatency.Milliseconds())),
+			makeDoc("ready", float64(metric.ReadyLatency.Milliseconds())),
 		)
 		if metric.IPAssignedLatency != 0 {
 			ipAssignedLatencies = append(ipAssignedLatencies, float64(metric.IPAssignedLatency))
+			s.NormLatencies = append(s.NormLatencies,
+				makeDoc("ipAssigned", float64(metric.IPAssignedLatency.Milliseconds())),
+			)
 		}
 		return true
 	})

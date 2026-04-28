@@ -101,7 +101,7 @@ type ConditionSetter[L any] interface {
 // GenericLatencyDocFactory creates a reusable closure to generate standard metrics.LatencyDocument outputs.
 // Each closure call clones the labels struct so every returned document carries its own
 // independent condition field instead of all sharing the same mutated pointer.
-func GenericLatencyDocFactory[T int | int64, L ConditionSetter[L]](metadataLabels L, doc metrics.LatencyDocument) func(condition string, valueMs T) metrics.LatencyDocument {
+func GenericLatencyDocFactory[T int | int64 | float64, L ConditionSetter[L]](metadataLabels L, doc metrics.LatencyDocument) func(condition string, valueMs T) metrics.LatencyDocument {
 	return func(condition string, valueMs T) metrics.LatencyDocument {
 		labelsCopy := metadataLabels.Clone()
 		labelsCopy.SetCondition(condition)
