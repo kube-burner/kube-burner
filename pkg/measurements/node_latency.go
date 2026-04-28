@@ -264,7 +264,7 @@ func (n *nodeLatency) normalizeLatencies() float64 {
 
 func (n *nodeLatency) getLatency(normLatency any) map[string]float64 {
 	doc := normLatency.(metrics.LatencyDocument)
-	condition := doc.Labels.(*netpolLatencyLabels).Condition
+	condition := doc.Labels.(*nodeLatencyLabels).Condition
 	return map[string]float64{condition: doc.Value}
 }
 

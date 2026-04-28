@@ -210,8 +210,10 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 				Metadata:   vsl.Metadata,
 			},
 			VolumeSnapshotLabels: volumeSnapshotLabels{
-				Namespace: volumeSnapshot.Namespace,
-				Name:      volumeSnapshot.Name,
+				Namespace:    volumeSnapshot.Namespace,
+				Name:         volumeSnapshot.Name,
+				JobIteration: getIntFromLabels(volumeSnapshot.Labels, config.KubeBurnerLabelJobIteration),
+				Replica:      getIntFromLabels(volumeSnapshot.Labels, config.KubeBurnerLabelReplica),
 			},
 			vsReady: volumeSnapshot.Status.CreationTime.Time,
 		})

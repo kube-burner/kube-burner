@@ -204,8 +204,10 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 				Metadata:   j.Metadata,
 			},
 			JobLatencyLabels: jobLatencyLabels{
-				Namespace: job.Namespace,
-				Name:      job.Name,
+				Namespace:    job.Namespace,
+				Name:         job.Name,
+				JobIteration: getIntFromLabels(job.Labels, config.KubeBurnerLabelJobIteration),
+				Replica:      getIntFromLabels(job.Labels, config.KubeBurnerLabelReplica),
 			},
 			jobComplete: completed,
 			startTime:   startTime,

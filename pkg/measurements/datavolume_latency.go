@@ -246,8 +246,10 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 				Metadata:   dv.Metadata,
 			},
 			DVLatencyLabels: dvLatencyLabels{
-				Namespace: dataVolume.Namespace,
-				Name:      dataVolume.Name,
+				Namespace:    dataVolume.Namespace,
+				Name:         dataVolume.Name,
+				JobIteration: getIntFromLabels(dataVolume.Labels, config.KubeBurnerLabelJobIteration),
+				Replica:      getIntFromLabels(dataVolume.Labels, config.KubeBurnerLabelReplica),
 			},
 			dvBound:   bound,
 			dvRunning: running,
