@@ -264,26 +264,38 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 		// v2 latencies are currently under AB testing which blindly trust kubernetes as source of
 		// truth and will prevent us from those over 1s delays as well as <0 cases.
 		errorFlag := 0
-		m.DVBoundLatency = int(m.dvBound.Sub(m.Timestamp).Milliseconds())
-		if m.DVBoundLatency < 0 {
-			log.Tracef("DVBoundLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.DVBoundLatency = 0
+		if m.dvBound.IsZero() {
+			m.DVBoundLatency = -1
+		} else {
+			m.DVBoundLatency = int(m.dvBound.Sub(m.Timestamp).Milliseconds())
+			if m.DVBoundLatency < 0 {
+				log.Tracef("DVBoundLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.DVBoundLatency = 0
+			}
 		}
 
-		m.DVRunningLatency = int(m.dvRunning.Sub(m.Timestamp).Milliseconds())
-		if m.DVRunningLatency < 0 {
-			// Running condition may be missed when creating empty volumes.
-			// Since we validated that the volume is Ready, assume the Running latency is 0 and don't report an error
-			log.Tracef("DVRunningLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
-			m.DVRunningLatency = 0
+		if m.dvRunning.IsZero() {
+			m.DVRunningLatency = -1
+		} else {
+			m.DVRunningLatency = int(m.dvRunning.Sub(m.Timestamp).Milliseconds())
+			if m.DVRunningLatency < 0 {
+				// Running condition may be missed when creating empty volumes.
+				// Since we validated that the volume is Ready, assume the Running latency is 0 and don't report an error
+				log.Tracef("DVRunningLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
+				m.DVRunningLatency = 0
+			}
 		}
 
-		m.DVReadyLatency = int(m.dvReady.Sub(m.Timestamp).Milliseconds())
-		if m.DVReadyLatency < 0 {
-			log.Tracef("DVReadyLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.DVReadyLatency = 0
+		if m.dvReady.IsZero() {
+			m.DVReadyLatency = -1
+		} else {
+			m.DVReadyLatency = int(m.dvReady.Sub(m.Timestamp).Milliseconds())
+			if m.DVReadyLatency < 0 {
+				log.Tracef("DVReadyLatency for DataVolume %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.DVReadyLatency = 0
+			}
 		}
 		m.ChurnMetric = dv.IsChurnMetric(m.Timestamp)
 		dataVolumeCount++
@@ -299,11 +311,17 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 
 func (dv *dvLatency) getLatency(normLatency any) map[string]float64 {
 	dataVolumeMetric := normLatency.(dvMetric)
-	return map[string]float64{
-		string(cdiv1beta1.DataVolumeBound):   float64(dataVolumeMetric.DVBoundLatency),
-		string(cdiv1beta1.DataVolumeRunning): float64(dataVolumeMetric.DVRunningLatency),
-		string(cdiv1beta1.DataVolumeReady):   float64(dataVolumeMetric.DVReadyLatency),
+	res := make(map[string]float64)
+	if dataVolumeMetric.DVBoundLatency != -1 {
+		res[string(cdiv1beta1.DataVolumeBound)] = float64(dataVolumeMetric.DVBoundLatency)
 	}
+	if dataVolumeMetric.DVRunningLatency != -1 {
+		res[string(cdiv1beta1.DataVolumeRunning)] = float64(dataVolumeMetric.DVRunningLatency)
+	}
+	if dataVolumeMetric.DVReadyLatency != -1 {
+		res[string(cdiv1beta1.DataVolumeReady)] = float64(dataVolumeMetric.DVReadyLatency)
+	}
+	return res
 }
 
 func (dv *dvLatency) IsCompatible() bool {

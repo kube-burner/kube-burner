@@ -261,15 +261,21 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 			return true
 		}
 		errorFlag := 0
-		m.PendingLatency = int(m.pending - m.Timestamp.UnixMilli())
-		if m.PendingLatency < 0 {
-			log.Tracef("PendingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
-			if m.pending < 0 {
-				errorFlag = 1
+		if m.pending == 0 {
+			m.PendingLatency = -1
+		} else {
+			m.PendingLatency = int(m.pending - m.Timestamp.UnixMilli())
+			if m.PendingLatency < 0 {
+				log.Tracef("PendingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
+				if m.pending < 0 {
+					errorFlag = 1
+				}
+				m.PendingLatency = 0
 			}
-			m.PendingLatency = 0
 		}
-		if m.bound > 0 {
+		if m.bound == 0 {
+			m.BindingLatency = -1
+		} else {
 			m.BindingLatency = int(m.bound - m.Timestamp.UnixMilli())
 			if m.BindingLatency < 0 {
 				log.Tracef("BindingLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
@@ -277,7 +283,9 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 				m.BindingLatency = 0
 			}
 		}
-		if m.lost > 0 {
+		if m.lost == 0 {
+			m.LostLatency = -1
+		} else {
 			m.LostLatency = int(m.lost - m.Timestamp.UnixMilli())
 			if m.LostLatency < 0 {
 				log.Tracef("LostLatency for pvc %v falling under negative case. So explicitly setting it to 0", m.Name)
@@ -305,12 +313,18 @@ func (p *pvcLatency) normalizeMetrics() float64 {
 
 func (p *pvcLatency) getLatency(normLatency any) map[string]float64 {
 	pvcMetric := normLatency.(pvcMetric)
-	return map[string]float64{
-		string(corev1.ClaimPending): float64(pvcMetric.PendingLatency),
-		string(corev1.ClaimBound):   float64(pvcMetric.BindingLatency),
-		string(corev1.ClaimLost):    float64(pvcMetric.LostLatency),
-		"Resize":                    float64(pvcMetric.ResizeLatency),
+	res := make(map[string]float64)
+	if pvcMetric.PendingLatency != -1 {
+		res[string(corev1.ClaimPending)] = float64(pvcMetric.PendingLatency)
 	}
+	if pvcMetric.BindingLatency != -1 {
+		res[string(corev1.ClaimBound)] = float64(pvcMetric.BindingLatency)
+	}
+	if pvcMetric.LostLatency != -1 {
+		res[string(corev1.ClaimLost)] = float64(pvcMetric.LostLatency)
+	}
+	res["Resize"] = float64(pvcMetric.ResizeLatency)
+	return res
 }
 
 func (p *pvcLatency) IsCompatible() bool {

@@ -286,46 +286,70 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 
 		errorFlag := 0
 		// Calculate latencies from the timestamp (creation time)
-		m.PendingLatency = int(m.pendingTime.Sub(m.Timestamp).Milliseconds())
-		if m.PendingLatency < 0 {
-			log.Tracef("PendingLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.PendingLatency = 0
+		if m.pendingTime.IsZero() {
+			m.PendingLatency = -1
+		} else {
+			m.PendingLatency = int(m.pendingTime.Sub(m.Timestamp).Milliseconds())
+			if m.PendingLatency < 0 {
+				log.Tracef("PendingLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.PendingLatency = 0
+			}
 		}
 
-		m.SchedulingLatency = int(m.schedulingTime.Sub(m.Timestamp).Milliseconds())
-		if m.SchedulingLatency < 0 {
-			log.Tracef("SchedulingLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.SchedulingLatency = 0
+		if m.schedulingTime.IsZero() {
+			m.SchedulingLatency = -1
+		} else {
+			m.SchedulingLatency = int(m.schedulingTime.Sub(m.Timestamp).Milliseconds())
+			if m.SchedulingLatency < 0 {
+				log.Tracef("SchedulingLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.SchedulingLatency = 0
+			}
 		}
 
-		m.ScheduledLatency = int(m.scheduledTime.Sub(m.Timestamp).Milliseconds())
-		if m.ScheduledLatency < 0 {
-			log.Tracef("ScheduledLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.ScheduledLatency = 0
+		if m.scheduledTime.IsZero() {
+			m.ScheduledLatency = -1
+		} else {
+			m.ScheduledLatency = int(m.scheduledTime.Sub(m.Timestamp).Milliseconds())
+			if m.ScheduledLatency < 0 {
+				log.Tracef("ScheduledLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.ScheduledLatency = 0
+			}
 		}
 
-		m.PreparingTargetLatency = int(m.preparingTargetTime.Sub(m.Timestamp).Milliseconds())
-		if m.PreparingTargetLatency < 0 {
-			log.Tracef("PreparingTargetLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.PreparingTargetLatency = 0
+		if m.preparingTargetTime.IsZero() {
+			m.PreparingTargetLatency = -1
+		} else {
+			m.PreparingTargetLatency = int(m.preparingTargetTime.Sub(m.Timestamp).Milliseconds())
+			if m.PreparingTargetLatency < 0 {
+				log.Tracef("PreparingTargetLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.PreparingTargetLatency = 0
+			}
 		}
 
-		m.TargetReadyLatency = int(m.targetReadyTime.Sub(m.Timestamp).Milliseconds())
-		if m.TargetReadyLatency < 0 {
-			log.Tracef("TargetReadyLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.TargetReadyLatency = 0
+		if m.targetReadyTime.IsZero() {
+			m.TargetReadyLatency = -1
+		} else {
+			m.TargetReadyLatency = int(m.targetReadyTime.Sub(m.Timestamp).Milliseconds())
+			if m.TargetReadyLatency < 0 {
+				log.Tracef("TargetReadyLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.TargetReadyLatency = 0
+			}
 		}
 
-		m.RunningLatency = int(m.runningTime.Sub(m.Timestamp).Milliseconds())
-		if m.RunningLatency < 0 {
-			log.Tracef("RunningLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
-			errorFlag = 1
-			m.RunningLatency = 0
+		if m.runningTime.IsZero() {
+			m.RunningLatency = -1
+		} else {
+			m.RunningLatency = int(m.runningTime.Sub(m.Timestamp).Milliseconds())
+			if m.RunningLatency < 0 {
+				log.Tracef("RunningLatency for VirtualMachineInstanceMigration %v falling under negative case. So explicitly setting it to 0", m.Name)
+				errorFlag = 1
+				m.RunningLatency = 0
+			}
 		}
 
 		m.SucceededLatency = int(m.succeededTime.Sub(m.Timestamp).Milliseconds())
@@ -350,15 +374,29 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 
 func (vmiml *vmimLatency) getLatency(normLatency any) map[string]float64 {
 	vmimMetric := normLatency.(vmimMetric)
-	return map[string]float64{
-		string(kvv1.MigrationPending):         float64(vmimMetric.PendingLatency),
-		string(kvv1.MigrationScheduling):      float64(vmimMetric.SchedulingLatency),
-		string(kvv1.MigrationScheduled):       float64(vmimMetric.ScheduledLatency),
-		string(kvv1.MigrationPreparingTarget): float64(vmimMetric.PreparingTargetLatency),
-		string(kvv1.MigrationTargetReady):     float64(vmimMetric.TargetReadyLatency),
-		string(kvv1.MigrationRunning):         float64(vmimMetric.RunningLatency),
-		string(kvv1.MigrationSucceeded):       float64(vmimMetric.SucceededLatency),
+	res := make(map[string]float64)
+
+	if vmimMetric.PendingLatency != -1 {
+		res[string(kvv1.MigrationPending)] = float64(vmimMetric.PendingLatency)
 	}
+	if vmimMetric.SchedulingLatency != -1 {
+		res[string(kvv1.MigrationScheduling)] = float64(vmimMetric.SchedulingLatency)
+	}
+	if vmimMetric.ScheduledLatency != -1 {
+		res[string(kvv1.MigrationScheduled)] = float64(vmimMetric.ScheduledLatency)
+	}
+	if vmimMetric.PreparingTargetLatency != -1 {
+		res[string(kvv1.MigrationPreparingTarget)] = float64(vmimMetric.PreparingTargetLatency)
+	}
+	if vmimMetric.TargetReadyLatency != -1 {
+		res[string(kvv1.MigrationTargetReady)] = float64(vmimMetric.TargetReadyLatency)
+	}
+	if vmimMetric.RunningLatency != -1 {
+		res[string(kvv1.MigrationRunning)] = float64(vmimMetric.RunningLatency)
+	}
+	res[string(kvv1.MigrationSucceeded)] = float64(vmimMetric.SucceededLatency)
+
+	return res
 }
 
 func (vmiml *vmimLatency) IsCompatible() bool {

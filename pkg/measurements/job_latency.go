@@ -217,10 +217,14 @@ func (j *jobLatency) normalizeMetrics() float64 {
 			log.Tracef("Job %v latency ignored as it did not reach Ready state", m.Name)
 			return true
 		}
-		m.StartTimeLatency = int(m.startTime.Sub(m.Timestamp).Milliseconds())
-		if m.StartTimeLatency < 0 {
-			log.Tracef("StartTimeLatency for job %v falling under negative case. So explicitly setting it to 0", m.Name)
-			m.StartTimeLatency = 0
+		if m.startTime.IsZero() {
+			m.StartTimeLatency = -1
+		} else {
+			m.StartTimeLatency = int(m.startTime.Sub(m.Timestamp).Milliseconds())
+			if m.StartTimeLatency < 0 {
+				log.Tracef("StartTimeLatency for job %v falling under negative case. So explicitly setting it to 0", m.Name)
+				m.StartTimeLatency = 0
+			}
 		}
 		m.CompletionLatency = int(m.jobComplete.Sub(m.Timestamp).Milliseconds())
 		m.ChurnMetric = j.IsChurnMetric(m.Timestamp)
@@ -232,10 +236,12 @@ func (j *jobLatency) normalizeMetrics() float64 {
 
 func (j *jobLatency) getLatency(normLatency any) map[string]float64 {
 	jobMetric := normLatency.(jobMetric)
-	return map[string]float64{
-		jobStartTimeMeasurement:     float64(jobMetric.StartTimeLatency),
-		string(batchv1.JobComplete): float64(jobMetric.CompletionLatency),
+	res := make(map[string]float64)
+	if jobMetric.StartTimeLatency != -1 {
+		res[jobStartTimeMeasurement] = float64(jobMetric.StartTimeLatency)
 	}
+	res[string(batchv1.JobComplete)] = float64(jobMetric.CompletionLatency)
+	return res
 }
 
 func (j *jobLatency) IsCompatible() bool {
