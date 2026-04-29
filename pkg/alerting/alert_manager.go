@@ -197,7 +197,7 @@ func parseMatrix(value model.Value, uuid, description string, metadata any, seve
 				Description: renderedDesc.String(),
 				MetricName:  alertMetricName,
 			}
-			if churnStart != nil && alert.Timestamp.After(*churnStart) && alert.Timestamp.Before(*churnEnd) {
+			if churnStart != nil && churnEnd != nil && alert.Timestamp.After(*churnStart) && alert.Timestamp.Before(*churnEnd) {
 				alert.ChurnMetric = true
 			}
 			alertSet = append(alertSet, alert)
