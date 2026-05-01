@@ -1,0 +1,143 @@
+metricsEndpoints:
+  - indexer:
+      type: local
+      metricsDirectory: collected-metrics
+    metrics: [../../metrics-profiles/keda-metrics.yml]
+global:
+  gc: false
+  timeout: 40m
+  measurements:
+    # 1. ScaledObject lifecycle latency measurement
+    - name: scaledObjectLatency
+      thresholds:
+        - conditionType: ScaledObjectActive
+          metric: P99
+          threshold: 60s
+        - conditionType: HPACreated
+          metric: P99
+          threshold: 60s
+        - conditionType: DeploymentReady
+          metric: P99
+          threshold: 120s
+
+    - name: podLatency
+      thresholds:
+        - conditionType: Ready
+          metric: P99
+
+    - name: serviceLatency
+      svcTimeout: 5s
+    - name: nodeLatency
+
+    # # 2. KEDA Operator pprof — CPU + heap profiles
+    # - name: pprof
+    #   pprofInterval: 30s
+    #   pprofDirectory: /tmp/pprof-keda/rabbit-mq-1
+    #   nodeAffinity:
+    #     kubernetes.io/hostname: "myrke2-worker-1.karmalabs.corp"
+    #   pprofTargets:
+    #     - name: keda-operator
+    #       url: http://10.43.144.36:8082/debug/pprof/profile?seconds=30
+    #       # url: http://keda-operator.keda.svc.cluster.local:8082/debug/pprof/profile?seconds=30
+    #     - name: keda-operator-heap
+    #       url: http://10.43.144.36:8082/debug/pprof/heap
+    #       # url: http://keda-operator.keda.svc.cluster.local:8082/debug/pprof/heap
+    #     - name: keda-metrics-apiserver
+    #       url: http://10.43.126.1:8083/debug/pprof/profile?seconds=30
+    #       # url: http://keda-metrics-apiserver.keda.svc.cluster.local:8083/debug/pprof/profile?seconds=30
+    #     - name: keda-metrics-apiserver-heap
+    #       url: http://10.43.126.1:8083/debug/pprof/heap
+    #       # url: http://keda-metrics-apiserver.keda.svc.cluster.local:8083/debug/pprof/heap
+    #     - name: keda-webhooks
+    #       url: http://10.43.151.88:8084/debug/pprof/profile?seconds=30
+    #       # url: http://keda-webhooks.keda.svc.cluster.local:8084/debug/pprof/profile?seconds=30
+    #     - name: keda-webhooks-heap
+    #       url: http://10.43.151.88:8084/debug/pprof/heap
+    #       # url: http://keda-webhooks.keda.svc.cluster.local:8084/debug/pprof/heap
+
+jobs:
+  - name: create-queue
+    jobType: create
+    jobIterations: 10
+    qps: 5
+    burst: 10
+    namespacedIterations: false
+    namespace: keda-perf-test
+    waitWhenFinished: true
+    objects:
+      - objectTemplate: examples/workloads/keda-rabbitmq/templates/create-queue.yml
+        replicas: 1
+
+  - name: rabbitmq-producers
+    jobType: create
+    jobIterations: 10
+    qps: 5
+    burst: 10
+    namespacedIterations: false
+    namespace: keda-perf-test
+    waitWhenFinished: false
+    objects:
+      - objectTemplate: examples/workloads/keda-rabbitmq/templates/producer-ramp-up-job.yml
+        replicas: 1
+
+  - name: rabbitmq-consumers
+    jobType: create
+    # measurements:
+    #   # pprof disabled: cluster-local DNS (*.svc.cluster.local) cannot be reached
+    #   # from the host where kube-burner runs, causing Stop() to hang indefinitely.
+    #   # To re-enable, use IP-based URLs (e.g. http://10.43.144.36:8082/...)
+    #   - name: pprof
+    #     pprofInterval: 30s
+    #     pprofDirectory: /tmp/pprof-keda/rabbit-mq-2-ramp-up
+    #     nodeAffinity:
+    #       kubernetes.io/hostname: "myrke2-worker-1.karmalabs.corp"
+    #     pprofTargets:
+    #       - name: keda-operator
+    #         url: http://10.43.144.36:8082/debug/pprof/profile?seconds=30
+    #       - name: keda-operator-heap
+    #         url: http://10.43.144.36:8082/debug/pprof/heap
+    #       - name: keda-metrics-apiserver
+    #         url: http://10.43.126.1:8083/debug/pprof/profile?seconds=30
+    #       - name: keda-metrics-apiserver-heap
+    #         url: http://10.43.126.1:8083/debug/pprof/heap
+    #       - name: keda-webhooks
+    #         url: http://10.43.151.88:8084/debug/pprof/profile?seconds=30
+    #       - name: keda-webhooks-heap
+    #         url: http://10.43.151.88:8084/debug/pprof/heap
+    jobIterations: 10
+    qps: 5
+    burst: 10
+    namespacedIterations: false
+    namespace: keda-perf-test
+    waitWhenFinished: true
+    jobPause: 30m
+    metricsClosing: afterJob
+    objects:
+      - objectTemplate: examples/workloads/keda-rabbitmq/templates/consumer-deployment.yml
+        replicas: 1
+      - objectTemplate: examples/workloads/keda-rabbitmq/templates/scaledobject.yml
+        replicas: 1
+
+  # Job 3: Delete ScaledObjects and collect final metrics
+  - name: rabbitmq-delete
+    jobType: delete
+    waitForDeletion: true
+    namespace: keda-perf-test
+    objects:
+      - kind: ScaledObject
+        apiVersion: keda.sh/v1alpha1
+        labelSelector: { kube-burner.io/job: rabbitmq-consumers }
+
+  # Job 4: Delete the RabbitMQ queues we created
+  - name: delete-queues
+    jobType: create
+    jobIterations: 10
+    qps: 5
+    burst: 10
+    namespacedIterations: false
+    namespace: keda-perf-test
+    waitWhenFinished: false
+    maxWaitTimeout: 2m
+    objects:
+      - objectTemplate: examples/workloads/keda-rabbitmq/templates/delete-queue.yml
+        replicas: 1

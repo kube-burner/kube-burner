@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rmq-consumer-{{.Iteration}}
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: rmq-consumer-{{.Iteration}}
+  template:
+    metadata:
+      labels:
+        app: rmq-consumer-{{.Iteration}}
+    spec:
+      containers:
+        - name: perf-test-consumer
+          image: pivotalrabbitmq/perf-test:latest
+          args: ["--uri", "$(RABBITMQ_URL)", "--producers", "0", "--consumers", "2", "--queue", "perf-queue-{{.Iteration}}", "--auto-delete", "false"]
+          env:
+            - name: RABBITMQ_URL
+              value: "amqp://user:password@rabbitmq.rabbitmq.svc.cluster.local:5672"
