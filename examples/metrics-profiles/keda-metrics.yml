@@ -15,11 +15,12 @@
 # Whether each scaler is active (1) or not (0)
 - query: keda_scaler_active
   metricName: kedaScalerActive
-  instant: true
+  instant: false
 
 # Current metric value as KEDA sees it (per scaler/trigger)
 - query: keda_scaler_metrics_value
   metricName: kedaScalerMetricsValue
+  instant: false
 
 # Latency of retrieving metrics from each scaler (seconds)
 - query: keda_scaler_metrics_latency_seconds
