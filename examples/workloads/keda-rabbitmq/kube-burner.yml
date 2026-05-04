@@ -54,39 +54,30 @@ jobs:
     objects:
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/producer-ramp-up-job.yml
         replicas: 1
+        inputVars:
+          containerImage: pivotalrabbitmq/perf-test:latest
+          producerPerPodCount: 10
 
   # Job 3: Create consumers to consume messages from the queues via kubernetes jobs and scale them using keda scaled objects
   - name: rabbitmq-consumers
     jobType: create
     measurements:
       - name: pprof
-        pprofInterval: 30s
-        pprofDirectory: /tmp/pprof-keda/rabbit-mq-2-ramp-up
+        pprofInterval: 30m
+        pprofDirectory: /tmp/pprof-keda/rabbit-mq-5-ramp-up
         pprofTargets:
           - name: keda-operator
-            namespace : keda
-            labelSelector: {app.kubernetes.io/name : keda-operator}
-            url: http://localhost:8082/debug/pprof/profile?seconds=30
+            url: http://10.43.144.36:8082/debug/pprof/profile?seconds=1800
           - name: keda-operator-heap
-            namespace : keda
-            labelSelector: {app.kubernetes.io/name : keda-operator}
-            url: http://localhost:8082/debug/pprof/heap
+            url: http://10.43.144.36:8082/debug/pprof/heap
           - name: keda-operator-metrics-apiserver
-            namespace : keda
-            labelSelector: {app.kubernetes.io/name : keda-operator-metrics-apiserver}
-            url: http://localhost:8083/debug/pprof/profile?seconds=30
+            url: http://10.43.126.1:8083/debug/pprof/profile?seconds=1800
           - name: keda-operator-metrics-apiserver-heap
-            namespace : keda
-            labelSelector: {app.kubernetes.io/name : keda-operator-metrics-apiserver}
-            url: http://localhost:8083/debug/pprof/heap
+            url: http://10.43.126.1:8083/debug/pprof/heap
           - name: keda-admission-webhooks
-            namespace : keda
-            labelSelector: {app.kubernetes.io/name : keda-admission-webhooks}
-            url: http://localhost:8084/debug/pprof/profile?seconds=30
+            url: http://10.43.151.88:8084/debug/pprof/profile?seconds=1800
           - name: keda-admission-webhooks-heap
-            namespace : keda
-            labelSelector: {app.kubernetes.io/name : keda-admission-webhooks}
-            url: http://localhost:8084/debug/pprof/heap
+            url: http://10.43.151.88:8084/debug/pprof/heap
     jobIterations: 10
     qps: 5
     burst: 10
@@ -98,8 +89,17 @@ jobs:
     objects:
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/consumer-deployment.yml
         replicas: 1
+        inputVars:
+          containerImage: pivotalrabbitmq/perf-test:latest
+          consumerPerPodCount: 2
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/scaledobject.yml
         replicas: 1
+        inputVars:
+          minReplicaCount: 0
+          maxReplicaCount: 30
+          cooldownPeriod: 30
+          pollingInterval: 15
+          queueLength: '"50"' # To ignore parsing as int in yaml and pass as string
 
   # Job 4: Delete ScaledObjects and collect final metrics
   - name: rabbitmq-delete

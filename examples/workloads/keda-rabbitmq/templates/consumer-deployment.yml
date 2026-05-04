@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: perf-test-consumer
-          image: pivotalrabbitmq/perf-test:latest
-          args: ["--uri", "$(RABBITMQ_URL)", "--producers", "0", "--consumers", "2", "--queue", "perf-queue-{{.Iteration}}", "--auto-delete", "false"]
+          image: {{ .containerImage }}
+          args: ["--uri", "$(RABBITMQ_URL)", "--producers", "0", "--consumers", "{{.consumerPerPodCount}}", "--queue", "perf-queue-{{.Iteration}}", "--auto-delete", "false"]
           env:
             - name: RABBITMQ_URL
               value: "amqp://user:password@rabbitmq.rabbitmq.svc.cluster.local:5672"

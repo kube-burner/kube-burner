@@ -13,7 +13,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: perf-test-producer
-          image: pivotalrabbitmq/perf-test:dev
+          image: {{ .containerImage }}
           # We use --variable-rate to step up the traffic and --time to stop after all phases finish.
           # Phase 1: 2000 msg/s for 300s (5m)
           # Phase 2: 5000 msg/s for 300s (5m)
@@ -26,7 +26,7 @@ spec:
             - "--uri"
             - "$(RABBITMQ_URL)"
             - "--producers"
-            - "10"
+            - "{{.producerPerPodCount}}"
             - "--consumers"
             - "0"
             - "--queue"

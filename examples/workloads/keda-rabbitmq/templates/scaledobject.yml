@@ -5,13 +5,13 @@ metadata:
 spec:
   scaleTargetRef:
     name: rmq-consumer-{{.Iteration}}
-  pollingInterval: 15
-  cooldownPeriod: 30
-  minReplicaCount: 0
-  maxReplicaCount: 10
+  pollingInterval: {{.pollingInterval}}
+  cooldownPeriod: {{.cooldownPeriod}}
+  minReplicaCount: {{.minReplicaCount}}
+  maxReplicaCount: {{.maxReplicaCount}}
   triggers:
     - type: rabbitmq
       metadata:
         queueName: perf-queue-{{.Iteration}}
-        queueLength: "50"
+        queueLength: {{.queueLength}}
         hostFromEnv: RABBITMQ_URL
