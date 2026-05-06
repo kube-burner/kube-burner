@@ -102,16 +102,38 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	return ex
 }
 
-func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {
-	// Processing template
+// buildTemplateData creates the template data map with adjusted iteration for namespacesPerObject.
+//
+// When namespacesPerObject > 1, objects span multiple namespaces. The adjustedIteration
+// ensures templates see the same iteration number across a namespace group.
+//
+// Example with namespacesPerObject=2:
+//   - iteration 0, 1 → adjustedIteration = 0 (both in first namespace group)
+//   - iteration 2, 3 → adjustedIteration = 1 (both in second namespace group)
+func (ex *JobExecutor) buildTemplateData(obj *object, iteration, replicaIndex int) map[string]any {
+	npo := obj.NamespacesPerObject
+	if npo < 1 {
+		npo = 1
+	}
+	adjustedIteration := iteration
+	if npo > 1 {
+		adjustedIteration = iteration / npo
+	}
+
 	templateData := map[string]any{
-		jobName:      ex.Name,
-		jobIteration: iteration,
-		jobUUID:      ex.uuid,
-		jobRunId:     ex.runid,
-		replica:      replicaIndex,
+		jobName:             ex.Name,
+		jobIteration:        adjustedIteration,
+		jobUUID:             ex.uuid,
+		jobRunId:            ex.runid,
+		replica:             replicaIndex,
+		namespacesPerObject: npo,
 	}
 	maps.Copy(templateData, obj.InputVars)
+	return templateData
+}
+
+func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIndex int, asJson bool) []byte {
+	templateData := ex.buildTemplateData(obj, iteration, replicaIndex)
 
 	templateOption := util.MissingKeyError
 	if ex.DefaultMissingKeysWithZero {
@@ -136,15 +158,7 @@ func (ex *JobExecutor) renderTemplateForObject(obj *object, iteration, replicaIn
 }
 
 func (ex *JobExecutor) renderTemplateForObjectMultiple(obj *object, iteration, replicaIndex int) ([]*unstructured.Unstructured, []*schema.GroupVersionKind) {
-	// Processing template
-	templateData := map[string]any{
-		jobName:      ex.Name,
-		jobIteration: iteration,
-		jobUUID:      ex.uuid,
-		jobRunId:     ex.runid,
-		replica:      replicaIndex,
-	}
-	maps.Copy(templateData, obj.InputVars)
+	templateData := ex.buildTemplateData(obj, iteration, replicaIndex)
 
 	templateOption := util.MissingKeyError
 	if ex.DefaultMissingKeysWithZero {

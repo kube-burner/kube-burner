@@ -1,0 +1,31 @@
+---
+global:
+  gc: false
+
+jobs:
+  - name: namespaces-per-object-test
+    jobType: create
+    jobIterations: 6
+    qps: 20
+    burst: 20
+    namespacedIterations: true
+    namespace: npo-test
+    waitWhenFinished: true
+    verifyObjects: true
+    errorOnVerify: true
+    churnConfig:
+      duration: 10s
+      percent: 20
+      delay: 2s
+      mode: namespaces
+      
+    objects:
+      # ClusterRole created once per 2 namespaces (shared across npo-test-0/npo-test-1, npo-test-2/npo-test-3)
+      - objectTemplate: objectTemplates/clusterrole.yml
+        namespacesPerObject: 2
+
+      # RoleBinding in each namespace, referencing the shared ClusterRole
+      - objectTemplate: objectTemplates/rolebinding.yml
+        inputVars:
+          clusterRoleNpo: 2 # Must match ClusterRole's namespacesPerObject
+          namespace: npo-test

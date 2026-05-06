@@ -52,6 +52,50 @@ type churnDeletedObject struct {
 	gvr    schema.GroupVersionResource
 }
 
+// getMaxNamespacesPerObject returns the maximum NamespacesPerObject value across all objects
+func (ex *JobExecutor) getMaxNamespacesPerObject() int {
+	maxNpo := 1
+	for _, obj := range ex.objects {
+		if obj.NamespacesPerObject > maxNpo {
+			maxNpo = obj.NamespacesPerObject
+		}
+	}
+	return maxNpo
+}
+
+// deleteSharedObjectsForIterations deletes cluster-scoped shared objects
+// that were created for iterations in the given range
+func (ex *JobExecutor) deleteSharedObjectsForIterations(ctx context.Context, iterationStart, iterationEnd int) {
+	for _, obj := range ex.objects {
+		if obj.NamespacesPerObject <= 1 {
+			continue
+		}
+		npo := obj.NamespacesPerObject
+
+		// Find iterations where this object was created within the churn range
+		for i := iterationStart; i < iterationEnd; i++ {
+			if i%npo == 0 {
+				// Object was created at this iteration, delete it
+				labelSelector := fmt.Sprintf("%s=%s,%s=%s,%s=%d",
+					config.KubeBurnerLabelJob, ex.Name,
+					config.KubeBurnerLabelUUID, ex.uuid,
+					config.KubeBurnerLabelJobIteration, i)
+
+				log.Infof("Deleting shared object %s at iteration %d (namespacesPerObject=%d)",
+					obj.ObjectTemplate, i, npo)
+
+				err := ex.dynamicClient.Resource(obj.gvr).DeleteCollection(ctx,
+					metav1.DeleteOptions{},
+					metav1.ListOptions{LabelSelector: labelSelector})
+				if err != nil {
+					log.Errorf("Error deleting shared object %s at iteration %d: %v",
+						obj.ObjectTemplate, i, err)
+				}
+			}
+		}
+	}
+}
+
 func (ex *JobExecutor) setupCreateJob() {
 	var f io.ReadCloser
 	var err error
@@ -172,6 +216,13 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
 					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
 				}
+			} else if obj.NamespacesPerObject > 1 {
+				// Only create when iteration is a multiple of namespacesPerObject
+				if i%obj.NamespacesPerObject == 0 {
+					log.Debugf("NamespacesPerObject=%d: creating %s at iteration %d",
+						obj.NamespacesPerObject, obj.ObjectTemplate, i)
+					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
+				}
 			} else {
 				ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
 			}
@@ -258,7 +309,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 				if !obj.namespaced {
 					n = ""
 				}
-				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout, obj.NamespacesPerObject > 1)
 			}(ns)
 		}(r)
 	}
@@ -310,7 +361,7 @@ func (ex *JobExecutor) waitForCompletion(ctx context.Context, iterationStart, it
 	}
 }
 
-func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
+func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration, allowClusterScopedChurn bool) {
 	var uns *unstructured.Unstructured
 	var err error
 	if log.GetLevel() == log.TraceLevel {
@@ -329,7 +380,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ns != "" {
 			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(ctx, obj, metav1.CreateOptions{})
 		} else {
-			if !ex.nsChurning {
+			if !ex.nsChurning || allowClusterScopedChurn {
 				uns, err = ex.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
 			} else {
 				// Skip non-namespaced objects during namespace churning - they won't be deleted with the namespace
@@ -423,6 +474,35 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 	}
 	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 
+	// Get max namespacesPerObject for alignment
+	maxNpo := ex.getMaxNamespacesPerObject()
+	// Align numToChurn to namespacesPerObject boundary.
+	//
+	// When namespacesPerObject > 1, objects are spread across multiple namespaces.
+	// We must churn in multiples of this value to avoid partial deletion.
+	//
+	// Example:
+	//   - 10 namespaces: ns-0, ns-1, ns-2, ns-3, ns-4, ns-5, ns-6, ns-7, ns-8, ns-9
+	//   - namespacesPerObject: 2 means:
+	//       - egressIP-0 exists in ns-0 and ns-1
+	//       - egressIP-1 exists in ns-2 and ns-3
+	//       - etc.
+	//
+	//   If you churn 3 namespaces (ns-0, ns-1, ns-2), you'd delete:
+	//     - Complete pair for egressIP-0 (ns-0 + ns-1) ✓
+	//     - Half of egressIP-1 (only ns-2, but ns-3 survives) ✗ BROKEN!
+	//
+	//   So we round up numToChurn from 3 to 4, ensuring complete pairs are churned.
+	if maxNpo > 1 {
+		// Align numToChurn to be a multiple of maxNpo (round up)
+		numToChurn = ((numToChurn + maxNpo - 1) / maxNpo) * maxNpo
+		// Ensure we don't exceed available namespaces
+		if numToChurn > len(nsList) {
+			numToChurn = (len(nsList) / maxNpo) * maxNpo
+		}
+		log.Debugf("Aligned numToChurn to %d (maxNamespacesPerObject=%d)", numToChurn, maxNpo)
+	}
+
 	for {
 		var randStart int
 		if ex.ChurnConfig.Duration > 0 {
@@ -441,7 +521,33 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		}
 
 		// Max amount of churn is 100% of namespaces
-		if len(nsList)-numToChurn+1 > 0 {
+		// Align randStart to maxNpo boundaries for proper shared object handling.
+		//
+		// When namespacesPerObject > 1, objects span multiple consecutive namespaces
+		// in groups. We must start churning at a group boundary.
+		//
+		// Example with 10 namespaces and namespacesPerObject=2:
+		//   - egressIP-0 spans ns-0 and ns-1
+		//   - egressIP-1 spans ns-2 and ns-3
+		//   - egressIP-2 spans ns-4 and ns-5
+		//   - etc.
+		//
+		//   If numToChurn=4, valid starting positions are 0, 2, 4, 6 (group boundaries).
+		//   - randStart=0: churn ns-0,1,2,3 → deletes egressIP-0 and egressIP-1 ✓
+		//   - randStart=2: churn ns-2,3,4,5 → deletes egressIP-1 and egressIP-2 ✓
+		//   - randStart=1: churn ns-1,2,3,4 → splits egressIP-0 AND egressIP-2 ✗ BROKEN!
+		//
+		//   So we pick randomly from aligned positions only: 0, 2, 4, 6 (4 choices).
+		if maxNpo > 1 {
+			// Calculate number of valid starting positions (aligned to maxNpo)
+			maxValidStart := len(nsList) - numToChurn
+			numValidPositions := (maxValidStart / maxNpo) + 1
+			if numValidPositions > 0 {
+				randStart = rand.Intn(numValidPositions) * maxNpo
+			}
+			log.Debugf("Selected aligned randStart=%d (maxNpo=%d, numValidPositions=%d)",
+				randStart, maxNpo, numValidPositions)
+		} else if len(nsList)-numToChurn+1 > 0 {
 			randStart = rand.Intn(len(nsList) - numToChurn + 1)
 		}
 		// We need to perform a natural sort
@@ -463,6 +569,8 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		}
 		// 1 hour timeout to delete namespace
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
+		// Delete shared cluster-scoped objects that serve the churned namespaces
+		ex.deleteSharedObjectsForIterations(cleanupCtx, randStart, numToChurn+randStart)
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		if ex.ChurnConfig.DeleteDelay > 0 {
 			log.Infof("Sleeping for %v after deletion", ex.ChurnConfig.DeleteDelay)
@@ -505,6 +613,13 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 		}
 		log.Infof("Deleting objects in churn cycle %d", cyclesCount)
 		for _, obj := range ex.objects {
+			// Skip shared objects from individual churn - they're cluster-scoped
+			// and shouldn't be churned independently of their namespaces
+			if obj.NamespacesPerObject > 1 {
+				log.Debugf("Skipping %s from object churn (namespacesPerObject=%d)",
+					obj.ObjectTemplate, obj.NamespacesPerObject)
+				continue
+			}
 			// if churning is enabled for the object
 			if obj.Churn {
 				labelSelector := obj.LabelSelector
@@ -586,7 +701,7 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout)
+			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout, false)
 		}()
 	}
 	wg.Wait()

@@ -239,6 +239,7 @@ Each object element supports the following parameters:
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize [how to wait](#object-wait-options) for object to be ready     | Object  | {}       |
 | `runOnce`              | Create or delete this object only once during the entire job    | Boolean | false   |
+| `namespacesPerObject`  | Controls how many namespaces share a single instance of an object. See [namespacesPerObject](#namespacesPerObject)  | Integer | 1   |
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
@@ -265,6 +266,147 @@ The following object types have built-in waiters:
 
 !!! info
     Find more info about the waiters implementation in the `pkg/burner/waiters.go` file
+
+### namespacesPerObject
+
+Controls how many namespaces share a single instance of an object. This is useful for cluster-scoped objects that should be shared across multiple namespaces.
+
+  **Default:** `1` (one object per namespace iteration)
+
+#### Use Cases
+
+This feature is helpful for:
+  
+ - **PersistentVolume/PersistentVolumeClaim**: One PV shared by PVCs across multiple namespaces
+ - **EgressIP**: One EgressIP shared by pods across multiple namespaces
+ - **ClusterUserDefinedNetwork**: One network definition used by workloads in multiple namespaces
+ - **MultiNetworkPolicy**: Network policies that span namespace groups
+ - **ClusterRole/RoleBinding**: One ClusterRole referenced by RoleBindings in multiple namespaces
+
+#### Example: Shared PersistentVolume
+
+  One PV shared across multiple namespaces, each with its own PVC:
+
+  ```yaml
+  jobs:
+    - name: pv-sharing-test
+      jobIterations: 4
+      namespacedIterations: true
+      namespace: pv-test
+      objects:
+        # One PV per 2 namespaces
+        - objectTemplate: persistentvolume.yml
+          namespacesPerObject: 2
+
+        # Each namespace gets its own PVC referencing the shared PV
+        - objectTemplate: persistentvolumeclaim.yml
+          inputVars:
+            pvNamespacesPerObject: 2
+            namespace: pv-test
+```
+
+#### Example: Shared EgressIP
+  
+  When testing EgressIP at scale, you often want one EgressIP shared across multiple namespaces rather than one per namespace:
+  
+  ```yaml
+  jobs:
+    - name: egressip-scale-test
+      jobIterations: 100
+      namespacedIterations: true
+      namespace: egressip-test
+      objects:
+        # One EgressIP per 10 namespaces
+        # Creates 10 EgressIPs for 100 namespaces
+        - objectTemplate: egressip.yml 
+          namespacesPerObject: 10
+          
+        # Pods in each namespace use the shared EgressIP
+        - objectTemplate: pod.yml
+          replicas: 5
+```
+
+#### Example: Shared ClusterRole
+
+When creating namespaced resources like RoleBindings that reference a cluster-scoped object (like RoleBindings referencing a ClusterRole), you want one ClusterRole shared across multiple namespaces:
+
+  ```yaml
+  jobs:
+    - name: rbac-test
+      jobIterations: 10
+      namespacedIterations: true
+      namespace: test-ns
+      objects:
+        # One ClusterRole per 2 namespaces
+        # Creates 5 ClusterRoles: for ns-0/1, ns-2/3, ns-4/5, ns-6/7, ns-8/9
+        - objectTemplate: clusterrole.yml
+          namespacesPerObject: 2
+
+        # One RoleBinding per namespace (references the shared ClusterRole)
+        - objectTemplate: rolebinding.yml
+```
+
+#### How it works
+With namespacesPerObject: 2 and jobIterations: 10:
+
+| Iteration | Namespace | ClusterRole Created | RoleBinding Created |
+|--------------|---------------------------------------------------------|---------|---------|
+| 0 | test-ns-0 | clusterrole-0 ✓ | binding-0 (refs clusterrole-0) |
+| 1 | test-ns-1 | (shares clusterrole-0) | binding-1 (refs clusterrole-0) |
+| 2 | test-ns-2 | clusterrole-1 ✓ | binding-2 (refs clusterrole-1) |
+| 3 | test-ns-3 | (shares clusterrole-1)  | binding-3 (refs clusterrole-1) |
+| ... | ... | ...  | ... |
+
+#### Template variables
+
+```yaml
+  # namespaces-per-object-test.yml
+  jobs:
+    - name: namespaces-per-object-test
+      namespace: test-ns
+      objects:
+        # ClusterRole created once per 2 namespaces (shared across test-ns-0/test-ns-1, test-ns-2/test-ns-3)
+        - objectTemplate: objectTemplates/clusterrole.yml
+          namespacesPerObject: 2
+        # RoleBinding in each namespace, referencing the shared ClusterRole
+        - objectTemplate: objectTemplates/rolebinding.yml
+          inputVars:
+            clusterRoleNpo: 2 # Must match ClusterRole's namespacesPerObject
+            namespace: test-ns
+
+  # rolebinding.yml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: binding-{{.Iteration}}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    # Calculate: Iteration / clusterRoleNpo
+    # e.g., iteration 1 with clusterRoleNpo=2 → 1/2 = 0 → clusterrole-0
+    name: clusterrole-{{ div .Iteration .clusterRoleNpo }} # Same for test-ns-0 and test-ns-1
+  subjects:
+    - kind: ServiceAccount
+      name: default
+      namespace: {{.namespace}}-{{.Iteration}}
+
+  # clusterrole.yml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: clusterrole-{{.Iteration}}
+  rules:
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get"]
+```
+
+#### Validation
+
+All objects in a job must have consistent namespacesPerObject values:
+  - All objects can have namespacesPerObject: 1 (default)
+  - Or all non-default values must be the same (e.g., all 2)
+  - Mixing namespacesPerObject: 2 and namespacesPerObject: 3 is not allowed
 
 ### Object wait Options
 

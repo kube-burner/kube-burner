@@ -94,9 +94,10 @@ func (c *ChurnConfig) UnmarshalYAML(unmarshal func(any) error) error {
 func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
-		Wait:     true,
-		Churn:    true,
-		Replicas: 1,
+		Wait:                true,
+		Churn:               true,
+		Replicas:            1,
+		NamespacesPerObject: 1,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err
@@ -298,6 +299,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
+	if err := validateNamespacesPerObject(); err != nil {
+		return configSpec, err
+	}
 	if err := HookBeforeWorkload(); err != nil {
 		return configSpec, err
 	}
@@ -462,6 +466,30 @@ func validateGC() error {
 	for _, job := range configSpec.Jobs {
 		if job.GC {
 			return fmt.Errorf("jobs GC and global waitWhenFinished cannot be enabled at the same time")
+		}
+	}
+	return nil
+}
+
+// validateNamespacesPerObject checks that all objects in a job have consistent namespacesPerObject values
+// All objects must have either namespacesPerObject=1 or the same non-1 value
+// VALID - all use default (1)
+// VALID - mix of 1 and 2
+// INVALID - mix of 2 and 3. You will get "Error: job my-job: inconsistent namespacesPerObject values. Found both 2 and 3..."
+func validateNamespacesPerObject() error {
+	for _, job := range configSpec.Jobs {
+		var nonDefaultValue int
+		for _, obj := range job.Objects {
+			if obj.NamespacesPerObject > 1 {
+				if nonDefaultValue == 0 {
+					// First non-1 value we've seen
+					nonDefaultValue = obj.NamespacesPerObject
+				} else if obj.NamespacesPerObject != nonDefaultValue {
+					// Different non-1 value found
+					return fmt.Errorf("job %s: inconsistent namespacesPerObject values. Found both %d and %d. All objects must have namespacesPerObject=1 or the same no",
+						job.Name, nonDefaultValue, obj.NamespacesPerObject)
+				}
+			}
 		}
 	}
 	return nil

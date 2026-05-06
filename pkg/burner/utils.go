@@ -193,12 +193,33 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 			continue
 		}
 		var objectsExpected int
+		// Calculate effective iterations accounting for namespacesPerObject.
+		// When namespacesPerObject > 1, objects are created only every Nth iteration.
+		//
+		// Example with namespacesPerObject=2 and jobIterations=10:
+		//   - egressIP created at iterations: 0, 2, 4, 6, 8 (5 times total)
+		//   - effectiveIterations = ceil(10 / 2) = 5
+		//   - objectsExpected = replicas * 5
+		//
+		// Formula: ceil(iterations / npo) = (iterations + npo - 1) / npo
+		npo := obj.NamespacesPerObject
+		if npo < 1 {
+			npo = 1
+		}
+
+		iterations := ex.JobIterations
+		if expectedIterations != nil {
+			iterations = *expectedIterations
+		}
+
 		if obj.RunOnce {
 			objectsExpected = obj.Replicas
-		} else if expectedIterations != nil {
-			objectsExpected = obj.Replicas * (*expectedIterations)
 		} else {
-			objectsExpected = obj.Replicas * ex.JobIterations
+			effectiveIterations := iterations
+			if npo > 1 {
+				effectiveIterations = (iterations + npo - 1) / npo
+			}
+			objectsExpected = obj.Replicas * effectiveIterations
 		}
 		if replicas != objectsExpected {
 			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)
