@@ -30,6 +30,18 @@ global:
     - name: nodeLatency
 
 jobs:
+  # Job 0: Create ServiceMonitor for KEDA metrics to prometheus
+  - name: create-servicemonitor
+    jobType: create
+    jobIterations: 1
+    qps: 5
+    burst: 10
+    namespacedIterations: false
+    namespace: keda
+    waitWhenFinished: true
+    objects:
+      - objectTemplate: examples/workloads/keda-rabbitmq/templates/keda-servicemonitors.yml
+        replicas: 1
   # Job 1: Create queues and services
   - name: create-queue
     jobType: create
@@ -64,7 +76,7 @@ jobs:
     measurements:
       - name: pprof
         pprofInterval: 30m
-        pprofDirectory: /tmp/pprof-keda/rabbit-mq-5-ramp-up
+        pprofDirectory: /tmp/pprof-keda/rabbit-mq-6-ramp-up
         pprofTargets:
           - name: keda-operator
             url: http://10.43.144.36:8082/debug/pprof/profile?seconds=1800
@@ -99,7 +111,7 @@ jobs:
           maxReplicaCount: 30
           cooldownPeriod: 30
           pollingInterval: 15
-          queueLength: '"50"' # To ignore parsing as int in yaml and pass as string
+          queueLength: '"50"' # To ignore parsing as int in yaml, pass as string
 
   # Job 4: Delete ScaledObjects and collect final metrics
   - name: rabbitmq-delete
