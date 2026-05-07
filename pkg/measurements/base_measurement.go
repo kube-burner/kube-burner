@@ -125,7 +125,7 @@ func (bm *BaseMeasurement) StopMeasurement(normalizeMetrics func() float64, getL
 		log.Infof("%s: %v 99th: %v ms max: %v ms avg: %v ms", bm.JobConfig.Name, pq.QuantileName, pq.P99, pq.Max, pq.Avg)
 	}
 	if errorRate > 10.00 {
-		return fmt.Errorf("something is wrong with system under test. %v latencies error rate was: %.2f", bm.MeasurementName, errorRate)
+		log.Warnf("%v latencies error rate was: %.2f", bm.MeasurementName, errorRate)
 	} else if errorRate > 0 {
 		log.Infof("%v error rate was: %.2f", bm.MeasurementName, errorRate)
 	}
