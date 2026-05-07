@@ -472,6 +472,17 @@ func IsChurnEnabled(job Job) bool {
 	return job.ChurnConfig.Duration > 0 || job.ChurnConfig.Cycles > 0
 }
 
+// IsGroupedEnabled checks if grouped execution is enabled for the job.
+// Grouped execution is enabled when any object has Group > 0.
+func IsGroupedEnabled(job Job) bool {
+	for _, obj := range job.Objects {
+		if obj.Group.ID > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // setNestedValue sets a value in a nested map based on dot notation keys
 func setNestedValue(m map[string]any, key string, value any) {
 	keys := strings.Split(key, ".")

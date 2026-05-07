@@ -52,6 +52,95 @@ type churnDeletedObject struct {
 	gvr    schema.GroupVersionResource
 }
 
+type objectGroupEntry struct {
+	number  int
+	objects []*object
+}
+
+// groupObjectsByNumber returns a map that groups objects by their group number
+func (ex *JobExecutor) groupObjectsByNumber() []objectGroupEntry {
+	groupMap := make(map[int][]*object)
+	for _, obj := range ex.objects {
+		n := obj.Group.ID
+		groupMap[n] = append(groupMap[n], obj)
+	}
+	groups := make([]objectGroupEntry, 0, len(groupMap))
+	for num, objs := range groupMap {
+		groups = append(groups, objectGroupEntry{number: num, objects: objs})
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].number < groups[j].number
+	})
+	return groups
+}
+
+// getGroupLifecyclePauses returns the max pauseBeforeGC and pauseAfterGC across
+// all objects in the group, and whether any object has gc enabled
+func (ex *JobExecutor) getGroupLifecyclePauses(grp objectGroupEntry) (pauseBefore, pauseAfter time.Duration, hasGC bool) {
+	for _, obj := range grp.objects {
+		if obj.Group.GC {
+			hasGC = true
+		}
+		if obj.Group.PauseBeforeGC > pauseBefore {
+			pauseBefore = obj.Group.PauseBeforeGC
+		}
+		if obj.Group.PauseAfterGC > pauseAfter {
+			pauseAfter = obj.Group.PauseAfterGC
+		}
+	}
+	return
+}
+
+// gcGroupObjects deletes objects in the group that have group.gc=true
+func (ex *JobExecutor) gcGroupObjects(ctx context.Context, grp objectGroupEntry) {
+	selectorLabels := labels.Set{
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelGroup: strconv.Itoa(grp.number),
+		config.KubeBurnerLabelUUID:  ex.uuid,
+	}
+	if ex.runid != "" {
+		selectorLabels[config.KubeBurnerLabelRunID] = ex.runid
+	}
+	labelSelector := selectorLabels.String()
+	for _, obj := range grp.objects {
+		if !obj.Group.GC {
+			continue
+		}
+		if obj.namespaced {
+			for ns, created := range ex.createdNamespaces {
+				if !created {
+					continue
+				}
+				CleanupNamespaceResourcesByLabel(ctx, *ex, obj, ns, labelSelector)
+			}
+			// Also clean up objects with a fixed namespace
+			if obj.namespace != "" {
+				CleanupNamespaceResourcesByLabel(ctx, *ex, obj, obj.namespace, labelSelector)
+			}
+		} else {
+			CleanupNonNamespacedResourcesByLabel(ctx, *ex, obj, labelSelector)
+		}
+	}
+	// Wait for deletion to complete
+	if ex.WaitForDeletion {
+		for _, obj := range grp.objects {
+			if !obj.Group.GC {
+				continue
+			}
+			if obj.namespaced {
+				for ns, created := range ex.createdNamespaces {
+					if !created {
+						continue
+					}
+					if err := waitForDeleteResourceInNamespace(ctx, *ex, obj, ns, labelSelector); err != nil {
+						log.Errorf("Error waiting for %s deletion in %s: %v", obj.Kind, ns, err)
+					}
+				}
+			}
+		}
+	}
+}
+
 func (ex *JobExecutor) setupCreateJob() {
 	var f io.ReadCloser
 	var err error
@@ -110,6 +199,13 @@ func (ex *JobExecutor) setupCreateJob() {
 
 // RunCreateJob executes a creation job
 func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterationEnd int) []error {
+	if config.IsGroupedEnabled(ex.Job) {
+		return ex.runCreateJobGrouped(ctx, iterationStart, iterationEnd)
+	}
+	return ex.runCreateJobDefault(ctx, iterationStart, iterationEnd)
+}
+
+func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, iterationEnd int) []error {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
 		config.KubeBurnerLabelJob:   ex.Name,
@@ -201,6 +297,129 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 	return waitErrors
 }
 
+// runCreateJobGrouped executes a creation job with grouped object ordering.
+// Objects are grouped by group number and all iterations of group N complete
+// before group N+1 begins. Namespaces are created upfront, then each group
+// iterates iteration-first so that namespace assignment matches the iteration.
+func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, iterationEnd int) []error {
+	nsAnnotations := make(map[string]string)
+	nsLabels := map[string]string{
+		config.KubeBurnerLabelJob:   ex.Name,
+		config.KubeBurnerLabelUUID:  ex.uuid,
+		config.KubeBurnerLabelRunID: ex.runid,
+	}
+	var wg sync.WaitGroup
+	var waitErrors []error
+	var hookErrors []error
+	maps.Copy(nsLabels, ex.NamespaceLabels)
+	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
+
+	// Phase 1: Create all namespaces upfront
+	if ex.nsRequired {
+		if ex.NamespacedIterations {
+			for i := iterationStart; i < iterationEnd; i++ {
+				ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
+			}
+		} else {
+			ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
+		}
+	}
+
+	groups := ex.groupObjectsByNumber()
+
+	// Phase 2: Execute each group in order
+	for _, grp := range groups {
+		if ctx.Err() != nil {
+			return []error{ctx.Err()}
+		}
+
+		log.Infof("Starting group %d with %d object template(s)", grp.number, len(grp.objects))
+		groupCreatedNamespaces := make(map[string]bool)
+
+		// Create all objects for all iterations in this group (iteration-first)
+		for i := iterationStart; i < iterationEnd; i++ {
+			if ex.executeHooksForJobStage(config.HookOnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
+				log.Errorf("%v", hookErrors)
+			}
+			if ctx.Err() != nil {
+				return []error{ctx.Err()}
+			}
+
+			var ns string
+			if ex.nsRequired {
+				if ex.NamespacedIterations {
+					ns = ex.generateNamespace(i)
+				} else {
+					ns = ex.Namespace
+				}
+				groupCreatedNamespaces[ns] = true
+			}
+
+			log.Debugf("Group %d: Creating object replicas from iteration %d", grp.number, i)
+			for objectIndex, obj := range grp.objects {
+				if obj.gvr == (schema.GroupVersionResource{}) {
+					ex.resolveObjectMapping(obj)
+				}
+				kbLabels := map[string]string{
+					config.KubeBurnerLabelUUID:         ex.uuid,
+					config.KubeBurnerLabelJob:          ex.Name,
+					config.KubeBurnerLabelIndex:        strconv.Itoa(objectIndex),
+					config.KubeBurnerLabelRunID:        ex.runid,
+					config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
+				}
+				obj.LabelSelector = kbLabels
+				if obj.RunOnce {
+					if i == 0 {
+						log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
+						ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
+					}
+				} else {
+					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
+				}
+			}
+
+			if ex.JobIterationDelay > 0 {
+				log.Infof("Sleeping for %v", ex.JobIterationDelay)
+				time.Sleep(ex.JobIterationDelay)
+			}
+		}
+
+		// Wait for all replicas in this group to be created
+		wg.Wait()
+
+		// Wait for object readiness if configured
+		if ex.PodWait || ex.WaitWhenFinished {
+			log.Infof("Group %d: Waiting for objects to be ready", grp.number)
+			for ns := range groupCreatedNamespaces {
+				if errs := ex.waitForObjects(ctx, ns, grp.number); errs != nil {
+					waitErrors = append(waitErrors, errs...)
+				}
+			}
+		}
+
+		// Handle group lifecycle (GC and pauses)
+		pauseBeforeGC, pauseAfterGC, hasGC := ex.getGroupLifecyclePauses(grp)
+
+		if pauseBeforeGC > 0 {
+			log.Infof("Group %d: pausing for %v before GC", grp.number, pauseBeforeGC)
+			time.Sleep(pauseBeforeGC)
+		}
+
+		if hasGC {
+			log.Infof("Group %d: garbage collecting objects", grp.number)
+			ex.gcGroupObjects(ctx, grp)
+			if pauseAfterGC > 0 {
+				log.Infof("Group %d: pausing for %v after GC", grp.number, pauseAfterGC)
+				time.Sleep(pauseAfterGC)
+			}
+		}
+
+		log.Infof("Group %d completed", grp.number)
+	}
+
+	return waitErrors
+}
+
 // Simple integer division on the iteration allows us to batch iterations into
 // namespaces. Division means namespaces are populated to their desired number
 // of iterations before the next namespace is created.
@@ -220,6 +439,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 		copiedLabels := make(map[string]string)
 		maps.Copy(copiedLabels, labels)
 		copiedLabels[config.KubeBurnerLabelReplica] = strconv.Itoa(r)
+		copiedLabels[config.KubeBurnerLabelGroup] = strconv.Itoa(obj.Group.ID)
 
 		if err := ex.limiter.Wait(ctx); err != nil {
 			return

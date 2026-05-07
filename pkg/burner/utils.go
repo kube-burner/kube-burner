@@ -160,6 +160,10 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 	success := true
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
+		if obj.Group.GC {
+			log.Debugf("Skipping verification for %s (gc enabled, objects already deleted)", obj.gvr.Resource)
+			continue
+		}
 		selector := labels.Set{
 			config.KubeBurnerLabelUUID:  ex.uuid,
 			config.KubeBurnerLabelRunID: ex.runid,

@@ -239,6 +239,7 @@ Each object element supports the following parameters:
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize [how to wait](#object-wait-options) for object to be ready     | Object  | {}       |
 | `runOnce`              | Create or delete this object only once during the entire job    | Boolean | false   |
+| `group`                | [Grouped execution](#grouped-execution) configuration. Contains `id` (group number, must be > 0 to activate), `gc`, `pauseBeforeGC`, and `pauseAfterGC`. | Object | {} |
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
@@ -318,7 +319,7 @@ This allows kube-burner to check the status at all the specified key/value pairs
 
 ### Default labels
 
-All objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>`. They are used for internal purposes, but they can also be used by the users.
+All objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>,kube-burner.io/group=<groupNumber>`. They are used for internal purposes, but they can also be used by the users.
 
 ### Multi-Document YAML Templates
 
@@ -852,6 +853,48 @@ jobs:
 
   - objectTemplate: service.yml
     replicas: 10
+```
+
+## Grouped Execution
+
+Only supported in create jobs. Assigns objects to numbered groups so that all iterations of group N complete before group N+1 begins. Enabled automatically when any object in the job has `group.id` greater than `0`.
+
+Each object supports the following fields within the `group` block:
+
+| Option          | Description                                                                 | Type     | Default |
+|-----------------|-----------------------------------------------------------------------------|----------|---------|
+| `id`            | Group number used to order execution. Must be > 0 to enable grouped mode    | Integer  | 0       |
+| `gc`            | Delete this object after its group completes                                | Boolean  | false   |
+| `pauseBeforeGC` | Duration to wait before garbage collection begins                           | Duration | 0s      |
+| `pauseAfterGC`  | Duration to wait after garbage collection completes                         | Duration | 0s      |
+
+!!! note
+    When multiple objects in a group specify `pauseBeforeGC` or `pauseAfterGC`, the maximum value is used. `pauseBeforeGC` applies even without `gc: true` (acting as an inter-group delay), while `pauseAfterGC` only applies when at least one object has `gc: true`. Objects with `gc: true` are skipped during object verification.
+
+### Example
+
+```yaml
+jobs:
+- name: grouped-workload
+  jobIterations: 10
+  namespacedIterations: true
+  namespace: grouped-test
+  objects:
+    # Group 1: create ConfigMaps, wait 30s, then garbage collect them
+  - objectTemplate: configmap.yml
+    replicas: 5
+    group:
+      id: 1
+      gc: true
+      pauseBeforeGC: 30s
+      pauseAfterGC: 10s
+
+    # Group 2: runs after group 1 completes (including GC)
+  - objectTemplate: deployment.yml
+    replicas: 3
+    group:
+      id: 2
+    wait: true
 ```
 
 ## Injected variables

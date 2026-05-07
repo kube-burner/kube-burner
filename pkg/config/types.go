@@ -117,6 +117,18 @@ type GlobalConfig struct {
 	DeletionStrategy string `yaml:"deletionStrategy" json:"deletionStrategy,omitempty"`
 }
 
+// ObjectGroup controls grouping and per-object lifecycle behavior within grouped execution
+type ObjectGroup struct {
+	// ID is the group number used to order execution
+	ID int `yaml:"id" json:"id,omitempty"`
+	// GC determines whether to garbage collect (delete) this object after the group completes
+	GC bool `yaml:"gc" json:"gc,omitempty"`
+	// PauseBeforeGC is the duration to wait after the object is ready, before garbage collection
+	PauseBeforeGC time.Duration `yaml:"pauseBeforeGC" json:"pauseBeforeGC,omitempty"`
+	// PauseAfterGC is the duration to wait after garbage collection completes
+	PauseAfterGC time.Duration `yaml:"pauseAfterGC" json:"pauseAfterGC,omitempty"`
+}
+
 // Object defines an object that kube-burner will create
 type Object struct {
 	// ObjectTemplate path to a valid YAML definition of a k8s resource
@@ -144,6 +156,8 @@ type Object struct {
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
 	// Churn object
 	Churn bool `yaml:"churn" json:"churn,omitempty"`
+	// Group controls grouping and per-object lifecycle behavior within grouped execution
+	Group ObjectGroup `yaml:"group" json:"group,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -347,6 +361,7 @@ const (
 	KubeBurnerLabelJobIteration             = "kube-burner.io/job-iteration"
 	KubeBurnerLabelReplica                  = "kube-burner.io/replica"
 	KubeBurnerLabelChurnDelete              = "kube-burner.io/churn-delete"
+	KubeBurnerLabelGroup                    = "kube-burner.io/group"
 	KubeBurnerLabelServiceLatency           = "kube-burner.io/service-latency"
 	KubeBurnerLabelSkipNetworkPolicyLatency = "kube-burner.io/skip-networkpolicy-latency"
 )
