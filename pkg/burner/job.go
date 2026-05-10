@@ -132,7 +132,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsJobName = jobExecutor.Name
 				// For incremental jobs we create runtime measurements per-step inside the incremental runner
 				if jobExecutor.IncrementalLoad == nil {
-					measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg, fmt.Sprintf("%s=%s", config.KubeBurnerLabelRunID, globalConfig.RUNID))
+					labelSelector := fmt.Sprintf("%s=%s", config.KubeBurnerLabelRunID, globalConfig.RUNID)
+					if !jobExecutor.MetricsAggregate && jobExecutor.JobType == config.CreationJob {
+						labelSelector = fmt.Sprintf("%s,%s=%s", labelSelector, config.KubeBurnerLabelJob, jobExecutor.Name)
+					}
+					measurementsInstance = measurementsFactory.NewMeasurements(&jobExecutor.Job, kubeClientProvider, embedCfg, labelSelector)
 					measurementsInstance.Start()
 				}
 			}
@@ -371,7 +375,7 @@ func runCreateOrIncremental(ctx context.Context, jobExecutor JobExecutor, measur
 		calculator := NewIterationCalculator(jobExecutor)
 		return jobExecutor.RunIncrementalCreateJob(ctx, calculator, measurementsFactory, kubeClientProvider, embedCfg, measurementsJobName, metricsScraper, configSpec)
 	}
-	return jobExecutor.RunCreateJob(ctx, 0, jobExecutor.JobIterations), nil
+	return jobExecutor.RunCreateJob(ctx, jobExecutor.IterationStart, jobExecutor.IterationStart+jobExecutor.JobIterations), nil
 }
 
 // If requests, preload the images used in the test into the node

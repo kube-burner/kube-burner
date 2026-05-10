@@ -150,6 +150,8 @@ type Object struct {
 type Job struct {
 	// IterationCount how many times to execute the job
 	JobIterations int `yaml:"jobIterations" json:"jobIterations,omitempty"`
+	// IterationStart offsets iteration numbering so namespaces and templates start from this value instead of 0
+	IterationStart int `yaml:"iterationStart" json:"iterationStart,omitempty"`
 	// IterationDelay how much time to wait between each job iteration
 	JobIterationDelay time.Duration `yaml:"jobIterationDelay" json:"jobIterationDelay,omitempty"`
 	// JobPause how much time to pause after finishing the job
