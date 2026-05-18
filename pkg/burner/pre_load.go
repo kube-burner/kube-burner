@@ -153,7 +153,7 @@ func countPulledImages(ctx context.Context, clientSet kubernetes.Interface, seen
 				continue
 			}
 			pullCount++
-			if status.Image != "" {
+			if isImagePulled(status) {
 				seen[podName+"/"+status.Name] = struct{}{}
 				pulledCount++
 			}
@@ -163,6 +163,21 @@ func countPulledImages(ctx context.Context, clientSet kubernetes.Interface, seen
 		}
 	}
 	return nil
+}
+
+func isImagePulled(status corev1.ContainerStatus) bool {
+	if status.State.Running != nil || status.State.Terminated != nil || status.RestartCount > 0 {
+		return true
+	}
+	if status.State.Waiting != nil {
+		switch status.State.Waiting.Reason {
+		case "", "ContainerCreating", "ErrImagePull", "ImagePullBackOff":
+			return false
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 func isOwnedByDaemonSet(ownerReferences []metav1.OwnerReference, daemonSetName string) bool {
