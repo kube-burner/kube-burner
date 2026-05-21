@@ -69,7 +69,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 			} else {
 				indexerAlias = metricsEndpoint.Alias
 			}
-			if metricsEndpoint.Type == indexers.LocalIndexer {
+			if metricsEndpoint.Type == indexers.LocalIndexer || metricsEndpoint.Type == indexers.TSDBIndexer {
 				if metricsEndpoint.MetricsDirectory == "collected-metrics-{{.UUID}}" {
 					if metricsDirectoryFlag != "" && metricsDirectoryFlag != "collected-metrics-{{.UUID}}" {
 						metricsEndpoint.MetricsDirectory = metricsDirectoryFlag
