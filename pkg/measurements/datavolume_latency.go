@@ -301,7 +301,6 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = dv.IsChurnMetric(m.Timestamp)
 		dataVolumeCount++
 		erroredDataVolumes += errorFlag
-		// dv.NormLatencies = append(dv.NormLatencies, m)
 		makeDoc := GenericLatencyDocFactory[int, *dvLatencyLabels](&m.DVLatencyLabels, m.LatencyDocument)
 
 		dv.NormLatencies = append(dv.NormLatencies,

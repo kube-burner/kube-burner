@@ -248,7 +248,6 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 		m.ChurnMetric = vsl.IsChurnMetric(m.Timestamp)
 		volumeSnapshotCount++
 		erroredVolumeSnapshots += errorFlag
-		// vsl.NormLatencies = append(vsl.NormLatencies, m)
 		makeDoc := GenericLatencyDocFactory[int, *volumeSnapshotLabels](&m.VolumeSnapshotLabels, m.LatencyDocument)
 		vsl.NormLatencies = append(vsl.NormLatencies,
 			makeDoc("Ready", m.VSReadyLatency),

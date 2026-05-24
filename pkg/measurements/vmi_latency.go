@@ -256,7 +256,7 @@ func (vmi *vmiLatency) handleCreateVMIPod(obj any) {
 		vmiMetric := v.(vmiMetric)
 		if vmiMetric.VMILatencyLabels.VMIName == vmiName {
 			vmiMetric.VMILatencyLabels.PodName = pod.Name
-			vmiMetric.podCreated = time.Now().UTC()
+			vmiMetric.podCreated = pod.CreationTimestamp.UTC()
 			vmi.Metrics.Store(k, vmiMetric)
 		}
 		return true

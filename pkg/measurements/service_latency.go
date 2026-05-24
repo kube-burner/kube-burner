@@ -277,8 +277,6 @@ func (s *serviceLatency) normalizeMetrics() {
 		metric := value.(svcMetric)
 		metric.ChurnMetric = s.IsChurnMetric(metric.Timestamp)
 		latencies = append(latencies, float64(metric.ReadyLatency))
-		// s.NormLatencies = append(s.NormLatencies, metric)
-
 		makeDoc := GenericLatencyDocFactory[float64, *svcLatencyLabels](&metric.SvcLatencyLabels, metric.LatencyDocument)
 
 		s.NormLatencies = append(s.NormLatencies,
