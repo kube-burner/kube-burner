@@ -239,7 +239,7 @@ Each object element supports the following parameters:
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize [how to wait](#object-wait-options) for object to be ready     | Object  | {}       |
 | `runOnce`              | Create or delete this object only once during the entire job    | Boolean | false   |
-| `namespacesPerObject`  | Controls how many namespaces share a single instance of an object. See [namespacesPerObject](#namespacesPerObject)  | Integer | 1   |
+| `SharingNamespacesCount`  | Controls how many namespaces share a single instance of an object. See [SharingNamespacesCount](#SharingNamespacesCount)  | Integer | 1   |
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
@@ -267,7 +267,7 @@ The following object types have built-in waiters:
 !!! info
     Find more info about the waiters implementation in the `pkg/burner/waiters.go` file
 
-### namespacesPerObject
+### SharingNamespacesCount
 
 Controls how many namespaces share a single instance of an object. This is useful for cluster-scoped objects that should be shared across multiple namespaces.
 
@@ -296,12 +296,12 @@ This feature is helpful for:
       objects:
         # One PV per 2 namespaces
         - objectTemplate: persistentvolume.yml
-          namespacesPerObject: 2
+          SharingNamespacesCount: 2
 
         # Each namespace gets its own PVC referencing the shared PV
         - objectTemplate: persistentvolumeclaim.yml
           inputVars:
-            pvNamespacesPerObject: 2
+            pvSharingNamespacesCount: 2
             namespace: pv-test
 ```
 
@@ -319,7 +319,7 @@ This feature is helpful for:
         # One EgressIP per 10 namespaces
         # Creates 10 EgressIPs for 100 namespaces
         - objectTemplate: egressip.yml 
-          namespacesPerObject: 10
+          SharingNamespacesCount: 10
           
         # Pods in each namespace use the shared EgressIP
         - objectTemplate: pod.yml
@@ -340,14 +340,14 @@ When creating namespaced resources like RoleBindings that reference a cluster-sc
         # One ClusterRole per 2 namespaces
         # Creates 5 ClusterRoles: for ns-0/1, ns-2/3, ns-4/5, ns-6/7, ns-8/9
         - objectTemplate: clusterrole.yml
-          namespacesPerObject: 2
+          SharingNamespacesCount: 2
 
         # One RoleBinding per namespace (references the shared ClusterRole)
         - objectTemplate: rolebinding.yml
 ```
 
 #### How it works
-With namespacesPerObject: 2 and jobIterations: 10:
+With SharingNamespacesCount: 2 and jobIterations: 10:
 
 | Iteration | Namespace | ClusterRole Created | RoleBinding Created |
 |--------------|---------------------------------------------------------|---------|---------|
@@ -367,11 +367,11 @@ With namespacesPerObject: 2 and jobIterations: 10:
       objects:
         # ClusterRole created once per 2 namespaces (shared across test-ns-0/test-ns-1, test-ns-2/test-ns-3)
         - objectTemplate: objectTemplates/clusterrole.yml
-          namespacesPerObject: 2
+          SharingNamespacesCount: 2
         # RoleBinding in each namespace, referencing the shared ClusterRole
         - objectTemplate: objectTemplates/rolebinding.yml
           inputVars:
-            clusterRoleNpo: 2 # Must match ClusterRole's namespacesPerObject
+            clusterRoleSnc: 2 # Must match ClusterRole's SharingNamespacesCount
             namespace: test-ns
 
   # rolebinding.yml
@@ -382,9 +382,9 @@ With namespacesPerObject: 2 and jobIterations: 10:
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
-    # Calculate: Iteration / clusterRoleNpo
-    # e.g., iteration 1 with clusterRoleNpo=2 → 1/2 = 0 → clusterrole-0
-    name: clusterrole-{{ div .Iteration .clusterRoleNpo }} # Same for test-ns-0 and test-ns-1
+    # Calculate: Iteration / clusterRoleSnc
+    # e.g., iteration 1 with clusterRoleSnc=2 → 1/2 = 0 → clusterrole-0
+    name: clusterrole-{{ div .Iteration .clusterRoleSnc }} # Same for test-ns-0 and test-ns-1
   subjects:
     - kind: ServiceAccount
       name: default
@@ -403,10 +403,10 @@ With namespacesPerObject: 2 and jobIterations: 10:
 
 #### Validation
 
-All objects in a job must have consistent namespacesPerObject values:
-  - All objects can have namespacesPerObject: 1 (default)
+All objects in a job must have consistent SharingNamespacesCount values:
+  - All objects can have SharingNamespacesCount: 1 (default)
   - Or all non-default values must be the same (e.g., all 2)
-  - Mixing namespacesPerObject: 2 and namespacesPerObject: 3 is not allowed
+  - Mixing SharingNamespacesCount: 2 and SharingNamespacesCount: 3 is not allowed
 
 ### Object wait Options
 

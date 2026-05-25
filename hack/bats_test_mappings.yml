@@ -27,7 +27,7 @@
 - label: subsystem:preload
   paths:
   - pkg/burner/pre_load.go
-- label: subsystem:namespaces-per-object
+- label: subsystem:sharing-namespaces-count
   paths:
   - pkg/burner/create.go
   - pkg/burner/executor.go

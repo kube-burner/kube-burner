@@ -102,31 +102,31 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	return ex
 }
 
-// buildTemplateData creates the template data map with adjusted iteration for namespacesPerObject.
+// buildTemplateData creates the template data map with adjusted iteration for sharingNamespacesCount.
 //
-// When namespacesPerObject > 1, objects span multiple namespaces. The adjustedIteration
+// When sharingNamespacesCount > 1, objects span multiple namespaces. The adjustedIteration
 // ensures templates see the same iteration number across a namespace group.
 //
-// Example with namespacesPerObject=2:
+// Example with sharingNamespacesCount=2:
 //   - iteration 0, 1 → adjustedIteration = 0 (both in first namespace group)
 //   - iteration 2, 3 → adjustedIteration = 1 (both in second namespace group)
 func (ex *JobExecutor) buildTemplateData(obj *object, iteration, replicaIndex int) map[string]any {
-	npo := obj.NamespacesPerObject
-	if npo < 1 {
-		npo = 1
+	snc := obj.SharingNamespacesCount
+	if snc < 1 {
+		snc = 1
 	}
 	adjustedIteration := iteration
-	if npo > 1 {
-		adjustedIteration = iteration / npo
+	if snc > 1 {
+		adjustedIteration = iteration / snc
 	}
 
 	templateData := map[string]any{
-		jobName:             ex.Name,
-		jobIteration:        adjustedIteration,
-		jobUUID:             ex.uuid,
-		jobRunId:            ex.runid,
-		replica:             replicaIndex,
-		namespacesPerObject: npo,
+		jobName:                ex.Name,
+		jobIteration:           adjustedIteration,
+		jobUUID:                ex.uuid,
+		jobRunId:               ex.runid,
+		replica:                replicaIndex,
+		sharingNamespacesCount: snc,
 	}
 	maps.Copy(templateData, obj.InputVars)
 	return templateData

@@ -52,37 +52,37 @@ type churnDeletedObject struct {
 	gvr    schema.GroupVersionResource
 }
 
-// getMaxNamespacesPerObject returns the maximum NamespacesPerObject value across all objects
-func (ex *JobExecutor) getMaxNamespacesPerObject() int {
-	maxNpo := 1
+// getMaxSharingNamespacesCountAcrossAllObjects returns the maximum SharingNamespacesCount value across all objects
+func (ex *JobExecutor) getMaxSharingNamespacesCountAcrossAllObjects() int {
+	maxSnc := 1
 	for _, obj := range ex.objects {
-		if obj.NamespacesPerObject > maxNpo {
-			maxNpo = obj.NamespacesPerObject
+		if obj.SharingNamespacesCount > maxSnc {
+			maxSnc = obj.SharingNamespacesCount
 		}
 	}
-	return maxNpo
+	return maxSnc
 }
 
 // deleteSharedObjectsForIterations deletes cluster-scoped shared objects
 // that were created for iterations in the given range
 func (ex *JobExecutor) deleteSharedObjectsForIterations(ctx context.Context, iterationStart, iterationEnd int) {
 	for _, obj := range ex.objects {
-		if obj.NamespacesPerObject <= 1 {
+		if obj.SharingNamespacesCount <= 1 {
 			continue
 		}
-		npo := obj.NamespacesPerObject
+		snc := obj.SharingNamespacesCount
 
 		// Find iterations where this object was created within the churn range
 		for i := iterationStart; i < iterationEnd; i++ {
-			if i%npo == 0 {
+			if i%snc == 0 {
 				// Object was created at this iteration, delete it
 				labelSelector := fmt.Sprintf("%s=%s,%s=%s,%s=%d",
 					config.KubeBurnerLabelJob, ex.Name,
 					config.KubeBurnerLabelUUID, ex.uuid,
 					config.KubeBurnerLabelJobIteration, i)
 
-				log.Infof("Deleting shared object %s at iteration %d (namespacesPerObject=%d)",
-					obj.ObjectTemplate, i, npo)
+				log.Infof("Deleting shared object %s at iteration %d (SharingNamespacesCount=%d)",
+					obj.ObjectTemplate, i, snc)
 
 				err := ex.dynamicClient.Resource(obj.gvr).DeleteCollection(ctx,
 					metav1.DeleteOptions{},
@@ -216,11 +216,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
 					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
 				}
-			} else if obj.NamespacesPerObject > 1 {
-				// Only create when iteration is a multiple of namespacesPerObject
-				if i%obj.NamespacesPerObject == 0 {
-					log.Debugf("NamespacesPerObject=%d: creating %s at iteration %d",
-						obj.NamespacesPerObject, obj.ObjectTemplate, i)
+			} else if obj.SharingNamespacesCount > 1 {
+				// Only create when iteration is a multiple of SharingNamespacesCount
+				if i%obj.SharingNamespacesCount == 0 {
+					log.Debugf("SharingNamespacesCount=%d: creating %s at iteration %d",
+						obj.SharingNamespacesCount, obj.ObjectTemplate, i)
 					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
 				}
 			} else {
@@ -309,7 +309,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 				if !obj.namespaced {
 					n = ""
 				}
-				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout, obj.NamespacesPerObject > 1)
+				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout, obj.SharingNamespacesCount > 1)
 			}(ns)
 		}(r)
 	}
@@ -474,16 +474,16 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 	}
 	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 
-	// Get max namespacesPerObject for alignment
-	maxNpo := ex.getMaxNamespacesPerObject()
-	// Align numToChurn to namespacesPerObject boundary.
+	// Get max SharingNamespacesCount for alignment
+	maxSnc := ex.getMaxSharingNamespacesCountAcrossAllObjects()
+	// Align numToChurn to SharingNamespacesCount boundary.
 	//
-	// When namespacesPerObject > 1, objects are spread across multiple namespaces.
+	// When SharingNamespacesCount > 1, objects are spread across multiple namespaces.
 	// We must churn in multiples of this value to avoid partial deletion.
 	//
 	// Example:
 	//   - 10 namespaces: ns-0, ns-1, ns-2, ns-3, ns-4, ns-5, ns-6, ns-7, ns-8, ns-9
-	//   - namespacesPerObject: 2 means:
+	//   - SharingNamespacesCount: 2 means:
 	//       - egressIP-0 exists in ns-0 and ns-1
 	//       - egressIP-1 exists in ns-2 and ns-3
 	//       - etc.
@@ -493,14 +493,14 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 	//     - Half of egressIP-1 (only ns-2, but ns-3 survives) ✗ BROKEN!
 	//
 	//   So we round up numToChurn from 3 to 4, ensuring complete pairs are churned.
-	if maxNpo > 1 {
-		// Align numToChurn to be a multiple of maxNpo (round up)
-		numToChurn = ((numToChurn + maxNpo - 1) / maxNpo) * maxNpo
+	if maxSnc > 1 {
+		// Align numToChurn to be a multiple of maxSnc (round up)
+		numToChurn = ((numToChurn + maxSnc - 1) / maxSnc) * maxSnc
 		// Ensure we don't exceed available namespaces
 		if numToChurn > len(nsList) {
-			numToChurn = (len(nsList) / maxNpo) * maxNpo
+			numToChurn = (len(nsList) / maxSnc) * maxSnc
 		}
-		log.Debugf("Aligned numToChurn to %d (maxNamespacesPerObject=%d)", numToChurn, maxNpo)
+		log.Debugf("Aligned numToChurn to %d (maxSharingNamespacesCount=%d)", numToChurn, maxSnc)
 	}
 
 	for {
@@ -521,12 +521,12 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		}
 
 		// Max amount of churn is 100% of namespaces
-		// Align randStart to maxNpo boundaries for proper shared object handling.
+		// Align randStart to maxSnc boundaries for proper shared object handling.
 		//
-		// When namespacesPerObject > 1, objects span multiple consecutive namespaces
+		// When SharingNamespacesCount > 1, objects span multiple consecutive namespaces
 		// in groups. We must start churning at a group boundary.
 		//
-		// Example with 10 namespaces and namespacesPerObject=2:
+		// Example with 10 namespaces and SharingNamespacesCount=2:
 		//   - egressIP-0 spans ns-0 and ns-1
 		//   - egressIP-1 spans ns-2 and ns-3
 		//   - egressIP-2 spans ns-4 and ns-5
@@ -538,15 +538,15 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		//   - randStart=1: churn ns-1,2,3,4 → splits egressIP-0 AND egressIP-2 ✗ BROKEN!
 		//
 		//   So we pick randomly from aligned positions only: 0, 2, 4, 6 (4 choices).
-		if maxNpo > 1 {
-			// Calculate number of valid starting positions (aligned to maxNpo)
+		if maxSnc > 1 {
+			// Calculate number of valid starting positions (aligned to maxSnc)
 			maxValidStart := len(nsList) - numToChurn
-			numValidPositions := (maxValidStart / maxNpo) + 1
+			numValidPositions := (maxValidStart / maxSnc) + 1
 			if numValidPositions > 0 {
-				randStart = rand.Intn(numValidPositions) * maxNpo
+				randStart = rand.Intn(numValidPositions) * maxSnc
 			}
-			log.Debugf("Selected aligned randStart=%d (maxNpo=%d, numValidPositions=%d)",
-				randStart, maxNpo, numValidPositions)
+			log.Debugf("Selected aligned randStart=%d (maxSnc=%d, numValidPositions=%d)",
+				randStart, maxSnc, numValidPositions)
 		} else if len(nsList)-numToChurn+1 > 0 {
 			randStart = rand.Intn(len(nsList) - numToChurn + 1)
 		}
@@ -615,9 +615,9 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 		for _, obj := range ex.objects {
 			// Skip shared objects from individual churn - they're cluster-scoped
 			// and shouldn't be churned independently of their namespaces
-			if obj.NamespacesPerObject > 1 {
-				log.Debugf("Skipping %s from object churn (namespacesPerObject=%d)",
-					obj.ObjectTemplate, obj.NamespacesPerObject)
+			if obj.SharingNamespacesCount > 1 {
+				log.Debugf("Skipping %s from object churn (SharingNamespacesCount=%d)",
+					obj.ObjectTemplate, obj.SharingNamespacesCount)
 				continue
 			}
 			// if churning is enabled for the object

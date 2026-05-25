@@ -12,5 +12,5 @@ spec:
   selector:
     matchLabels:
       # Reference the correct PV using adjusted iteration
-      pv-group: "{{ div .Iteration .pvNamespacesPerObject }}"
+      pv-group: "{{ div .Iteration .pvSharingNamespacesCount }}"
 

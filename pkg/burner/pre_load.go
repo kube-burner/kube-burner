@@ -193,17 +193,17 @@ func getJobImages(job JobExecutor) ([]string, error) {
 	var imageList []string
 	for _, object := range job.objects {
 		// Build template data with same variables as normal rendering
-		npo := object.NamespacesPerObject
-		if npo < 1 {
-			npo = 1
+		snc := object.SharingNamespacesCount
+		if snc < 1 {
+			snc = 1
 		}
 		templateData := map[string]any{
-			jobName:             job.Name,
-			jobIteration:        0, // Use iteration 0 for preload
-			jobUUID:             job.uuid,
-			jobRunId:            job.runid,
-			replica:             1,
-			namespacesPerObject: npo,
+			jobName:                job.Name,
+			jobIteration:           0, // Use iteration 0 for preload
+			jobUUID:                job.uuid,
+			jobRunId:               job.runid,
+			replica:                1,
+			sharingNamespacesCount: snc,
 		}
 		// Merge InputVars (they take precedence)
 		for k, v := range object.InputVars {
