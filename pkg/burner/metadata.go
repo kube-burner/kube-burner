@@ -31,7 +31,6 @@ type JobSummary struct {
 	ChurnStartTimestamp *time.Time     `json:"churnStartTimestamp,omitempty"`
 	ChurnEndTimestamp   *time.Time     `json:"churnEndTimestamp,omitempty"`
 	ElapsedTime         float64        `json:"elapsedTime"`
-	AchievedQps         float64        `json:"achievedQps,omitempty"`
 	UUID                string         `json:"uuid"`
 	IncrementalLoadUUID string         `json:"incrementalLoadUUID,omitempty"`
 	MetricName          string         `json:"metricName"`

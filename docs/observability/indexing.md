@@ -123,7 +123,6 @@ The job summary document includes the following fields:
 | `churnStartTimestamp`  | Start timestamp of the churn phase (only present if churn is enabled)                               | String (ISO 8601) | No             |
 | `churnEndTimestamp`    | End timestamp of the churn phase (only present if churn is enabled)                                  | String (ISO 8601) | No             |
 | `elapsedTime`          | Total execution time in seconds                                                                      | Float            | Yes            |
-| `achievedQps`          | Achieved queries per second (calculated as object operations / elapsed time)                       | Float            | No             |
 | `uuid`                 | Unique identifier for this benchmark run                                                              | String           | Yes            |
 | `metricName`           | Always set to `"jobSummary"` for identification                                                     | String           | Yes            |
 | `version`               | kube-burner version and git commit in format `version@gitCommit`                                      | String           | No             |
@@ -142,7 +141,6 @@ Example job summary document:
   "churnStartTimestamp": "2023-08-29T00:17:45.000000000Z",
   "churnEndTimestamp": "2023-08-29T00:18:00.000000000Z",
   "elapsedTime": 48.0,
-  "achievedQps": 0.333,
   "uuid": "83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16",
   "metricName": "jobSummary",
   "version": "v1.10.0@4c9c3f43db83",
@@ -173,7 +171,7 @@ Example job summary document:
 ```
 
 !!! Note
-    Fields marked with `omitempty` in the JSON structure (such as `churnStartTimestamp`, `churnEndTimestamp`, `achievedQps`, `version`, and `executionErrors`) will not be present in the indexed document when they have no value or are not applicable.
+    Fields marked with `omitempty` in the JSON structure (such as `churnStartTimestamp`, `churnEndTimestamp`, `version`, and `executionErrors`) will not be present in the indexed document when they have no value or are not applicable.
 
 ## Metric exporting & importing
 

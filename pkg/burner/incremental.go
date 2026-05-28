@@ -170,7 +170,6 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 	stepDelay := ex.IncrementalLoad.StepDelay
 	var allErrs []error
 	var stepJobs []prometheus.Job
-	var startOperations, endOperations int32
 
 	originalUUID := ex.uuid
 	originalRunID := ex.runid
@@ -205,7 +204,6 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 			stepMetadata[k] = v
 		}
 		stepMetadata["incrementalLoadUUID"] = stepRunID
-		startOperations = ex.objectOperations
 
 		// create step-specific measurements factory with incrementalLoadUUID in metadata
 		stepMsFactory := measurements.NewMeasurementsFactory(configSpec, stepMetadata, nil)
@@ -274,14 +272,12 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 
 		log.Infof("Running garbage collection for job %s (uuid=%s) after incremental step", ex.Name, ex.uuid)
 		ex.gc(ctx, nil)
-		endOperations = ex.objectOperations
 
 		stepEnd := time.Now().UTC()
 		stepJobs = append(stepJobs, prometheus.Job{
 			Start:               stepStart,
 			End:                 stepEnd,
 			JobConfig:           ex.Job,
-			ObjectOperations:    endOperations - startOperations,
 			UUID:                originalUUID,
 			IncrementalLoadUUID: stepRunID,
 		})
