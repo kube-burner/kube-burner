@@ -20,9 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
-	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
@@ -35,7 +33,7 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 		log.Infof("Deleting namespace %s using GVR", namespace)
 		for _, obj := range ex.objects {
 			if obj.namespaced {
-				CleanupNamespaceResourcesByLabel(ctx, ex, obj, namespace, labelSelector)
+				CleanupNamespacedResourcesByLabel(ctx, ex, obj, namespace, labelSelector)
 			}
 		}
 		err := waitForDeleteNamespacedResources(ctx, ex, namespace, labelSelector)
@@ -46,37 +44,27 @@ func CleanupNamespacesUsingGVR(ctx context.Context, ex JobExecutor, namespacesTo
 	return nil
 }
 
-// Deletes resources with the give labelSelector within a namespace
-func CleanupNamespaceResourcesByLabel(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) {
+// Deletes resources with the given labelSelector within a namespace
+func CleanupNamespacedResourcesByLabel(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) {
 	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
-	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	err := resourceInterface.DeleteCollection(ctx,
+		metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationForeground)},
+		metav1.ListOptions{LabelSelector: labelSelector},
+	)
 	if err != nil {
-		log.Errorf("Unable to list %vs in %v: %v", obj.Kind, namespace, err)
-		return
-	}
-	if len(resources.Items) > 0 {
-		log.Debugf("Deleting %d %ss labeled with %s in %s", len(resources.Items), obj.Kind, labelSelector, namespace)
-	}
-	for _, item := range resources.Items {
-		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationForeground)}); err != nil {
-			if !errors.IsNotFound(err) {
-				log.Errorf("Error deleting %v/%v in %v: %v", item.GetKind(), item.GetName(), namespace, err)
-			}
-		}
+		log.Errorf("Error deleting %v labeled with %s: %v", obj.gvr.Resource, labelSelector, err)
 	}
 }
 
 // Cleanup non-namespaced resources using executor list
-func CleanupNonNamespacedResourcesByLabel(ctx context.Context, ex JobExecutor, object *object, labelSelector string) {
+func CleanupClusterScopedResourcesByLabel(ctx context.Context, ex JobExecutor, object *object, labelSelector string) {
 	resourceInterface := ex.dynamicClient.Resource(object.gvr)
-	resources, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	err := resourceInterface.DeleteCollection(ctx,
+		metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationForeground)},
+		metav1.ListOptions{LabelSelector: labelSelector},
+	)
 	if err != nil {
-		log.Debugf("Unable to list resources for object: %v error: %v. Hence skipping it", object.Object, err)
-		return
-	}
-	if len(resources.Items) > 0 {
-		log.Infof("Deleting %d %ss labeled with %s", len(resources.Items), object.Kind, labelSelector)
-		util.DeleteNonNamespacedResources(ctx, resources, resourceInterface)
+		log.Errorf("Error deleting cluster-scoped %v labeled with %s: %v", object.gvr.Resource, labelSelector, err)
 	}
 }
 
