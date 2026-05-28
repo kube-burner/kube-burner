@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/cloud-bulldozer/go-commons/v2/version"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
@@ -431,7 +430,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 		prometheusClient.ScrapeJobsMetrics(executedJobs...)
 	}
 	for _, indexer := range configSpec.MetricsEndpoints {
-		if (indexer.Type == indexers.LocalIndexer || indexer.Type == indexers.TSDBIndexer) && indexer.CreateTarball {
+		if util.IsLocalIndexer(indexer.Type) && indexer.CreateTarball {
 			metrics.CreateTarball(indexer.IndexerConfig)
 		}
 	}

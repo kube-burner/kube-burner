@@ -306,7 +306,7 @@ func splitIndexersByType(configSpec config.Spec, indexerList map[string]indexers
 			alias = fmt.Sprintf("indexer-%d", i)
 		}
 		if indexer, exists := indexerList[alias]; exists {
-			if endpoint.Type == indexers.LocalIndexer {
+			if util.IsLocalIndexer(endpoint.Type) {
 				localIndexers["collected-metrics"] = indexer
 			} else {
 				remoteIndexers[alias] = indexer

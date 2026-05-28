@@ -407,7 +407,7 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err)
 				}
 			}
-			if (configSpec.MetricsEndpoints[0].Type == indexers.LocalIndexer || configSpec.MetricsEndpoints[0].Type == indexers.TSDBIndexer) && tarballName != "" {
+			if util.IsLocalIndexer(configSpec.MetricsEndpoints[0].Type) && tarballName != "" {
 				if err := metrics.CreateTarball(configSpec.MetricsEndpoints[0].IndexerConfig); err != nil {
 					log.Fatal(err)
 				}
