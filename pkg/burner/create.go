@@ -524,6 +524,10 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 					return timeI.Before(&timeJ)
 				})
 				log.Debugf("Total %s listed: %d, churning %d%%", obj.gvr.Resource, len(objectList.Items), ex.ChurnConfig.Percent)
+				if len(objectList.Items) == 0 {
+					log.Warnf("No %s found with label selector %s, skipping churn cycle", obj.gvr.Resource, labels.FormatLabels(labelSelector))
+					continue
+				}
 				percent := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
 				objectsToDelete := objectList.Items[:percent]
 				log.Infof("Deleting %d %s", len(objectsToDelete), obj.gvr.Resource)
