@@ -471,22 +471,17 @@ func validateGC() error {
 	return nil
 }
 
-// validateSharingNamespacesCount checks that all objects in a job have consistent sharingNamespacesCount values
-// All objects must have either sharingNamespacesCount=1 or the same non-1 value
-// VALID - all use default (1)
-// VALID - mix of 1 and 2
-// INVALID - mix of 2 and 3. You will get "Error: job my-job: inconsistent sharingNamespacesCount values. Found both 2 and 3..."
+// validateSharingNamespacesCount checks that all objects in a job have consistent SharingNamespacesCount values
+// All objects must have either SharingNamespacesCount=1 or the same non-1 value
 func validateSharingNamespacesCount() error {
 	for _, job := range configSpec.Jobs {
 		var nonDefaultValue int
 		for _, obj := range job.Objects {
 			if obj.SharingNamespacesCount > 1 {
 				if nonDefaultValue == 0 {
-					// First non-1 value we've seen
 					nonDefaultValue = obj.SharingNamespacesCount
 				} else if obj.SharingNamespacesCount != nonDefaultValue {
-					// Different non-1 value found
-					return fmt.Errorf("job %s: inconsistent sharingNamespacesCount values. Found both %d and %d. All objects must have sharingNamespacesCount=1 or the same no",
+					return fmt.Errorf("job %s: inconsistent SharingNamespacesCount values. Found both %d and %d. All objects must have SharingNamespacesCount=1 or the same non-1 value",
 						job.Name, nonDefaultValue, obj.SharingNamespacesCount)
 				}
 			}

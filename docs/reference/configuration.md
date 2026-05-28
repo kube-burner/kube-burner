@@ -269,85 +269,16 @@ The following object types have built-in waiters:
 
 ### SharingNamespacesCount
 
-Controls how many namespaces share a single instance of an object. This is useful for cluster-scoped objects that should be shared across multiple namespaces.
+The `SharingNamespacesCount` parameter controls how many namespaces share a single instance of a cluster-scoped object. This is useful for cluster-scoped objects (like `ClusterRoles` or `PersistentVolume`) that should be shared across multiple namespaces.
+Without this, each iteration creates a namespace and a cluster-scoped resource. Thus we have one-to-one mapping for the namespace and cluster-scoped resource i.e a cluster-scoped resource is not shared across the namespaces. When SharingNamespacesCount is set for a cluster-scoped resource, an iteration creates a namespace, skips creating cluster-scoped resource if it is created in the previous iterations and then the namespace scoped object templates in that iteration has to use the corresponding previously created cluster-scoped resource, resulting the sharing of the cluster-scoped resource.
 
-  **Default:** `1` (one object per namespace iteration)
+As some iterations skip creating the cluster scoped resource, next iterations need to adjust the .Iteration var while passing to the template. For example, in the below table, iteration 1 skips creating ClusterRole and then in iteration 2 adjusts the .Iteration to 1 so that clusterrole-{.Iteration} will be rendered as clusterrole-1
 
-#### Use Cases
+The main intention of bringing this feature is to fit cluster-scoped object and the namespaces when shared into a sing job, so that churn and incremental features work. kube-burner adjusts churn boundaries and churn starting iterations according to the mapping between the cluster scoped resource and namespaces.
 
-This feature is helpful for:
-  
- - **PersistentVolume/PersistentVolumeClaim**: One PV shared by PVCs across multiple namespaces
- - **EgressIP**: One EgressIP shared by pods across multiple namespaces
- - **ClusterUserDefinedNetwork**: One network definition used by workloads in multiple namespaces
- - **MultiNetworkPolicy**: Network policies that span namespace groups
- - **ClusterRole/RoleBinding**: One ClusterRole referenced by RoleBindings in multiple namespaces
+Below table illustrates what kube-burner does in each iteration to create ClusterRole (cluster-scoped object) and RoleBinding, when a ClusterRole is shared among 2 RoleBinding (or namepsaces).
 
-#### Example: Shared PersistentVolume
-
-  One PV shared across multiple namespaces, each with its own PVC:
-
-  ```yaml
-  jobs:
-    - name: pv-sharing-test
-      jobIterations: 4
-      namespacedIterations: true
-      namespace: pv-test
-      objects:
-        # One PV per 2 namespaces
-        - objectTemplate: persistentvolume.yml
-          SharingNamespacesCount: 2
-
-        # Each namespace gets its own PVC referencing the shared PV
-        - objectTemplate: persistentvolumeclaim.yml
-          inputVars:
-            pvSharingNamespacesCount: 2
-            namespace: pv-test
-```
-
-#### Example: Shared EgressIP
-  
-  When testing EgressIP at scale, you often want one EgressIP shared across multiple namespaces rather than one per namespace:
-  
-  ```yaml
-  jobs:
-    - name: egressip-scale-test
-      jobIterations: 100
-      namespacedIterations: true
-      namespace: egressip-test
-      objects:
-        # One EgressIP per 10 namespaces
-        # Creates 10 EgressIPs for 100 namespaces
-        - objectTemplate: egressip.yml 
-          SharingNamespacesCount: 10
-          
-        # Pods in each namespace use the shared EgressIP
-        - objectTemplate: pod.yml
-          replicas: 5
-```
-
-#### Example: Shared ClusterRole
-
-When creating namespaced resources like RoleBindings that reference a cluster-scoped object (like RoleBindings referencing a ClusterRole), you want one ClusterRole shared across multiple namespaces:
-
-  ```yaml
-  jobs:
-    - name: rbac-test
-      jobIterations: 10
-      namespacedIterations: true
-      namespace: test-ns
-      objects:
-        # One ClusterRole per 2 namespaces
-        # Creates 5 ClusterRoles: for ns-0/1, ns-2/3, ns-4/5, ns-6/7, ns-8/9
-        - objectTemplate: clusterrole.yml
-          SharingNamespacesCount: 2
-
-        # One RoleBinding per namespace (references the shared ClusterRole)
-        - objectTemplate: rolebinding.yml
-```
-
-#### How it works
-With SharingNamespacesCount: 2 and jobIterations: 10:
+With SharingNamespacesCount: 2 set for ClusterRole (a cluster scoped object) and jobIterations: 10:
 
 | Iteration | Namespace | ClusterRole Created | RoleBinding Created |
 |--------------|---------------------------------------------------------|---------|---------|
@@ -357,12 +288,23 @@ With SharingNamespacesCount: 2 and jobIterations: 10:
 | 3 | test-ns-3 | (shares clusterrole-1)  | binding-3 (refs clusterrole-1) |
 | ... | ... | ...  | ... |
 
+  **Default:** `1` (one object per namespace iteration)
+
+#### Use Cases
+
+This feature is helpful for:
+ - **PersistentVolume/PersistentVolumeClaim**: One PV shared by PVCs across multiple namespaces
+ - **EgressIP**: One EgressIP shared by pods across multiple namespaces
+ - **ClusterUserDefinedNetwork**: One network definition used by workloads in multiple namespaces
+ - **MultiNetworkPolicy**: Network policies that span namespace groups
+ - **ClusterRole/RoleBinding**: One ClusterRole referenced by RoleBindings in multiple namespaces
+
 #### Template variables
 
 ```yaml
-  # namespaces-per-object-test.yml
+  # sharing-namespaces-count-test.yml
   jobs:
-    - name: namespaces-per-object-test
+    - name: sharing-namespaces-count-test
       namespace: test-ns
       objects:
         # ClusterRole created once per 2 namespaces (shared across test-ns-0/test-ns-1, test-ns-2/test-ns-3)
@@ -394,6 +336,7 @@ With SharingNamespacesCount: 2 and jobIterations: 10:
   apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
+    # kube-burner adjusted this .Iteration
     name: clusterrole-{{.Iteration}}
   rules:
     - apiGroups: [""]

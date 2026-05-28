@@ -18,6 +18,7 @@ jobs:
       percent: 20
       delay: 2s
       mode: namespaces
+      deleteDelay: 2s
       
     objects:
       # ClusterRole created once per 2 namespaces (shared across snc-test-0/snc-test-1, snc-test-2/snc-test-3)

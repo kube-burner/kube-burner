@@ -193,20 +193,6 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 			continue
 		}
 		var objectsExpected int
-		// Calculate effective iterations accounting for sharingNamespacesCount.
-		// When sharingNamespacesCount > 1, objects are created only every Nth iteration.
-		//
-		// Example with sharingNamespacesCount=2 and jobIterations=10:
-		//   - egressIP created at iterations: 0, 2, 4, 6, 8 (5 times total)
-		//   - effectiveIterations = ceil(10 / 2) = 5
-		//   - objectsExpected = replicas * 5
-		//
-		// Formula: ceil(iterations / snc) = (iterations + snc - 1) / snc
-		snc := obj.SharingNamespacesCount
-		if snc < 1 {
-			snc = 1
-		}
-
 		iterations := ex.JobIterations
 		if expectedIterations != nil {
 			iterations = *expectedIterations
@@ -216,8 +202,9 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 			objectsExpected = obj.Replicas
 		} else {
 			effectiveIterations := iterations
-			if snc > 1 {
-				effectiveIterations = (iterations + snc - 1) / snc
+			// Calculate effective iterations accounting for SharingNamespacesCount.
+			if obj.SharingNamespacesCount > 1 {
+				effectiveIterations = (iterations + obj.SharingNamespacesCount - 1) / obj.SharingNamespacesCount
 			}
 			objectsExpected = obj.Replicas * effectiveIterations
 		}

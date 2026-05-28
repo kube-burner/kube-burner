@@ -52,47 +52,73 @@ type churnDeletedObject struct {
 	gvr    schema.GroupVersionResource
 }
 
-// getMaxSharingNamespacesCountAcrossAllObjects returns the maximum SharingNamespacesCount value across all objects
-func (ex *JobExecutor) getMaxSharingNamespacesCountAcrossAllObjects() int {
-	maxSnc := 1
-	for _, obj := range ex.objects {
-		if obj.SharingNamespacesCount > maxSnc {
-			maxSnc = obj.SharingNamespacesCount
-		}
-	}
-	return maxSnc
+// clusterScopedObjectCache holds pre-loaded cluster-scoped objects grouped by iteration
+type clusterScopedObjectCache struct {
+	obj              *object
+	itemsByIteration map[int][]unstructured.Unstructured
 }
 
-// deleteSharedObjectsForIterations deletes cluster-scoped shared objects
-// that were created for iterations in the given range
-func (ex *JobExecutor) deleteSharedObjectsForIterations(ctx context.Context, iterationStart, iterationEnd int) {
+// preloadClusterScopedObjects lists all cluster-scoped objects once and groups them by iteration.
+// This avoids repeated List calls during each churn cycle.
+func (ex *JobExecutor) preloadClusterScopedObjects(ctx context.Context) []clusterScopedObjectCache {
+	caches := make([]clusterScopedObjectCache, 0)
+
 	for _, obj := range ex.objects {
-		if obj.SharingNamespacesCount <= 1 {
+		if obj.namespaced {
 			continue
 		}
-		snc := obj.SharingNamespacesCount
 
-		// Find iterations where this object was created within the churn range
+		labelSelector := fmt.Sprintf("%s=%s,%s=%s",
+			config.KubeBurnerLabelJob, ex.Name,
+			config.KubeBurnerLabelUUID, ex.uuid)
+
+		resources, err := ex.dynamicClient.Resource(obj.gvr).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			log.Errorf("Error listing cluster-scoped objects %s: %v", obj.ObjectTemplate, err)
+			continue
+		}
+
+		// Group by job-iteration label (handles replicas automatically)
+		itemsByIteration := make(map[int][]unstructured.Unstructured)
+		for _, item := range resources.Items {
+			iterLabel := item.GetLabels()[config.KubeBurnerLabelJobIteration]
+			iter, _ := strconv.Atoi(iterLabel)
+			itemsByIteration[iter] = append(itemsByIteration[iter], item)
+		}
+
+		caches = append(caches, clusterScopedObjectCache{
+			obj:              obj,
+			itemsByIteration: itemsByIteration,
+		})
+	}
+
+	return caches
+}
+
+// deleteClusterScopedObjects marks cluster-scoped objects in the given iteration range
+// with a deletion label, then deletes them using CleanupNonNamespacedResourcesByLabel.
+func (ex *JobExecutor) deleteClusterScopedObjects(ctx context.Context, caches []clusterScopedObjectCache, iterationStart, iterationEnd int) {
+	delPatch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":""}}}`, config.KubeBurnerLabelChurnDelete))
+
+	for _, cache := range caches {
+		resourceInterface := ex.dynamicClient.Resource(cache.obj.gvr)
+
 		for i := iterationStart; i < iterationEnd; i++ {
-			if i%snc == 0 {
-				// Object was created at this iteration, delete it
-				labelSelector := fmt.Sprintf("%s=%s,%s=%s,%s=%d",
-					config.KubeBurnerLabelJob, ex.Name,
-					config.KubeBurnerLabelUUID, ex.uuid,
-					config.KubeBurnerLabelJobIteration, i)
-
-				log.Infof("Deleting shared object %s at iteration %d (SharingNamespacesCount=%d)",
-					obj.ObjectTemplate, i, snc)
-
-				err := ex.dynamicClient.Resource(obj.gvr).DeleteCollection(ctx,
-					metav1.DeleteOptions{},
-					metav1.ListOptions{LabelSelector: labelSelector})
-				if err != nil {
-					log.Errorf("Error deleting shared object %s at iteration %d: %v",
-						obj.ObjectTemplate, i, err)
+			if i%cache.obj.SharingNamespacesCount == 0 {
+				items, exists := cache.itemsByIteration[i]
+				if !exists {
+					continue
+				}
+				for _, item := range items {
+					_, err := resourceInterface.Patch(ctx, item.GetName(), types.MergePatchType, delPatch, metav1.PatchOptions{})
+					if err != nil {
+						log.Errorf("Error applying deletion label to %s %s: %v", cache.obj.Kind, item.GetName(), err)
+					}
 				}
 			}
 		}
+
+		CleanupNonNamespacedResourcesByLabel(ctx, *ex, cache.obj, config.KubeBurnerLabelChurnDelete)
 	}
 }
 
@@ -474,33 +500,22 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 	}
 	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 
-	// Get max SharingNamespacesCount for alignment
-	maxSnc := ex.getMaxSharingNamespacesCountAcrossAllObjects()
-	// Align numToChurn to SharingNamespacesCount boundary.
-	//
-	// When SharingNamespacesCount > 1, objects are spread across multiple namespaces.
-	// We must churn in multiples of this value to avoid partial deletion.
-	//
-	// Example:
-	//   - 10 namespaces: ns-0, ns-1, ns-2, ns-3, ns-4, ns-5, ns-6, ns-7, ns-8, ns-9
-	//   - SharingNamespacesCount: 2 means:
-	//       - egressIP-0 exists in ns-0 and ns-1
-	//       - egressIP-1 exists in ns-2 and ns-3
-	//       - etc.
-	//
-	//   If you churn 3 namespaces (ns-0, ns-1, ns-2), you'd delete:
-	//     - Complete pair for egressIP-0 (ns-0 + ns-1) ✓
-	//     - Half of egressIP-1 (only ns-2, but ns-3 survives) ✗ BROKEN!
-	//
-	//   So we round up numToChurn from 3 to 4, ensuring complete pairs are churned.
-	if maxSnc > 1 {
-		// Align numToChurn to be a multiple of maxSnc (round up)
-		numToChurn = ((numToChurn + maxSnc - 1) / maxSnc) * maxSnc
-		// Ensure we don't exceed available namespaces
-		if numToChurn > len(nsList) {
-			numToChurn = (len(nsList) / maxSnc) * maxSnc
+	// Pre-load cluster-scoped objects once before the churn loop
+	clusterScopedCaches := ex.preloadClusterScopedObjects(ctx)
+	sharingNamespacesCount := 1
+	for _, obj := range ex.objects {
+		if obj.SharingNamespacesCount > sharingNamespacesCount {
+			sharingNamespacesCount = obj.SharingNamespacesCount
+			break
 		}
-		log.Debugf("Aligned numToChurn to %d (maxSharingNamespacesCount=%d)", numToChurn, maxSnc)
+	}
+	// Align numToChurn to SharingNamespacesCount boundary.
+	if sharingNamespacesCount > 1 {
+		numToChurn = ((numToChurn + sharingNamespacesCount - 1) / sharingNamespacesCount) * sharingNamespacesCount
+		if numToChurn > len(nsList) {
+			numToChurn = (len(nsList) / sharingNamespacesCount) * sharingNamespacesCount
+		}
+		log.Debugf("Aligned numToChurn to %d (maxSharingNamespacesCount=%d)", numToChurn, sharingNamespacesCount)
 	}
 
 	for {
@@ -520,33 +535,14 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 			return errs
 		}
 
-		// Max amount of churn is 100% of namespaces
-		// Align randStart to maxSnc boundaries for proper shared object handling.
-		//
-		// When SharingNamespacesCount > 1, objects span multiple consecutive namespaces
-		// in groups. We must start churning at a group boundary.
-		//
-		// Example with 10 namespaces and SharingNamespacesCount=2:
-		//   - egressIP-0 spans ns-0 and ns-1
-		//   - egressIP-1 spans ns-2 and ns-3
-		//   - egressIP-2 spans ns-4 and ns-5
-		//   - etc.
-		//
-		//   If numToChurn=4, valid starting positions are 0, 2, 4, 6 (group boundaries).
-		//   - randStart=0: churn ns-0,1,2,3 → deletes egressIP-0 and egressIP-1 ✓
-		//   - randStart=2: churn ns-2,3,4,5 → deletes egressIP-1 and egressIP-2 ✓
-		//   - randStart=1: churn ns-1,2,3,4 → splits egressIP-0 AND egressIP-2 ✗ BROKEN!
-		//
-		//   So we pick randomly from aligned positions only: 0, 2, 4, 6 (4 choices).
-		if maxSnc > 1 {
-			// Calculate number of valid starting positions (aligned to maxSnc)
+		// Align randStart to sharingNamespacesCount boundaries for proper shared object handling.
+		if sharingNamespacesCount > 1 {
+			// Calculate number of valid starting positions (aligned to sharingNamespacesCount)
 			maxValidStart := len(nsList) - numToChurn
-			numValidPositions := (maxValidStart / maxSnc) + 1
+			numValidPositions := (maxValidStart / sharingNamespacesCount) + 1
 			if numValidPositions > 0 {
-				randStart = rand.Intn(numValidPositions) * maxSnc
+				randStart = rand.Intn(numValidPositions) * sharingNamespacesCount
 			}
-			log.Debugf("Selected aligned randStart=%d (maxSnc=%d, numValidPositions=%d)",
-				randStart, maxSnc, numValidPositions)
 		} else if len(nsList)-numToChurn+1 > 0 {
 			randStart = rand.Intn(len(nsList) - numToChurn + 1)
 		}
@@ -570,7 +566,7 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		// 1 hour timeout to delete namespace
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		// Delete shared cluster-scoped objects that serve the churned namespaces
-		ex.deleteSharedObjectsForIterations(cleanupCtx, randStart, numToChurn+randStart)
+		ex.deleteClusterScopedObjects(cleanupCtx, clusterScopedCaches, randStart, numToChurn+randStart)
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
 		if ex.ChurnConfig.DeleteDelay > 0 {
 			log.Infof("Sleeping for %v after deletion", ex.ChurnConfig.DeleteDelay)

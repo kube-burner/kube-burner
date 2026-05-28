@@ -347,7 +347,7 @@ teardown_file() {
   [ "$status" -eq 2 ]
 }
 
-# bats test_tags=subsystem:namespaces-per-object
+# bats test_tags=subsystem:sharing-namespaces-count
 @test "kube-burner: sharingNamespacesCount for cluster-scoped objects" {
   run_cmd ${KUBE_BURNER} init -c kube-burner-sharing-namespaces-count.yml --uuid=${UUID}
 

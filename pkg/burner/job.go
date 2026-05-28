@@ -45,17 +45,16 @@ type returnPair struct {
 }
 
 const (
-	jobName                = "JobName"
-	replica                = "Replica"
-	jobIteration           = "Iteration"
-	jobUUID                = "UUID"
-	jobRunId               = "RunID"
-	sharingNamespacesCount = "SharingNamespacesCount"
-	rcTimeout              = 2
-	rcAlert                = 3
-	rcMeasurement          = 4
-	garbageCollectionJob   = "garbage-collection"
-	APIVersionV1           = "v1"
+	jobName              = "JobName"
+	replica              = "Replica"
+	jobIteration         = "Iteration"
+	jobUUID              = "UUID"
+	jobRunId             = "RunID"
+	rcTimeout            = 2
+	rcAlert              = 3
+	rcMeasurement        = 4
+	garbageCollectionJob = "garbage-collection"
+	APIVersionV1         = "v1"
 )
 
 var (

@@ -192,24 +192,7 @@ func isOwnedByDaemonSet(ownerReferences []metav1.OwnerReference, daemonSetName s
 func getJobImages(job JobExecutor) ([]string, error) {
 	var imageList []string
 	for _, object := range job.objects {
-		// Build template data with same variables as normal rendering
-		snc := object.SharingNamespacesCount
-		if snc < 1 {
-			snc = 1
-		}
-		templateData := map[string]any{
-			jobName:                job.Name,
-			jobIteration:           0, // Use iteration 0 for preload
-			jobUUID:                job.uuid,
-			jobRunId:               job.runid,
-			replica:                1,
-			sharingNamespacesCount: snc,
-		}
-		// Merge InputVars (they take precedence)
-		for k, v := range object.InputVars {
-			templateData[k] = v
-		}
-		renderedObj, err := util.RenderTemplate(object.objectSpec, templateData, util.MissingKeyZero, job.functionTemplates)
+		renderedObj, err := util.RenderTemplate(object.objectSpec, object.InputVars, util.MissingKeyZero, job.functionTemplates)
 		if err != nil {
 			return imageList, err
 		}

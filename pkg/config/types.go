@@ -146,7 +146,7 @@ type Object struct {
 	Churn bool `yaml:"churn" json:"churn,omitempty"`
 	// SharingNamespacesCount specifies how many namespaces share this object.
 	// When set > 1, the object is created only once per N iterations.
-	// Template receives adjusted Iteration: iteration / sharingNamespacesCount.
+	// Template receives adjusted Iteration: iteration / SharingNamespacesCount.
 	// Default 1 means normal behavior (one object per iteration).
 	SharingNamespacesCount int `yaml:"sharingNamespacesCount" json:"sharingNamespacesCount,omitempty"`
 }
