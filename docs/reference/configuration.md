@@ -345,6 +345,16 @@ This feature is helpful for:
       verbs: ["get"]
 ```
 
+#### Churn behavior
+
+When `repeatEveryNIterations` is used with namespace churn, kube-burner aligns the churn boundaries and starting positions to `repeatEveryNIterations` boundaries. This ensures that shared objects and their dependent namespaces are churned together as a unit.
+
+For example, with `jobIterations: 10`, `repeatEveryNIterations: 2`, and `churn percent: 50%`:
+  - Without alignment: 50% of 10 = 5 iterations would be churned
+  - With alignment: churn count is rounded up to the next `repeatEveryNIterations` boundary = 6 iterations
+
+This alignment ensures that when a shared object (e.g., ClusterRole) is deleted, all namespaces that reference it are also churned together, maintaining consistency.
+
 #### Validation
 
 All objects in a job must have consistent repeatEveryNIterations values:
