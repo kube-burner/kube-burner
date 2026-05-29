@@ -202,9 +202,9 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 			objectsExpected = obj.Replicas
 		} else {
 			effectiveIterations := iterations
-			// Calculate effective iterations accounting for SharingNamespacesCount.
-			if obj.SharingNamespacesCount > 1 {
-				effectiveIterations = (iterations + obj.SharingNamespacesCount - 1) / obj.SharingNamespacesCount
+			// Calculate effective iterations accounting for RepeatEveryNIterations.
+			if obj.RepeatEveryNIterations > 1 {
+				effectiveIterations = (iterations + obj.RepeatEveryNIterations - 1) / obj.RepeatEveryNIterations
 			}
 			objectsExpected = obj.Replicas * effectiveIterations
 		}

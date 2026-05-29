@@ -102,9 +102,9 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 	return ex
 }
 
-// buildTemplateData creates the template data map with adjusted iteration for SharingNamespacesCount.
+// buildTemplateData creates the template data map with adjusted iteration for RepeatEveryNIterations.
 func (ex *JobExecutor) buildTemplateData(obj *object, iteration, replicaIndex int) map[string]any {
-	adjustedIteration := iteration / obj.SharingNamespacesCount
+	adjustedIteration := iteration / obj.RepeatEveryNIterations
 
 	templateData := map[string]any{
 		jobName:      ex.Name,

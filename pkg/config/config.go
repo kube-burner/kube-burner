@@ -97,7 +97,7 @@ func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 		Wait:                   true,
 		Churn:                  true,
 		Replicas:               1,
-		SharingNamespacesCount: 1,
+		RepeatEveryNIterations: 1,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err
@@ -299,7 +299,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
-	if err := validateSharingNamespacesCount(); err != nil {
+	if err := validateRepeatEveryNIterations(); err != nil {
 		return configSpec, err
 	}
 	if err := HookBeforeWorkload(); err != nil {
@@ -471,20 +471,26 @@ func validateGC() error {
 	return nil
 }
 
-// validateSharingNamespacesCount checks that all objects in a job have consistent SharingNamespacesCount values
-// All objects must have either SharingNamespacesCount=1 or the same non-1 value
-func validateSharingNamespacesCount() error {
+// validateRepeatEveryNIterations checks that:
+// 1. All objects in a job have consistent RepeatEveryNIterations values (all =1 or all same non-1 value)
+// 2. RepeatEveryNIterations > 1 is not used with object-based churn mode
+func validateRepeatEveryNIterations() error {
 	for _, job := range configSpec.Jobs {
 		var nonDefaultValue int
 		for _, obj := range job.Objects {
-			if obj.SharingNamespacesCount > 1 {
+			if obj.RepeatEveryNIterations > 1 {
 				if nonDefaultValue == 0 {
-					nonDefaultValue = obj.SharingNamespacesCount
-				} else if obj.SharingNamespacesCount != nonDefaultValue {
-					return fmt.Errorf("job %s: inconsistent SharingNamespacesCount values. Found both %d and %d. All objects must have SharingNamespacesCount=1 or the same non-1 value",
-						job.Name, nonDefaultValue, obj.SharingNamespacesCount)
+					nonDefaultValue = obj.RepeatEveryNIterations
+				} else if obj.RepeatEveryNIterations != nonDefaultValue {
+					return fmt.Errorf("job %s: inconsistent RepeatEveryNIterations values. Found both %d and %d. All objects must have RepeatEveryNIterations=1 or the same non-1 value",
+						job.Name, nonDefaultValue, obj.RepeatEveryNIterations)
 				}
 			}
+		}
+		// Check that RepeatEveryNIterations > 1 is not used with object-based churn
+		if nonDefaultValue > 1 && IsChurnEnabled(job) && job.ChurnConfig.Mode == ChurnObjects {
+			return fmt.Errorf("job %s: repeatEveryNIterations > 1 cannot be used with churn mode 'objects'. Use churn mode 'namespaces' instead",
+				job.Name)
 		}
 	}
 	return nil

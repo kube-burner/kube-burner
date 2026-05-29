@@ -144,11 +144,11 @@ type Object struct {
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
 	// Churn object
 	Churn bool `yaml:"churn" json:"churn,omitempty"`
-	// SharingNamespacesCount specifies how many namespaces share this object.
+	// RepeatEveryNIterations specifies how often to create this object.
 	// When set > 1, the object is created only once per N iterations.
-	// Template receives adjusted Iteration: iteration / SharingNamespacesCount.
+	// Template receives adjusted Iteration: iteration / RepeatEveryNIterations.
 	// Default 1 means normal behavior (one object per iteration).
-	SharingNamespacesCount int `yaml:"sharingNamespacesCount" json:"sharingNamespacesCount,omitempty"`
+	RepeatEveryNIterations int `yaml:"repeatEveryNIterations" json:"repeatEveryNIterations,omitempty"`
 }
 
 // Job defines a kube-burner job

@@ -3,13 +3,13 @@ global:
   gc: false
 
 jobs:
-  - name: sharing-namespaces-count-test
+  - name: repeat-every-n-iterations-test
     jobType: create
     jobIterations: 6
     qps: 20
     burst: 20
     namespacedIterations: true
-    namespace: snc-test
+    namespace: repeat-test
     waitWhenFinished: true
     verifyObjects: true
     errorOnVerify: true
@@ -19,14 +19,14 @@ jobs:
       delay: 2s
       mode: namespaces
       deleteDelay: 2s
-      
+
     objects:
-      # ClusterRole created once per 2 namespaces (shared across snc-test-0/snc-test-1, snc-test-2/snc-test-3)
+      # ClusterRole created once per 2 iterations (shared across repeat-test-0/repeat-test-1, repeat-test-2/repeat-test-3)
       - objectTemplate: objectTemplates/clusterrole.yml
-        sharingNamespacesCount: 2
+        repeatEveryNIterations: 2
 
       # RoleBinding in each namespace, referencing the shared ClusterRole
       - objectTemplate: objectTemplates/rolebinding.yml
         inputVars:
-          clusterRoleSnc: 2 # Must match ClusterRole's sharingNamespacesCount
-          namespace: snc-test
+          clusterRoleRepeatN: 2 # Must match ClusterRole's repeatEveryNIterations
+          namespace: repeat-test

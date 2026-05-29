@@ -1,10 +1,10 @@
 ---
-# Example: Sharing cluster-scoped objects across multiple namespaces
+# Example: Sharing objects across multiple iterations
 #
-# This demonstrates SharingNamespacesCount with PersistentVolumes.
+# This demonstrates repeatEveryNIterations with PersistentVolumes.
 # One PV is shared across 2 namespaces, each namespace gets its own PVC.
 #
-# With jobIterations=4 and SharingNamespacesCount=2:
+# With jobIterations=4 and repeatEveryNIterations=2:
 #   - PV pv-0 is used by namespaces ns-0 and ns-1
 #   - PV pv-1 is used by namespaces ns-2 and ns-3
 
@@ -24,13 +24,13 @@ jobs:
     errorOnVerify: true
     objects:
       # PersistentVolume (cluster-scoped)
-      # Created once per 2 namespaces
+      # Created once per 2 iterations
       - objectTemplate: templates/persistentvolume.yml
-        SharingNamespacesCount: 2
+        repeatEveryNIterations: 2
 
       # PersistentVolumeClaim (namespace-scoped)
       # One per namespace, references the shared PV
       - objectTemplate: templates/persistentvolumeclaim.yml
         inputVars:
-          pvSharingNamespacesCount: 2
+          pvRepeatN: 2
 

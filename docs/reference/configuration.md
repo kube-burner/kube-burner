@@ -239,7 +239,7 @@ Each object element supports the following parameters:
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize [how to wait](#object-wait-options) for object to be ready     | Object  | {}       |
 | `runOnce`              | Create or delete this object only once during the entire job    | Boolean | false   |
-| `SharingNamespacesCount`  | Controls how many namespaces share a single instance of an object. See [SharingNamespacesCount](#SharingNamespacesCount)  | Integer | 1   |
+| `repeatEveryNIterations`  | Controls how often to create an object (once per N iterations). See [repeatEveryNIterations](#repeatEveryNIterations)  | Integer | 1   |
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
@@ -267,18 +267,19 @@ The following object types have built-in waiters:
 !!! info
     Find more info about the waiters implementation in the `pkg/burner/waiters.go` file
 
-### SharingNamespacesCount
+### repeatEveryNIterations
 
-The `SharingNamespacesCount` parameter controls how many namespaces share a single instance of a cluster-scoped object. This is useful for cluster-scoped objects (like `ClusterRoles` or `PersistentVolume`) that should be shared across multiple namespaces.
-Without this, each iteration creates a namespace and a cluster-scoped resource. Thus we have one-to-one mapping for the namespace and cluster-scoped resource i.e a cluster-scoped resource is not shared across the namespaces. When SharingNamespacesCount is set for a cluster-scoped resource, an iteration creates a namespace, skips creating cluster-scoped resource if it is created in the previous iterations and then the namespace scoped object templates in that iteration has to use the corresponding previously created cluster-scoped resource, resulting the sharing of the cluster-scoped resource.
+The `repeatEveryNIterations` parameter controls how often an object is created - once per N iterations instead of every iteration. This is useful for objects (cluster-scoped or namespaced) that should be shared across multiple iterations.
 
-As some iterations skip creating the cluster scoped resource, next iterations need to adjust the .Iteration var while passing to the template. For example, in the below table, iteration 1 skips creating ClusterRole and then in iteration 2 adjusts the .Iteration to 1 so that clusterrole-{.Iteration} will be rendered as clusterrole-1
+Without this, each iteration creates every object. With `repeatEveryNIterations` set, an object is created only when the iteration number is a multiple of N. Other iterations skip creating that object and can reference the previously created one.
 
-The main intention of bringing this feature is to fit cluster-scoped object and the namespaces when shared into a sing job, so that churn and incremental features work. kube-burner adjusts churn boundaries and churn starting iterations according to the mapping between the cluster scoped resource and namespaces.
+As some iterations skip creating the object, the `.Iteration` template variable is adjusted accordingly. For example, with `repeatEveryNIterations: 2`, iteration 1 skips creating the object and uses `.Iteration = 0`, so `clusterrole-{{.Iteration}}` renders as `clusterrole-0`.
 
-Below table illustrates what kube-burner does in each iteration to create ClusterRole (cluster-scoped object) and RoleBinding, when a ClusterRole is shared among 2 RoleBinding (or namepsaces).
+This feature enables sharing objects across iterations within a single job, allowing churn and incremental features to work correctly. kube-burner adjusts churn boundaries and starting iterations according to the repeat interval.
 
-With SharingNamespacesCount: 2 set for ClusterRole (a cluster scoped object) and jobIterations: 10:
+Below table illustrates what kube-burner does in each iteration to create ClusterRole and RoleBinding, when a ClusterRole is shared among 2 RoleBindings.
+
+With repeatEveryNIterations: 2 set for ClusterRole and jobIterations: 10:
 
 | Iteration | Namespace | ClusterRole Created | RoleBinding Created |
 |--------------|---------------------------------------------------------|---------|---------|
@@ -302,18 +303,18 @@ This feature is helpful for:
 #### Template variables
 
 ```yaml
-  # sharing-namespaces-count-test.yml
+  # repeat-every-n-iterations-test.yml
   jobs:
-    - name: sharing-namespaces-count-test
+    - name: repeat-every-n-iterations-test
       namespace: test-ns
       objects:
-        # ClusterRole created once per 2 namespaces (shared across test-ns-0/test-ns-1, test-ns-2/test-ns-3)
+        # ClusterRole created once per 2 iterations (shared across test-ns-0/test-ns-1, test-ns-2/test-ns-3)
         - objectTemplate: objectTemplates/clusterrole.yml
-          SharingNamespacesCount: 2
+          repeatEveryNIterations: 2
         # RoleBinding in each namespace, referencing the shared ClusterRole
         - objectTemplate: objectTemplates/rolebinding.yml
           inputVars:
-            clusterRoleSnc: 2 # Must match ClusterRole's SharingNamespacesCount
+            repeatN: 2 # Must match ClusterRole's repeatEveryNIterations
             namespace: test-ns
 
   # rolebinding.yml
@@ -324,9 +325,9 @@ This feature is helpful for:
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
-    # Calculate: Iteration / clusterRoleSnc
-    # e.g., iteration 1 with clusterRoleSnc=2 → 1/2 = 0 → clusterrole-0
-    name: clusterrole-{{ div .Iteration .clusterRoleSnc }} # Same for test-ns-0 and test-ns-1
+    # Calculate: Iteration / repeatN
+    # e.g., iteration 1 with repeatN=2 → 1/2 = 0 → clusterrole-0
+    name: clusterrole-{{ div .Iteration .repeatN }} # Same for test-ns-0 and test-ns-1
   subjects:
     - kind: ServiceAccount
       name: default
@@ -346,10 +347,11 @@ This feature is helpful for:
 
 #### Validation
 
-All objects in a job must have consistent SharingNamespacesCount values:
-  - All objects can have SharingNamespacesCount: 1 (default)
+All objects in a job must have consistent repeatEveryNIterations values:
+  - All objects can have repeatEveryNIterations: 1 (default)
   - Or all non-default values must be the same (e.g., all 2)
-  - Mixing SharingNamespacesCount: 2 and SharingNamespacesCount: 3 is not allowed
+  - Mixing repeatEveryNIterations: 2 and repeatEveryNIterations: 3 is not allowed
+  - repeatEveryNIterations > 1 cannot be used with churn mode `objects`. Use churn mode `namespaces` instead
 
 ### Object wait Options
 

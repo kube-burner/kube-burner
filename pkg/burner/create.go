@@ -96,23 +96,31 @@ func (ex *JobExecutor) preloadClusterScopedObjects(ctx context.Context) []cluste
 }
 
 // deleteClusterScopedObjects marks cluster-scoped objects in the given iteration range
-// with a deletion label, then deletes them using CleanupNonNamespacedResourcesByLabel.
-func (ex *JobExecutor) deleteClusterScopedObjects(ctx context.Context, caches []clusterScopedObjectCache, iterationStart, iterationEnd int) {
+// with a deletion label, deletes them using CleanupNonNamespacedResourcesByLabel,
+// and returns the list of deleted objects for verification.
+func (ex *JobExecutor) deleteClusterScopedObjects(ctx context.Context, caches []clusterScopedObjectCache, iterationStart, iterationEnd int) []churnDeletedObject {
 	delPatch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":""}}}`, config.KubeBurnerLabelChurnDelete))
+	var deletedObjects []churnDeletedObject
 
 	for _, cache := range caches {
 		resourceInterface := ex.dynamicClient.Resource(cache.obj.gvr)
 
 		for i := iterationStart; i < iterationEnd; i++ {
-			if i%cache.obj.SharingNamespacesCount == 0 {
+			if i%cache.obj.RepeatEveryNIterations == 0 {
 				items, exists := cache.itemsByIteration[i]
 				if !exists {
 					continue
 				}
-				for _, item := range items {
+				for idx := range items {
+					item := &items[idx]
 					_, err := resourceInterface.Patch(ctx, item.GetName(), types.MergePatchType, delPatch, metav1.PatchOptions{})
 					if err != nil {
 						log.Errorf("Error applying deletion label to %s %s: %v", cache.obj.Kind, item.GetName(), err)
+					} else {
+						deletedObjects = append(deletedObjects, churnDeletedObject{
+							object: item,
+							gvr:    cache.obj.gvr,
+						})
 					}
 				}
 			}
@@ -120,6 +128,7 @@ func (ex *JobExecutor) deleteClusterScopedObjects(ctx context.Context, caches []
 
 		CleanupNonNamespacedResourcesByLabel(ctx, *ex, cache.obj, config.KubeBurnerLabelChurnDelete)
 	}
+	return deletedObjects
 }
 
 func (ex *JobExecutor) setupCreateJob() {
@@ -242,11 +251,11 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
 					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
 				}
-			} else if obj.SharingNamespacesCount > 1 {
-				// Only create when iteration is a multiple of SharingNamespacesCount
-				if i%obj.SharingNamespacesCount == 0 {
-					log.Debugf("SharingNamespacesCount=%d: creating %s at iteration %d",
-						obj.SharingNamespacesCount, obj.ObjectTemplate, i)
+			} else if obj.RepeatEveryNIterations > 1 {
+				// Only create when iteration is a multiple of RepeatEveryNIterations
+				if i%obj.RepeatEveryNIterations == 0 {
+					log.Debugf("RepeatEveryNIterations=%d: creating %s at iteration %d",
+						obj.RepeatEveryNIterations, obj.ObjectTemplate, i)
 					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
 				}
 			} else {
@@ -335,7 +344,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 				if !obj.namespaced {
 					n = ""
 				}
-				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout, obj.SharingNamespacesCount > 1)
+				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
 			}(ns)
 		}(r)
 	}
@@ -387,7 +396,7 @@ func (ex *JobExecutor) waitForCompletion(ctx context.Context, iterationStart, it
 	}
 }
 
-func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration, allowClusterScopedChurn bool) {
+func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersionResource, ns string, obj *unstructured.Unstructured, timeout time.Duration) {
 	var uns *unstructured.Unstructured
 	var err error
 	if log.GetLevel() == log.TraceLevel {
@@ -406,13 +415,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ns != "" {
 			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(ctx, obj, metav1.CreateOptions{})
 		} else {
-			if !ex.nsChurning || allowClusterScopedChurn {
-				uns, err = ex.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
-			} else {
-				// Skip non-namespaced objects during namespace churning - they won't be deleted with the namespace
-				log.Debugf("Skipping non-namespaced object %s/%s during namespace churning", obj.GetKind(), obj.GetName())
-				return true, nil
-			}
+			uns, err = ex.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
 		}
 		if err != nil {
 			if kerrors.IsUnauthorized(err) {
@@ -502,20 +505,20 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 
 	// Pre-load cluster-scoped objects once before the churn loop
 	clusterScopedCaches := ex.preloadClusterScopedObjects(ctx)
-	sharingNamespacesCount := 1
+	repeatEveryNIterations := 1
 	for _, obj := range ex.objects {
-		if obj.SharingNamespacesCount > sharingNamespacesCount {
-			sharingNamespacesCount = obj.SharingNamespacesCount
+		if obj.RepeatEveryNIterations > repeatEveryNIterations {
+			repeatEveryNIterations = obj.RepeatEveryNIterations
 			break
 		}
 	}
-	// Align numToChurn to SharingNamespacesCount boundary.
-	if sharingNamespacesCount > 1 {
-		numToChurn = ((numToChurn + sharingNamespacesCount - 1) / sharingNamespacesCount) * sharingNamespacesCount
+	// Align numToChurn to RepeatEveryNIterations boundary.
+	if repeatEveryNIterations > 1 {
+		numToChurn = ((numToChurn + repeatEveryNIterations - 1) / repeatEveryNIterations) * repeatEveryNIterations
 		if numToChurn > len(nsList) {
-			numToChurn = (len(nsList) / sharingNamespacesCount) * sharingNamespacesCount
+			numToChurn = (len(nsList) / repeatEveryNIterations) * repeatEveryNIterations
 		}
-		log.Debugf("Aligned numToChurn to %d (maxSharingNamespacesCount=%d)", numToChurn, sharingNamespacesCount)
+		log.Debugf("Aligned numToChurn to %d (maxRepeatEveryNIterations=%d)", numToChurn, repeatEveryNIterations)
 	}
 
 	for {
@@ -535,13 +538,13 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 			return errs
 		}
 
-		// Align randStart to sharingNamespacesCount boundaries for proper shared object handling.
-		if sharingNamespacesCount > 1 {
-			// Calculate number of valid starting positions (aligned to sharingNamespacesCount)
+		// Align randStart to repeatEveryNIterations boundaries for proper shared object handling.
+		if repeatEveryNIterations > 1 {
+			// Calculate number of valid starting positions (aligned to repeatEveryNIterations)
 			maxValidStart := len(nsList) - numToChurn
-			numValidPositions := (maxValidStart / sharingNamespacesCount) + 1
+			numValidPositions := (maxValidStart / repeatEveryNIterations) + 1
 			if numValidPositions > 0 {
-				randStart = rand.Intn(numValidPositions) * sharingNamespacesCount
+				randStart = rand.Intn(numValidPositions) * repeatEveryNIterations
 			}
 		} else if len(nsList)-numToChurn+1 > 0 {
 			randStart = rand.Intn(len(nsList) - numToChurn + 1)
@@ -566,8 +569,10 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		// 1 hour timeout to delete namespace
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
 		// Delete shared cluster-scoped objects that serve the churned namespaces
-		ex.deleteClusterScopedObjects(cleanupCtx, clusterScopedCaches, randStart, numToChurn+randStart)
+		// Some cluster-scoped objects need to be deleted in parallel with the namespaces, so we verify them only after namespace deletion
+		deletedObjects := ex.deleteClusterScopedObjects(cleanupCtx, clusterScopedCaches, randStart, numToChurn+randStart)
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
+		ex.verifyDelete(ctx, deletedObjects)
 		if ex.ChurnConfig.DeleteDelay > 0 {
 			log.Infof("Sleeping for %v after deletion", ex.ChurnConfig.DeleteDelay)
 			time.Sleep(ex.ChurnConfig.DeleteDelay)
@@ -609,13 +614,6 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 		}
 		log.Infof("Deleting objects in churn cycle %d", cyclesCount)
 		for _, obj := range ex.objects {
-			// Skip shared objects from individual churn - they're cluster-scoped
-			// and shouldn't be churned independently of their namespaces
-			if obj.SharingNamespacesCount > 1 {
-				log.Debugf("Skipping %s from object churn (SharingNamespacesCount=%d)",
-					obj.ObjectTemplate, obj.SharingNamespacesCount)
-				continue
-			}
 			// if churning is enabled for the object
 			if obj.Churn {
 				labelSelector := obj.LabelSelector
@@ -697,7 +695,7 @@ func (ex *JobExecutor) reCreateDeletedObjects(ctx context.Context, deletedObject
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout, false)
+			ex.createRequest(ctx, objectToCreate.gvr, objectToCreate.object.GetNamespace(), objectToCreate.object, ex.MaxWaitTimeout)
 		}()
 	}
 	wg.Wait()

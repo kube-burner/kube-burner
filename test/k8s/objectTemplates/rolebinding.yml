@@ -5,9 +5,9 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  # Calculate: Iteration / clusterRoleSnc
-  # e.g., iteration 1 with clusterRoleSnc=2 → 1/2 = 0 → clusterrole-0
-  name: clusterrole-{{ div .Iteration .clusterRoleSnc }}
+  # Calculate: Iteration / clusterRoleRepeatN
+  # e.g., iteration 1 with clusterRoleRepeatN=2 → 1/2 = 0 → clusterrole-0
+  name: clusterrole-{{ div .Iteration .clusterRoleRepeatN }}
 subjects:
   - kind: ServiceAccount
     name: default
