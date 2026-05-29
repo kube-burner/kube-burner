@@ -2333,7 +2333,6 @@
                   "_id": 1,
                   "_index": 2,
                   "_type": 3,
-                  "achievedQps": 7,
                   "elapsedTime": 8,
                   "jobConfig.burst": 6,
                   "jobConfig.cleanup": 12,
@@ -2360,7 +2359,6 @@
                 },
                 "renameByName": {
                   "_type": "",
-                  "achievedQps": "Achieved QPS",
                   "elapsedTime": "Elapsed time (seconds)",
                   "jobConfig.burst": "Burst",
                   "jobConfig.cleanup": "",

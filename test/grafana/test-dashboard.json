@@ -205,7 +205,6 @@
               "_id": true,
               "_index": true,
               "_type": true,
-              "achievedQps": false,
               "elapsedTime": false,
               "endTimestamp": true,
               "highlight": true,
@@ -245,7 +244,6 @@
               "_id": 1,
               "_index": 2,
               "_type": 5,
-              "achievedQps": 11,
               "elapsedTime": 10,
               "endTimestamp": 6,
               "highlight": 7,
@@ -278,7 +276,6 @@
             },
             "renameByName": {
               "_type": "",
-              "achievedQps": "Achieved QPS",
               "elapsedTime": "Elapsed Time",
               "jobConfig.burst": "Burst",
               "jobConfig.jobIterations": "Iterations",
