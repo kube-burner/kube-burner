@@ -239,6 +239,7 @@ Each object element supports the following parameters:
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize [how to wait](#object-wait-options) for object to be ready     | Object  | {}       |
 | `runOnce`              | Create or delete this object only once during the entire job    | Boolean | false   |
+| `repeatEveryNIterations`  | Controls how often to create an object (once per N iterations). See [repeatEveryNIterations](#repeatEveryNIterations)  | Integer | 1   |
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
@@ -265,6 +266,102 @@ The following object types have built-in waiters:
 
 !!! info
     Find more info about the waiters implementation in the `pkg/burner/waiters.go` file
+
+### repeatEveryNIterations
+
+The `repeatEveryNIterations` parameter controls how often an object is created - once per N iterations instead of every iteration. This is useful for objects (cluster-scoped or namespaced) that should be shared across multiple iterations.
+
+Without this, each iteration creates every object. With `repeatEveryNIterations` set, an object is created only when the iteration number is a multiple of N. Other iterations skip creating that object and can reference the previously created one.
+
+As some iterations skip creating the object, the `.Iteration` template variable is adjusted accordingly. For example, with `repeatEveryNIterations: 2`, iteration 1 skips creating the object and uses `.Iteration = 0`, so `clusterrole-{{.Iteration}}` renders as `clusterrole-0`.
+
+This feature enables sharing objects across iterations within a single job, allowing churn and incremental features to work correctly. kube-burner adjusts churn boundaries and starting iterations according to the repeat interval.
+
+Below table illustrates what kube-burner does in each iteration to create ClusterRole and RoleBinding, when a ClusterRole is shared among 2 RoleBindings.
+
+With repeatEveryNIterations: 2 set for ClusterRole and jobIterations: 10:
+
+| Iteration | Namespace | ClusterRole Created | RoleBinding Created |
+|--------------|---------------------------------------------------------|---------|---------|
+| 0 | test-ns-0 | clusterrole-0 ✓ | binding-0 (refs clusterrole-0) |
+| 1 | test-ns-1 | (shares clusterrole-0) | binding-1 (refs clusterrole-0) |
+| 2 | test-ns-2 | clusterrole-1 ✓ | binding-2 (refs clusterrole-1) |
+| 3 | test-ns-3 | (shares clusterrole-1)  | binding-3 (refs clusterrole-1) |
+| ... | ... | ...  | ... |
+
+  **Default:** `1` (one object per namespace iteration)
+
+#### Use Cases
+
+This feature is helpful for:
+ - **PersistentVolume/PersistentVolumeClaim**: One PV shared by PVCs across multiple namespaces
+ - **EgressIP**: One EgressIP shared by pods across multiple namespaces
+ - **ClusterUserDefinedNetwork**: One network definition used by workloads in multiple namespaces
+ - **MultiNetworkPolicy**: Network policies that span namespace groups
+ - **ClusterRole/RoleBinding**: One ClusterRole referenced by RoleBindings in multiple namespaces
+
+#### Template variables
+
+```yaml
+  # repeat-every-n-iterations-test.yml
+  jobs:
+    - name: repeat-every-n-iterations-test
+      namespace: test-ns
+      objects:
+        # ClusterRole created once per 2 iterations (shared across test-ns-0/test-ns-1, test-ns-2/test-ns-3)
+        - objectTemplate: objectTemplates/clusterrole.yml
+          repeatEveryNIterations: 2
+        # RoleBinding in each namespace, referencing the shared ClusterRole
+        - objectTemplate: objectTemplates/rolebinding.yml
+          inputVars:
+            repeatN: 2 # Must match ClusterRole's repeatEveryNIterations
+            namespace: test-ns
+
+  # rolebinding.yml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: binding-{{.Iteration}}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    # Calculate: Iteration / repeatN
+    # e.g., iteration 1 with repeatN=2 → 1/2 = 0 → clusterrole-0
+    name: clusterrole-{{ div .Iteration .repeatN }} # Same for test-ns-0 and test-ns-1
+  subjects:
+    - kind: ServiceAccount
+      name: default
+      namespace: {{.namespace}}-{{.Iteration}}
+
+  # clusterrole.yml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    # kube-burner adjusted this .Iteration
+    name: clusterrole-{{.Iteration}}
+  rules:
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get"]
+```
+
+#### Churn behavior
+
+When `repeatEveryNIterations` is used with namespace churn, kube-burner aligns the churn boundaries and starting positions to `repeatEveryNIterations` boundaries. This ensures that shared objects and their dependent namespaces are churned together as a unit.
+
+For example, with `jobIterations: 10`, `repeatEveryNIterations: 2`, and `churn percent: 50%`:
+  - Without alignment: 50% of 10 = 5 iterations would be churned
+  - With alignment: churn count is rounded up to the next `repeatEveryNIterations` boundary = 6 iterations
+
+This alignment ensures that when a shared object (e.g., ClusterRole) is deleted, all namespaces that reference it are also churned together, maintaining consistency.
+
+#### Validation
+
+All objects in a job must have consistent repeatEveryNIterations values:
+  - All objects can have repeatEveryNIterations: 1 (default)
+  - Or all non-default values must be the same (e.g., all 2)
+  - Mixing repeatEveryNIterations: 2 and repeatEveryNIterations: 3 is not allowed
+  - repeatEveryNIterations > 1 cannot be used with churn mode `objects`. Use churn mode `namespaces` instead
 
 ### Object wait Options
 
