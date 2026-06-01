@@ -94,9 +94,10 @@ func (c *ChurnConfig) UnmarshalYAML(unmarshal func(any) error) error {
 func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
-		Wait:     true,
-		Churn:    true,
-		Replicas: 1,
+		Wait:                   true,
+		Churn:                  true,
+		Replicas:               1,
+		RepeatEveryNIterations: 1,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err
@@ -298,6 +299,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
+	if err := validateRepeatEveryNIterations(); err != nil {
+		return configSpec, err
+	}
 	if err := HookBeforeWorkload(); err != nil {
 		return configSpec, err
 	}
@@ -462,6 +466,31 @@ func validateGC() error {
 	for _, job := range configSpec.Jobs {
 		if job.GC {
 			return fmt.Errorf("jobs GC and global waitWhenFinished cannot be enabled at the same time")
+		}
+	}
+	return nil
+}
+
+// validateRepeatEveryNIterations checks that:
+// 1. All objects in a job have consistent RepeatEveryNIterations values (all =1 or all same non-1 value)
+// 2. RepeatEveryNIterations > 1 is not used with object-based churn mode
+func validateRepeatEveryNIterations() error {
+	for _, job := range configSpec.Jobs {
+		var nonDefaultValue int
+		for _, obj := range job.Objects {
+			if obj.RepeatEveryNIterations > 1 {
+				if nonDefaultValue == 0 {
+					nonDefaultValue = obj.RepeatEveryNIterations
+				} else if obj.RepeatEveryNIterations != nonDefaultValue {
+					return fmt.Errorf("job %s: inconsistent RepeatEveryNIterations values. Found both %d and %d. All objects must have RepeatEveryNIterations=1 or the same non-1 value",
+						job.Name, nonDefaultValue, obj.RepeatEveryNIterations)
+				}
+			}
+		}
+		// Check that RepeatEveryNIterations > 1 is not used with object-based churn
+		if nonDefaultValue > 1 && IsChurnEnabled(job) && job.ChurnConfig.Mode == ChurnObjects {
+			return fmt.Errorf("job %s: repeatEveryNIterations > 1 cannot be used with churn mode 'objects'. Use churn mode 'namespaces' instead",
+				job.Name)
 		}
 	}
 	return nil

@@ -1,0 +1,32 @@
+---
+global:
+  gc: false
+
+jobs:
+  - name: repeat-every-n-iterations-test
+    jobType: create
+    jobIterations: 6
+    qps: 20
+    burst: 20
+    namespacedIterations: true
+    namespace: repeat-test
+    waitWhenFinished: true
+    verifyObjects: true
+    errorOnVerify: true
+    churnConfig:
+      duration: 10s
+      percent: 20
+      delay: 2s
+      mode: namespaces
+      deleteDelay: 2s
+
+    objects:
+      # ClusterRole created once per 2 iterations (shared across repeat-test-0/repeat-test-1, repeat-test-2/repeat-test-3)
+      - objectTemplate: objectTemplates/clusterrole.yml
+        repeatEveryNIterations: 2
+
+      # RoleBinding in each namespace, referencing the shared ClusterRole
+      - objectTemplate: objectTemplates/rolebinding.yml
+        inputVars:
+          clusterRoleRepeatN: 2 # Must match ClusterRole's repeatEveryNIterations
+          namespace: repeat-test
