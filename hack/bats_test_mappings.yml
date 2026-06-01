@@ -27,3 +27,10 @@
 - label: subsystem:preload
   paths:
   - pkg/burner/pre_load.go
+- label: subsystem:repeat-every-n-iterations
+  paths:
+  - pkg/burner/create.go
+  - pkg/burner/executor.go
+  - pkg/config/types.go
+  - pkg/config/config.go
+    

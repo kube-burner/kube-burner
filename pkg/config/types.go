@@ -158,6 +158,11 @@ type Object struct {
 	Churn bool `yaml:"churn" json:"churn,omitempty"`
 	// Group controls grouping and per-object lifecycle behavior within grouped execution
 	Group ObjectGroup `yaml:"group" json:"group,omitempty"`
+	// RepeatEveryNIterations specifies how often to create this object.
+	// When set > 1, the object is created only once per N iterations.
+	// Template receives adjusted Iteration: iteration / RepeatEveryNIterations.
+	// Default 1 means normal behavior (one object per iteration).
+	RepeatEveryNIterations int `yaml:"repeatEveryNIterations" json:"repeatEveryNIterations,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -196,6 +201,8 @@ type Job struct {
 	Cleanup bool `yaml:"cleanup" json:"cleanup,omitempty"`
 	// NamespacedIterations create a namespace per job iteration
 	NamespacedIterations bool `yaml:"namespacedIterations" json:"namespacedIterations,omitempty"`
+	// PreCreateNamespaces creates all namespaces upfront before object creation begins
+	PreCreateNamespaces bool `yaml:"preCreateNamespaces" json:"preCreateNamespaces,omitempty"`
 	// IterationsPerNamespace is the modulus to apply to job iterations to calculate . Default 1
 	IterationsPerNamespace int `yaml:"iterationsPerNamespace" json:"iterationsPerNamespace,omitempty"`
 	// VerifyObjects verify object count after running the job

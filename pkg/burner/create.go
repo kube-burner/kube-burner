@@ -141,6 +141,85 @@ func (ex *JobExecutor) gcGroupObjects(ctx context.Context, grp objectGroupEntry)
 	}
 }
 
+// clusterScopedObjectCache holds pre-loaded cluster-scoped objects grouped by iteration
+type clusterScopedObjectCache struct {
+	obj              *object
+	itemsByIteration map[int][]unstructured.Unstructured
+}
+
+// preloadClusterScopedObjects lists all cluster-scoped objects once and groups them by iteration.
+// This avoids repeated List calls during each churn cycle.
+func (ex *JobExecutor) preloadClusterScopedObjects(ctx context.Context) []clusterScopedObjectCache {
+	caches := make([]clusterScopedObjectCache, 0)
+
+	for _, obj := range ex.objects {
+		if obj.namespaced {
+			continue
+		}
+
+		labelSelector := fmt.Sprintf("%s=%s,%s=%s",
+			config.KubeBurnerLabelJob, ex.Name,
+			config.KubeBurnerLabelUUID, ex.uuid)
+
+		resources, err := ex.dynamicClient.Resource(obj.gvr).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			log.Errorf("Error listing cluster-scoped objects %s: %v", obj.ObjectTemplate, err)
+			continue
+		}
+
+		// Group by job-iteration label (handles replicas automatically)
+		itemsByIteration := make(map[int][]unstructured.Unstructured)
+		for _, item := range resources.Items {
+			iterLabel := item.GetLabels()[config.KubeBurnerLabelJobIteration]
+			iter, _ := strconv.Atoi(iterLabel)
+			itemsByIteration[iter] = append(itemsByIteration[iter], item)
+		}
+
+		caches = append(caches, clusterScopedObjectCache{
+			obj:              obj,
+			itemsByIteration: itemsByIteration,
+		})
+	}
+
+	return caches
+}
+
+// deleteClusterScopedObjects marks cluster-scoped objects in the given iteration range
+// with a deletion label, deletes them using CleanupNonNamespacedResourcesByLabel,
+// and returns the list of deleted objects for verification.
+func (ex *JobExecutor) deleteClusterScopedObjects(ctx context.Context, caches []clusterScopedObjectCache, iterationStart, iterationEnd int) []churnDeletedObject {
+	delPatch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":""}}}`, config.KubeBurnerLabelChurnDelete))
+	var deletedObjects []churnDeletedObject
+
+	for _, cache := range caches {
+		resourceInterface := ex.dynamicClient.Resource(cache.obj.gvr)
+
+		for i := iterationStart; i < iterationEnd; i++ {
+			if i%cache.obj.RepeatEveryNIterations == 0 {
+				items, exists := cache.itemsByIteration[i]
+				if !exists {
+					continue
+				}
+				for idx := range items {
+					item := &items[idx]
+					_, err := resourceInterface.Patch(ctx, item.GetName(), types.MergePatchType, delPatch, metav1.PatchOptions{})
+					if err != nil {
+						log.Errorf("Error applying deletion label to %s %s: %v", cache.obj.Kind, item.GetName(), err)
+					} else {
+						deletedObjects = append(deletedObjects, churnDeletedObject{
+							object: item,
+							gvr:    cache.obj.gvr,
+						})
+					}
+				}
+			}
+		}
+
+		CleanupNonNamespacedResourcesByLabel(ctx, *ex, cache.obj, config.KubeBurnerLabelChurnDelete)
+	}
+	return deletedObjects
+}
+
 func (ex *JobExecutor) setupCreateJob() {
 	var f io.ReadCloser
 	var err error
@@ -219,8 +298,13 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 	var hookErrors []error
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
-	if ex.nsRequired && !ex.NamespacedIterations {
-		ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
+	if ex.nsRequired {
+		if ex.PreCreateNamespaces {
+			ex.preCreateNamespaces(iterationStart, iterationEnd, nsLabels, nsAnnotations)
+		}
+		if !ex.NamespacedIterations {
+			ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
+		}
 	}
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
@@ -266,6 +350,13 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 				if i == 0 {
 					// this executes only once during the first iteration of an object
 					log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
+					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
+				}
+			} else if obj.RepeatEveryNIterations > 1 {
+				// Only create when iteration is a multiple of RepeatEveryNIterations
+				if i%obj.RepeatEveryNIterations == 0 {
+					log.Debugf("RepeatEveryNIterations=%d: creating %s at iteration %d",
+						obj.RepeatEveryNIterations, obj.ObjectTemplate, i)
 					ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
 				}
 			} else {
@@ -314,15 +405,9 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 
-	// Phase 1: Create all namespaces upfront
+	// Phase 1: Create all namespaces upfront (grouped execution always pre-creates namespaces)
 	if ex.nsRequired {
-		if ex.NamespacedIterations {
-			for i := iterationStart; i < iterationEnd; i++ {
-				ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
-			}
-		} else {
-			ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
-		}
+		ex.preCreateNamespaces(iterationStart, iterationEnd, nsLabels, nsAnnotations)
 	}
 
 	groups := ex.groupObjectsByNumber()
@@ -418,6 +503,17 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 	}
 
 	return waitErrors
+}
+
+// preCreateNamespaces creates all required namespaces upfront before object creation begins.
+func (ex *JobExecutor) preCreateNamespaces(iterationStart, iterationEnd int, nsLabels, nsAnnotations map[string]string) {
+	if ex.NamespacedIterations {
+		for i := iterationStart; i < iterationEnd; i++ {
+			ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
+		}
+	} else {
+		ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
+	}
 }
 
 // Simple integer division on the iteration allows us to batch iterations into
@@ -549,13 +645,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ns != "" {
 			uns, err = ex.dynamicClient.Resource(gvr).Namespace(ns).Create(ctx, obj, metav1.CreateOptions{})
 		} else {
-			if !ex.nsChurning {
-				uns, err = ex.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
-			} else {
-				// Skip non-namespaced objects during namespace churning - they won't be deleted with the namespace
-				log.Debugf("Skipping non-namespaced object %s/%s during namespace churning", obj.GetKind(), obj.GetName())
-				return true, nil
-			}
+			uns, err = ex.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
 		}
 		if err != nil {
 			if kerrors.IsUnauthorized(err) {
@@ -643,6 +733,24 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 	}
 	numToChurn := int(math.Max(float64(ex.ChurnConfig.Percent*len(jobNamespaces.Items)/100), 1))
 
+	// Pre-load cluster-scoped objects once before the churn loop
+	clusterScopedCaches := ex.preloadClusterScopedObjects(ctx)
+	repeatEveryNIterations := 1
+	for _, obj := range ex.objects {
+		if obj.RepeatEveryNIterations > repeatEveryNIterations {
+			repeatEveryNIterations = obj.RepeatEveryNIterations
+			break
+		}
+	}
+	// Align numToChurn to RepeatEveryNIterations boundary.
+	if repeatEveryNIterations > 1 {
+		numToChurn = ((numToChurn + repeatEveryNIterations - 1) / repeatEveryNIterations) * repeatEveryNIterations
+		if numToChurn > len(nsList) {
+			numToChurn = (len(nsList) / repeatEveryNIterations) * repeatEveryNIterations
+		}
+		log.Debugf("Aligned numToChurn to %d (maxRepeatEveryNIterations=%d)", numToChurn, repeatEveryNIterations)
+	}
+
 	for {
 		var randStart int
 		if ex.ChurnConfig.Duration > 0 {
@@ -660,8 +768,15 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 			return errs
 		}
 
-		// Max amount of churn is 100% of namespaces
-		if len(nsList)-numToChurn+1 > 0 {
+		// Align randStart to repeatEveryNIterations boundaries for proper shared object handling.
+		if repeatEveryNIterations > 1 {
+			// Calculate number of valid starting positions (aligned to repeatEveryNIterations)
+			maxValidStart := len(nsList) - numToChurn
+			numValidPositions := (maxValidStart / repeatEveryNIterations) + 1
+			if numValidPositions > 0 {
+				randStart = rand.Intn(numValidPositions) * repeatEveryNIterations
+			}
+		} else if len(nsList)-numToChurn+1 > 0 {
 			randStart = rand.Intn(len(nsList) - numToChurn + 1)
 		}
 		// We need to perform a natural sort
@@ -683,7 +798,11 @@ func (ex *JobExecutor) churnNamespaces(ctx context.Context) []error {
 		}
 		// 1 hour timeout to delete namespace
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), time.Hour)
+		// Delete shared cluster-scoped objects that serve the churned namespaces
+		// Some cluster-scoped objects need to be deleted in parallel with the namespaces, so we verify them only after namespace deletion
+		deletedObjects := ex.deleteClusterScopedObjects(cleanupCtx, clusterScopedCaches, randStart, numToChurn+randStart)
 		util.CleanupNamespacesByLabel(cleanupCtx, ex.clientSet, config.KubeBurnerLabelChurnDelete)
+		ex.verifyDelete(ctx, deletedObjects)
 		if ex.ChurnConfig.DeleteDelay > 0 {
 			log.Infof("Sleeping for %v after deletion", ex.ChurnConfig.DeleteDelay)
 			time.Sleep(ex.ChurnConfig.DeleteDelay)
@@ -744,7 +863,17 @@ func (ex *JobExecutor) churnObjects(ctx context.Context) {
 					return timeI.Before(&timeJ)
 				})
 				log.Debugf("Total %s listed: %d, churning %d%%", obj.gvr.Resource, len(objectList.Items), ex.ChurnConfig.Percent)
+				if len(objectList.Items) == 0 {
+					log.Warnf("No %s found with label selector %s, skipping churn cycle", obj.gvr.Resource, labels.FormatLabels(labelSelector))
+					continue
+				}
 				percent := int(math.Max(float64(ex.ChurnConfig.Percent*len(objectList.Items)/100), 1))
+				if percent < 0 {
+					percent = 0
+				}
+				if percent > len(objectList.Items) {
+					percent = len(objectList.Items)
+				}
 				objectsToDelete := objectList.Items[:percent]
 				log.Infof("Deleting %d %s", len(objectsToDelete), obj.gvr.Resource)
 				for _, objToDelete := range objectsToDelete {

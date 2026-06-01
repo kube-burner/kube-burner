@@ -346,3 +346,18 @@ teardown_file() {
   run ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --timeout=2s
   [ "$status" -eq 2 ]
 }
+
+# bats test_tags=subsystem:sharing-namespaces-count
+@test "kube-burner: repeatEveryNIterations for objects" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-repeat-every-n-iterations.yml --uuid=${UUID}
+
+  # Verify ClusterRoles: 6 iterations / 2 repeatEveryNIterations = 3 ClusterRoles
+  clusterroles=$(kubectl get clusterroles -l kube-burner.io/uuid=${UUID} --no-headers | wc -l)
+  [ "$clusterroles" -eq 3 ]
+
+  # Verify RoleBindings: 6 (one per namespace)
+  bindings=$(kubectl get rolebindings -A -l kube-burner.io/uuid=${UUID} --no-headers | wc -l)
+  [ "$bindings" -eq 6 ]
+  ${KUBE_BURNER} destroy -c kube-burner-repeat-every-n-iterations.yml
+}
+
