@@ -181,6 +181,7 @@ func NormalizeLabels(labels map[string]string) map[string]string {
 	return out
 }
 
+// IsLocalIndexer checks if the given indexer is a local indexer
 func IsLocalIndexer(indexer indexers.IndexerType) bool {
 	switch indexer {
 	case indexers.LocalIndexer, indexers.TSDBIndexer:
