@@ -66,9 +66,12 @@ var (
 	}
 )
 
-func (ex *JobExecutor) waitForObjects(ctx context.Context, ns string) []error {
+func (ex *JobExecutor) waitForObjects(ctx context.Context, ns string, groupNumber ...int) []error {
 	var errs []error
 	for _, obj := range ex.objects {
+		if len(groupNumber) > 0 && obj.Group.ID != groupNumber[0] {
+			continue
+		}
 		if err := ex.waitForObject(ctx, ns, obj); err != nil {
 			errs = append(errs, err)
 		}
