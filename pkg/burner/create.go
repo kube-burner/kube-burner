@@ -445,10 +445,27 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 				if obj.gvr == (schema.GroupVersionResource{}) {
 					ex.resolveObjectMapping(obj)
 				}
+				// If namespace requirements become known only after resolving the REST mapping.
+				if ns == "" && obj.namespaced && obj.namespace == "" {
+					if ex.NamespacedIterations {
+						ns = ex.createNamespace(ex.generateNamespace(i), nsLabels, nsAnnotations)
+					} else {
+						ns = ex.createNamespace(ex.Namespace, nsLabels, nsAnnotations)
+					}
+					groupCreatedNamespaces[ns] = true
+				}
+				// Use the global object index (ex.objects) to keep kube-burner.io/index stable.
+				globalIndex := objectIndex
+				for idx, o := range ex.objects {
+					if o == obj {
+						globalIndex = idx
+						break
+					}
+				}
 				kbLabels := map[string]string{
 					config.KubeBurnerLabelUUID:         ex.uuid,
 					config.KubeBurnerLabelJob:          ex.Name,
-					config.KubeBurnerLabelIndex:        strconv.Itoa(objectIndex),
+					config.KubeBurnerLabelIndex:        strconv.Itoa(globalIndex),
 					config.KubeBurnerLabelRunID:        ex.runid,
 					config.KubeBurnerLabelJobIteration: strconv.Itoa(i),
 				}
@@ -456,6 +473,11 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 				if obj.RunOnce {
 					if i == 0 {
 						log.Debugf("RunOnce set to %s, so creating object once", obj.ObjectTemplate)
+						ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
+					}
+				} else if obj.RepeatEveryNIterations > 1 {
+					if i%obj.RepeatEveryNIterations == 0 {
+						log.Debugf("RepeatEveryNIterations=%d: creating %s at iteration %d", obj.RepeatEveryNIterations, obj.ObjectTemplate, i)
 						ex.replicaHandler(ctx, kbLabels, obj, ns, i, &wg)
 					}
 				} else {
