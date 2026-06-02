@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -178,4 +179,14 @@ func NormalizeLabels(labels map[string]string) map[string]string {
 		out[strings.ReplaceAll(k, ".", "_")] = v
 	}
 	return out
+}
+
+// IsLocalIndexer checks if the given indexer is a local indexer
+func IsLocalIndexer(indexer indexers.IndexerType) bool {
+	switch indexer {
+	case indexers.LocalIndexer, indexers.TSDBIndexer:
+		return true
+	default:
+		return false
+	}
 }
