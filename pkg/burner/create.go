@@ -670,10 +670,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 			uns, err = ex.dynamicClient.Resource(gvr).Create(ctx, obj, metav1.CreateOptions{})
 		}
 		if err != nil {
-			if kerrors.IsUnauthorized(err) {
-				log.Fatalf("Authorization error creating %s/%s: %s", obj.GetKind(), obj.GetName(), err)
-				return true, err
-			} else if kerrors.IsAlreadyExists(err) {
+			if kerrors.IsAlreadyExists(err) {
 				if ns != "" {
 					log.Errorf("%s/%s in namespace %s already exists", obj.GetKind(), obj.GetName(), ns)
 				} else {
