@@ -46,7 +46,6 @@ type Job struct {
 	Start               time.Time
 	End                 time.Time
 	JobConfig           config.Job
-	ObjectOperations    int32
 	UUID                string
 	IncrementalLoadUUID string
 }

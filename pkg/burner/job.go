@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -218,7 +217,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
 				executedJobs[jobIdx].End = jobEnd
-				executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if jobExecutor.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
@@ -226,7 +224,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if jobExecutor.MetricsClosing == config.AfterJobPause {
 				executedJobs[jobIdx].End = time.Now().UTC()
-				executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := jobEnd.Sub(executedJobs[startJobIdx].Start).Round(time.Second)
@@ -242,7 +239,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 					if jobExecutor.MetricsClosing == config.AfterMeasurements {
 						executedJobs[jobIdx].End = time.Now().UTC()
-						executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 					}
 					if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
 						msWg.Add(1)
@@ -396,21 +392,13 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
 			}
-			var achievedQps float64
 			elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
-			if elapsedTime > 0 {
-				achievedQps = math.Round((float64(job.ObjectOperations)/elapsedTime)*1000) / 1000
-			}
-			if job.JobConfig.IncrementalLoad != nil && job.IncrementalLoadUUID == "" {
-				achievedQps = 0
-			}
 			jobSummaries = append(jobSummaries, JobSummary{
 				UUID:                uuid,
 				IncrementalLoadUUID: job.IncrementalLoadUUID,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,
 				ElapsedTime:         elapsedTime,
-				AchievedQps:         achievedQps,
 				ChurnStartTimestamp: job.JobConfig.ChurnStart,
 				ChurnEndTimestamp:   job.JobConfig.ChurnEnd,
 				JobConfig:           job.JobConfig,

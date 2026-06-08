@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -659,7 +658,6 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		if ctx.Err() != nil {
 			return true, err
 		}
-		atomic.AddInt32(&ex.objectOperations, 1)
 		// When the object has a namespace already specified, use it
 		if objNs := obj.GetNamespace(); objNs != "" {
 			ns = objNs
