@@ -198,22 +198,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					return
 				}
 			}
-			if jobExecutor.BeforeCleanup != "" || len(jobExecutor.Hooks) > 0 {
-				// Execute beforeCleanup hooks first
-				jobExecutor.executeHooksForJobStage(config.HookBeforeCleanup, &errs, &innerRC)
-
-				if jobExecutor.BeforeCleanup != "" {
-					log.Infof("Waiting for beforeCleanup command %s to finish", jobExecutor.BeforeCleanup)
-					stdOut, stdErr, err := util.RunShellCmd(jobExecutor.BeforeCleanup, jobExecutor.embedCfg)
-					if err != nil {
-						err = fmt.Errorf("BeforeCleanup failed: %v", err)
-						log.Error(err.Error())
-						errs = append(errs, err)
-						innerRC = 1
-					}
-					log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
-				}
-			}
+			jobExecutor.executeHooksForJobStage(config.HookBeforeCleanup, &errs, &innerRC)
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
 				executedJobs[jobIdx].End = jobEnd
