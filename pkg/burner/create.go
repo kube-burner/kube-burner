@@ -20,6 +20,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -45,6 +46,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
 )
+
+var templatedGVKRegex = regexp.MustCompile(`(?m)^\s*(kind|apiVersion)\s*:.*\{\{`)
 
 type churnDeletedObject struct {
 	object *unstructured.Unstructured
@@ -219,6 +222,58 @@ func (ex *JobExecutor) deleteClusterScopedObjects(ctx context.Context, caches []
 	return deletedObjects
 }
 
+func hasTemplatedGVK(rawTemplate []byte) bool {
+	return templatedGVKRegex.Match(rawTemplate)
+}
+
+// resolveDynamicObjects refreshes the REST mapper and probes dynamic-GVK objects
+// to determine namespace requirements. Called once before the iteration loop
+// so that CRDs created by earlier jobs are visible.
+func (ex *JobExecutor) resolveDynamicObjects(iterationStart int) {
+	hasDynamic := false
+	for _, obj := range ex.objects {
+		if obj.dynamicGVK {
+			hasDynamic = true
+			break
+		}
+	}
+	if !hasDynamic {
+		return
+	}
+	ex.mapper.Reset()
+	for _, obj := range ex.objects {
+		if !obj.dynamicGVK {
+			continue
+		}
+		templateData := ex.buildTemplateData(obj, iterationStart, 1)
+		templateOption := util.MissingKeyError
+		if ex.DefaultMissingKeysWithZero {
+			templateOption = util.MissingKeyZero
+		}
+		rendered, err := util.RenderTemplate(obj.objectSpec, templateData, templateOption, ex.functionTemplates)
+		if err != nil {
+			log.Warnf("Could not probe dynamic-kind object %s: %v", obj.ObjectTemplate, err)
+			continue
+		}
+		_, probeGVKs := yamlToUnstructuredMultiple(obj.ObjectTemplate, rendered)
+		if obj.documentIndex >= len(probeGVKs) {
+			continue
+		}
+		probeMapping, err := ex.mapper.RESTMapping(probeGVKs[obj.documentIndex].GroupKind())
+		if err != nil {
+			log.Debugf("Dynamic-kind object %s: REST mapping not yet available for %v, will retry per-replica", obj.ObjectTemplate, probeGVKs[obj.documentIndex].GroupKind())
+			continue
+		}
+		obj.gvr = probeMapping.Resource
+		obj.namespaced = probeMapping.Scope.Name() == meta.RESTScopeNameNamespace
+		obj.Kind = probeGVKs[obj.documentIndex].Kind
+		if obj.namespaced && obj.namespace == "" {
+			ex.nsRequired = true
+		}
+		log.Debugf("Dynamic-kind object %s: probed as namespaced=%v (gvr=%v)", obj.ObjectTemplate, obj.namespaced, obj.gvr)
+	}
+}
+
 func (ex *JobExecutor) setupCreateJob() {
 	var f io.ReadCloser
 	var err error
@@ -262,6 +317,10 @@ func (ex *JobExecutor) setupCreateJob() {
 				obj.namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
 			} else {
 				obj.gvr = schema.GroupVersionResource{}
+				if hasTemplatedGVK(t) {
+					obj.dynamicGVK = true
+					log.Debugf("Object template %s has templated kind %q, GVR will be resolved at creation time", o.ObjectTemplate, gvk.Kind)
+				}
 			}
 			// Job requires namespaces when one of the objects is namespaced and doesn't have any namespace specified
 			if obj.namespaced && obj.namespace == "" {
@@ -297,6 +356,7 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 	var hookErrors []error
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
+	ex.resolveDynamicObjects(iterationStart)
 	if ex.nsRequired {
 		if ex.PreCreateNamespaces {
 			ex.preCreateNamespaces(iterationStart, iterationEnd, nsLabels, nsAnnotations)
@@ -326,8 +386,7 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 		}
 		log.Debugf("Creating object replicas from iteration %d", i)
 		for objectIndex, obj := range ex.objects {
-			if obj.gvr == (schema.GroupVersionResource{}) {
-				// resolveObjectMapping may set ex.nsRequired to true if the object is namespaced but doesn't have a namespace specified
+			if obj.gvr == (schema.GroupVersionResource{}) && !obj.dynamicGVK {
 				ex.resolveObjectMapping(obj)
 				if ex.nsRequired {
 					nsName := ex.Namespace
@@ -404,6 +463,8 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 	maps.Copy(nsLabels, ex.NamespaceLabels)
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 
+	ex.resolveDynamicObjects(iterationStart)
+
 	// Phase 1: Create all namespaces upfront (grouped execution always pre-creates namespaces)
 	if ex.nsRequired {
 		ex.preCreateNamespaces(iterationStart, iterationEnd, nsLabels, nsAnnotations)
@@ -441,7 +502,7 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 
 			log.Debugf("Group %d: Creating object replicas from iteration %d", grp.number, i)
 			for objectIndex, obj := range grp.objects {
-				if obj.gvr == (schema.GroupVersionResource{}) {
+				if obj.gvr == (schema.GroupVersionResource{}) && !obj.dynamicGVK {
 					ex.resolveObjectMapping(obj)
 				}
 				// If namespace requirements become known only after resolving the REST mapping.
@@ -574,28 +635,31 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			newObject.SetLabels(objectLabels)
 			updateChildLabels(newObject, objectLabels)
 
-			// Before attempting to create an object, this error check confirms the REST mapping exists.
-			// If the mapping fails, the function returns early, preventing a futile create attempt.
-			// The object's GVK might not have been resolvable during setupCreateJob() - perhaps the
-			// corresponding CRD might not be installed or the kube-apiserver isn't reachable at the moment.
-			_, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			gvr := obj.gvr
+			namespaced := obj.namespaced
 
+			mapping, err := ex.mapper.RESTMapping(gvk.GroupKind())
+			if err != nil && obj.dynamicGVK {
+				ex.mapper.Reset()
+				mapping, err = ex.mapper.RESTMapping(gvk.GroupKind())
+			}
 			if err != nil {
 				log.Errorf("Error getting REST Mapping for %v: %v", gvk, err)
 				return
 			}
-			// replicaWg is necessary because we want to wait for all replicas
-			// to be created before running any other action such as verify objects,
-			// wait for ready, etc. Without this wait group, running for example,
-			// verify objects can lead into a race condition when some objects
-			// hasn't been created yet
+
+			if obj.dynamicGVK {
+				gvr = mapping.Resource
+				namespaced = mapping.Scope.Name() == meta.RESTScopeNameNamespace
+			}
+
 			replicaWg.Add(1)
 			go func(n string) {
 				defer replicaWg.Done()
-				if !obj.namespaced {
+				if !namespaced {
 					n = ""
 				}
-				ex.createRequest(ctx, obj.gvr, n, newObject, ex.MaxWaitTimeout)
+				ex.createRequest(ctx, gvr, n, newObject, ex.MaxWaitTimeout)
 			}(ns)
 		}(r)
 	}
