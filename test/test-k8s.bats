@@ -186,6 +186,19 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
+  jq -e '
+    length > 0 and
+    all(.[]; (has("distribution") | not)
+      and (has("microshift") | not)
+      and (has("platform") | not)
+      and (has("openshift") | not)
+      and (has("microshiftVersion") | not)
+      and (has("microshiftMajorVersion") | not)
+      and (.k8sVersion | type == "string")
+      and (.k8sVersion | length > 0)
+      and (.totalNodes | type == "number")
+      and (.totalNodes >= 1))
+  ' ${METRICS_FOLDER}/jobSummary.json
 }
 
 # bats test_tags=subsystem:health-check
@@ -360,4 +373,3 @@ teardown_file() {
   [ "$bindings" -eq 6 ]
   ${KUBE_BURNER} destroy -c kube-burner-repeat-every-n-iterations.yml
 }
-

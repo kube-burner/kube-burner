@@ -319,6 +319,7 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 			containersReady:        containersReady,
 			podReady:               podReady,
 			JobName:                p.JobConfig.Name,
+			Metadata:               p.Metadata,
 		})
 	}
 }

@@ -263,6 +263,7 @@ func (vmiml *vmimLatency) Collect(measurementWg *sync.WaitGroup) {
 			targetReadyTime:     targetReady,
 			runningTime:         running,
 			succeededTime:       succeeded,
+			Metadata:            vmiml.Metadata,
 		})
 	}
 }
