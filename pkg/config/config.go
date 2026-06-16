@@ -472,13 +472,18 @@ func validateGC() error {
 }
 
 // validateRepeatEveryNIterations checks that:
-// 1. All objects in a job have consistent RepeatEveryNIterations values (all =1 or all same non-1 value)
-// 2. RepeatEveryNIterations > 1 is not used with object-based churn on churnable objects
+// 1. RepeatEveryNIterations must be >= 1 (0 or negative would cause divide-by-zero)
+// 2. All objects in a job have consistent RepeatEveryNIterations values (all =1 or all same non-1 value)
+// 3. RepeatEveryNIterations > 1 is not used with object-based churn on churnable objects
 func validateRepeatEveryNIterations() error {
 	for _, job := range configSpec.Jobs {
 		var nonDefaultValue int
 		hasChurnableRepeat := false
 		for _, obj := range job.Objects {
+			if obj.RepeatEveryNIterations < 1 {
+				return fmt.Errorf("job %s: repeatEveryNIterations must be >= 1, got %d",
+					job.Name, obj.RepeatEveryNIterations)
+			}
 			if obj.RepeatEveryNIterations > 1 {
 				if nonDefaultValue == 0 {
 					nonDefaultValue = obj.RepeatEveryNIterations
