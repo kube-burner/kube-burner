@@ -41,24 +41,24 @@ jobs:
       k8s.ovn.org/primary-user-defined-network: ""
     objects:
 
-      - objectTemplate: udn_l3.yml
+      - objectTemplate: templates/udn_l3.yml
         replicas: 1
 
-      - objectTemplate: np-deny-all.yml
+      - objectTemplate: templates/np-deny-all.yml
         replicas: 1
 
-      - objectTemplate: np-allow-from-clients.yml
+      - objectTemplate: templates/np-allow-from-clients.yml
         replicas: 1
 
-      - objectTemplate: service.yml
+      - objectTemplate: templates/service.yml
         replicas: 5
 
-      - objectTemplate: deployment-server.yml
+      - objectTemplate: templates/deployment-server.yml
         replicas: 3
         inputVars:
           podReplicas: 2
 
-      - objectTemplate: deployment-client.yml
+      - objectTemplate: templates/deployment-client.yml
         replicas: 2
         inputVars:
           podReplicas: 2
