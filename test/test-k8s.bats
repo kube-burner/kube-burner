@@ -153,6 +153,7 @@ teardown_file() {
 
 # bats test_tags=subsystem:indexing
 @test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true" {
+  check-kubevirt-ready || skip "KubeVirt is not available"
   run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
@@ -228,6 +229,7 @@ teardown_file() {
 
 # bats test_tags=subsystem:job-type-kubevirt
 @test "kube-burner-virt-operations.yml: jobType kubevirt" {
+  check-kubevirt-ready || skip "KubeVirt is not available"
   run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid=${UUID} --log-level=debug
 }
 
@@ -263,6 +265,7 @@ teardown_file() {
 
 # bats test_tags=subsystem:indexing
 @test "kube-burner-metrics-aggregate.yml: metrics aggregation" {
+  check-kubevirt-ready || skip "KubeVirt is not available"
   export STORAGE_CLASS_NAME
   STORAGE_CLASS_NAME=$(get_default_storage_class)
   run_cmd ${KUBE_BURNER} init -c kube-burner-metrics-aggregate.yml --uuid=${UUID} --log-level=debug

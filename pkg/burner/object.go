@@ -36,6 +36,7 @@ type object struct {
 	namespaced    bool
 	ready         bool
 	documentIndex int
+	dynamicGVK    bool
 }
 
 func newObject(obj config.Object, mapper *restmapper.DeferredDiscoveryRESTMapper, defaultAPIVersion string, embedCfg *fileutils.EmbedConfiguration) *object {
