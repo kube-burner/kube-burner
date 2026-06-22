@@ -26,6 +26,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
 	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/cluster"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/watchers"
@@ -84,9 +85,17 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
 	defer cancel()
+	clientSet, restConfig := kubeClientProvider.DefaultClientSet()
+	probeCtx, probeCancel := context.WithTimeout(ctx, configSpec.GlobalConfig.RequestTimeout)
+	clusterInfo, err := cluster.Probe(probeCtx, clientSet)
+	probeCancel()
+	if err != nil {
+		log.Warnf("Cluster probe partially failed: %v", err)
+	}
+	metricsScraper.SummaryMetadata = clusterInfo.ApplyMetadata(metricsScraper.SummaryMetadata)
+	metricsScraper.MetricsMetadata = clusterInfo.ApplyMetadata(metricsScraper.MetricsMetadata)
 	go func() {
 		var innerRC int
-		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		if err := handlePreloadImages(ctx, jobExecutors, kubeClientProvider); err != nil {

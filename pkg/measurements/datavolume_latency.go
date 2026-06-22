@@ -241,6 +241,7 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 			dvRunning:  running,
 			dvReady:    ready,
 			JobName:    dv.JobConfig.Name,
+			Metadata:   dv.Metadata,
 		})
 	}
 }

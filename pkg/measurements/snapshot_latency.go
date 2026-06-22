@@ -201,6 +201,7 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 			UUID:       vsl.Uuid,
 			vsReady:    volumeSnapshot.Status.CreationTime.Time,
 			JobName:    vsl.JobConfig.Name,
+			Metadata:   vsl.Metadata,
 		})
 	}
 }

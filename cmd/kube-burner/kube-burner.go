@@ -31,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
 	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/cluster"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
@@ -297,12 +298,21 @@ func measureCmd() *cobra.Command {
 					log.Fatalf("Error reading provided user metadata: %v", err)
 				}
 			}
+			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			clientSet, _ := kubeClientProvider.DefaultClientSet()
+			probeCtx, probeCancel := context.WithTimeout(cmd.Context(), configSpec.GlobalConfig.RequestTimeout)
+			clusterInfo, err := cluster.Probe(probeCtx, clientSet)
+			probeCancel()
+			if err != nil {
+				log.Warnf("Cluster probe partially failed: %v", err)
+			}
+			metadata = clusterInfo.ApplyMetadata(metadata)
 			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
 				&config.Job{
 					Name:    jobName,
 					JobType: config.CreationJob,
 				},
-				config.NewKubeClientProvider(kubeConfig, kubeContext),
+				kubeClientProvider,
 				nil,
 				selector,
 			)

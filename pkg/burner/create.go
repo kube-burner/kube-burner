@@ -113,14 +113,14 @@ func (ex *JobExecutor) gcGroupObjects(ctx context.Context, grp objectGroupEntry)
 				if !created {
 					continue
 				}
-				CleanupNamespaceResourcesByLabel(ctx, *ex, obj, ns, labelSelector)
+				CleanupNamespacedResourcesByLabel(ctx, *ex, obj, ns, labelSelector)
 			}
 			// Also clean up objects with a fixed namespace
 			if obj.namespace != "" {
-				CleanupNamespaceResourcesByLabel(ctx, *ex, obj, obj.namespace, labelSelector)
+				CleanupNamespacedResourcesByLabel(ctx, *ex, obj, obj.namespace, labelSelector)
 			}
 		} else {
-			CleanupNonNamespacedResourcesByLabel(ctx, *ex, obj, labelSelector)
+			CleanupClusterScopedResourcesByLabel(ctx, *ex, obj, labelSelector)
 		}
 	}
 	// Wait for deletion to complete
@@ -187,7 +187,7 @@ func (ex *JobExecutor) preloadClusterScopedObjects(ctx context.Context) []cluste
 }
 
 // deleteClusterScopedObjects marks cluster-scoped objects in the given iteration range
-// with a deletion label, deletes them using CleanupNonNamespacedResourcesByLabel,
+// with a deletion label, deletes them using CleanupClusterScopedResourcesByLabel,
 // and returns the list of deleted objects for verification.
 func (ex *JobExecutor) deleteClusterScopedObjects(ctx context.Context, caches []clusterScopedObjectCache, iterationStart, iterationEnd int) []churnDeletedObject {
 	delPatch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":""}}}`, config.KubeBurnerLabelChurnDelete))
@@ -217,7 +217,7 @@ func (ex *JobExecutor) deleteClusterScopedObjects(ctx context.Context, caches []
 			}
 		}
 
-		CleanupNonNamespacedResourcesByLabel(ctx, *ex, cache.obj, config.KubeBurnerLabelChurnDelete)
+		CleanupClusterScopedResourcesByLabel(ctx, *ex, cache.obj, config.KubeBurnerLabelChurnDelete)
 	}
 	return deletedObjects
 }
