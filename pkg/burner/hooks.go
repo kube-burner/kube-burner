@@ -89,74 +89,42 @@ func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) er
 	return nil
 }
 
-// isShellScript checks whether the command invokes sh or bash with a script file argument.
-// It returns the script path for shell script invocations, or an empty string otherwise.
-// Whether that script should be read from the embedded FS is determined later in prepareCommand().
-func isShellScript(cmd []string) string {
-	if len(cmd) < 2 {
-		return ""
-	}
-	shell := filepath.Base(cmd[0])
-	if shell != "bash" && shell != "sh" {
-		return ""
-	}
-	script := cmd[1]
-	// Check if it's a script file (not a flag like -c)
-	if len(script) > 0 && script[0] == '-' {
-		return ""
-	}
-	// Check for common script extensions or assume it's a script if no extension
-	ext := filepath.Ext(script)
-	if ext == ".sh" || ext == "" {
-		return script
-	}
-	return ""
-}
-
 // prepareCommand creates an exec.Cmd, potentially reading the script from embedded FS
 // It first checks if the script exists locally or is an absolute path, and only falls back
 // to embedded FS if the script is not found
 func (hm *HookManager) prepareCommand(hook config.Hook) (*exec.Cmd, io.ReadCloser, error) {
 	var scriptReader io.ReadCloser
 	var cmd *exec.Cmd
-
-	scriptPath := isShellScript(hook.Cmd)
-	if scriptPath != "" {
-		// Check if script exists locally or is an absolute path
-		useEmbedded := false
-		if !filepath.IsAbs(scriptPath) {
-			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-				// Script not found locally, try embedded FS
-				useEmbedded = true
-			}
+	scriptPath := hook.Cmd[0]
+	useEmbedded := false
+	if !filepath.IsAbs(scriptPath) {
+		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+			// Script not found locally, try embedded FS
+			useEmbedded = true
 		}
-
-		if useEmbedded && hm.embedCfg != nil {
-			// Try to read script from embedded FS
-			reader, err := fileutils.GetScriptsReader(scriptPath, hm.embedCfg)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to read script %s: %w", scriptPath, err)
-			}
-			scriptReader = reader
-
-			// Build command: shell -s - <args>
-			// -s tells shell to read from stdin, - marks end of options
-			args := []string{"-s", "-"}
-			if len(hook.Cmd) > 2 {
-				args = append(args, hook.Cmd[2:]...)
-			}
-			cmd = exec.CommandContext(hm.ctx, hook.Cmd[0], args...)
-			cmd.Stdin = scriptReader
-			log.Debugf("Reading script %s from embedded filesystem", scriptPath)
-		} else {
-			// Execute command directly (script exists locally or is absolute path)
-			cmd = exec.CommandContext(hm.ctx, hook.Cmd[0], hook.Cmd[1:]...)
-		}
-	} else {
-		// Not a shell script invocation, execute command directly
-		cmd = exec.CommandContext(hm.ctx, hook.Cmd[0], hook.Cmd[1:]...)
 	}
 
+	if useEmbedded && hm.embedCfg != nil {
+		// Try to read script from embedded FS
+		reader, err := fileutils.GetScriptsReader(scriptPath, hm.embedCfg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read script %s: %w", scriptPath, err)
+		}
+		scriptReader = reader
+
+		// Build command: sh -s - <args...>
+		// Script is read from stdin; positional params start at hook.Cmd[1].
+		args := []string{"-s", "-"}
+		if len(hook.Cmd) > 1 {
+			args = append(args, hook.Cmd[1:]...)
+		}
+		cmd = exec.CommandContext(hm.ctx, "/bin/sh", args...)
+		cmd.Stdin = scriptReader
+		log.Debugf("Reading script %s from embedded filesystem", scriptPath)
+
+	} else {
+		cmd = exec.CommandContext(hm.ctx, hook.Cmd[0], hook.Cmd[1:]...)
+	}
 	return cmd, scriptReader, nil
 }
 
