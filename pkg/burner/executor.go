@@ -72,7 +72,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
 		embedCfg:          embedCfg,
 		deletionStrategy:  configSpec.GlobalConfig.DeletionStrategy,
-		hookManager:       NewHookManager(context.Background(), len(job.Hooks)),
+		hookManager:       NewHookManager(context.Background(), len(job.Hooks), embedCfg),
 	}
 
 	clientSet, runtimeRestConfig := kubeClientProvider.ClientSet(job.QPS, job.Burst)
