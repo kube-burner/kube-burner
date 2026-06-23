@@ -87,6 +87,9 @@ func waitForDeleteNamespacedResources(ctx context.Context, ex JobExecutor, names
 func waitForDeleteResourceInNamespace(ctx context.Context, ex JobExecutor, obj *object, namespace string, labelSelector string) error {
 	resourceInterface := ex.dynamicClient.Resource(obj.gvr).Namespace(namespace)
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		if err := ex.waitLimiter.Wait(ctx); err != nil {
+			return false, err
+		}
 		objList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
 			log.Errorf("Error listing objects: %v", err)
