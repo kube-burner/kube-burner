@@ -1,0 +1,39 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keda-operator
+  namespace: keda
+  labels:
+    release: kube-prometheus-stack
+spec:
+  endpoints:
+  - port: metrics
+    path: /metrics
+    scheme: http
+    scrapeTimeout: 30s
+  namespaceSelector:
+    matchNames:
+    - keda
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keda-operator
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keda-operator-metrics-apiserver
+  namespace: keda
+  labels:
+    release: kube-prometheus-stack
+spec:
+  endpoints:
+  - port: metrics
+    path: /metrics
+    scheme: http
+    scrapeTimeout: 30s
+  namespaceSelector:
+    matchNames:
+    - keda
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keda-operator-metrics-apiserver

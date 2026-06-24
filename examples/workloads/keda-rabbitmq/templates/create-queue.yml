@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-queue-{{.Iteration}}
+spec:
+  template:
+    metadata:
+      labels:
+        app: create-queue-{{.Iteration}}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-queue
+          image: rabbitmq:3-management
+          command: ["sh", "-c", "rabbitmqadmin -u user -p password -H rabbitmq.rabbitmq.svc.cluster.local declare queue name=perf-queue-{{.Iteration}} durable=false"]
