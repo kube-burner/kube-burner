@@ -282,6 +282,45 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 			IncrementalLoadUUID: stepRunID,
 		})
 
+		// Capture Prometheus metrics and job summary after each step if configured
+		if ex.IncrementalLoad.CaptureMetricsPerStep {
+			log.Infof("Capturing metrics for incremental step (total iterations: %d)", end)
+			stepJob := stepJobs[len(stepJobs)-1]
+
+			elapsedTime := stepJob.End.Sub(stepJob.Start).Round(time.Second).Seconds()
+
+			stepSummaryMetadata := make(map[string]any)
+			for k, v := range metricsScraper.SummaryMetadata {
+				stepSummaryMetadata[k] = v
+			}
+			stepSummaryMetadata["incrementalLoadUUID"] = stepRunID
+
+			jobSummary := JobSummary{
+				UUID:                originalUUID,
+				IncrementalLoadUUID: stepRunID,
+				Timestamp:           stepJob.Start,
+				EndTimestamp:        stepJob.End,
+				ElapsedTime:         elapsedTime,
+				JobConfig:           ex.Job,
+				Metadata:            stepSummaryMetadata,
+				Passed:              true,
+				MetricName:          jobSummaryMetric,
+			}
+			if len(metricsScraper.IndexerList) > 0 {
+				for _, indexer := range metricsScraper.IndexerList {
+					IndexJobSummary([]JobSummary{jobSummary}, indexer)
+				}
+			}
+
+			if len(metricsScraper.PrometheusClients) > 0 {
+				for _, prometheusClient := range metricsScraper.PrometheusClients {
+					if err := prometheusClient.ScrapeJobsMetrics(stepJob); err != nil {
+						log.Errorf("Error scraping metrics for incremental step: %v", err)
+					}
+				}
+			}
+		}
+
 		if stepDelay > 0 {
 			log.Infof("Sleeping %v before next step", stepDelay)
 			time.Sleep(stepDelay)
