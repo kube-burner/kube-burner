@@ -93,6 +93,47 @@ func (ex *JobExecutor) getGroupLifecyclePauses(grp objectGroupEntry) (pauseBefor
 	return
 }
 
+func (ex *JobExecutor) gcConcurrencyLimit() int {
+	if ex.Burst > 0 {
+		return ex.Burst
+	}
+	if ex.restConfig != nil && ex.restConfig.Burst > 0 {
+		return ex.restConfig.Burst
+	}
+	return 1
+}
+
+func (ex *JobExecutor) runGCCleanupTasks(ctx context.Context, cleanupTasks []func()) {
+	if len(cleanupTasks) == 0 {
+		return
+	}
+	workers := ex.gcConcurrencyLimit()
+	if workers > len(cleanupTasks) {
+		workers = len(cleanupTasks)
+	}
+	taskCh := make(chan func(), len(cleanupTasks))
+	for _, task := range cleanupTasks {
+		taskCh <- task
+	}
+	close(taskCh)
+
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for task := range taskCh {
+				if err := ex.limiter.Wait(ctx); err != nil {
+					log.Debugf("GC cleanup aborted while waiting on rate limiter: %v", err)
+					return
+				}
+				task()
+			}
+		}()
+	}
+	wg.Wait()
+}
+
 // gcGroupObjects deletes objects in the group that have group.gc=true
 func (ex *JobExecutor) gcGroupObjects(ctx context.Context, grp objectGroupEntry) {
 	selectorLabels := labels.Set{
@@ -104,6 +145,7 @@ func (ex *JobExecutor) gcGroupObjects(ctx context.Context, grp objectGroupEntry)
 		selectorLabels[config.KubeBurnerLabelRunID] = ex.runid
 	}
 	labelSelector := selectorLabels.String()
+	var cleanupTasks []func()
 	for _, obj := range grp.objects {
 		if !obj.Group.GC {
 			continue
@@ -113,16 +155,28 @@ func (ex *JobExecutor) gcGroupObjects(ctx context.Context, grp objectGroupEntry)
 				if !created {
 					continue
 				}
-				CleanupNamespacedResourcesByLabel(ctx, *ex, obj, ns, labelSelector)
+				obj := obj
+				namespace := ns
+				cleanupTasks = append(cleanupTasks, func() {
+					CleanupNamespacedResourcesByLabel(ctx, *ex, obj, namespace, labelSelector)
+				})
 			}
 			// Also clean up objects with a fixed namespace
 			if obj.namespace != "" {
-				CleanupNamespacedResourcesByLabel(ctx, *ex, obj, obj.namespace, labelSelector)
+				obj := obj
+				namespace := obj.namespace
+				cleanupTasks = append(cleanupTasks, func() {
+					CleanupNamespacedResourcesByLabel(ctx, *ex, obj, namespace, labelSelector)
+				})
 			}
 		} else {
-			CleanupClusterScopedResourcesByLabel(ctx, *ex, obj, labelSelector)
+			obj := obj
+			cleanupTasks = append(cleanupTasks, func() {
+				CleanupClusterScopedResourcesByLabel(ctx, *ex, obj, labelSelector)
+			})
 		}
 	}
+	ex.runGCCleanupTasks(ctx, cleanupTasks)
 	// Wait for deletion to complete
 	if ex.WaitForDeletion {
 		for _, obj := range grp.objects {
