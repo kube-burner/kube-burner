@@ -115,6 +115,11 @@ func (p *podLatency) handleCreatePod(obj any) {
 		return
 	}
 	podLabels := pod.GetLabels()
+	// Skip pod latency tracking if the skip label is set
+	if value, ok := podLabels[config.KubeBurnerLabelSkipPodLatency]; ok && value == "true" {
+		log.Debugf("Skipping pod latency tracking for %s/%s (skip label set)", pod.Namespace, pod.Name)
+		return
+	}
 	p.Metrics.LoadOrStore(string(pod.UID), podMetric{
 		Timestamp:    pod.CreationTimestamp.UTC(),
 		Namespace:    pod.Namespace,
