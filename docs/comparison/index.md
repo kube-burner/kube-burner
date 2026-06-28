@@ -2,7 +2,7 @@
 
 Kube-burner is a Kubernetes performance and scale test orchestration toolset capable of creating, deleting, and patching Kubernetes resources at scale, with Prometheus metric collection and indexing. It was created by Red Hat and has been accepted as a CNCF Sandbox project. ClusterLoader2 (CL2), is the official Kubernetes scalability and performance testing framework, living within the kubernetes/perf-tests repository and maintained by SIG Scalability.
 
-Kube-burner tests are imperative, job-based YAML files that define a set of operations to perform on a cluster, these operations can use a combination of parameters and templates able to create simulate complex workflows, on the other hand CL2 tests are also written in YAML using a semi-declarative paradigm. A test defines a set of desired states for a cluster (e.g. I want to run 10k pods, 2k cluster-ip services, or 5 daemon-sets) and specifies how quickly each state should be reached (the "pod throughput").
+Kube-burner tests are imperative, job-based YAML files that define a set of operations to perform on a cluster, these operations can use a combination of parameters and templates able to create simulate complex workflows, on the other hand CL2 tests are also written in YAML using a semi-declarative paradigm. A test defines a set of jobs with a series of phases and measurements (e.g. Job 1, Create 10k pods and 2k cluster-ip services and wait for them to be ready, Job 2: path the previous pods) and specifies how quickly each state should be reached.
 
 | Dimension | kube-burner | ClusterLoader2 |
 |---|---|---|
@@ -10,7 +10,7 @@ Kube-burner tests are imperative, job-based YAML files that define a set of oper
 | **Primary target** | Vanilla Kubernetes; deep OpenShift support via (kube-burner-ocp)[https://github.com/kube-burner/kube-burner-ocp] | Vanilla Kubernetes |
 | **Config style** | Imperative job-based YAML | Semi-declarative desired-state YAML |
 | **Templating** | Go templates for resource YAML | Go templates + Module API for config reuse |
-| **Operations** | Create, delete, patch and kubevirt operations | Create, update and delete  |
+| **Operations** | Create, delete, read, patch and kubevirt operations | Create, update and delete  |
 | **Rate control** | QPS and Burst | TuningSet-driven rate control |
 | **Namespace handling** | Auto-creates namespaced iterations | Auto-managed namespaces with range control |
 | **Workload churn** | Native churn job type | Not built-in; achievable via step sequencing |
