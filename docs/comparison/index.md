@@ -9,7 +9,6 @@ Kube-burner tests are imperative, job-based YAML files that define a set of oper
 | **Status** | CNCF Sandbox | Official k8s framework |
 | **Primary target** | Vanilla Kubernetes; deep OpenShift support via (kube-burner-ocp)[https://github.com/kube-burner/kube-burner-ocp] | Vanilla Kubernetes |
 | **Config style** | Imperative job-based YAML | Semi-declarative desired-state YAML |
-| **Workflow** | Jobs → Objects + Templates | Steps → Phases → Measurements (TuningSets control throughput) |
 | **Templating** | Go templates for resource YAML | Go templates + Module API for config reuse |
 | **Operations** | Create, delete, patch and kubevirt operations | Create, update and delete  |
 | **Rate control** | QPS and Burst | TuningSet-driven rate control |
