@@ -471,6 +471,7 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 	}
 
 	groups := ex.groupObjectsByNumber()
+	iterationProgress := (iterationEnd - iterationStart) / 10
 
 	// Phase 2: Execute each group in order
 	for _, grp := range groups {
@@ -480,6 +481,7 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 
 		log.Infof("Starting group %d with %d object template(s)", grp.number, len(grp.objects))
 		groupCreatedNamespaces := make(map[string]bool)
+		percent := 1
 
 		// Create all objects for all iterations in this group (iteration-first)
 		for i := iterationStart; i < iterationEnd; i++ {
@@ -489,16 +491,12 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 			if ctx.Err() != nil {
 				return []error{ctx.Err()}
 			}
-
-			var ns string
-			if ex.nsRequired {
-				if ex.NamespacedIterations {
-					ns = ex.generateNamespace(i)
-				} else {
-					ns = ex.Namespace
-				}
-				groupCreatedNamespaces[ns] = true
+			if ex.JobIterations > 1 && iterationProgress > 0 && i == iterationStart+iterationProgress*percent {
+				log.Infof("Group %d: %v/%v iterations completed", grp.number, i-iterationStart, iterationEnd-iterationStart)
+				percent++
 			}
+
+			ns := ex.resolveGroupIterationNamespace(i, groupCreatedNamespaces)
 
 			log.Debugf("Group %d: Creating object replicas from iteration %d", grp.number, i)
 			for objectIndex, obj := range grp.objects {
@@ -514,14 +512,7 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 					}
 					groupCreatedNamespaces[ns] = true
 				}
-				// Use the global object index (ex.objects) to keep kube-burner.io/index stable.
-				globalIndex := objectIndex
-				for idx, o := range ex.objects {
-					if o == obj {
-						globalIndex = idx
-						break
-					}
-				}
+				globalIndex := ex.findGlobalObjectIndex(obj, objectIndex)
 				kbLabels := map[string]string{
 					config.KubeBurnerLabelUUID:         ex.uuid,
 					config.KubeBurnerLabelJob:          ex.Name,
@@ -585,6 +576,33 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 	}
 
 	return waitErrors
+}
+
+// resolveGroupIterationNamespace determines the namespace for a given iteration in grouped execution.
+// Namespaces are pre-created in Phase 1, so this only resolves the name.
+func (ex *JobExecutor) resolveGroupIterationNamespace(i int, groupCreatedNamespaces map[string]bool) string {
+	if ex.nsRequired {
+		var ns string
+		if ex.NamespacedIterations {
+			ns = ex.generateNamespace(i)
+		} else {
+			ns = ex.Namespace
+		}
+		groupCreatedNamespaces[ns] = true
+		return ns
+	}
+	return ""
+}
+
+// findGlobalObjectIndex returns the index of obj in ex.objects to keep kube-burner.io/index
+// stable across grouped and non-grouped execution. Falls back to localIndex if not found.
+func (ex *JobExecutor) findGlobalObjectIndex(obj *object, localIndex int) int {
+	for idx, o := range ex.objects {
+		if o == obj {
+			return idx
+		}
+	}
+	return localIndex
 }
 
 // preCreateNamespaces creates all required namespaces upfront before object creation begins.
