@@ -83,11 +83,12 @@ func deleteClusterScopedResourcesIndividually(ctx context.Context, ex JobExecuto
 		return
 	}
 	for _, item := range itemList.Items {
+		ex.limiter.Wait(ctx)
 		log.Debugf("Deleting cluster-scoped %v/%v", object.gvr.Resource, item.GetName())
 		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{
 			PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 		}); err != nil && !errors.IsNotFound(err) {
-			log.Errorf("Error deleting cluster-scoped %v %v: %v", object.gvr.Resource, item.GetName(), err)
+			log.Errorf("Error deleting cluster-scoped %v/%v: %v", object.gvr.Resource, item.GetName(), err)
 		}
 	}
 }
