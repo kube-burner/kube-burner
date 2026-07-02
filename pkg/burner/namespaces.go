@@ -21,6 +21,7 @@ import (
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
@@ -56,7 +57,8 @@ func CleanupNamespacedResourcesByLabel(ctx context.Context, ex JobExecutor, obj 
 	}
 }
 
-// Cleanup non-namespaced resources using executor list
+// Cleanup non-namespaced resources using executor list.
+// Falls back to individual deletion when DeleteCollection is not supported (e.g. Namespaces).
 func CleanupClusterScopedResourcesByLabel(ctx context.Context, ex JobExecutor, object *object, labelSelector string) {
 	resourceInterface := ex.dynamicClient.Resource(object.gvr)
 	err := resourceInterface.DeleteCollection(ctx,
@@ -64,7 +66,30 @@ func CleanupClusterScopedResourcesByLabel(ctx context.Context, ex JobExecutor, o
 		metav1.ListOptions{LabelSelector: labelSelector},
 	)
 	if err != nil {
+		if errors.IsMethodNotSupported(err) {
+			log.Debugf("DeleteCollection not supported for %v, falling back to individual deletion", object.gvr.Resource)
+			deleteClusterScopedResourcesIndividually(ctx, ex, object, labelSelector)
+			return
+		}
 		log.Errorf("Error deleting cluster-scoped %v labeled with %s: %v", object.gvr.Resource, labelSelector, err)
+	}
+}
+
+func deleteClusterScopedResourcesIndividually(ctx context.Context, ex JobExecutor, object *object, labelSelector string) {
+	resourceInterface := ex.dynamicClient.Resource(object.gvr)
+	itemList, err := resourceInterface.List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		log.Errorf("Error listing cluster-scoped %v labeled with %s: %v", object.gvr.Resource, labelSelector, err)
+		return
+	}
+	for _, item := range itemList.Items {
+		ex.limiter.Wait(ctx)
+		log.Debugf("Deleting cluster-scoped %v/%v", object.gvr.Resource, item.GetName())
+		if err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{
+			PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
+		}); err != nil && !errors.IsNotFound(err) {
+			log.Errorf("Error deleting cluster-scoped %v/%v: %v", object.gvr.Resource, item.GetName(), err)
+		}
 	}
 }
 
