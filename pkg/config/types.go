@@ -244,6 +244,19 @@ type Job struct {
 	ChurnStart *time.Time `yaml:"-" json:"-"`
 	// ChurnEnd marks when the churn phase ended, set at runtime
 	ChurnEnd *time.Time `yaml:"-" json:"-"`
+	// GroupWindows records the execution timeframe of each object group, set at runtime.
+	// It is a pointer so that the recorded windows are shared across job config copies.
+	GroupWindows *[]GroupWindow `yaml:"-" json:"-"`
+}
+
+// GroupWindow marks the execution timeframe of an object group, set at runtime
+type GroupWindow struct {
+	// ID is the group number
+	ID int
+	// Start marks when the group execution started
+	Start time.Time
+	// End marks when the group execution ended
+	End time.Time
 }
 
 type Hook struct {

@@ -480,6 +480,7 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 		}
 
 		log.Infof("Starting group %d with %d object template(s)", grp.number, len(grp.objects))
+		groupStart := time.Now().UTC()
 		groupCreatedNamespaces := make(map[string]bool)
 		percent := 1
 
@@ -573,6 +574,13 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 		}
 
 		log.Infof("Group %d completed", grp.number)
+		if ex.GroupWindows != nil {
+			*ex.GroupWindows = append(*ex.GroupWindows, config.GroupWindow{
+				ID:    grp.number,
+				Start: groupStart,
+				End:   time.Now().UTC(),
+			})
+		}
 	}
 
 	return waitErrors
