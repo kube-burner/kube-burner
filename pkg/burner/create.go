@@ -490,6 +490,13 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 				log.Errorf("%v", hookErrors)
 			}
 			if ctx.Err() != nil {
+				if ex.GroupWindows != nil {
+					*ex.GroupWindows = append(*ex.GroupWindows, config.GroupWindow{
+						ID:    grp.number,
+						Start: groupStart,
+						End:   time.Now().UTC(),
+					})
+				}
 				return []error{ctx.Err()}
 			}
 			if ex.JobIterations > 1 && iterationProgress > 0 && i == iterationStart+iterationProgress*percent {
