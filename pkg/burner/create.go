@@ -490,13 +490,7 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 				log.Errorf("%v", hookErrors)
 			}
 			if ctx.Err() != nil {
-				if ex.GroupWindows != nil {
-					*ex.GroupWindows = append(*ex.GroupWindows, config.GroupWindow{
-						ID:    grp.number,
-						Start: groupStart,
-						End:   time.Now().UTC(),
-					})
-				}
+				ex.recordGroupWindow(grp.number, groupStart)
 				return []error{ctx.Err()}
 			}
 			if ex.JobIterations > 1 && iterationProgress > 0 && i == iterationStart+iterationProgress*percent {
@@ -581,16 +575,20 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 		}
 
 		log.Infof("Group %d completed", grp.number)
-		if ex.GroupWindows != nil {
-			*ex.GroupWindows = append(*ex.GroupWindows, config.GroupWindow{
-				ID:    grp.number,
-				Start: groupStart,
-				End:   time.Now().UTC(),
-			})
-		}
+		ex.recordGroupWindow(grp.number, groupStart)
 	}
 
 	return waitErrors
+}
+
+func (ex *JobExecutor) recordGroupWindow(groupID int, groupStart time.Time) {
+	if ex.GroupWindows != nil {
+		*ex.GroupWindows = append(*ex.GroupWindows, config.GroupWindow{
+			ID:    groupID,
+			Start: groupStart,
+			End:   time.Now().UTC(),
+		})
+	}
 }
 
 // resolveGroupIterationNamespace determines the namespace for a given iteration in grouped execution.
