@@ -28,7 +28,6 @@ type JobHook string
 const (
 	HookBeforeJobExecution JobHook = "beforeJobExecution"
 	HookAfterJobExecution  JobHook = "afterJobExecution"
-	HookBeforeChurn        JobHook = "beforeChurn"
 	HookAfterChurn         JobHook = "afterChurn"
 	HookBeforeCleanup      JobHook = "beforeCleanup"
 	HookAfterCleanup       JobHook = "afterCleanup"
