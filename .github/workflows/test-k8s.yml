@@ -39,12 +39,13 @@ jobs:
     steps:
 
     - name: Checkout PR head
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # Use the PR head SHA
         ref: ${{ github.event.pull_request.head.sha }}
         # Fetch only the most recent commit of the PR
         fetch-depth: 1
+        allow-unsafe-pr-checkout: true
         persist-credentials: false
 
     - name: Fetch base branch for comparison
