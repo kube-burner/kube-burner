@@ -189,6 +189,14 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 			m.ChurnMetric = true
 		}
 	}
+	if !isInstant && job.JobConfig.GroupWindows != nil {
+		for _, gw := range *job.JobConfig.GroupWindows {
+			if !timestamp.Before(gw.Start) && !timestamp.After(gw.End) {
+				metadata["groupId"] = gw.ID
+				break
+			}
+		}
+	}
 	return m
 }
 

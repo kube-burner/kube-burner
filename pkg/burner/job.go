@@ -122,6 +122,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		for _, jobExecutor := range jobExecutors {
 			jobIdx := len(executedJobs) // Track the index where we're appending
 			startJobIdx := jobIdx       // Will work for both incremental and normal jobs
+			// Allocate a shared slice to record group execution windows at runtime.
+			// The pointer is propagated to every job config copy so datapoints can be
+			// tagged with the groupId of the window they fall into.
+			if jobExecutor.JobType == config.CreationJob && config.IsGroupedEnabled(jobExecutor.Job) {
+				jobExecutor.GroupWindows = &[]config.GroupWindow{}
+			}
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
