@@ -507,9 +507,8 @@ The `when` field specifies at which stage the hook should execute:
 | Stage                    | Description                                           |
 |--------------------------|-------------------------------------------------------|
 | `beforeJobExecution`     | Before job objects are created                        |
-| `afterJobExecution`      | After job objects are created (before churning)       |
 | `onEachIteration`        | On each job iteration                                 |
-| `beforeChurn`            | Before churn operation starts                         |
+| `afterJobExecution`      | After job objects are created (before churning)       |
 | `afterChurn`             | After churn operation completes                       |
 | `beforeCleanup`          | Before cleanup/deletion begins                        |
 | `afterCleanup`           | After cleanup/deletion completes                      |
@@ -616,7 +615,7 @@ hooks:
 ```yaml
 hooks:
   - cmd: ["/scripts/collect-churn-metrics.sh"]
-    when: beforeChurn
+    when: afterJobExecution
     background: true
 ```
 

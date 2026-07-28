@@ -435,7 +435,6 @@ func HookBeforeWorkload() error {
 	validWhen := map[JobHook]bool{
 		HookBeforeJobExecution: true,
 		HookAfterJobExecution:  true,
-		HookBeforeChurn:        true,
 		HookAfterChurn:         true,
 		HookBeforeCleanup:      true,
 		HookAfterCleanup:       true,
