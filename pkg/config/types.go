@@ -290,6 +290,8 @@ type IncrementalLoad struct {
 	Pattern LoadPattern `yaml:"pattern" json:"pattern,omitempty"`
 	// HealthCheckScript optional shell script to run as a health check between steps
 	HealthCheckScript string `yaml:"healthCheckScript" json:"healthCheckScript,omitempty"`
+	// ScrapeMetricsPerStep scrape prometheus metrics after each incremental step
+	ScrapeMetricsPerStep bool `yaml:"scrapeMetricsPerStep" json:"scrapeMetricsPerStep,omitempty"`
 }
 
 type LoadPattern struct {
