@@ -88,6 +88,7 @@ func initCmd() *cobra.Command {
 		Short: "Launch benchmark",
 		PostRun: func(cmd *cobra.Command, args []string) {
 			log.Info("👋 Exiting kube-burner ", uuid)
+			fmt.Println("test")
 			os.Exit(rc)
 		},
 		Args: cobra.NoArgs,
