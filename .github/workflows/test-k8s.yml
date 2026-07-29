@@ -1,5 +1,5 @@
 # test-k8s.yml
-name: Execute tests on k8s and OCP
+name: Execute tests on k8s
 on:
   pull_request_target:
     branches:
@@ -54,11 +54,13 @@ jobs:
       # This tells Git about origin/main (or master) without downloading the whole repo
       run: git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
 
-    - name: Download kube-burner binary
-      uses: actions/download-artifact@v8
+    - name: Set up Go 1.25
+      uses: actions/setup-go@v7
       with:
-        name: kube-burner
-        path: /tmp/
+        go-version: "1.25"
+
+    - name: Build code
+      run: sudo make build install
 
     - name: Install bats
       uses: bats-core/bats-action@4.0.0
@@ -71,7 +73,6 @@ jobs:
 
     - name: Execute Tests
       run: |
-        chmod +x /tmp/kube-burner
         make test-k8s
       env:
         TERM: linux
@@ -79,4 +80,4 @@ jobs:
         KIND_VERSION: v0.19.0
         K8S_VERSION: ${{matrix.k8s-version}}
         PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
-        TEST_BINARY: /tmp/kube-burner
+        TEST_BINARY: /usr/bin/kube-burner
