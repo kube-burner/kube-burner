@@ -249,7 +249,9 @@ func (s *serviceLatency) Stop() error {
 	defer func() {
 		cancel()
 		s.stopWatchers()
-		close(s.stopInformerCh)
+		if s.stopInformerCh != nil {
+			close(s.stopInformerCh)
+		}
 	}()
 	kutil.CleanupNamespacesByLabel(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
