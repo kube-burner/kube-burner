@@ -21,6 +21,7 @@ import (
 	"maps"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
@@ -59,6 +60,8 @@ type JobExecutor struct {
 	deletionStrategy  string
 	nsChurning        bool
 	hookManager       *HookManager
+	stageNotifier     *measurements.Measurements
+	midPointNotified  bool
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {

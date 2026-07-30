@@ -368,14 +368,20 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
+	totalIterations := iterationEnd - iterationStart
+	midIteration := iterationStart + totalIterations/2
+	ex.midPointNotified = false
 
 	for i := iterationStart; i < iterationEnd; i++ {
 		// Execute onEachIteration hooks
-		if ex.executeHooksForJobStage(config.HookOnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
+		if ex.executeHooksForJobStage(config.OnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
 			log.Errorf("%v", hookErrors)
 		}
 		if ctx.Err() != nil {
 			return []error{ctx.Err()}
+		}
+		if !ex.midPointNotified && totalIterations > 1 && i == midIteration {
+			ex.notifyMidPoint()
 		}
 		if ex.JobIterations > 1 && i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
@@ -472,6 +478,9 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 
 	groups := ex.groupObjectsByNumber()
 	iterationProgress := (iterationEnd - iterationStart) / 10
+	totalIterations := iterationEnd - iterationStart
+	midIteration := iterationStart + totalIterations/2
+	ex.midPointNotified = false
 
 	// Phase 2: Execute each group in order
 	for _, grp := range groups {
@@ -486,12 +495,15 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 
 		// Create all objects for all iterations in this group (iteration-first)
 		for i := iterationStart; i < iterationEnd; i++ {
-			if ex.executeHooksForJobStage(config.HookOnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
+			if ex.executeHooksForJobStage(config.OnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
 				log.Errorf("%v", hookErrors)
 			}
 			if ctx.Err() != nil {
 				ex.recordGroupWindow(grp.number, groupStart)
 				return []error{ctx.Err()}
+			}
+			if !ex.midPointNotified && totalIterations > 1 && i == midIteration {
+				ex.notifyMidPoint()
 			}
 			if ex.JobIterations > 1 && iterationProgress > 0 && i == iterationStart+iterationProgress*percent {
 				log.Infof("Group %d: %v/%v iterations completed", grp.number, i-iterationStart, iterationEnd-iterationStart)
@@ -697,6 +709,14 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 	wg.Wait()
 }
 
+func (ex *JobExecutor) notifyMidPoint() {
+	if ex.stageNotifier == nil || ex.midPointNotified {
+		return
+	}
+	ex.midPointNotified = true
+	ex.stageNotifier.NotifyJobStage(config.MidPoint)
+}
+
 // waitForCompletion waits for objects to be ready across the relevant namespaces
 func (ex *JobExecutor) waitForCompletion(ctx context.Context, iterationStart, iterationEnd int, ns string, namespacesWaited map[string]bool) []error {
 	log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
@@ -819,7 +839,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 		ex.churnObjects(ctx)
 	}
 	// Execute afterChurn hooks
-	if ex.executeHooksForJobStage(config.HookAfterChurn, &hookErrors, nil); len(hookErrors) > 0 {
+	if ex.executeHooksForJobStage(config.AfterChurn, &hookErrors, nil); len(hookErrors) > 0 {
 		log.Errorf("%v", hookErrors)
 	}
 	return nil

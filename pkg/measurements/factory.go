@@ -53,6 +53,11 @@ type Measurement interface {
 	GetMetrics() *sync.Map
 }
 
+// JobStageAware is implemented by measurements that react to job lifecycle stages.
+type JobStageAware interface {
+	OnJobStage(stage config.JobStage)
+}
+
 var measurementFactoryMap = map[string]NewMeasurementFactory{
 	"podLatency":            newPodLatencyMeasurementFactory,
 	"jobLatency":            newJobLatencyMeasurementFactory,
@@ -149,6 +154,18 @@ func (ms *Measurements) Start() {
 		go measurement.Start(&wg)
 	}
 	wg.Wait()
+}
+
+// NotifyJobStage notifies stage-aware measurements; blocks until they finish handling the stage.
+func (ms *Measurements) NotifyJobStage(stage config.JobStage) {
+	if ms == nil {
+		return
+	}
+	for _, measurement := range ms.MeasurementsMap {
+		if aware, ok := measurement.(JobStageAware); ok {
+			aware.OnJobStage(stage)
+		}
+	}
 }
 
 func (ms *Measurements) Collect() {
