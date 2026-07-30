@@ -28,8 +28,9 @@ type Config struct {
 	Timeout         time.Duration
 	MetricsEndpoint string
 	UserMetadata    string
-	PrometheusURL   string
-	PrometheusToken string
+	PrometheusURL       string
+	PrometheusToken     string
+	PrometheusTokenFile string
 }
 
 type WorkloadHelper struct {

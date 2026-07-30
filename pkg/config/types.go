@@ -84,6 +84,7 @@ type MetricsEndpoint struct {
 	Step                   time.Duration `yaml:"step"`
 	SkipTLSVerify          bool          `yaml:"skipTLSVerify"`
 	Token                  string        `yaml:"token"`
+	TokenFile              string        `yaml:"tokenFile"`
 	Username               string        `yaml:"username"`
 	Password               string        `yaml:"password"`
 	Alias                  string        `yaml:"alias"`
