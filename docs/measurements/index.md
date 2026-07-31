@@ -1020,6 +1020,8 @@ And the quantiles document has the structure:
 This measurement can be used to collect Golang profiling information from processes running in the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data.
 Profiling information is collected when the measurement starts and stops, but it's possible to collect it in a regular basis by setting the parameter `pprofInterval`. The collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory`, by default is `pprof`.
 
+Each `pprofTarget` accepts an optional `replicas` field that limits how many matching instances are collected. The default is `0`, which means collect from all matching pods (or DaemonSet pods for node targets).
+
 As some components require authentication to get profiling information, `kube-burner` provides two different modalities to address it:
 
 - **Bearer token authentication**: This modality is configured by the variable `bearerToken`, which holds a valid Bearer token that will be used by cURL to get pprof data. This method is usually valid with kube-apiserver and kube-controller-managers components
@@ -1042,12 +1044,14 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
     - name: kube-apiserver-heap
       namespace: "openshift-kube-apiserver"
       labelSelector: {app: openshift-kube-apiserver}
+      replicas: 1 # collect from a single apiserver instance
       bearerToken: thisIsNotAValidToken
       url: https://localhost:6443/debug/pprof/heap
 
     - name: etcd-heap
       namespace: "openshift-etcd"
       labelSelector: {app: etcd}
+      # replicas omitted or 0 → collect from all etcd pods
       certFile: etcd-peer-pert.crt
       keyFile: etcd-peer-pert.key
       url: https://localhost:2379/debug/pprof/heap
@@ -1072,6 +1076,7 @@ Find below a configuration snippet to collect pprof HEAP profiling data from kub
       node-role.kubernetes.io/worker: ""
     pprofTargets:
     - name: kubelet-heap
+      replicas: 2 # collect from two worker nodes; 0 means all
       url: https://localhost:10250/debug/pprof/heap
     - name: crio-heap
       url: http://localhost/debug/pprof/heap

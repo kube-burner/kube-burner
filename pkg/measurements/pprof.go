@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -156,6 +157,7 @@ func (p *pprof) copyCerts() error {
 }
 
 func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
+	var pods []corev1.Pod
 	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
 	if p.getPprofNodeTargets(target) != nil { // Node target
 		labelSelector := labels.Set(p.getPprofNodeTargets(target)).String()
@@ -165,14 +167,23 @@ func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 		if err != nil {
 			return []corev1.Pod{}, fmt.Errorf("error listing DaemonSet pods: %v", err)
 		}
-		return podList.Items, nil
+		pods = podList.Items
+	} else {
+		labelSelector := labels.Set(target.LabelSelector).String()
+		podList, err := p.ClientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			return []corev1.Pod{}, fmt.Errorf("error listing pods labeled with %s: %v", labelSelector, err)
+		}
+		pods = podList.Items
 	}
-	labelSelector := labels.Set(target.LabelSelector).String()
-	podList, err := p.ClientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
-	if err != nil {
-		return []corev1.Pod{}, fmt.Errorf("error listing pods labeled with %s: %v", labelSelector, err)
+	sort.Slice(pods, func(i, j int) bool {
+		return pods[i].Name < pods[j].Name
+	})
+	if target.Replicas > 0 && len(pods) > target.Replicas {
+		log.Infof("Limiting %s pprof collection to %d/%d instances", target.Name, target.Replicas, len(pods))
+		pods = pods[:target.Replicas]
 	}
-	return podList.Items, nil
+	return pods, nil
 }
 
 func (p *pprof) getPProf(wg *sync.WaitGroup, suffix string) {

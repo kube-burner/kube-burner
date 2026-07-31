@@ -76,6 +76,8 @@ type PProftarget struct {
 	Namespace string `yaml:"namespace"`
 	// LabelSelector get pprof from pods with these labels
 	LabelSelector map[string]string `yaml:"labelSelector"`
+	// Replicas number of target instances to collect from; 0 means all
+	Replicas int `yaml:"replicas"`
 	// BearerToken bearer token
 	BearerToken string `yaml:"bearerToken"`
 	// URL target URL

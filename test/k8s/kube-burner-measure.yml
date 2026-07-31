@@ -11,4 +11,5 @@ global:
        kubernetes.io/os: linux
      pprofTargets:
        - name: kubelet-heap
+         replicas: 1
          url: https://localhost:10250/debug/pprof/heap
