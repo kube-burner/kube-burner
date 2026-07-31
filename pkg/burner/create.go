@@ -279,6 +279,11 @@ func (ex *JobExecutor) setupCreateJob() {
 	var err error
 	log.Debugf("Preparing create job: %s", ex.Name)
 	for _, o := range ex.Objects {
+		if o.RunOnce {
+			ex.totalReplicas += o.Replicas
+		} else {
+			ex.totalReplicas += o.Replicas * ex.JobIterations
+		}
 		if o.Replicas < 1 {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
@@ -368,10 +373,6 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
-	totalIterations := iterationEnd - iterationStart
-	midIteration := iterationStart + totalIterations/2
-	ex.midPointNotified = false
-
 	for i := iterationStart; i < iterationEnd; i++ {
 		// Execute onEachIteration hooks
 		if ex.executeHooksForJobStage(config.OnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
@@ -379,9 +380,6 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 		}
 		if ctx.Err() != nil {
 			return []error{ctx.Err()}
-		}
-		if !ex.midPointNotified && totalIterations > 1 && i == midIteration {
-			ex.notifyMidPoint()
 		}
 		if ex.JobIterations > 1 && i == iterationStart+iterationProgress*percent {
 			log.Infof("%v/%v iterations completed", i-iterationStart, iterationEnd-iterationStart)
@@ -478,9 +476,6 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 
 	groups := ex.groupObjectsByNumber()
 	iterationProgress := (iterationEnd - iterationStart) / 10
-	totalIterations := iterationEnd - iterationStart
-	midIteration := iterationStart + totalIterations/2
-	ex.midPointNotified = false
 
 	// Phase 2: Execute each group in order
 	for _, grp := range groups {
@@ -501,9 +496,6 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 			if ctx.Err() != nil {
 				ex.recordGroupWindow(grp.number, groupStart)
 				return []error{ctx.Err()}
-			}
-			if !ex.midPointNotified && totalIterations > 1 && i == midIteration {
-				ex.notifyMidPoint()
 			}
 			if ex.JobIterations > 1 && iterationProgress > 0 && i == iterationStart+iterationProgress*percent {
 				log.Infof("Group %d: %v/%v iterations completed", grp.number, i-iterationStart, iterationEnd-iterationStart)
@@ -710,10 +702,9 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 }
 
 func (ex *JobExecutor) notifyMidPoint() {
-	if ex.stageNotifier == nil || ex.midPointNotified {
+	if ex.stageNotifier == nil {
 		return
 	}
-	ex.midPointNotified = true
 	ex.stageNotifier.NotifyJobStage(config.MidPoint)
 }
 
@@ -768,6 +759,10 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 	if log.GetLevel() == log.TraceLevel {
 		out, _ := yaml.Marshal(obj)
 		log.Trace(string(out))
+	}
+	ex.createdReplicas++
+	if ex.createdReplicas >= ex.totalReplicas/2 {
+		ex.notifyMidPoint()
 	}
 	util.RetryWithExponentialBackOff(func() (bool, error) {
 		if ctx.Err() != nil {

@@ -61,7 +61,8 @@ type JobExecutor struct {
 	nsChurning        bool
 	hookManager       *HookManager
 	stageNotifier     *measurements.Measurements
-	midPointNotified  bool
+	totalReplicas     int
+	createdReplicas   int
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {

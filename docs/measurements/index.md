@@ -1026,7 +1026,7 @@ Profiling information is collected when the measurement starts and stops. Additi
 Stage collection triggers at:
 
 - `beforeJobExecution`, `afterJobExecution`, `afterChurn`, `beforeCleanup`, `afterCleanup`, `beforeGC`, `afterGC` (same points as [hooks](../reference/configuration.md#hooks); only while the measurement is running)
-- `midPoint`: once at the midpoint of create-job work — mid-iteration when `jobIterations > 1`.mid-replica when a single iteration has `replicas > 1`
+- `midPoint`: once at the midpoint of create-job work — when `createdReplicas >= totalReplicas/2` in the regular job execution, it doesn't take into account churning.
 
 !!! note
     `onEachIteration` does not trigger pprof collection. Stage collection and `pprofInterval` can be used together.
