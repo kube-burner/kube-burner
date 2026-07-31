@@ -329,7 +329,7 @@ teardown_file() {
 
 @test "kube-burner-measure.yml: measure command" {
   run_cmd ${KUBE_BURNER} measure -c kube-burner-measure.yml --uuid=${UUID} --log-level=debug --duration=1m --selector=app=kube-burner-measure
-  check_file_exists ${METRICS_FOLDER}/pprof/*.pprof
+  check_file_exists ${METRICS_FOLDER}/pprof/kubelet-heap/kube-burner-measure/*.pprof
   verify_object_count namespace 0 "" kubernetes.io/metadata.name=kube-burner-pprof-collector
 }
 
