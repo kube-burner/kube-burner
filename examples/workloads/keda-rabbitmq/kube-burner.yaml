@@ -57,6 +57,8 @@ jobs:
         inputVars: &rabbitmqCreds
           rabbitmqUser: user
           rabbitmqPass: password
+          rabbitmqHost: rabbitmq.rabbitmq.svc.cluster.local
+          rabbitmqPort: "5672"
   # Job 2: Create producers to send messages to the queues via kubernetes jobs
   - name: rabbitmq-producers
     jobType: create
