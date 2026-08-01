@@ -18,4 +18,4 @@ spec:
           args: ["--uri", "$(RABBITMQ_URL)", "--producers", "2", "--consumers", "0", "--queue", "perf-queue-{{.Iteration}}"]
           env:
             - name: RABBITMQ_URL
-              value: "amqp://user:password@rabbitmq.rabbitmq.svc.cluster.local:5672"
+              value: "amqp://{{.rabbitmqUser}}:{{.rabbitmqPass}}@rabbitmq.rabbitmq.svc.cluster.local:5672"

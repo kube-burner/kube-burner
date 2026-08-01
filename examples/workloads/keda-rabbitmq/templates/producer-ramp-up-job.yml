@@ -49,4 +49,4 @@ spec:
             - "1800"
           env:
             - name: RABBITMQ_URL
-              value: "amqp://user:password@rabbitmq.rabbitmq.svc.cluster.local:5672"
+              value: "amqp://{{.rabbitmqUser}}:{{.rabbitmqPass}}@rabbitmq.rabbitmq.svc.cluster.local:5672"

@@ -14,4 +14,4 @@ spec:
         - name: delete-queue
           image: rabbitmq:3-management
           # We add "|| true" so it doesn't fail if the queue is already gone.
-          command: ["sh", "-c", "rabbitmqadmin -u user -p password -H rabbitmq.rabbitmq.svc.cluster.local delete queue name=perf-queue-{{.Iteration}} || true"]
+          command: ["sh", "-c", "rabbitmqadmin -u {{.rabbitmqUser}} -p {{.rabbitmqPass}} -H rabbitmq.rabbitmq.svc.cluster.local delete queue name=perf-queue-{{.Iteration}} || true"]

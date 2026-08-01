@@ -54,6 +54,9 @@ jobs:
     objects:
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/create-queue.yml
         replicas: 1
+        inputVars: &rabbitmqCreds
+          rabbitmqUser: user
+          rabbitmqPass: password
   # Job 2: Create producers to send messages to the queues via kubernetes jobs
   - name: rabbitmq-producers
     jobType: create
@@ -67,6 +70,7 @@ jobs:
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/producer-ramp-up-job.yml
         replicas: 1
         inputVars:
+          <<: *rabbitmqCreds
           containerImage: pivotalrabbitmq/perf-test:latest
           producerPerPodCount: 10
 
@@ -102,6 +106,7 @@ jobs:
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/consumer-deployment.yml
         replicas: 1
         inputVars:
+          <<: *rabbitmqCreds
           containerImage: pivotalrabbitmq/perf-test:latest
           consumerPerPodCount: 2
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/scaledobject.yml
@@ -136,3 +141,5 @@ jobs:
     objects:
       - objectTemplate: examples/workloads/keda-rabbitmq/templates/delete-queue.yml
         replicas: 1
+        inputVars:
+          <<: *rabbitmqCreds
