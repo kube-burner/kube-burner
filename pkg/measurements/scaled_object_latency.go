@@ -87,6 +87,7 @@ type scaledObjectMetric struct {
 type scaledObjectLatency struct {
 	BaseMeasurement
 	jobNamespaces map[string]struct{}
+	byTarget      sync.Map
 }
 
 type scaledObjectLatencyMeasurementFactory struct {
@@ -117,10 +118,12 @@ func (so *scaledObjectLatency) handleCreateScaledObject(obj any) {
 	}
 	soLabels := soObj.GetLabels()
 	scaleTargetName := ""
+	// Get the scale target deployment name of KEDA ScaledObject
 	if soObj.Spec.ScaleTargetRef != nil {
 		scaleTargetName = soObj.Spec.ScaleTargetRef.Name
 	}
-	so.Metrics.LoadOrStore(string(soObj.UID), scaledObjectMetric{
+	uid := string(soObj.UID)
+	so.Metrics.LoadOrStore(uid, scaledObjectMetric{
 		Timestamp:       soObj.CreationTimestamp.UTC(),
 		Namespace:       soObj.Namespace,
 		Name:            soObj.Name,
@@ -132,6 +135,9 @@ func (so *scaledObjectLatency) handleCreateScaledObject(obj any) {
 		JobIteration:    getIntFromLabels(soLabels, config.KubeBurnerLabelJobIteration),
 		Replica:         getIntFromLabels(soLabels, config.KubeBurnerLabelReplica),
 	})
+	if scaleTargetName != "" {
+		so.byTarget.Store(soObj.Namespace+"/"+scaleTargetName, uid)
+	}
 	log.Debugf("scaledObjectLatency: tracked ScaledObject %s/%s (target: %s)", soObj.Namespace, soObj.Name, scaleTargetName)
 }
 
@@ -171,36 +177,31 @@ func (so *scaledObjectLatency) handleCreateHPA(obj any) {
 		log.Errorf("scaledObjectLatency: failed to convert to HPA: %v", err)
 		return
 	}
-	// Check if this HPA is in a job namespace
 	if _, ok := so.jobNamespaces[hpa.Namespace]; !ok {
 		return
 	}
-	// Find the owning ScaledObject from ownerReferences
-	var ownerSOName string
+	var ownerUID string
 	for _, or := range hpa.OwnerReferences {
 		if or.Kind == "ScaledObject" {
-			ownerSOName = or.Name
+			ownerUID = string(or.UID)
 			break
 		}
 	}
-	if ownerSOName == "" {
-		return // Not a KEDA-managed HPA
+	if ownerUID == "" {
+		return
 	}
-	hpaName := hpa.Name
-	hpaNs := hpa.Namespace
-	now := time.Now().UTC()
-	// Find the matching ScaledObject in our metrics map
-	so.Metrics.Range(func(key, value any) bool {
-		m := value.(scaledObjectMetric)
-		if m.Name == ownerSOName && m.Namespace == hpaNs && m.hpaCreated.IsZero() {
-			m.hpaCreated = now
-			m.HPAName = hpaName
-			so.Metrics.Store(key, m)
-			log.Debugf("scaledObjectLatency: HPA %s created for ScaledObject %s/%s", hpaName, hpaNs, ownerSOName)
-			return false // stop iteration
-		}
-		return true
-	})
+	value, ok := so.Metrics.Load(ownerUID)
+	if !ok {
+		return
+	}
+	m := value.(scaledObjectMetric)
+	if !m.hpaCreated.IsZero() {
+		return
+	}
+	m.hpaCreated = time.Now().UTC() // same clock as Active/DeployReady
+	m.HPAName = hpa.Name
+	so.Metrics.Store(ownerUID, m)
+	log.Debugf("scaledObjectLatency: HPA %s created for ScaledObject %s/%s", hpa.Name, m.Namespace, m.Name)
 }
 
 // handleUpdateDeployment tracks when the target deployment has readyReplicas > 0
@@ -220,17 +221,22 @@ func (so *scaledObjectLatency) handleUpdateDeployment(obj any) {
 	deployName := deploy.Name
 	deployNs := deploy.Namespace
 	now := time.Now().UTC()
-	// Match against ScaledObjects that target this deployment
-	so.Metrics.Range(func(key, value any) bool {
-		m := value.(scaledObjectMetric)
-		if m.ScaleTargetName == deployName && m.Namespace == deployNs && m.deploymentReady.IsZero() {
-			m.deploymentReady = now
-			so.Metrics.Store(key, m)
-			log.Debugf("scaledObjectLatency: Deployment %s/%s has %d ready replicas", deployNs, deployName, deploy.Status.ReadyReplicas)
-			return false // stop iteration
-		}
-		return true
-	})
+	uidVal, ok := so.byTarget.Load(deploy.Namespace + "/" + deploy.Name)
+	if !ok {
+		return
+	}
+	uid := uidVal.(string)
+	value, ok := so.Metrics.Load(uid)
+	if !ok {
+		return
+	}
+	m := value.(scaledObjectMetric)
+	if !m.deploymentReady.IsZero() {
+		return
+	}
+	m.deploymentReady = now
+	so.Metrics.Store(uid, m)
+	log.Debugf("scaledObjectLatency: Deployment %s/%s has %d ready replicas", deployNs, deployName, deploy.Status.ReadyReplicas)
 }
 
 // Start begins the scaledObjectLatency measurement by setting up informers
