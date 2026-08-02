@@ -161,16 +161,22 @@ func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
 	if p.getPprofNodeTargets(target) != nil { // Node target
 		labelSelector := labels.Set(p.getPprofNodeTargets(target)).String()
-		podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector,
-			FieldSelector: "status.phase=Running",
-		})
+		podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(context.TODO(),
+			metav1.ListOptions{
+				LabelSelector: labelSelector,
+				FieldSelector: "status.phase=Running",
+			})
 		if err != nil {
 			return []corev1.Pod{}, fmt.Errorf("error listing DaemonSet pods: %v", err)
 		}
 		pods = podList.Items
 	} else {
 		labelSelector := labels.Set(target.LabelSelector).String()
-		podList, err := p.ClientSet.CoreV1().Pods(target.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		podList, err := p.ClientSet.CoreV1().Pods(target.Namespace).List(context.TODO(),
+			metav1.ListOptions{
+				LabelSelector: labelSelector,
+				FieldSelector: "status.phase=Running",
+			})
 		if err != nil {
 			return []corev1.Pod{}, fmt.Errorf("error listing pods labeled with %s: %v", labelSelector, err)
 		}
