@@ -83,16 +83,16 @@
 # ── Scaling Behavior ──────────────────────────────────────────────────────────
 
 # Deployment ready replica count over time (observe scale-out/in)
-- query: kube_deployment_status_replicas_ready{namespace="keda-perf-test"}
+- query: kube_deployment_status_replicas_ready{namespace="{{ with .KEDA_TEST_NAMESPACE }}{{ . }}{{ else }}keda-perf-test{{ end }}"}
   metricName: kedaTargetReplicasReady
   instant: false
 
 # HPA desired replicas (KEDA's desired state)
-- query: kube_horizontalpodautoscaler_status_desired_replicas{namespace="keda-perf-test"}
+- query: kube_horizontalpodautoscaler_status_desired_replicas{namespace="{{ with .KEDA_TEST_NAMESPACE }}{{ . }}{{ else }}keda-perf-test{{ end }}"}
   metricName: kedaHPADesiredReplicas
   instant: false
 
 # HPA current replicas
-- query: kube_horizontalpodautoscaler_status_current_replicas{namespace="keda-perf-test"}
+- query: kube_horizontalpodautoscaler_status_current_replicas{namespace="{{ with .KEDA_TEST_NAMESPACE }}{{ . }}{{ else }}keda-perf-test{{ end }}"}
   metricName: kedaHPACurrentReplicas
   instant: false
