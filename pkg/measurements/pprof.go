@@ -72,11 +72,6 @@ func (plmf pprofLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job,
 
 func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	dstPath := path.Join(p.Config.PProfDirectory, p.JobConfig.Name)
-	err := os.MkdirAll(dstPath, 0744)
-	if err != nil {
-		return fmt.Errorf("error creating pprof directory: %v", err)
-	}
 	if p.needsDaemonSet() {
 		if err := p.deployDaemonSet(); err != nil {
 			return fmt.Errorf("error deploying DaemonSet: %v", err)
@@ -184,10 +179,9 @@ func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 func (p *pprof) getPProf(suffix string) {
 	wg := sync.WaitGroup{}
 	for pos, target := range p.Config.PProfTargets {
-		dstDirectory := path.Join(p.Config.PProfDirectory, target.Name, p.JobConfig.Name)
+		dstDirectory := path.Join(p.Config.PProfDirectory, p.JobConfig.Name, target.Name)
 		if _, err := os.Stat(dstDirectory); os.IsNotExist(err) {
-			err := os.MkdirAll(dstDirectory, 0744)
-			if err != nil {
+			if os.MkdirAll(dstDirectory, 0744); err != nil {
 				log.Errorf("Error creating pprof directory %s: %v", dstDirectory, err)
 				continue
 			}
