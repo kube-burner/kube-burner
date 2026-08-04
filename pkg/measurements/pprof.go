@@ -159,8 +159,9 @@ func (p *pprof) copyCerts() error {
 func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 	var pods []corev1.Pod
 	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
-	if p.getPprofNodeTargets(target) != nil { // Node target
-		labelSelector := labels.Set(p.getPprofNodeTargets(target)).String()
+	pprofNodeTargets := p.getPprofNodeTargets(target)
+	if pprofNodeTargets != nil { // Node target
+		labelSelector := labels.Set(pprofNodeTargets).String()
 		podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(context.TODO(),
 			metav1.ListOptions{
 				LabelSelector: labelSelector,
