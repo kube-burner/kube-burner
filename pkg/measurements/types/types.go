@@ -26,8 +26,9 @@ const (
 func (m *Measurement) UnmarshalMeasurement(unmarshal func(any) error) error {
 	type rawMeasurement Measurement
 	measurement := rawMeasurement{
-		PProfDirectory: pprofDirectory,
-		ServiceTimeout: 5 * time.Second,
+		PProfDirectory:       pprofDirectory,
+		ServiceTimeout:       5 * time.Second,
+		PProfStageCollection: true,
 	}
 	if err := unmarshal(&measurement); err != nil {
 		return err
@@ -46,6 +47,8 @@ type Measurement struct {
 	PProfTargets []PProftarget `yaml:"pprofTargets"`
 	// PPRofInterval pprof collect interval
 	PProfInterval time.Duration `yaml:"pprofInterval"`
+	// PProfStageCollection collects pprof at job lifecycle stages
+	PProfStageCollection bool `yaml:"pprofStageCollection"`
 	// PProfDirectory output directory
 	PProfDirectory string `yaml:"pprofDirectory"`
 	// NodeAffinity node affinity configuration

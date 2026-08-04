@@ -278,7 +278,13 @@ func (ex *JobExecutor) setupCreateJob() {
 	var f io.ReadCloser
 	var err error
 	log.Debugf("Preparing create job: %s", ex.Name)
+	ex.midPoint = &midPointTracker{}
 	for _, o := range ex.Objects {
+		if o.RunOnce {
+			ex.midPoint.totalReplicas += o.Replicas
+		} else {
+			ex.midPoint.totalReplicas += o.Replicas * ex.JobIterations
+		}
 		if o.Replicas < 1 {
 			log.Warnf("Object template %s has replicas %d < 1, skipping", o.ObjectTemplate, o.Replicas)
 			continue
@@ -368,10 +374,9 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 	// We have to sum 1 since the iterations start from 1
 	iterationProgress := (iterationEnd - iterationStart) / 10
 	percent := 1
-
 	for i := iterationStart; i < iterationEnd; i++ {
 		// Execute onEachIteration hooks
-		if ex.executeHooksForJobStage(config.HookOnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
+		if ex.executeHooksForJobStage(config.OnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
 			log.Errorf("%v", hookErrors)
 		}
 		if ctx.Err() != nil {
@@ -486,7 +491,7 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 
 		// Create all objects for all iterations in this group (iteration-first)
 		for i := iterationStart; i < iterationEnd; i++ {
-			if ex.executeHooksForJobStage(config.HookOnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
+			if ex.executeHooksForJobStage(config.OnEachIteration, &hookErrors, nil); len(hookErrors) > 0 {
 				log.Errorf("%v", hookErrors)
 			}
 			if ctx.Err() != nil {
@@ -697,6 +702,27 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 	wg.Wait()
 }
 
+func (ex *JobExecutor) notifyMidPoint() {
+	if ex.stageNotifier == nil || ex.midPoint == nil {
+		return
+	}
+	ex.midPoint.once.Do(func() {
+		ex.stageNotifier.NotifyJobStage(config.MidPoint)
+	})
+}
+
+// notifyMidpoint counts a successful create from the initial create phase and
+// fires MidPoint exactly once when createdReplicas reaches totalReplicas/2.
+func (ex *JobExecutor) notifyMidpoint() {
+	if ex.midPoint == nil || config.IsChurnEnabled(ex.Job) || ex.stageNotifier == nil || ex.midPoint.totalReplicas <= 0 {
+		return
+	}
+	created := ex.midPoint.createdReplicas.Add(1)
+	if created >= int64(ex.midPoint.totalReplicas)/2 {
+		ex.notifyMidPoint()
+	}
+}
+
 // waitForCompletion waits for objects to be ready across the relevant namespaces
 func (ex *JobExecutor) waitForCompletion(ctx context.Context, iterationStart, iterationEnd int, ns string, namespacesWaited map[string]bool) []error {
 	log.Infof("Waiting up to %s for actions to be completed", ex.MaxWaitTimeout)
@@ -769,6 +795,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 				} else {
 					log.Errorf("%s/%s already exists", obj.GetKind(), obj.GetName())
 				}
+				ex.notifyMidpoint()
 				return true, nil
 			} else if kerrors.IsNotFound(err) {
 				log.Errorf("Error creating object %s/%s: %v", obj.GetKind(), obj.GetName(), err.Error())
@@ -787,6 +814,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		} else {
 			log.Debugf("Created %s/%s", uns.GetKind(), uns.GetName())
 		}
+		ex.notifyMidpoint()
 		return true, err
 	}, 1*time.Second, 3, 0, timeout)
 }
@@ -804,6 +832,7 @@ func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[st
 
 // RunCreateJobWithChurn executes a churn creation job
 func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
+	// MidPoint only tracks the initial create phase
 	// Cleanup namespaces based on the labels we added to the objects
 	log.Infof("Churning mode: %s", ex.ChurnConfig.Mode)
 	var hookErrors []error
@@ -819,7 +848,7 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 		ex.churnObjects(ctx)
 	}
 	// Execute afterChurn hooks
-	if ex.executeHooksForJobStage(config.HookAfterChurn, &hookErrors, nil); len(hookErrors) > 0 {
+	if ex.executeHooksForJobStage(config.AfterChurn, &hookErrors, nil); len(hookErrors) > 0 {
 		log.Errorf("%v", hookErrors)
 	}
 	return nil

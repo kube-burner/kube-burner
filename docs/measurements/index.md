@@ -1018,7 +1018,18 @@ And the quantiles document has the structure:
 ## pprof collection
 
 This measurement can be used to collect Golang profiling information from processes running in the cluster. To do so, kube-burner connects to pods labeled with `labelSelector` and running in `namespace`. This measurement uses an implementation similar to `kubectl exec`, and as soon as it connects to one pod it executes the command `curl <pprofURL>` to get the pprof data.
-Profiling information is collected when the measurement starts and stops, but it's possible to collect it in a regular basis by setting the parameter `pprofInterval`. The collected pprof files are downloaded from the pods to the local directory configured by the parameter `pprofDirectory`, by default is `pprof`.
+Profiling information is collected when the measurement starts and stops. Additional collections can be configured independently:
+
+- `pprofInterval`: collect periodically at the given interval
+- `pprofStageCollection`: when `true` (default), collect at job lifecycle stages.
+
+Stage collection triggers at:
+
+- `beforeJobExecution`, `afterJobExecution`, `afterChurn`, `beforeCleanup`, `afterCleanup`, `beforeGC`, `afterGC` (same points as [hooks](../reference/configuration.md#hooks); only while the measurement is running)
+- `midPoint`: once when successful creates reach `ceil(totalReplicas/2)` during the initial create phase; churn recreations are not counted.
+
+!!! note
+    `onEachIteration` does not trigger pprof collection. Stage collection and `pprofInterval` can be used together.
 
 As some components require authentication to get profiling information, `kube-burner` provides two different modalities to address it:
 
@@ -1029,6 +1040,21 @@ As some components require authentication to get profiling information, `kube-bu
     - `certFile`: Path to a certificate file.
     - `keyFile`: Path to a private key file.
 
+Collected files are stored in a directory with the following structure:
+
+```
+pprof-data/
+├── myjob/
+│   ├── target-name/
+│   │   ├── pod-name-start.pprof
+│   │   ├── pod-name-midPoint.pprof
+│   │   └── pod-name-end.pprof
+│   └── target-name-2/
+│       ├── pod-name-start.pprof
+│       ├── pod-name-midPoint.pprof
+│       └── pod-name-end.pprof
+```
+
 !!! note
     The decoded content of the certificate and private key is written to the files /tmp/pprof.crt and /tmp/pprof.key of the remote pods respectively
 
@@ -1037,6 +1063,7 @@ An example of how to configure this measurement to collect pprof HEAP and CPU pr
 ```yaml
   measurements:
   - name: pprof
+    pprofStageCollection: true
     pprofDirectory: pprof-data
     pprofTargets:
     - name: kube-apiserver-heap

@@ -44,7 +44,8 @@ import (
 
 type pprof struct {
 	BaseMeasurement
-	stopChannel chan bool
+	stopChannel  chan bool
+	collectMutex sync.Mutex
 }
 
 type pprofLatencyMeasurementFactory struct {
@@ -71,11 +72,7 @@ func (plmf pprofLatencyMeasurementFactory) NewMeasurement(jobConfig *config.Job,
 
 func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 	defer measurementWg.Done()
-	var wg sync.WaitGroup
-	err := os.MkdirAll(p.Config.PProfDirectory, 0744)
-	if err != nil {
-		return fmt.Errorf("error creating pprof directory: %v", err)
-	}
+	p.stopChannel = make(chan bool)
 	if p.needsDaemonSet() {
 		if err := p.deployDaemonSet(); err != nil {
 			return fmt.Errorf("error deploying DaemonSet: %v", err)
@@ -84,39 +81,43 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 			return fmt.Errorf("error waiting for DaemonSet to be ready: %v", err)
 		}
 	}
-	p.stopChannel = make(chan bool)
 	if err := p.copyCerts(); err != nil {
 		return fmt.Errorf("error copying certificates: %v", err)
 	}
-	p.getPProf(&wg, fmt.Sprintf("%s-start", p.JobConfig.Name))
-	wg.Wait()
+	p.collect("start")
 	go func() {
 		defer close(p.stopChannel)
 		var ticker *time.Ticker
 		var tickerC <-chan time.Time
+		// If interval is 0, use nil channel which never sends
 		if p.Config.PProfInterval > 0 {
 			ticker = time.NewTicker(p.Config.PProfInterval)
 			tickerC = ticker.C
 			defer ticker.Stop()
-		} else {
-			// If interval is 0, use nil channel which never sends (infinite ticker)
-			tickerC = nil
 		}
 		for {
 			select {
 			case <-tickerC:
-				// Copy certificates only in the first iteration
-				p.getPProf(&wg, time.Now().Format("2006-01-02T15_04_05Z"))
-				wg.Wait()
+				p.collect(time.Now().Format("2006-01-02T15_04_05Z"))
 			case <-p.stopChannel:
-				if ticker != nil {
-					ticker.Stop()
-				}
 				return
 			}
 		}
 	}()
 	return nil
+}
+
+func (p *pprof) OnJobStage(stage config.JobStage) {
+	if !p.Config.PProfStageCollection {
+		return
+	}
+	p.collect(string(stage))
+}
+
+func (p *pprof) collect(suffix string) {
+	p.collectMutex.Lock()
+	defer p.collectMutex.Unlock()
+	p.getPProf(suffix)
 }
 
 func (p *pprof) copyCerts() error {
@@ -175,8 +176,14 @@ func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 	return podList.Items, nil
 }
 
-func (p *pprof) getPProf(wg *sync.WaitGroup, suffix string) {
+func (p *pprof) getPProf(suffix string) {
+	wg := sync.WaitGroup{}
 	for pos, target := range p.Config.PProfTargets {
+		dstDirectory := path.Join(p.Config.PProfDirectory, p.JobConfig.Name, target.Name)
+		if err := os.MkdirAll(dstDirectory, 0744); err != nil {
+			log.Errorf("Error creating pprof directory %s: %v", dstDirectory, err)
+			continue
+		}
 		log.Infof("Collecting %s pprof", target.Name)
 		pods, err := p.getPods(target)
 		if err != nil {
@@ -185,14 +192,14 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, suffix string) {
 		}
 		for _, pod := range pods {
 			wg.Add(1)
-			go func(target types.PProftarget, pod corev1.Pod) {
+			go func(target types.PProftarget, pod corev1.Pod, dstDirectory string) {
 				defer wg.Done()
-				pprofFile := fmt.Sprintf("%s-%s-%s.pprof", target.Name, pod.Name, suffix)
+				pprofFile := fmt.Sprintf("%s-%s.pprof", pod.Name, suffix)
 				if target.LabelSelector == nil {
-					pprofFile = fmt.Sprintf("%s-%s-%s.pprof", target.Name, pod.Spec.NodeName, suffix)
+					pprofFile = fmt.Sprintf("%s-%s.pprof", pod.Spec.NodeName, suffix)
 				}
 				var stderr bytes.Buffer
-				f, err := os.Create(path.Join(p.Config.PProfDirectory, pprofFile))
+				f, err := os.Create(path.Join(dstDirectory, pprofFile))
 				if err != nil {
 					log.Errorf("Error creating pprof file %s: %s", pprofFile, err)
 					return
@@ -225,7 +232,7 @@ func (p *pprof) getPProf(wg *sync.WaitGroup, suffix string) {
 				} else {
 					log.Debugf("Successfully collected pprof data: %s", pprofFile)
 				}
-			}(p.Config.PProfTargets[pos], pod)
+			}(p.Config.PProfTargets[pos], pod, dstDirectory)
 		}
 	}
 	wg.Wait()
@@ -273,9 +280,7 @@ func (p *pprof) Collect(measurementWg *sync.WaitGroup) {
 
 func (p *pprof) Stop() error {
 	p.stopChannel <- true
-	var wg sync.WaitGroup
-	p.getPProf(&wg, fmt.Sprintf("%s-end", p.JobConfig.Name))
-	wg.Wait()
+	p.getPProf("end")
 	if p.needsDaemonSet() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
