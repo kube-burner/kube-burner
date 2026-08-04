@@ -112,13 +112,13 @@ func (hm *HookManager) prepareCommand(hook config.Hook) (*exec.Cmd, io.ReadClose
 		}
 		scriptReader = reader
 
-		// Build command: sh -s - <args...>
+		// Build command: bash -s - <args...>
 		// Script is read from stdin; positional params start at hook.Cmd[1].
 		args := []string{"-s", "-"}
 		if len(hook.Cmd) > 1 {
 			args = append(args, hook.Cmd[1:]...)
 		}
-		cmd = exec.CommandContext(hm.ctx, "/bin/sh", args...)
+		cmd = exec.CommandContext(hm.ctx, "/bin/bash", args...)
 		cmd.Stdin = scriptReader
 		log.Debugf("Reading script %s from embedded filesystem", scriptPath)
 
