@@ -76,11 +76,12 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 			if util.IsLocalIndexer(metricsEndpoint.Type) {
 				if metricsEndpoint.MetricsDirectory == "collected-metrics-{{.UUID}}" {
 					if metricsDirectoryFlag != "" && metricsDirectoryFlag != "collected-metrics-{{.UUID}}" {
-						metricsEndpoint.MetricsDirectory = metricsDirectoryFlag
+						scraperConfig.ConfigSpec.MetricsEndpoints[pos].MetricsDirectory = metricsDirectoryFlag
 					} else {
 						// Default value from config.go unmarshalYAML
-						metricsEndpoint.MetricsDirectory = fmt.Sprintf("collected-metrics-%s", scraperConfig.ConfigSpec.GlobalConfig.UUID)
+						scraperConfig.ConfigSpec.MetricsEndpoints[pos].MetricsDirectory = fmt.Sprintf("collected-metrics-%s", scraperConfig.ConfigSpec.GlobalConfig.UUID)
 					}
+					metricsEndpoint = scraperConfig.ConfigSpec.MetricsEndpoints[pos]
 				}
 			}
 			log.Infof("📁 Creating %s indexer: %s", metricsEndpoint.Type, indexerAlias)
