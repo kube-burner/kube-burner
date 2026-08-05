@@ -84,12 +84,12 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 			return fmt.Errorf("error waiting for DaemonSet to be ready: %v", err)
 		}
 	}
-	p.stopChannel = make(chan bool)
 	if err := p.copyCerts(); err != nil {
 		return fmt.Errorf("error copying certificates: %v", err)
 	}
 	p.getPProf(&wg, fmt.Sprintf("%s-start", p.JobConfig.Name))
 	wg.Wait()
+	p.stopChannel = make(chan bool)
 	go func() {
 		defer close(p.stopChannel)
 		var ticker *time.Ticker
@@ -272,7 +272,9 @@ func (p *pprof) Collect(measurementWg *sync.WaitGroup) {
 }
 
 func (p *pprof) Stop() error {
-	p.stopChannel <- true
+	if p.stopChannel != nil {
+		p.stopChannel <- true
+	}
 	var wg sync.WaitGroup
 	p.getPProf(&wg, fmt.Sprintf("%s-end", p.JobConfig.Name))
 	wg.Wait()

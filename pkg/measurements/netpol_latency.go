@@ -579,7 +579,9 @@ func (n *netpolLatency) Stop() error {
 	if len(connections) > 0 {
 		n.processResults()
 	}
-	proxyPortForwarder.CancelPodPortForwarder()
+	if proxyPortForwarder != nil {
+		proxyPortForwarder.CancelPodPortForwarder()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
