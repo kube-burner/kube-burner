@@ -26,6 +26,7 @@ type Auth struct {
 	Username      string
 	Password      string
 	Token         string
+	TokenFile     string
 	SkipTLSVerify bool
 }
 

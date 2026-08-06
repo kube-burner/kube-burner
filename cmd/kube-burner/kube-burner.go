@@ -342,7 +342,7 @@ func measureCmd() *cobra.Command {
 func indexCmd() *cobra.Command {
 	var url, metricsEndpoint, metricsProfile, jobName string
 	var start, end int64
-	var username, password, uuid, token, userMetadata string
+	var username, password, uuid, token, tokenFile, userMetadata string
 	var esServer, esIndex, metricsDirectory string
 	var configSpec config.Spec
 	var skipTLSVerify, skipLogFile bool
@@ -375,6 +375,7 @@ func indexCmd() *cobra.Command {
 				Username:      username,
 				Password:      password,
 				Token:         token,
+				TokenFile:     tokenFile,
 				Step:          prometheusStep,
 				Endpoint:      url,
 				Metrics:       metricsProfiles,
@@ -427,6 +428,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
+	cmd.Flags().StringVar(&tokenFile, "token-file", "", "Path to a file containing the Prometheus Bearer token (re-read on each request for token rotation)")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "comma-separated list of metric profiles")
@@ -489,7 +491,7 @@ func importCmd() *cobra.Command {
 func alertCmd() *cobra.Command {
 	var configSpec config.Spec
 	var err error
-	var url, alertProfile, username, password, uuid, token string
+	var url, alertProfile, username, password, uuid, token, tokenFile string
 	var esServer, esIndex, metricsDirectory string
 	var start, end int64
 	var skipTLSVerify bool
@@ -531,6 +533,7 @@ func alertCmd() *cobra.Command {
 				Username:      username,
 				Password:      password,
 				Token:         token,
+				TokenFile:     tokenFile,
 				SkipTLSVerify: skipTLSVerify,
 			}
 			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, indexer)
@@ -554,6 +557,7 @@ func alertCmd() *cobra.Command {
 	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
+	cmd.Flags().StringVar(&tokenFile, "token-file", "", "Path to a file containing the Prometheus Bearer token (re-read on each request for token rotation)")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "alerts.yaml", "Alert profile file or URL")

@@ -46,6 +46,8 @@ It is possible to look for alerts without triggering a kube-burner workload by u
 
 ```shell
 $ kube-burner check-alerts -u https://prometheus.url.com -t ${token} -a alert-profile.yml
+# Or use --token-file for automatic token refresh:
+# kube-burner check-alerts -u https://prometheus.url.com --token-file /path/to/token -a alert-profile.yml
 INFO[2020-12-10 11:47:23] 👽 Initializing prometheus client
 INFO[2020-12-10 11:47:24] 🔔 Initializing alert manager
 INFO[2020-12-10 11:47:24] Evaluating expression: 'avg_over_time(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[2m]))[5m:]) > 0.01'

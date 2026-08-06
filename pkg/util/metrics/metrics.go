@@ -96,6 +96,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				Username:      metricsEndpoint.Username,
 				Password:      metricsEndpoint.Password,
 				Token:         metricsEndpoint.Token,
+				TokenFile:     metricsEndpoint.TokenFile,
 				SkipTLSVerify: metricsEndpoint.SkipTLSVerify,
 			}
 			p, err := prometheus.NewPrometheusClient(*scraperConfig.ConfigSpec, metricsEndpoint.Endpoint, auth, metricsEndpoint.Step, scraperConfig.MetricsMetadata, indexer)

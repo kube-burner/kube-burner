@@ -12,6 +12,7 @@ The logic to configure metric collection and indexing is established by the `met
 | `username` | Prometheus username (Basic auth) | `username` |
 | `password` | Prometheus password (Basic auth) | `topSecret` |
 | `token` | Prometheus bearer token (Bearer auth) | `yourTokenDefinition` |
+| `tokenFile` | Path to a file containing the bearer token. The token is re-read on every request, allowing external token rotation for long-running workloads. Takes precedence over `token` if both are set | `/path/to/token` |
 | `step` | Prometheus step size, used when scraping it, by default `30s` | `1m` |
 | `skipTLSVerify` | Skip TLS certificate verification, `true` by default | `true` |
 | `metrics` | List of metrics files | `[metrics.yml, more-metrics.yml]` |
@@ -101,6 +102,8 @@ Example `tsdb` indexer configuration:
 metricsEndpoints:
   - endpoint: https://remote-endpoint:9090
     token: <token>
+    # Or use tokenFile for automatic token refresh:
+    # tokenFile: /path/to/token
     metrics:
     - metrics-profile.yaml
     indexer:
@@ -201,7 +204,7 @@ A valid file provided to the `--metrics-endpoint` looks like this:
   indexer:
     type: local
 - endpoint: http://remotehost:9090 # Another Prometheus endpoint
-  token: <token>
+  tokenFile: /path/to/token # Token is re-read on every request for automatic refresh
   alerts: [alerts.yaml] # Alert profile, when metrics is not defined, defining an indexer is optional
 ```
 
