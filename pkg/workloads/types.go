@@ -24,10 +24,10 @@ import (
 )
 
 type Config struct {
-	UUID            string
-	Timeout         time.Duration
-	MetricsEndpoint string
-	UserMetadata    string
+	UUID                string
+	Timeout             time.Duration
+	MetricsEndpoint     string
+	UserMetadata        string
 	PrometheusURL       string
 	PrometheusToken     string
 	PrometheusTokenFile string
