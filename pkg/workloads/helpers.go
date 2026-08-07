@@ -85,6 +85,7 @@ func (wh *WorkloadHelper) Run(configFile string) int {
 	for pos := range ConfigSpec.MetricsEndpoints {
 		ConfigSpec.MetricsEndpoints[pos].Endpoint = wh.PrometheusURL
 		ConfigSpec.MetricsEndpoints[pos].Token = wh.PrometheusToken
+		ConfigSpec.MetricsEndpoints[pos].TokenFile = wh.PrometheusTokenFile
 	}
 	metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 		ConfigSpec:      &ConfigSpec,

@@ -37,7 +37,7 @@ jobs:
     waitWhenFinished: true
     podWait: false
     objects:
-      - objectTemplate: ./examples/workloads/kubelet-density/templates/pod.yml
+      - objectTemplate: templates/pod.yml
         replicas: 1
         inputVars:
           containerImage: registry.k8s.io/pause:3.1

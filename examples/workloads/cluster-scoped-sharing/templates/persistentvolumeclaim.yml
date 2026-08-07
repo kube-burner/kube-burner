@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{.Iteration}}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+  storageClassName: manual
+  selector:
+    matchLabels:
+      # Reference the correct PV using adjusted iteration
+      pv-group: "{{ div .Iteration .pvRepeatN }}"
+

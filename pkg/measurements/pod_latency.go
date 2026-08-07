@@ -319,13 +319,16 @@ func (p *podLatency) Collect(measurementWg *sync.WaitGroup) {
 			containersReady:        containersReady,
 			podReady:               podReady,
 			JobName:                p.JobConfig.Name,
+			Metadata:               p.Metadata,
 		})
 	}
 }
 
 // Stop stops podLatency measurement
 func (p *podLatency) Stop() error {
-	defer close(p.eventInformerCh)
+	if p.eventInformerCh != nil {
+		defer close(p.eventInformerCh)
+	}
 	return p.StopMeasurement(p.normalizeMetrics, p.getLatency)
 }
 

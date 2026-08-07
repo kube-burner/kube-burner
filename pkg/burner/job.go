@@ -18,16 +18,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
-	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/cloud-bulldozer/go-commons/v2/version"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
 	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/cluster"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	"github.com/kube-burner/kube-burner/v2/pkg/watchers"
@@ -86,9 +85,17 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
 	defer cancel()
+	clientSet, restConfig := kubeClientProvider.DefaultClientSet()
+	probeCtx, probeCancel := context.WithTimeout(ctx, configSpec.GlobalConfig.RequestTimeout)
+	clusterInfo, err := cluster.Probe(probeCtx, clientSet)
+	probeCancel()
+	if err != nil {
+		log.Warnf("Cluster probe partially failed: %v", err)
+	}
+	metricsScraper.SummaryMetadata = clusterInfo.ApplyMetadata(metricsScraper.SummaryMetadata)
+	metricsScraper.MetricsMetadata = clusterInfo.ApplyMetadata(metricsScraper.MetricsMetadata)
 	go func() {
 		var innerRC int
-		_, restConfig := kubeClientProvider.DefaultClientSet()
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 		if err := handlePreloadImages(ctx, jobExecutors, kubeClientProvider); err != nil {
@@ -115,6 +122,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		for _, jobExecutor := range jobExecutors {
 			jobIdx := len(executedJobs) // Track the index where we're appending
 			startJobIdx := jobIdx       // Will work for both incremental and normal jobs
+			// Allocate a shared slice to record group execution windows at runtime.
+			// The pointer is propagated to every job config copy so datapoints can be
+			// tagged with the groupId of the window they fall into.
+			if jobExecutor.JobType == config.CreationJob && config.IsGroupedEnabled(jobExecutor.Job) {
+				jobExecutor.GroupWindows = &[]config.GroupWindow{}
+			}
 			executedJobs = append(executedJobs, prometheus.Job{
 				Start:     time.Now().UTC(),
 				JobConfig: jobExecutor.Job,
@@ -200,26 +213,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					return
 				}
 			}
-			if jobExecutor.BeforeCleanup != "" || len(jobExecutor.Hooks) > 0 {
-				// Execute beforeCleanup hooks first
-				jobExecutor.executeHooksForJobStage(config.HookBeforeCleanup, &errs, &innerRC)
-
-				if jobExecutor.BeforeCleanup != "" {
-					log.Infof("Waiting for beforeCleanup command %s to finish", jobExecutor.BeforeCleanup)
-					stdOut, stdErr, err := util.RunShellCmd(jobExecutor.BeforeCleanup, jobExecutor.embedCfg)
-					if err != nil {
-						err = fmt.Errorf("BeforeCleanup failed: %v", err)
-						log.Error(err.Error())
-						errs = append(errs, err)
-						innerRC = 1
-					}
-					log.Infof("BeforeCleanup out: %v, err: %v", stdOut.String(), stdErr.String())
-				}
-			}
+			jobExecutor.executeHooksForJobStage(config.HookBeforeCleanup, &errs, &innerRC)
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
 				executedJobs[jobIdx].End = jobEnd
-				executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if jobExecutor.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
@@ -227,7 +224,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if jobExecutor.MetricsClosing == config.AfterJobPause {
 				executedJobs[jobIdx].End = time.Now().UTC()
-				executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 			}
 			if !globalConfig.WaitWhenFinished {
 				elapsedTime := jobEnd.Sub(executedJobs[startJobIdx].Start).Round(time.Second)
@@ -243,7 +239,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 					if jobExecutor.MetricsClosing == config.AfterMeasurements {
 						executedJobs[jobIdx].End = time.Now().UTC()
-						executedJobs[jobIdx].ObjectOperations = jobExecutor.objectOperations
 					}
 					if !jobExecutor.SkipIndexing && len(metricsScraper.IndexerList) > 0 {
 						msWg.Add(1)
@@ -397,21 +392,13 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
 			}
-			var achievedQps float64
 			elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
-			if elapsedTime > 0 {
-				achievedQps = math.Round((float64(job.ObjectOperations)/elapsedTime)*1000) / 1000
-			}
-			if job.JobConfig.IncrementalLoad != nil && job.IncrementalLoadUUID == "" {
-				achievedQps = 0
-			}
 			jobSummaries = append(jobSummaries, JobSummary{
 				UUID:                uuid,
 				IncrementalLoadUUID: job.IncrementalLoadUUID,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,
 				ElapsedTime:         elapsedTime,
-				AchievedQps:         achievedQps,
 				ChurnStartTimestamp: job.JobConfig.ChurnStart,
 				ChurnEndTimestamp:   job.JobConfig.ChurnEnd,
 				JobConfig:           job.JobConfig,
@@ -431,7 +418,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 		prometheusClient.ScrapeJobsMetrics(executedJobs...)
 	}
 	for _, indexer := range configSpec.MetricsEndpoints {
-		if (indexer.Type == indexers.LocalIndexer || indexer.Type == indexers.TSDBIndexer) && indexer.CreateTarball {
+		if util.IsLocalIndexer(indexer.Type) && indexer.CreateTarball {
 			metrics.CreateTarball(indexer.IndexerConfig)
 		}
 	}
@@ -509,19 +496,7 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
-	// We first delete the non-namespaced resources and resources with predefined namespace
-	for _, obj := range ex.objects {
-		ex.limiter.Wait(ctx)
-		if !obj.namespaced {
-			CleanupNonNamespacedResourcesByLabel(ctx, *ex, obj, labelSelector)
-		} else if obj.namespace != "" { // When the object has a fixed namespace not generated by kube-burner
-			CleanupNamespaceResourcesByLabel(ctx, *ex, obj, obj.namespace, labelSelector)
-			err := waitForDeleteResourceInNamespace(ctx, *ex, obj, obj.namespace, labelSelector)
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-		}
-	}
+	// gvr deletion strategy
 	if ex.deletionStrategy == config.GVRDeletionStrategy {
 		namespaces, err := ex.clientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
@@ -551,5 +526,23 @@ func (ex *JobExecutor) gc(ctx context.Context, wg *sync.WaitGroup) {
 		if err != nil {
 			log.Error(err.Error())
 		}
+	}
+	// Delete resources with predefined namespace first, and then cluster-scoped resources
+	for _, obj := range ex.objects {
+		if !obj.namespaced || obj.namespace == "" { // Only objects with a fixed namespace (not generated by kube-burner)
+			continue
+		}
+		ex.limiter.Wait(ctx)
+		CleanupNamespacedResourcesByLabel(ctx, *ex, obj, obj.namespace, labelSelector)
+		if err := waitForDeleteResourceInNamespace(ctx, *ex, obj, obj.namespace, labelSelector); err != nil {
+			log.Errorf("Error waiting for %s deletion in %s: %v", obj.Kind, obj.namespace, err)
+		}
+	}
+	for _, obj := range ex.objects {
+		if obj.namespaced {
+			continue
+		}
+		ex.limiter.Wait(ctx)
+		CleanupClusterScopedResourcesByLabel(ctx, *ex, obj, labelSelector)
 	}
 }

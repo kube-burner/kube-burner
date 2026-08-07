@@ -196,6 +196,7 @@ func (j *jobLatency) Collect(measurementWg *sync.WaitGroup) {
 			jobComplete: completed,
 			startTime:   startTime,
 			JobName:     j.JobConfig.Name,
+			Metadata:    j.Metadata,
 		})
 	}
 }

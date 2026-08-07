@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"os"
 	"text/template"
 	"time"
 
@@ -44,7 +45,18 @@ func NewPrometheusClient(configSpec config.Spec, url string, auth Auth, step tim
 		metadata:   metadata,
 	}
 	log.Infof("👽 Initializing prometheus client with URL: %s", url)
-	p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
+	if auth.TokenFile != "" {
+		if _, statErr := os.Stat(auth.TokenFile); statErr != nil {
+			return nil, fmt.Errorf("token file %s does not exist or is not readable: %w", auth.TokenFile, statErr)
+		}
+		if auth.Token != "" {
+			log.Warn("Both 'token' and 'tokenFile' are set; 'tokenFile' takes precedence")
+		}
+		log.Infof("Using token file %s for prometheus authentication", auth.TokenFile)
+		p.Client, err = prometheus.NewClientWithTokenFile(url, auth.TokenFile, auth.Username, auth.Password, auth.SkipTLSVerify)
+	} else {
+		p.Client, err = prometheus.NewClient(url, auth.Token, auth.Username, auth.Password, auth.SkipTLSVerify)
+	}
 	return &p, err
 }
 
@@ -187,6 +199,14 @@ func (p *Prometheus) createMetric(query, metricName string, job Job, labels mode
 	if job.JobConfig.ChurnStart != nil && job.JobConfig.ChurnEnd != nil {
 		if !isInstant && timestamp.After(*job.JobConfig.ChurnStart) && timestamp.Before(*job.JobConfig.ChurnEnd) {
 			m.ChurnMetric = true
+		}
+	}
+	if !isInstant && job.JobConfig.GroupWindows != nil {
+		for _, gw := range *job.JobConfig.GroupWindows {
+			if !timestamp.Before(gw.Start) && !timestamp.After(gw.End) {
+				metadata["groupId"] = gw.ID
+				break
+			}
 		}
 	}
 	return m

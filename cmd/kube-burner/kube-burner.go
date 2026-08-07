@@ -31,6 +31,7 @@ import (
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
 	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
+	"github.com/kube-burner/kube-burner/v2/pkg/util/cluster"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/metrics"
 	log "github.com/sirupsen/logrus"
@@ -297,12 +298,21 @@ func measureCmd() *cobra.Command {
 					log.Fatalf("Error reading provided user metadata: %v", err)
 				}
 			}
+			kubeClientProvider := config.NewKubeClientProvider(kubeConfig, kubeContext)
+			clientSet, _ := kubeClientProvider.DefaultClientSet()
+			probeCtx, probeCancel := context.WithTimeout(cmd.Context(), configSpec.GlobalConfig.RequestTimeout)
+			clusterInfo, err := cluster.Probe(probeCtx, clientSet)
+			probeCancel()
+			if err != nil {
+				log.Warnf("Cluster probe partially failed: %v", err)
+			}
+			metadata = clusterInfo.ApplyMetadata(metadata)
 			measurementsInstance := measurements.NewMeasurementsFactory(configSpec, metadata, nil).NewMeasurements(
 				&config.Job{
 					Name:    jobName,
 					JobType: config.CreationJob,
 				},
-				config.NewKubeClientProvider(kubeConfig, kubeContext),
+				kubeClientProvider,
 				nil,
 				selector,
 			)
@@ -332,7 +342,7 @@ func measureCmd() *cobra.Command {
 func indexCmd() *cobra.Command {
 	var url, metricsEndpoint, metricsProfile, jobName string
 	var start, end int64
-	var username, password, uuid, token, userMetadata string
+	var username, password, uuid, token, tokenFile, userMetadata string
 	var esServer, esIndex, metricsDirectory string
 	var configSpec config.Spec
 	var skipTLSVerify, skipLogFile bool
@@ -365,6 +375,7 @@ func indexCmd() *cobra.Command {
 				Username:      username,
 				Password:      password,
 				Token:         token,
+				TokenFile:     tokenFile,
 				Step:          prometheusStep,
 				Endpoint:      url,
 				Metrics:       metricsProfiles,
@@ -407,7 +418,7 @@ func indexCmd() *cobra.Command {
 					log.Fatal(err)
 				}
 			}
-			if (configSpec.MetricsEndpoints[0].Type == indexers.LocalIndexer || configSpec.MetricsEndpoints[0].Type == indexers.TSDBIndexer) && tarballName != "" {
+			if util.IsLocalIndexer(configSpec.MetricsEndpoints[0].Type) && tarballName != "" {
 				if err := metrics.CreateTarball(configSpec.MetricsEndpoints[0].IndexerConfig); err != nil {
 					log.Fatal(err)
 				}
@@ -417,6 +428,7 @@ func indexCmd() *cobra.Command {
 	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
+	cmd.Flags().StringVar(&tokenFile, "token-file", "", "Path to a file containing the Prometheus Bearer token (re-read on each request for token rotation)")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&metricsProfile, "metrics-profile", "m", "metrics.yml", "comma-separated list of metric profiles")
@@ -479,7 +491,7 @@ func importCmd() *cobra.Command {
 func alertCmd() *cobra.Command {
 	var configSpec config.Spec
 	var err error
-	var url, alertProfile, username, password, uuid, token string
+	var url, alertProfile, username, password, uuid, token, tokenFile string
 	var esServer, esIndex, metricsDirectory string
 	var start, end int64
 	var skipTLSVerify bool
@@ -521,6 +533,7 @@ func alertCmd() *cobra.Command {
 				Username:      username,
 				Password:      password,
 				Token:         token,
+				TokenFile:     tokenFile,
 				SkipTLSVerify: skipTLSVerify,
 			}
 			p, err := prometheus.NewPrometheusClient(configSpec, url, auth, prometheusStep, nil, indexer)
@@ -544,6 +557,7 @@ func alertCmd() *cobra.Command {
 	cmd.Flags().StringVar(&uuid, "uuid", "", "Benchmark UUID (generated automatically if not provided)")
 	cmd.Flags().StringVarP(&url, "prometheus-url", "u", "", "Prometheus URL")
 	cmd.Flags().StringVarP(&token, "token", "t", "", "Prometheus Bearer token")
+	cmd.Flags().StringVar(&tokenFile, "token-file", "", "Path to a file containing the Prometheus Bearer token (re-read on each request for token rotation)")
 	cmd.Flags().StringVar(&username, "username", "", "Prometheus username for authentication")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "Prometheus password for basic authentication")
 	cmd.Flags().StringVarP(&alertProfile, "alert-profile", "a", "alerts.yaml", "Alert profile file or URL")

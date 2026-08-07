@@ -17,7 +17,6 @@ package burner
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
@@ -60,7 +59,6 @@ func deleteHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstr
 	if err != nil {
 		log.Errorf("Error found removing %s/%s: %s", item.GetKind(), item.GetName(), err)
 	}
-	atomic.AddInt32(&ex.objectOperations, 1)
 }
 
 func verifyDelete(ctx context.Context, ex *JobExecutor, obj *object) {

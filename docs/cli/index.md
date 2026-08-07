@@ -52,6 +52,8 @@ This is the main subcommand; it triggers a new kube-burner benchmark and it supp
 
 !!! Note "Prometheus authentication"
     Both basic and token authentication methods need permissions able to query the given Prometheus endpoint.
+    For long-running workloads where the bearer token may expire, use `tokenFile` instead of `token` in the metrics endpoint configuration.
+    The token is re-read from the file on every Prometheus request, allowing an external process to rotate it without restarting kube-burner.
 
 With the above, running a kube-burner benchmark would be as simple as:
 
@@ -91,6 +93,9 @@ A metrics-endpoints.yaml file with valid keys for the `init` command would look 
   username: foo
   password: bar
   alerts: [alert-profile.yaml]
+- endpoint: http://anotherhost:9090
+  tokenFile: /path/to/token  # Token is re-read on every request for automatic refresh
+  metrics: [metrics.yaml]
 ```
 
 ### Exit codes

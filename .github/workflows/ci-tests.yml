@@ -2,7 +2,7 @@ name: CI tests
 on:
   workflow_call:
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
     branches:
       - master
       - main
@@ -19,8 +19,3 @@ jobs:
 
   check-docs:
     uses: ./.github/workflows/check-docs-links.yml
-
-  tests:
-    needs: build
-    uses: ./.github/workflows/test-k8s.yml
-    secrets: inherit

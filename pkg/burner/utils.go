@@ -160,6 +160,10 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 	success := true
 	log.Info("Verifying created objects")
 	for objectIndex, obj := range ex.objects {
+		if obj.Group.GC {
+			log.Debugf("Skipping verification for %s (gc enabled, objects already deleted)", obj.gvr.Resource)
+			continue
+		}
 		selector := labels.Set{
 			config.KubeBurnerLabelUUID:  ex.uuid,
 			config.KubeBurnerLabelRunID: ex.runid,
@@ -193,12 +197,20 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 			continue
 		}
 		var objectsExpected int
+		iterations := ex.JobIterations
+		if expectedIterations != nil {
+			iterations = *expectedIterations
+		}
+
 		if obj.RunOnce {
 			objectsExpected = obj.Replicas
-		} else if expectedIterations != nil {
-			objectsExpected = obj.Replicas * (*expectedIterations)
 		} else {
-			objectsExpected = obj.Replicas * ex.JobIterations
+			effectiveIterations := iterations
+			// Calculate effective iterations accounting for RepeatEveryNIterations.
+			if obj.RepeatEveryNIterations > 1 {
+				effectiveIterations = (iterations + obj.RepeatEveryNIterations - 1) / obj.RepeatEveryNIterations
+			}
+			objectsExpected = obj.Replicas * effectiveIterations
 		}
 		if replicas != objectsExpected {
 			log.Errorf("%s found: %d Expected: %d", obj.gvr.Resource, replicas, objectsExpected)

@@ -23,13 +23,26 @@ jobs:
       - name: Install dependencies required for multi-arch builds
         run: sudo apt-get update && sudo apt-get install qemu-user-static podman fuse-overlayfs
 
+      - name: Upgrade crun (actions/runner-images#14473)
+        run: |
+          CRUN_VERSION=1.28
+          CRUN_URL=https://github.com/containers/crun/releases/download
+          CRUN_URL="${CRUN_URL}/${CRUN_VERSION}"
+          CRUN_SHA256=2aa6b7024a9c9f153895c0d11ae233d3758f54844011c3a039e3e89048d01d42
+          curl -fsSL \
+            "${CRUN_URL}/crun-${CRUN_VERSION}-linux-amd64" \
+            -o /tmp/crun
+          echo "${CRUN_SHA256}  /tmp/crun" | sha256sum --check
+          sudo install -m 0755 /tmp/crun /usr/bin/crun
+          crun --version
+
       - name: Set up Go 1.25
         uses: actions/setup-go@v6
         with:
           go-version: "1.25"
 
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -64,7 +77,7 @@ jobs:
     steps:
 
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
           persist-credentials: false

@@ -1,8 +1,10 @@
 # test-k8s.yml
-name: Execute tests on k8s and OCP
+name: Execute tests on k8s
 on:
-  workflow_dispatch:
-  workflow_call:
+  pull_request_target:
+    branches:
+      - master
+      - main
 jobs:
   fetch-latest-kind-node-tags:
     runs-on: ubuntu-latest
@@ -39,23 +41,26 @@ jobs:
     steps:
 
     - name: Checkout PR head
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # Use the PR head SHA
         ref: ${{ github.event.pull_request.head.sha }}
         # Fetch only the most recent commit of the PR
         fetch-depth: 1
+        allow-unsafe-pr-checkout: true
         persist-credentials: false
 
     - name: Fetch base branch for comparison
       # This tells Git about origin/main (or master) without downloading the whole repo
       run: git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
 
-    - name: Download kube-burner binary
-      uses: actions/download-artifact@v8
+    - name: Set up Go 1.25
+      uses: actions/setup-go@v7
       with:
-        name: kube-burner
-        path: /tmp/
+        go-version: "1.25"
+
+    - name: Build code
+      run: sudo make build install
 
     - name: Install bats
       uses: bats-core/bats-action@4.0.0
@@ -66,9 +71,21 @@ jobs:
         detik-install: false
         file-install: false
 
+    - name: Upgrade crun (actions/runner-images#14473)
+      run: |
+        CRUN_VERSION=1.28
+        CRUN_URL=https://github.com/containers/crun/releases/download
+        CRUN_URL="${CRUN_URL}/${CRUN_VERSION}"
+        CRUN_SHA256=2aa6b7024a9c9f153895c0d11ae233d3758f54844011c3a039e3e89048d01d42
+        curl -fsSL \
+          "${CRUN_URL}/crun-${CRUN_VERSION}-linux-amd64" \
+          -o /tmp/crun
+        echo "${CRUN_SHA256}  /tmp/crun" | sha256sum --check
+        sudo install -m 0755 /tmp/crun /usr/bin/crun
+        crun --version
+
     - name: Execute Tests
       run: |
-        chmod +x /tmp/kube-burner
         make test-k8s
       env:
         TERM: linux
@@ -76,4 +93,4 @@ jobs:
         KIND_VERSION: v0.19.0
         K8S_VERSION: ${{matrix.k8s-version}}
         PERFSCALE_PROD_ES_SERVER: ${{ secrets.PERFSCALE_PROD_ES_SERVER }}
-        TEST_BINARY: /tmp/kube-burner
+        TEST_BINARY: /usr/bin/kube-burner

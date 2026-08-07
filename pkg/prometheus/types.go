@@ -26,6 +26,7 @@ type Auth struct {
 	Username      string
 	Password      string
 	Token         string
+	TokenFile     string
 	SkipTLSVerify bool
 }
 
@@ -46,7 +47,6 @@ type Job struct {
 	Start               time.Time
 	End                 time.Time
 	JobConfig           config.Job
-	ObjectOperations    int32
 	UUID                string
 	IncrementalLoadUUID string
 }
