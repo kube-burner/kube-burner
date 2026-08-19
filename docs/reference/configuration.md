@@ -540,7 +540,7 @@ The `when` field specifies at which stage the hook should execute:
 
 #### Embedded Script Support
 
-When using kube-burner-ocp or any application with an embedded filesystem, hooks can reference scripts stored in the embedded `scripts` directory.
+When using kube-burner-ocp or any application with an embedded filesystem, hooks can reference scripts stored in that filesystem. The directory name is configured by the wrapper when it calls `workloads.NewWorkloadHelper()` (commonly `scripts`; see [wrappers](../wrappers/wrappers.md)).
 
 Set `cmd` to the script name followed by any arguments. Do not prefix the command with `bash` or `sh`; kube-burner runs embedded scripts with `/bin/bash`:
 
@@ -556,7 +556,7 @@ kube-burner resolves the first element of `cmd` as follows:
 
 1. If the path is absolute, execute the command directly as given
 2. If a matching file exists in the current working directory, execute the command directly as given
-3. Otherwise, load the script from the embedded filesystem's `scripts` directory and execute it with `/bin/bash -s -`. Remaining `cmd` entries are passed as positional arguments (`$1`, `$2`, ...)
+3. Otherwise, load the script from the embedded scripts directory configured by the wrapper and execute it with `/bin/bash -s -`. Remaining `cmd` entries are passed as positional arguments (`$1`, `$2`, ...)
 
 Local files always take precedence over embedded scripts. This allows workload authors to bundle scripts with their configurations without requiring users to extract them.
 
