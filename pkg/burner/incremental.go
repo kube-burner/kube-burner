@@ -175,6 +175,37 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 	originalRunID := ex.runid
 	originalIterations := ex.JobIterations
 
+	// Initialize etcd defragmentation manager if enabled
+	var etcdDefragMgr *util.EtcdDefragManager
+	etcdDefragEnabled := ex.IncrementalLoad.EtcdDefrag != nil && ex.IncrementalLoad.EtcdDefrag.Enabled
+	if etcdDefragEnabled {
+		log.Info("📦 Etcd defragmentation management enabled for incremental load")
+		etcdDefragMgr = util.NewEtcdDefragManager(ex.clientSet, ex.restConfig)
+
+		// Disable automatic defragmentation before starting incremental load
+		if err := etcdDefragMgr.DisableAutoDefrag(ctx); err != nil {
+			log.Errorf("Failed to disable auto-defrag: %v", err)
+			allErrs = append(allErrs, err)
+			return allErrs, stepJobs
+		}
+
+		// Ensure auto-defrag is re-enabled on exit
+		defer func() {
+			log.Info("🔧 Re-enabling automatic etcd defragmentation on exit")
+			if err := etcdDefragMgr.EnableAutoDefrag(context.Background()); err != nil {
+				log.Errorf("Failed to re-enable auto-defrag: %v", err)
+			}
+		}()
+
+		// Run initial defrag before starting any load
+		log.Info("🔧 Running initial etcd defragmentation before incremental load")
+		if err := etcdDefragMgr.DefragAndWaitHealthy(ctx); err != nil {
+			log.Errorf("Initial defragmentation failed: %v", err)
+			allErrs = append(allErrs, err)
+			return allErrs, stepJobs
+		}
+	}
+
 	for {
 		_, end, done := calculator.Next(current)
 		if done {
@@ -285,6 +316,17 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 		if stepDelay > 0 {
 			log.Infof("Sleeping %v before next step", stepDelay)
 			time.Sleep(stepDelay)
+		}
+
+		// Run etcd defragmentation before next step if enabled
+		if etcdDefragEnabled && etcdDefragMgr != nil {
+			log.Info("🔧 Running etcd defragmentation before next incremental step")
+			if err := etcdDefragMgr.DefragAndWaitHealthy(ctx); err != nil {
+				log.Errorf("Defragmentation failed before step: %v", err)
+				allErrs = append(allErrs, err)
+				return allErrs, stepJobs
+			}
+			log.Info("✅ Etcd defragmentation completed, cluster is healthy")
 		}
 
 		current = end

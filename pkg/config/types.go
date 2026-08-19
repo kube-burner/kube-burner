@@ -290,6 +290,23 @@ type IncrementalLoad struct {
 	Pattern LoadPattern `yaml:"pattern" json:"pattern,omitempty"`
 	// HealthCheckScript optional shell script to run as a health check between steps
 	HealthCheckScript string `yaml:"healthCheckScript" json:"healthCheckScript,omitempty"`
+	// EtcdDefrag enables manual etcd defragmentation management during incremental load
+	// When enabled:
+	// - Disables automatic etcd defragmentation before starting incremental load
+	// - Runs manual defragmentation before each incremental step
+	// - Waits for etcd cluster to be healthy after defragmentation
+	// - Re-enables automatic defragmentation after all steps complete
+	EtcdDefrag *EtcdDefragConfig `yaml:"etcdDefrag,omitempty" json:"etcdDefrag,omitempty"`
+}
+
+// EtcdDefragConfig configures etcd defragmentation behavior for incremental load
+type EtcdDefragConfig struct {
+	// Enabled enables etcd defragmentation management
+	Enabled bool `yaml:"enabled" json:"enabled,omitempty"`
+	// MemberGapDelay is the delay between defragmenting each etcd member (default: 30s)
+	MemberGapDelay time.Duration `yaml:"memberGapDelay,omitempty" json:"memberGapDelay,omitempty"`
+	// HealthCheckTimeout is the timeout for waiting etcd to become healthy after defrag (default: 5m)
+	HealthCheckTimeout time.Duration `yaml:"healthCheckTimeout,omitempty" json:"healthCheckTimeout,omitempty"`
 }
 
 type LoadPattern struct {
