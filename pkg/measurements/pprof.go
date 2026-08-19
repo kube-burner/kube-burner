@@ -159,8 +159,7 @@ func (p *pprof) copyCerts() error {
 func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 	var pods []corev1.Pod
 	// If DaemonSet is deployed and no explicit label selector is provided, use DaemonSet pods
-	pprofNodeTargets := p.getPprofNodeTargets(target)
-	if pprofNodeTargets != nil { // Node target
+	if pprofNodeTargets := p.getPprofNodeTargets(target); pprofNodeTargets != nil { // Node target
 		labelSelector := labels.Set(pprofNodeTargets).String()
 		podList, err := p.ClientSet.CoreV1().Pods(types.PprofNamespace).List(context.TODO(),
 			metav1.ListOptions{
@@ -186,8 +185,7 @@ func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 	if target.Replicas > 0 && target.Replicas < len(pods) {
 		log.Debugf("Limiting %s pprof collection to %d/%d instances", target.Name, target.Replicas, len(pods))
 		pods = pods[:target.Replicas]
-	}
-	if target.Replicas < 0 {
+	} else {
 		log.Debugf("Limiting %s pprof collection to all instances", target.Name)
 	}
 	sort.Slice(pods, func(i, j int) bool {
