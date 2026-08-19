@@ -184,13 +184,13 @@ func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 	}
 	if target.Replicas > 0 && target.Replicas < len(pods) {
 		log.Debugf("Limiting %s pprof collection to %d/%d instances", target.Name, target.Replicas, len(pods))
+		sort.Slice(pods, func(i, j int) bool {
+			return pods[i].Name < pods[j].Name
+		})
 		pods = pods[:target.Replicas]
 	} else {
 		log.Debugf("Limiting %s pprof collection to all instances", target.Name)
 	}
-	sort.Slice(pods, func(i, j int) bool {
-		return pods[i].Name < pods[j].Name
-	})
 	return pods, nil
 }
 
