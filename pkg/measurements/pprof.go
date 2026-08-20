@@ -188,8 +188,6 @@ func (p *pprof) getPods(target types.PProftarget) ([]corev1.Pod, error) {
 			return pods[i].Name < pods[j].Name
 		})
 		pods = pods[:target.Replicas]
-	} else {
-		log.Debugf("Limiting %s pprof collection to all instances", target.Name)
 	}
 	return pods, nil
 }
