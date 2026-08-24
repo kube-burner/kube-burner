@@ -1,5 +1,5 @@
 # External GitHub URLs that get rate-limited (429) during CI checks
 https://github.com/kubevirt/containerized-data-importer/blob/main/doc/datavolumes.md#conditions
 
-# Slack invite/channel URLs require auth and return 403/404 to crawlers
+# Slack invite/channel URLs require auth and return 403/404
 https://kubernetes.slack.com/.*
