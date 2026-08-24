@@ -261,11 +261,11 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	}
 
 	inputData, err := getInputData(userDataFileReader, additionalVars)
-	inputData["UUID"] = uuid
-	configSpec.GlobalConfig.UUID = uuid
 	if err != nil {
 		return configSpec, err
 	}
+	inputData["UUID"] = uuid
+	configSpec.GlobalConfig.UUID = uuid
 	templateOptions := util.MissingKeyError
 	if allowMissingKeys {
 		templateOptions = util.MissingKeyZero
