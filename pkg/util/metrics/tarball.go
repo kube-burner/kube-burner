@@ -23,7 +23,9 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	log "github.com/sirupsen/logrus"
@@ -44,9 +46,6 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
-			return nil
-		}
 		info, err := d.Info()
 		if err != nil {
 			return fmt.Errorf("could not get file info for %s: %v", path, err)
@@ -61,9 +60,15 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 		}
 		// Keep nested directory structure in the tarball.
 		hdr.Name = filepath.ToSlash(relPath)
+		if d.IsDir() {
+			hdr.Name += "/"
+		}
 		err = tarWriter.WriteHeader(hdr)
 		if err != nil {
 			return fmt.Errorf("could not write file header into tarball: %v", err)
+		}
+		if d.IsDir() {
+			return nil
 		}
 		m, err := os.Open(path)
 		if err != nil {
@@ -85,7 +90,6 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 
 func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 	log.Infof("Importing tarball: %v", tarball)
-	var rawData bytes.Buffer
 	tarballFile, err := os.Open(tarball)
 	if err != nil {
 		return fmt.Errorf("could not open tarball file: %v", err)
@@ -96,12 +100,21 @@ func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 		return fmt.Errorf("could not create gzip reader: %v", err)
 	}
 	tr := tar.NewReader(gzipReader)
+	return readTarDir(tr, indexer)
+}
+
+func readTarDir(tr *tar.Reader, indexer *indexers.Indexer) error {
+	var rawData bytes.Buffer
 	for {
 		var metrics []any
 		hdr, err := tr.Next()
 		// io.EOF returned at the end of file
 		if err == io.EOF {
 			break
+		}
+		if hdr.Typeflag == tar.TypeDir {
+			readTarDir(tr, indexer)
+			continue
 		}
 		_, err = io.Copy(&rawData, tr)
 		json.Unmarshal(rawData.Bytes(), &metrics)
@@ -110,7 +123,10 @@ func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 			return fmt.Errorf("tarball read error: %v", err)
 		}
 		log.Infof("Reading metrics from %s", hdr.Name)
-		resp, err := (*indexer).Index(metrics, indexers.IndexingOpts{})
+		cleanedName := path.Clean(hdr.Name)
+		fileName := path.Base(cleanedName)
+		metricName := strings.Split(fileName, ".json")[0]
+		resp, err := (*indexer).Index(metrics, indexers.IndexingOpts{MetricName: metricName})
 		if err != nil {
 			return err
 		}
