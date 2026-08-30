@@ -509,6 +509,7 @@ The `when` field specifies at which stage the hook should execute:
 | `beforeJobExecution`     | Before the job starts creating or processing objects                                                 |
 | `onEachIteration`        | At the start of each iteration of a create job                                                       |
 | `afterJobExecution`      | After the job finishes creating or processing objects (before churn, if enabled)                     |
+| `beforeChurn`            | Before churn starts on create jobs with churn enabled                                                |
 | `afterChurn`             | After churn completes on create jobs with churn enabled                                              |
 | `beforeCleanup`          | After the job finishes, before job pause and optional garbage collection                             |
 | `afterCleanup`           | After per-job garbage collection (`gc: true`), or after global GC when `gcMetrics` is enabled        |
@@ -617,7 +618,7 @@ hooks:
 ```yaml
 hooks:
   - cmd: ["/usr/local/bin/collect-churn-metrics.sh"]
-    when: afterJobExecution
+    when: beforeChurn
     background: true
 ```
 

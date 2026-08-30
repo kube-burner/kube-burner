@@ -807,6 +807,10 @@ func (ex *JobExecutor) RunCreateJobWithChurn(ctx context.Context) []error {
 	// Cleanup namespaces based on the labels we added to the objects
 	log.Infof("Churning mode: %s", ex.ChurnConfig.Mode)
 	var hookErrors []error
+	// Execute beforeChurn hooks
+	if ex.executeHooksForJobStage(config.HookBeforeChurn, &hookErrors, nil); len(hookErrors) > 0 {
+		log.Errorf("%v", hookErrors)
+	}
 	switch ex.ChurnConfig.Mode {
 	case config.ChurnNamespaces:
 		ex.nsChurning = true // Enable namespace churning flag to prevent non namespaced objects to be churned
