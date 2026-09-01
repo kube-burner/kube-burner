@@ -499,6 +499,7 @@ Hooks are configured as a list under the `hooks` field in a job:
 | `cmd`        | Command and arguments to execute. For [embedded scripts](#embedded-script-support), the first element is the script name and the rest are script arguments. | List     | []      |
 | `when`       | Execution stage for the hook                                                                         | String   | ""      |
 | `background` | Run hook in background (non-blocking)                                                                | Boolean  | false   |
+| `outputFile` | File to write the command output to (optional)                                                       | String   | ""      |
 
 #### Supported Hook Stages
 

@@ -129,36 +129,51 @@ func (hm *HookManager) prepareCommand(hook config.Hook) (*exec.Cmd, io.ReadClose
 }
 
 func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
+	var stdout, stderr bytes.Buffer
 	log.Infof("Starting Background hook at %s , %v", hook.When, hook.Cmd)
-
 	cmd, scriptReader, err := hm.prepareCommand(hook)
 	if err != nil {
 		return err
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	var outputFile *os.File
+	if hook.OutputFile != "" {
+		outputFile, err = os.Create(hook.OutputFile)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+		cmd.Stdout = outputFile
+		cmd.Stderr = outputFile
+	} else {
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+	}
 
 	// Set process group for proper cleanup on Unix systems
 	setSysProcAttr(cmd)
 
 	if err := cmd.Start(); err != nil {
+		if outputFile != nil {
+			outputFile.Close()
+		}
 		if scriptReader != nil {
 			scriptReader.Close()
 		}
 		return fmt.Errorf("failed to start background hook: %w", err)
 	}
 	hm.backgrounWg.Add(1)
-	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr, scriptReader)
+	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr, scriptReader, outputFile)
 
 	return nil
 }
 
 // monitorBackgroundHook monitors a background hook with proper error handling
-func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer, scriptReader io.ReadCloser) {
+func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer, scriptReader io.ReadCloser, outputFile *os.File) {
 	defer hm.backgrounWg.Done()
 	defer func() {
+		if outputFile != nil {
+			outputFile.Close()
+		}
 		if scriptReader != nil {
 			scriptReader.Close()
 		}

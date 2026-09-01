@@ -267,6 +267,8 @@ type Hook struct {
 	When JobHook `yaml:"when" json:"when,omitempty"`
 	// Background indicates whether to run the command in background
 	Background bool `yaml:"background" json:"background,omitempty"`
+	// OutputFile specifies the file to write the command output to
+	OutputFile string `yaml:"outputFile" json:"outputFile,omitempty"`
 }
 
 type WaitOptions struct {
