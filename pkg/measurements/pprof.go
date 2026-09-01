@@ -84,12 +84,12 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 			return fmt.Errorf("error waiting for DaemonSet to be ready: %v", err)
 		}
 	}
-	p.stopChannel = make(chan bool)
 	if err := p.copyCerts(); err != nil {
 		return fmt.Errorf("error copying certificates: %v", err)
 	}
-	p.getPProf(&wg, "start")
+	p.getPProf(&wg, fmt.Sprintf("%s-start", p.JobConfig.Name))
 	wg.Wait()
+	p.stopChannel = make(chan bool)
 	go func() {
 		defer close(p.stopChannel)
 		var ticker *time.Ticker
@@ -106,7 +106,7 @@ func (p *pprof) Start(measurementWg *sync.WaitGroup) error {
 			select {
 			case <-tickerC:
 				// Copy certificates only in the first iteration
-				p.getPProf(&wg, time.Now().Format(time.RFC3339))
+				p.getPProf(&wg, time.Now().Format("2006-01-02T15_04_05Z"))
 				wg.Wait()
 			case <-p.stopChannel:
 				if ticker != nil {
@@ -272,9 +272,11 @@ func (p *pprof) Collect(measurementWg *sync.WaitGroup) {
 }
 
 func (p *pprof) Stop() error {
-	p.stopChannel <- true
+	if p.stopChannel != nil {
+		p.stopChannel <- true
+	}
 	var wg sync.WaitGroup
-	p.getPProf(&wg, "end")
+	p.getPProf(&wg, fmt.Sprintf("%s-end", p.JobConfig.Name))
 	wg.Wait()
 	if p.needsDaemonSet() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)

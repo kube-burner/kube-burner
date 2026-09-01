@@ -141,7 +141,7 @@ func (a *AlertManager) Evaluate(job prometheus.Job) error {
 			log.Warnf("Error performing query %s: %s", expr, err)
 			continue
 		}
-		alertData, err := parseMatrix(v, a.uuid, alert.Description, a.metadata, alert.Severity, job.ChurnStart, job.ChurnEnd)
+		alertData, err := parseMatrix(v, a.uuid, alert.Description, a.metadata, alert.Severity, job.JobConfig.ChurnStart, job.JobConfig.ChurnEnd)
 		if err != nil {
 			log.Error(err.Error())
 			errs = append(errs, err)
@@ -197,7 +197,7 @@ func parseMatrix(value model.Value, uuid, description string, metadata any, seve
 				Description: renderedDesc.String(),
 				MetricName:  alertMetricName,
 			}
-			if churnStart != nil && alert.Timestamp.After(*churnStart) && alert.Timestamp.Before(*churnEnd) {
+			if churnStart != nil && churnEnd != nil && alert.Timestamp.After(*churnStart) && alert.Timestamp.Before(*churnEnd) {
 				alert.ChurnMetric = true
 			}
 			alertSet = append(alertSet, alert)

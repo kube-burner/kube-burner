@@ -121,6 +121,7 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `jobIterations`              | How many times to execute the job                                                                                                     | Integer  | 1        |
 | `namespace`                  | Namespace base name to use                                                                                                            | String   | ""       |
 | `namespacedIterations`       | Whether to create a namespace per job iteration                                                                                       | Boolean  | true     |
+| `preCreateNamespaces`        | Create all namespaces upfront before object creation begins. Automatically enabled for grouped execution                              | Boolean  | false    |
 | `iterationsPerNamespace`     | The maximum number of `jobIterations` to create in a single namespace. Important for node-density workloads that create Services.     | Integer  | 1        |
 | `cleanup`                    | Cleanup clean up old namespaces                                                                                                       | Boolean  | true     |
 | `podWait`                    | Wait for all pods/jobs (including probes) to be running/completed before moving forward to the next job iteration                     | Boolean  | false    |
@@ -128,7 +129,6 @@ This section contains the list of jobs `kube-burner` will execute. Each job can 
 | `maxWaitTimeout`             | Maximum wait timeout per namespace                                                                                                    | Duration | 4h       |
 | `jobIterationDelay`          | How long to wait between each job iteration. This is also the wait interval between each delete operation                             | Duration | 0s       |
 | `jobPause`                   | How long to pause after finishing the job                                                                                             | Duration | 0s       |
-| `beforeCleanup`              | Allows to run a bash script before the workload is deleted                                                                            | String   | ""       |
 | `gc`                         | Garbage collect job                                                                                                                   | Boolean  | false    |
 | `qps`                        | Limit object creation queries per second                                                                                              | Integer  | 0        |
 | `burst`                      | Maximum burst for throttle                                                                                                            | Integer  | 0        |
@@ -240,6 +240,9 @@ Each object element supports the following parameters:
 | `wait`                 | Wait for object to be ready                                       | Boolean | true    |
 | `waitOptions`          | Customize [how to wait](#object-wait-options) for object to be ready     | Object  | {}       |
 | `runOnce`              | Create or delete this object only once during the entire job    | Boolean | false   |
+| `group`                | [Grouped execution](#grouped-execution) configuration. Contains `id` (group number, must be > 0 to activate), `gc`, `pauseBeforeGC`, and `pauseAfterGC`. | Object | {} |
+| `repeatEveryNIterations`  | Controls how often to create an object (once per N iterations). See [repeatEveryNIterations](#repeatEveryNIterations)  | Integer | 1   |
+
 
 !!! warning
     Kube-burner is only able to wait for a subset of resources, unless `waitOptions` are specified.
@@ -266,6 +269,102 @@ The following object types have built-in waiters:
 
 !!! info
     Find more info about the waiters implementation in the `pkg/burner/waiters.go` file
+
+### repeatEveryNIterations
+
+The `repeatEveryNIterations` parameter controls how often an object is created - once per N iterations instead of every iteration. This is useful for objects (cluster-scoped or namespaced) that should be shared across multiple iterations.
+
+Without this, each iteration creates every object. With `repeatEveryNIterations` set, an object is created only when the iteration number is a multiple of N. Other iterations skip creating that object and can reference the previously created one.
+
+As some iterations skip creating the object, the `.Iteration` template variable is adjusted accordingly. For example, with `repeatEveryNIterations: 2`, iteration 1 skips creating the object and uses `.Iteration = 0`, so `clusterrole-{{.Iteration}}` renders as `clusterrole-0`.
+
+This feature enables sharing objects across iterations within a single job, allowing churn and incremental features to work correctly. kube-burner adjusts churn boundaries and starting iterations according to the repeat interval.
+
+Below table illustrates what kube-burner does in each iteration to create ClusterRole and RoleBinding, when a ClusterRole is shared among 2 RoleBindings.
+
+With repeatEveryNIterations: 2 set for ClusterRole and jobIterations: 10:
+
+| Iteration | Namespace | ClusterRole Created | RoleBinding Created |
+|--------------|---------------------------------------------------------|---------|---------|
+| 0 | test-ns-0 | clusterrole-0 ✓ | binding-0 (refs clusterrole-0) |
+| 1 | test-ns-1 | (shares clusterrole-0) | binding-1 (refs clusterrole-0) |
+| 2 | test-ns-2 | clusterrole-1 ✓ | binding-2 (refs clusterrole-1) |
+| 3 | test-ns-3 | (shares clusterrole-1)  | binding-3 (refs clusterrole-1) |
+| ... | ... | ...  | ... |
+
+  **Default:** `1` (one object per namespace iteration)
+
+#### Use Cases
+
+This feature is helpful for:
+ - **PersistentVolume/PersistentVolumeClaim**: One PV shared by PVCs across multiple namespaces
+ - **EgressIP**: One EgressIP shared by pods across multiple namespaces
+ - **ClusterUserDefinedNetwork**: One network definition used by workloads in multiple namespaces
+ - **MultiNetworkPolicy**: Network policies that span namespace groups
+ - **ClusterRole/RoleBinding**: One ClusterRole referenced by RoleBindings in multiple namespaces
+
+#### Template variables
+
+```yaml
+  # repeat-every-n-iterations-test.yml
+  jobs:
+    - name: repeat-every-n-iterations-test
+      namespace: test-ns
+      objects:
+        # ClusterRole created once per 2 iterations (shared across test-ns-0/test-ns-1, test-ns-2/test-ns-3)
+        - objectTemplate: objectTemplates/clusterrole.yml
+          repeatEveryNIterations: 2
+        # RoleBinding in each namespace, referencing the shared ClusterRole
+        - objectTemplate: objectTemplates/rolebinding.yml
+          inputVars:
+            repeatN: 2 # Must match ClusterRole's repeatEveryNIterations
+            namespace: test-ns
+
+  # rolebinding.yml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: binding-{{.Iteration}}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    # Calculate: Iteration / repeatN
+    # e.g., iteration 1 with repeatN=2 → 1/2 = 0 → clusterrole-0
+    name: clusterrole-{{ div .Iteration .repeatN }} # Same for test-ns-0 and test-ns-1
+  subjects:
+    - kind: ServiceAccount
+      name: default
+      namespace: {{.namespace}}-{{.Iteration}}
+
+  # clusterrole.yml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    # kube-burner adjusted this .Iteration
+    name: clusterrole-{{.Iteration}}
+  rules:
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get"]
+```
+
+#### Churn behavior
+
+When `repeatEveryNIterations` is used with namespace churn, kube-burner aligns the churn boundaries and starting positions to `repeatEveryNIterations` boundaries. This ensures that shared objects and their dependent namespaces are churned together as a unit.
+
+For example, with `jobIterations: 10`, `repeatEveryNIterations: 2`, and `churn percent: 50%`:
+  - Without alignment: 50% of 10 = 5 iterations would be churned
+  - With alignment: churn count is rounded up to the next `repeatEveryNIterations` boundary = 6 iterations
+
+This alignment ensures that when a shared object (e.g., ClusterRole) is deleted, all namespaces that reference it are also churned together, maintaining consistency.
+
+#### Validation
+
+All objects in a job must have consistent repeatEveryNIterations values:
+  - All objects can have repeatEveryNIterations: 1 (default)
+  - Or all non-default values must be the same (e.g., all 2)
+  - Mixing repeatEveryNIterations: 2 and repeatEveryNIterations: 3 is not allowed
+  - repeatEveryNIterations > 1 cannot be used with churn mode `objects`. Use churn mode `namespaces` instead
 
 ### Object wait Options
 
@@ -319,7 +418,7 @@ This allows kube-burner to check the status at all the specified key/value pairs
 
 ### Default labels
 
-All objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>`. They are used for internal purposes, but they can also be used by the users.
+All objects created by kube-burner are labeled with `kube-burner.io/uuid=<UUID>,kube-burner.io/job=<jobName>,kube-burner.io/index=<objectIndex>,kube-burner.io/group=<groupNumber>`. They are used for internal purposes, but they can also be used by the users.
 
 ### Multi-Document YAML Templates
 
@@ -399,11 +498,11 @@ Hooks allow you to execute external commands at various stages of execution. The
 
 Hooks are configured as a list under the `hooks` field:
 
-| Option       | Description                                             | Type     | Default |
-|--------------|---------------------------------------------------------|----------|---------|
-| `cmd`        | Command and arguments to execute                        | List     | []      |
-| `when`       | Execution stage for the hook                            | String   | ""      |
-| `background` | Run hook in background (non-blocking)                   | Boolean  | false   |
+| Option       | Description                                                                                          | Type     | Default |
+|--------------|------------------------------------------------------------------------------------------------------|----------|---------|
+| `cmd`        | Command and arguments to execute. For [embedded scripts](#embedded-script-support), the first element is the script name and the rest are script arguments. | List     | []      |
+| `when`       | Execution stage for the hook                                                                         | String   | ""      |
+| `background` | Run hook in background (non-blocking)                                                                | Boolean  | false   |
 
 #### Supported Hook Stages
 
@@ -418,17 +517,18 @@ The `when` field specifies at which stage the hook should execute:
 
 **Job-Level Hook Stages** (configured in `jobs[].hooks`):
 
-| Stage                    | Description                                           |
-|--------------------------|-------------------------------------------------------|
-| `beforeJobExecution`     | Before job objects are created                        |
-| `afterJobExecution`      | After job objects are created (before churning)       |
-| `onEachIteration`        | On each job iteration                                 |
-| `beforeChurn`            | Before churn operation starts                         |
-| `afterChurn`             | After churn operation completes                       |
-| `beforeCleanup`          | Before cleanup/deletion begins                        |
-| `afterCleanup`           | After cleanup/deletion completes                      |
-| `beforeGC`               | Before garbage collection                             |
-| `afterGC`                | After garbage collection                              |
+| Stage                    | Description                                                                                          |
+|--------------------------|------------------------------------------------------------------------------------------------------|
+| `beforeJobExecution`     | Before the job starts creating or processing objects                                                 |
+| `onEachIteration`        | At the start of each iteration of a create job                                                       |
+| `afterJobExecution`      | After the job finishes creating or processing objects (before churn, if enabled)                     |
+| `beforeChurn`            | Before churn starts in create jobs with churn enabled. Please note that some actions may occur between afterJobExecution and this phase                                                    
+|
+| `afterChurn`             | After churn completes on create jobs with churn enabled                                              |
+| `beforeCleanup`          | After the job finishes, before job pause and optional garbage collection                             |
+| `afterCleanup`           | After per-job garbage collection (`gc: true`), or after global GC when `gcMetrics` is enabled        |
+| `beforeGC`               | Before cleanup of leftover namespaces from previous runs (job `cleanup: true`)                       |
+| `afterGC`                | After cleanup of leftover namespaces from previous runs (job `cleanup: true`)                        |
 
 #### Execution Behavior
 
@@ -437,21 +537,43 @@ The `when` field specifies at which stage the hook should execute:
 - Execute sequentially in the order defined
 - Block job execution until completion
 - No timeout by default (respects parent context cancellation only)
-- Errors cause job to fail
+- Errors cause the job to fail immediately
 
 **Background Hooks** (`background: true`):
 
 - All background hooks for a stage start in parallel
-- Job execution continues immediately
-- Results are collected at the end of the job execution
-- Errors are reported but don't block execution
+- Job execution continues immediately without waiting for them
+- Results are collected after all hook stages of the job complete
+- Errors do not interrupt the running job; they are reported at the end and included in the return code
 - Properly cleaned up when parent context is cancelled
 
 **Execution Order:**
 
 1. All background hooks for the stage start in parallel
 2. Foreground hooks execute sequentially after background hooks start
-3. Background hooks are waited on before proceeding to the next major phase
+3. The job continues without waiting for background hooks. They are waited on after all stages of the job complete
+
+#### Embedded Script Support
+
+When using kube-burner-ocp or any application with an embedded filesystem, hooks can reference scripts stored in that filesystem. The directory name is configured by the wrapper when it calls `workloads.NewWorkloadHelper()` (commonly `scripts`; see [wrappers](../wrappers/wrappers.md)).
+
+Set `cmd` to the script name followed by any arguments. Do not prefix the command with `bash` or `sh`; kube-burner runs embedded scripts with `/bin/bash`:
+
+```yaml
+jobs:
+  - name: my-workload
+    hooks:
+      - cmd: ["setup-environment.sh", "--config", "production"]
+        when: beforeJobExecution
+```
+
+kube-burner resolves the first element of `cmd` as follows:
+
+1. If the path is absolute, execute the command directly as given
+2. If a matching file exists in the current working directory, execute the command directly as given
+3. Otherwise, load the script from the embedded scripts directory configured by the wrapper and execute it with `/bin/bash -s -`. Remaining `cmd` entries are passed as positional arguments (`$1`, `$2`, ...)
+
+Local files always take precedence over embedded scripts. This allows workload authors to bundle scripts with their configurations without requiring users to extract them.
 
 #### Example Configuration
 
@@ -493,7 +615,7 @@ jobs:
 
     hooks:
       # Background monitoring hook - runs throughout deployment
-      - cmd: ["/bin/bash", "/scripts/monitor-resources.sh"]
+      - cmd: ["/bin/bash", "/usr/local/bin/monitor-resources.sh"]
         when: beforeJobExecution
         background: true
 
@@ -503,12 +625,12 @@ jobs:
         background: false
 
       # Per-iteration hook
-      - cmd: ["/bin/bash", "/scripts/log-iteration.sh"]
+      - cmd: ["/bin/bash", "/usr/local/bin/log-iteration.sh"]
         when: onEachIteration
         background: false
 
       # Cleanup verification
-      - cmd: ["/scripts/verify-cleanup.sh"]
+      - cmd: ["/usr/local/bin/verify-cleanup.sh"]
         when: afterCleanup
         background: false
 
@@ -540,7 +662,7 @@ hooks:
 **VM provisioning and readiness:**
 ```yaml
 hooks:
-  - cmd: ["/scripts/provision-vm.sh", "--wait-ready"]
+  - cmd: ["/usr/local/bin/provision-vm.sh", "--wait-ready"]
     when: beforeJobExecution
     background: false  # No timeout, waits as long as needed
 ```
@@ -548,7 +670,7 @@ hooks:
 **Data collection during churn:**
 ```yaml
 hooks:
-  - cmd: ["/scripts/collect-churn-metrics.sh"]
+  - cmd: ["/usr/local/bin/collect-churn-metrics.sh"]
     when: beforeChurn
     background: true
 ```
@@ -556,24 +678,24 @@ hooks:
 **Sequential cleanup verification:**
 ```yaml
 hooks:
-  - cmd: ["/scripts/check-resources.sh"]
+  - cmd: ["/usr/local/bin/check-resources.sh"]
     when: afterCleanup
     background: false
 ```
 
 #### Best Practices
 
-1. **Use background hooks for monitoring** - Start monitoring/data collection in the background while workload runs
+1. **Use background hooks for monitoring** - Start monitoring/data collection in the background while the workload runs
 2. **Use foreground hooks for setup** - Block execution for critical setup steps
-3. **Handle errors appropriately** - Foreground hook failures will fail the job
-4. **Use absolute paths** - Specify full paths to executables and scripts
-5. **Keep hooks lightweight for `onEachIteration`** - This runs for every iteration
+3. **Handle errors appropriately** - Foreground hook failures fail the job immediately; background hook failures fail it after the job completes
+4. **Choose the right path form** - Use absolute paths for local executables. Use a relative script name (without `bash`/`sh`) for scripts bundled in an embedded filesystem
+5. **Keep hooks lightweight for `onEachIteration`** - This runs at the start of every create-job iteration
 
 #### Error Handling
 
 - **Foreground hooks**: Errors stop job execution and are reported immediately
 - **Background hooks**: Errors are collected and reported after job completion
-- All hook errors are included in job summary and return code
+- All hook errors are included in the job summary and return code
 
 ## Job types
 
@@ -904,6 +1026,50 @@ jobs:
 
   - objectTemplate: service.yml
     replicas: 10
+```
+
+## Grouped Execution
+
+Only supported in create jobs. Assigns objects to numbered groups so that all iterations of group N complete before group N+1 begins. Enabled automatically when any object in the job has `group.id` greater than `0`.
+
+Each object supports the following fields within the `group` block:
+
+| Option          | Description                                                                 | Type     | Default |
+|-----------------|-----------------------------------------------------------------------------|----------|---------|
+| `id`            | Group number used to order execution. Must be > 0 to enable grouped mode    | Integer  | 0       |
+| `gc`            | Delete this object after its group completes                                | Boolean  | false   |
+| `pauseBeforeGC` | Duration to wait before garbage collection begins                           | Duration | 0s      |
+| `pauseAfterGC`  | Duration to wait after garbage collection completes                         | Duration | 0s      |
+
+!!! note
+    When multiple objects in a group specify `pauseBeforeGC` or `pauseAfterGC`, the maximum value is used. `pauseBeforeGC` applies even without `gc: true` (acting as an inter-group delay), while `pauseAfterGC` only applies when at least one object has `gc: true`. Objects with `gc: true` are skipped during object verification.
+
+When metrics are collected during grouped execution, any range query datapoints that fall within a group's execution timeframe will have a `groupId` field, set to the group number, added to their `metadata` in the indexed metrics. This allows for identification of metrics captured during a specific group's execution for analysis purposes.
+
+### Example
+
+```yaml
+jobs:
+- name: grouped-workload
+  jobIterations: 10
+  namespacedIterations: true
+  namespace: grouped-test
+  objects:
+    # Group 1: create ConfigMaps, wait 30s, then garbage collect them
+  - objectTemplate: configmap.yml
+    replicas: 5
+    group:
+      id: 1
+      gc: true
+      pauseBeforeGC: 30s
+      pauseAfterGC: 10s
+
+    # Group 2: runs after group 1 completes (including GC)
+  - objectTemplate: deployment.yml
+    replicas: 3
+    group:
+      id: 2
+    wait: true
 ```
 
 ## Injected variables

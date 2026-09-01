@@ -6,19 +6,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 1
         ref: ${{ github.event.pull_request.head.sha }}
         persist-credentials: false
 
-    - name: Set up Go 1.23
-      uses: actions/setup-go@v6
+    - name: Set up Go 1.25
+      uses: actions/setup-go@v7
       with:
-        go-version: 1.23
+        go-version: "1.25"
 
     - name: Build code
       run: make build
+
+    - name: Upgrade crun (actions/runner-images#14473)
+      run: |
+        CRUN_VERSION=1.28
+        CRUN_URL=https://github.com/containers/crun/releases/download
+        CRUN_URL="${CRUN_URL}/${CRUN_VERSION}"
+        CRUN_SHA256=2aa6b7024a9c9f153895c0d11ae233d3758f54844011c3a039e3e89048d01d42
+        curl -fsSL \
+          "${CRUN_URL}/crun-${CRUN_VERSION}-linux-amd64" \
+          -o /tmp/crun
+        echo "${CRUN_SHA256}  /tmp/crun" | sha256sum --check
+        sudo install -m 0755 /tmp/crun /usr/bin/crun
+        crun --version
 
     - name: Build container images
       run: make images
@@ -30,11 +43,3 @@ jobs:
 
     - name: Build documentation
       run: mkdocs build
-
-    - name: Install
-      run: sudo make install
-
-    - uses: actions/upload-artifact@v7
-      with:
-        name: kube-burner
-        path: /usr/bin/kube-burner

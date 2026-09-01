@@ -36,7 +36,7 @@ setup_file() {
 
 setup() {
   export UUID; UUID=$(uuidgen)
-  export METRICS_FOLDER="metrics-${UUID}"
+  export METRICS_FOLDER="collected-metrics-${UUID}"
   export ES_INDEXING=""
   export CHURN_MODE=""
   export CHURN_CYCLES=0
@@ -45,6 +45,7 @@ setup() {
   export INCREMENTAL_LOAD=""
   export JOBGC=false
   export LOCAL_INDEXING=""
+  export TSDB_INDEXING=""
   export ALERTING=""
   export TIMESERIES_INDEXER=""
   export CRD=""
@@ -150,9 +151,10 @@ teardown_file() {
   check_file_list ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/podLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/podLatencyQuantilesMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/svcLatencyQuantilesMeasurement-${JOB_NAME}.json
 }
 
-# bats test_tags=subsystem:preload,subsystem:indexing
-@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true; set-preload=true" {
-  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --set jobs.0.preLoadImages=true --log-level=debug
+# bats test_tags=subsystem:indexing
+@test "kube-burner-virt.yml: metrics-endpoints=true; vm-latency-indexing=true" {
+  check-kubevirt-ready || skip "KubeVirt is not available"
+  run_cmd ${KUBE_BURNER} init -c kube-burner-virt.yml --uuid=${UUID} -e metrics-endpoints.yaml --log-level=debug
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS vmiLatencyMeasurement vmiLatencyQuantilesMeasurement alert
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/vmiLatencyMeasurement-${JOB_NAME}.json ${METRICS_FOLDER}/vmiLatencyQuantilesMeasurement-${JOB_NAME}.json
   verify_object_count namespace 0 "" kube-burner.io/job=${JOB_NAME},kube-burner.io/uuid=${UUID}
@@ -185,6 +187,19 @@ teardown_file() {
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
   check_metric_value jobSummary top2PrometheusCPU prometheusRSS podLatencyMeasurement podLatencyQuantilesMeasurement
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
+  jq -e '
+    length > 0 and
+    all(.[]; (has("distribution") | not)
+      and (has("microshift") | not)
+      and (has("platform") | not)
+      and (has("openshift") | not)
+      and (has("microshiftVersion") | not)
+      and (has("microshiftMajorVersion") | not)
+      and (.k8sVersion | type == "string")
+      and (.k8sVersion | length > 0)
+      and (.totalNodes | type == "number")
+      and (.totalNodes >= 1))
+  ' ${METRICS_FOLDER}/jobSummary.json
 }
 
 # bats test_tags=subsystem:health-check
@@ -227,6 +242,7 @@ teardown_file() {
 
 # bats test_tags=subsystem:job-type-kubevirt
 @test "kube-burner-virt-operations.yml: jobType kubevirt" {
+  check-kubevirt-ready || skip "KubeVirt is not available"
   run_cmd ${KUBE_BURNER} init -c  kube-burner-virt-operations.yml --uuid=${UUID} --log-level=debug
 }
 
@@ -262,6 +278,7 @@ teardown_file() {
 
 # bats test_tags=subsystem:indexing
 @test "kube-burner-metrics-aggregate.yml: metrics aggregation" {
+  check-kubevirt-ready || skip "KubeVirt is not available"
   export STORAGE_CLASS_NAME
   STORAGE_CLASS_NAME=$(get_default_storage_class)
   run_cmd ${KUBE_BURNER} init -c kube-burner-metrics-aggregate.yml --uuid=${UUID} --log-level=debug
@@ -317,7 +334,7 @@ teardown_file() {
 }
 
 @test "kube-burner.yml: incremental-load=true" {
-  export INCREMENTAL_LOAD=true LOCAL_INDEXING=true
+  export INCREMENTAL_LOAD=true LOCAL_INDEXING=true TSDB_INDEXING=true
   run_cmd ${KUBE_BURNER} init -c kube-burner.yml --uuid=${UUID} --log-level=debug --kubeconfig="${TEST_KUBECONFIG}" --kube-context="${TEST_KUBECONTEXT}"
   check_file_list ${METRICS_FOLDER}/jobSummary.json ${METRICS_FOLDER}/prometheusBuildInfo.json
 }
@@ -344,4 +361,18 @@ teardown_file() {
 @test "rc timeout check" {
   run ${KUBE_BURNER} init -c /tmp/kube-burner.yml --uuid=${UUID} --timeout=2s
   [ "$status" -eq 2 ]
+}
+
+# bats test_tags=subsystem:sharing-namespaces-count
+@test "kube-burner: repeatEveryNIterations for objects" {
+  run_cmd ${KUBE_BURNER} init -c kube-burner-repeat-every-n-iterations.yml --uuid=${UUID}
+
+  # Verify ClusterRoles: 6 iterations / 2 repeatEveryNIterations = 3 ClusterRoles
+  clusterroles=$(kubectl get clusterroles -l kube-burner.io/uuid=${UUID} --no-headers | wc -l)
+  [ "$clusterroles" -eq 3 ]
+
+  # Verify RoleBindings: 6 (one per namespace)
+  bindings=$(kubectl get rolebindings -A -l kube-burner.io/uuid=${UUID} --no-headers | wc -l)
+  [ "$bindings" -eq 6 ]
+  ${KUBE_BURNER} destroy -c kube-burner-repeat-every-n-iterations.yml
 }

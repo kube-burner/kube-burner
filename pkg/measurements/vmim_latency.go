@@ -87,6 +87,7 @@ type vmimMetric struct {
 	JobName      string `json:"jobName,omitempty"`
 	JobIteration int    `json:"jobIteration"`
 	Replica      int    `json:"replica"`
+	ChurnMetric  bool   `json:"churnMetric,omitempty"`
 	Metadata     any    `json:"metadata,omitempty"`
 }
 
@@ -262,6 +263,7 @@ func (vmiml *vmimLatency) Collect(measurementWg *sync.WaitGroup) {
 			targetReadyTime:     targetReady,
 			runningTime:         running,
 			succeededTime:       succeeded,
+			Metadata:            vmiml.Metadata,
 		})
 	}
 }
@@ -334,6 +336,7 @@ func (vmiml *vmimLatency) normalizeMetrics() float64 {
 			m.SucceededLatency = 0
 		}
 
+		m.ChurnMetric = vmiml.IsChurnMetric(m.Timestamp)
 		count++
 		errored += errorFlag
 		vmiml.NormLatencies = append(vmiml.NormLatencies, m)

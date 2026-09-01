@@ -45,8 +45,9 @@ var _ = Describe("Error Enhancement", func() {
 				result := errors.EnhanceYAMLParseError("config.yml", yamlErr)
 
 				Expect(result).To(HaveOccurred())
-				Expect(result.Error()).Should(ContainSubstring("failed to parse config file config.yml"))
-				Expect(result.Error()).Should(ContainSubstring("line 5: invalid syntax; line 10: unknown field"))
+				Expect(result.Error()).Should(ContainSubstring("failed to parse config file: config.yml:"))
+				Expect(result.Error()).Should(ContainSubstring("line 5: invalid syntax"))
+				Expect(result.Error()).Should(ContainSubstring("line 10: unknown field"))
 			})
 		})
 

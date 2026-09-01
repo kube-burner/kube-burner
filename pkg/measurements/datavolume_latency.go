@@ -77,6 +77,7 @@ type dvMetric struct {
 	JobName      string `json:"jobName,omitempty"`
 	JobIteration int    `json:"jobIteration"`
 	Replica      int    `json:"replica"`
+	ChurnMetric  bool   `json:"churnMetric,omitempty"`
 	Metadata     any    `json:"metadata,omitempty"`
 }
 
@@ -240,6 +241,7 @@ func (dv *dvLatency) Collect(measurementWg *sync.WaitGroup) {
 			dvRunning:  running,
 			dvReady:    ready,
 			JobName:    dv.JobConfig.Name,
+			Metadata:   dv.Metadata,
 		})
 	}
 }
@@ -284,6 +286,7 @@ func (dv *dvLatency) normalizeMetrics() float64 {
 			errorFlag = 1
 			m.DVReadyLatency = 0
 		}
+		m.ChurnMetric = dv.IsChurnMetric(m.Timestamp)
 		dataVolumeCount++
 		erroredDataVolumes += errorFlag
 		dv.NormLatencies = append(dv.NormLatencies, m)

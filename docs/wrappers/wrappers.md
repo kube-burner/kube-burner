@@ -13,6 +13,8 @@ wh := workloads.NewWorkloadHelper(config.Config, embedFS, "workloads", "metrics"
 returnCode := wh.Run("workload.yaml")
 ```
 
+The four string arguments after `embedFS` are the paths within the embedded filesystem for workloads, metrics, alerts, and scripts. The scripts directory is used to resolve [hook scripts](../reference/configuration.md#embedded-script-support) and `healthCheckScript` files that are not found locally. It can be any path in the embedded filesystem; `scripts` is only a convention.
+
 ## Customizing template rendering
 
 It's possible to provide custom template rendering functions from a wrapper, this can be done by calling the function `AddRenderingFunction()` of the util package. For example:

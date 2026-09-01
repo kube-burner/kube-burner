@@ -64,7 +64,7 @@ func (i *MetricsEndpoint) UnmarshalYAML(unmarshal func(any) error) error {
 	indexer := rawIndexer{
 		IndexerConfig: indexers.IndexerConfig{
 			InsecureSkipVerify: false,
-			MetricsDirectory:   "collected-metrics",
+			MetricsDirectory:   "collected-metrics-{{.UUID}}",
 			TarballName:        "kube-burner-metrics.tgz",
 		},
 		SkipTLSVerify: true,
@@ -94,9 +94,10 @@ func (c *ChurnConfig) UnmarshalYAML(unmarshal func(any) error) error {
 func (o *Object) UnmarshalYAML(unmarshal func(any) error) error {
 	type rawObject Object
 	object := rawObject{
-		Wait:     true,
-		Churn:    true,
-		Replicas: 1,
+		Wait:                   true,
+		Churn:                  true,
+		Replicas:               1,
+		RepeatEveryNIterations: 1,
 	}
 	if err := unmarshal(&object); err != nil {
 		return err
@@ -261,6 +262,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 
 	inputData, err := getInputData(userDataFileReader, additionalVars)
 	inputData["UUID"] = uuid
+	configSpec.GlobalConfig.UUID = uuid
 	if err != nil {
 		return configSpec, err
 	}
@@ -297,6 +299,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	if err := validateGC(); err != nil {
 		return configSpec, err
 	}
+	if err := validateRepeatEveryNIterations(); err != nil {
+		return configSpec, err
+	}
 	if err := HookBeforeWorkload(); err != nil {
 		return configSpec, err
 	}
@@ -316,7 +321,6 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 		}
 	}
 	configSpec.GlobalConfig.Timeout = timeout
-	configSpec.GlobalConfig.UUID = uuid
 	configSpec.GlobalConfig.RUNID = uid.NewString()
 	return configSpec, nil
 }
@@ -467,9 +471,53 @@ func validateGC() error {
 	return nil
 }
 
+// validateRepeatEveryNIterations checks that:
+// 1. RepeatEveryNIterations must be >= 1 (0 or negative would cause divide-by-zero)
+// 2. All objects in a job have consistent RepeatEveryNIterations values (all =1 or all same non-1 value)
+// 3. RepeatEveryNIterations > 1 is not used with object-based churn on churnable objects
+func validateRepeatEveryNIterations() error {
+	for _, job := range configSpec.Jobs {
+		var nonDefaultValue int
+		hasChurnableRepeat := false
+		for _, obj := range job.Objects {
+			if obj.RepeatEveryNIterations < 1 {
+				return fmt.Errorf("job %s: repeatEveryNIterations must be >= 1, got %d",
+					job.Name, obj.RepeatEveryNIterations)
+			}
+			if obj.RepeatEveryNIterations > 1 {
+				if nonDefaultValue == 0 {
+					nonDefaultValue = obj.RepeatEveryNIterations
+				} else if obj.RepeatEveryNIterations != nonDefaultValue {
+					return fmt.Errorf("job %s: inconsistent RepeatEveryNIterations values. Found both %d and %d. All objects must have RepeatEveryNIterations=1 or the same non-1 value",
+						job.Name, nonDefaultValue, obj.RepeatEveryNIterations)
+				}
+				if obj.Churn {
+					hasChurnableRepeat = true
+				}
+			}
+		}
+		if hasChurnableRepeat && IsChurnEnabled(job) && job.ChurnConfig.Mode == ChurnObjects {
+			return fmt.Errorf("job %s: repeatEveryNIterations > 1 cannot be used with churn mode 'objects' on churnable objects. Set churn: false on objects with repeatEveryNIterations or use churn mode 'namespaces' instead",
+				job.Name)
+		}
+	}
+	return nil
+}
+
 // checks if Churn is enabled
 func IsChurnEnabled(job Job) bool {
 	return job.ChurnConfig.Duration > 0 || job.ChurnConfig.Cycles > 0
+}
+
+// IsGroupedEnabled checks if grouped execution is enabled for the job.
+// Grouped execution is enabled when any object has Group > 0.
+func IsGroupedEnabled(job Job) bool {
+	for _, obj := range job.Objects {
+		if obj.Group.ID > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // setNestedValue sets a value in a nested map based on dot notation keys

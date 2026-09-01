@@ -106,6 +106,7 @@ type netpolMetric struct {
 	Name            string        `json:"netpol"`
 	Metadata        any           `json:"metadata,omitempty"`
 	JobName         string        `json:"jobName,omitempty"`
+	ChurnMetric     bool          `json:"churnMetric,omitempty"`
 }
 
 type netpolLatencyMeasurementFactory struct {
@@ -578,7 +579,9 @@ func (n *netpolLatency) Stop() error {
 	if len(connections) > 0 {
 		n.processResults()
 	}
-	proxyPortForwarder.CancelPodPortForwarder()
+	if proxyPortForwarder != nil {
+		proxyPortForwarder.CancelPodPortForwarder()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
 		cancel()
@@ -594,6 +597,7 @@ func (n *netpolLatency) normalizeMetrics() float64 {
 	n.Metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(netpolMetric)
+		metric.ChurnMetric = n.IsChurnMetric(metric.Timestamp)
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		minLatencies = append(minLatencies, float64(metric.MinReadyLatency))
 		n.NormLatencies = append(n.NormLatencies, metric)

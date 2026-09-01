@@ -70,6 +70,7 @@ type volumeSnapshotMetric struct {
 	JobName      string `json:"jobName,omitempty"`
 	JobIteration int    `json:"jobIteration"`
 	Replica      int    `json:"replica"`
+	ChurnMetric  bool   `json:"churnMetric,omitempty"`
 	Metadata     any    `json:"metadata,omitempty"`
 }
 
@@ -200,6 +201,7 @@ func (vsl *volumeSnapshotLatency) Collect(measurementWg *sync.WaitGroup) {
 			UUID:       vsl.Uuid,
 			vsReady:    volumeSnapshot.Status.CreationTime.Time,
 			JobName:    vsl.JobConfig.Name,
+			Metadata:   vsl.Metadata,
 		})
 	}
 }
@@ -229,6 +231,7 @@ func (vsl *volumeSnapshotLatency) normalizeMetrics() float64 {
 			errorFlag = 1
 			m.VSReadyLatency = 0
 		}
+		m.ChurnMetric = vsl.IsChurnMetric(m.Timestamp)
 		volumeSnapshotCount++
 		erroredVolumeSnapshots += errorFlag
 		vsl.NormLatencies = append(vsl.NormLatencies, m)

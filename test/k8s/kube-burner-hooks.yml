@@ -34,7 +34,7 @@ jobs:
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "beforeChurn"]
         when: beforeChurn
         background: true
-      
+
       - cmd: ["/bin/bash", "../hooks/simple-hook.sh", "afterChurn"]
         when: afterChurn
         background: true

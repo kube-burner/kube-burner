@@ -23,9 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -95,13 +93,4 @@ func waitForDeleteNamespaces(ctx context.Context, clientSet kubernetes.Interface
 		return fmt.Errorf("error cleaning up namespaces: %v", err)
 	}
 	return nil
-}
-
-func DeleteNonNamespacedResources(ctx context.Context, resources *unstructured.UnstructuredList, resourceInterface dynamic.NamespaceableResourceInterface) {
-	for _, item := range resources.Items {
-		err := resourceInterface.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
-		if err != nil {
-			log.Errorf("Error deleting %v/%v: %v", item.GetKind(), item.GetName(), err)
-		}
-	}
 }

@@ -1,6 +1,5 @@
 metricsEndpoints:
   - indexer:
-      metricsDirectory: {{ .METRICS_FOLDER }}
       type: local
 global:
   measurements:

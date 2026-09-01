@@ -40,19 +40,35 @@ func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 	defer tarball.Close()
 	defer gzipWriter.Close()
 	defer tarWriter.Close()
-	err = filepath.Walk(indexerConfig.MetricsDirectory, func(path string, info fs.FileInfo, err error) error {
+	err = filepath.WalkDir(indexerConfig.MetricsDirectory, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
-		hdr, _ := tar.FileInfoHeader(info, info.Name())
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("could not get file info for %s: %v", path, err)
+		}
+		relPath, err := filepath.Rel(indexerConfig.MetricsDirectory, path)
+		if err != nil {
+			return fmt.Errorf("could not build relative path for %s: %v", path, err)
+		}
+		hdr, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return fmt.Errorf("could not build tar header for %s: %v", path, err)
+		}
+		// Keep nested directory structure in the tarball.
+		hdr.Name = filepath.ToSlash(relPath)
 		err = tarWriter.WriteHeader(hdr)
 		if err != nil {
 			return fmt.Errorf("could not write file header into tarball: %v", err)
 		}
-		m, _ := os.Open(path)
+		m, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("could not open file %s: %v", path, err)
+		}
 		defer m.Close()
 		_, err = io.Copy(tarWriter, m)
 		if err != nil {

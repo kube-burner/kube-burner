@@ -17,7 +17,6 @@ package burner
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	log "github.com/sirupsen/logrus"
@@ -52,5 +51,4 @@ func readHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstruc
 	if err != nil {
 		log.Errorf("Error found reading %s/%s: %s", item.GetKind(), item.GetName(), err)
 	}
-	atomic.AddInt32(&ex.objectOperations, 1)
 }

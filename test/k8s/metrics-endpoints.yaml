@@ -5,7 +5,6 @@
   alias: local-indexing
   indexer:
     type: local
-    metricsDirectory: {{ .METRICS_FOLDER }}
   metrics:
   - metrics-profile.yaml
 - endpoint: http://localhost:9090

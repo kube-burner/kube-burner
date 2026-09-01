@@ -10,6 +10,10 @@ KUBE_BURNER=${KUBE_BURNER:-kube-burner}
 KIND_YAML=${KIND_YAML:-kind.yml}
 KUBEVIRT_CR=${KUBEVIRT_CR:-objectTemplates/kubevirt-cr.yaml}
 
+check-kubevirt-ready() {
+  kubectl wait --for=condition=Available --timeout=60s -n kubevirt kv/kubevirt &>/dev/null
+}
+
 setup-kind() {
   KIND_FOLDER=${KIND_FOLDER:-$(mktemp -d)}
   echo "Downloading kind"

@@ -26,9 +26,28 @@ import (
 
 // Processes common config and executes according to the caller
 func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
-	userMetadata := make(map[string]any)
+	if scraperConfig.SummaryMetadata == nil {
+		scraperConfig.SummaryMetadata = make(map[string]any)
+	}
+	if scraperConfig.MetricsMetadata == nil {
+		scraperConfig.MetricsMetadata = make(map[string]any)
+	}
+	if scraperConfig.UserMetaData != "" {
+		userMetadata, err := util.ReadUserMetadata(scraperConfig.UserMetaData)
+		if err != nil {
+			log.Fatalf("Error reading provided user metadata: %v", err)
+		}
+		// Combine users provided metadata with metrics and summary metadata
+		for k, v := range userMetadata {
+			scraperConfig.SummaryMetadata[k] = v
+			scraperConfig.MetricsMetadata[k] = v
+		}
+	}
 	if len(scraperConfig.ConfigSpec.MetricsEndpoints) == 0 && scraperConfig.MetricsEndpoint == "" {
-		return Scraper{}
+		return Scraper{
+			SummaryMetadata: scraperConfig.SummaryMetadata,
+			MetricsMetadata: scraperConfig.MetricsMetadata,
+		}
 	}
 	var err error
 	var indexer *indexers.Indexer
@@ -37,22 +56,12 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	var prometheusClients []*prometheus.Prometheus
 	var alertM *alerting.AlertManager
 	var alertMs []*alerting.AlertManager
-	if scraperConfig.UserMetaData != "" {
-		userMetadata, err = util.ReadUserMetadata(scraperConfig.UserMetaData)
-		if err != nil {
-			log.Fatalf("Error reading provided user metadata: %v", err)
-		}
-	}
-	// Combine users provided metadata with metrics and summary metadata
-	for k, v := range userMetadata {
-		if scraperConfig.SummaryMetadata != nil {
-			scraperConfig.SummaryMetadata[k] = v
-		}
-		if scraperConfig.MetricsMetadata != nil {
-			scraperConfig.MetricsMetadata[k] = v
-		}
-	}
 	// MetricsEndpoint has preference over the configuration file
+	// if --metrics-directory is set, retain the value that is overwritten by UnmarshalYAML default
+	var metricsDirectoryFlag string
+	if len(scraperConfig.ConfigSpec.MetricsEndpoints) > 0 {
+		metricsDirectoryFlag = scraperConfig.ConfigSpec.MetricsEndpoints[0].MetricsDirectory
+	}
 	if scraperConfig.MetricsEndpoint != "" {
 		scraperConfig.ConfigSpec.MetricsEndpoints = DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint)
 	}
@@ -63,6 +72,17 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				indexerAlias = fmt.Sprintf("indexer-%d", pos)
 			} else {
 				indexerAlias = metricsEndpoint.Alias
+			}
+			if util.IsLocalIndexer(metricsEndpoint.Type) {
+				if metricsEndpoint.MetricsDirectory == "collected-metrics-{{.UUID}}" {
+					if metricsDirectoryFlag != "" && metricsDirectoryFlag != "collected-metrics-{{.UUID}}" {
+						scraperConfig.ConfigSpec.MetricsEndpoints[pos].MetricsDirectory = metricsDirectoryFlag
+					} else {
+						// Default value from config.go unmarshalYAML
+						scraperConfig.ConfigSpec.MetricsEndpoints[pos].MetricsDirectory = fmt.Sprintf("collected-metrics-%s", scraperConfig.ConfigSpec.GlobalConfig.UUID)
+					}
+					metricsEndpoint = scraperConfig.ConfigSpec.MetricsEndpoints[pos]
+				}
 			}
 			log.Infof("📁 Creating %s indexer: %s", metricsEndpoint.Type, indexerAlias)
 			indexer, err = indexers.NewIndexer(metricsEndpoint.IndexerConfig)
@@ -76,6 +96,7 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 				Username:      metricsEndpoint.Username,
 				Password:      metricsEndpoint.Password,
 				Token:         metricsEndpoint.Token,
+				TokenFile:     metricsEndpoint.TokenFile,
 				SkipTLSVerify: metricsEndpoint.SkipTLSVerify,
 			}
 			p, err := prometheus.NewPrometheusClient(*scraperConfig.ConfigSpec, metricsEndpoint.Endpoint, auth, metricsEndpoint.Step, scraperConfig.MetricsMetadata, indexer)

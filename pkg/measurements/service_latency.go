@@ -70,6 +70,7 @@ type svcMetric struct {
 	Name              string             `json:"service"`
 	ServiceType       corev1.ServiceType `json:"type"`
 	JobName           string             `json:"jobName,omitempty"`
+	ChurnMetric       bool               `json:"churnMetric,omitempty"`
 	Metadata          any                `json:"metadata,omitempty"`
 }
 
@@ -248,7 +249,9 @@ func (s *serviceLatency) Stop() error {
 	defer func() {
 		cancel()
 		s.stopWatchers()
-		close(s.stopInformerCh)
+		if s.stopInformerCh != nil {
+			close(s.stopInformerCh)
+		}
 	}()
 	kutil.CleanupNamespacesByLabel(ctx, s.ClientSet, fmt.Sprintf("kubernetes.io/metadata.name=%s", types.SvcLatencyNs))
 	s.normalizeMetrics()
@@ -267,6 +270,7 @@ func (s *serviceLatency) normalizeMetrics() {
 	s.Metrics.Range(func(key, value any) bool {
 		sLen++
 		metric := value.(svcMetric)
+		metric.ChurnMetric = s.IsChurnMetric(metric.Timestamp)
 		latencies = append(latencies, float64(metric.ReadyLatency))
 		s.NormLatencies = append(s.NormLatencies, metric)
 		if metric.IPAssignedLatency != 0 {

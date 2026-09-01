@@ -88,6 +88,7 @@ type MetricsEndpoint struct {
 	Step                   time.Duration `yaml:"step"`
 	SkipTLSVerify          bool          `yaml:"skipTLSVerify"`
 	Token                  string        `yaml:"token"`
+	TokenFile              string        `yaml:"tokenFile"`
 	Username               string        `yaml:"username"`
 	Password               string        `yaml:"password"`
 	Alias                  string        `yaml:"alias"`
@@ -122,6 +123,18 @@ type GlobalConfig struct {
 	Hooks []Hook `yaml:"hooks" json:"hooks,omitempty"`
 }
 
+// ObjectGroup controls grouping and per-object lifecycle behavior within grouped execution
+type ObjectGroup struct {
+	// ID is the group number used to order execution
+	ID int `yaml:"id" json:"id,omitempty"`
+	// GC determines whether to garbage collect (delete) this object after the group completes
+	GC bool `yaml:"gc" json:"gc,omitempty"`
+	// PauseBeforeGC is the duration to wait after the object is ready, before garbage collection
+	PauseBeforeGC time.Duration `yaml:"pauseBeforeGC" json:"pauseBeforeGC,omitempty"`
+	// PauseAfterGC is the duration to wait after garbage collection completes
+	PauseAfterGC time.Duration `yaml:"pauseAfterGC" json:"pauseAfterGC,omitempty"`
+}
+
 // Object defines an object that kube-burner will create
 type Object struct {
 	// ObjectTemplate path to a valid YAML definition of a k8s resource
@@ -149,6 +162,13 @@ type Object struct {
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
 	// Churn object
 	Churn bool `yaml:"churn" json:"churn,omitempty"`
+	// Group controls grouping and per-object lifecycle behavior within grouped execution
+	Group ObjectGroup `yaml:"group" json:"group,omitempty"`
+	// RepeatEveryNIterations specifies how often to create this object.
+	// When set > 1, the object is created only once per N iterations.
+	// Template receives adjusted Iteration: iteration / RepeatEveryNIterations.
+	// Default 1 means normal behavior (one object per iteration).
+	RepeatEveryNIterations int `yaml:"repeatEveryNIterations" json:"repeatEveryNIterations,omitempty"`
 }
 
 // Job defines a kube-burner job
@@ -159,8 +179,6 @@ type Job struct {
 	JobIterationDelay time.Duration `yaml:"jobIterationDelay" json:"jobIterationDelay,omitempty"`
 	// JobPause how much time to pause after finishing the job
 	JobPause time.Duration `yaml:"jobPause" json:"jobPause,omitempty"`
-	// BeforeCleanup allows to run a bash script before the workload is deleted.
-	BeforeCleanup string `yaml:"beforeCleanup" json:"beforeCleanup,omitempty"`
 	// Name job name
 	Name string `yaml:"name" json:"name,omitempty"`
 	// Objects list of objects
@@ -187,6 +205,8 @@ type Job struct {
 	Cleanup bool `yaml:"cleanup" json:"cleanup,omitempty"`
 	// NamespacedIterations create a namespace per job iteration
 	NamespacedIterations bool `yaml:"namespacedIterations" json:"namespacedIterations,omitempty"`
+	// PreCreateNamespaces creates all namespaces upfront before object creation begins
+	PreCreateNamespaces bool `yaml:"preCreateNamespaces" json:"preCreateNamespaces,omitempty"`
 	// IterationsPerNamespace is the modulus to apply to job iterations to calculate . Default 1
 	IterationsPerNamespace int `yaml:"iterationsPerNamespace" json:"iterationsPerNamespace,omitempty"`
 	// VerifyObjects verify object count after running the job
@@ -226,6 +246,23 @@ type Job struct {
 	IncrementalLoad *IncrementalLoad `yaml:"incrementalLoad" json:"incrementalLoad,omitempty"`
 	// Hooks to execute at different stages of the job
 	Hooks []Hook `yaml:"hooks" json:"hooks,omitempty"`
+	// ChurnStart marks when the churn phase started, set at runtime
+	ChurnStart *time.Time `yaml:"-" json:"-"`
+	// ChurnEnd marks when the churn phase ended, set at runtime
+	ChurnEnd *time.Time `yaml:"-" json:"-"`
+	// GroupWindows records the execution timeframe of each object group, set at runtime.
+	// It is a pointer so that the recorded windows are shared across job config copies.
+	GroupWindows *[]GroupWindow `yaml:"-" json:"-"`
+}
+
+// GroupWindow marks the execution timeframe of an object group, set at runtime
+type GroupWindow struct {
+	// ID is the group number
+	ID int
+	// Start marks when the group execution started
+	Start time.Time
+	// End marks when the group execution ended
+	End time.Time
 }
 
 type Hook struct {
@@ -348,6 +385,7 @@ const (
 	KubeBurnerLabelJobIteration             = "kube-burner.io/job-iteration"
 	KubeBurnerLabelReplica                  = "kube-burner.io/replica"
 	KubeBurnerLabelChurnDelete              = "kube-burner.io/churn-delete"
+	KubeBurnerLabelGroup                    = "kube-burner.io/group"
 	KubeBurnerLabelServiceLatency           = "kube-burner.io/service-latency"
 	KubeBurnerLabelSkipNetworkPolicyLatency = "kube-burner.io/skip-networkpolicy-latency"
 )
