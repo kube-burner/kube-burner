@@ -43,14 +43,12 @@ spec:
         - name: SERVICE_ENDPOINT
           value: "http://udn-density-{{randInt 1 6}}/256.html"
         imagePullPolicy: IfNotPresent
-        {{ if not .simple }}
         readinessProbe:
           exec:
             command:
             - "/bin/sh"
             - "-c"
             - "curl --fail -sS ${SERVICE_ENDPOINT} -o /dev/null"
-        {{ end }}
         securityContext:
           privileged: false
         volumeMounts:
