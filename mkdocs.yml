@@ -19,6 +19,7 @@ nav:
     - contributing/release.md
   - Tests: contributing/tests.md
 - Wrappers: wrappers/wrappers.md
+- Comparison with other tools: comparison/index.md
 site_name: Kube-burner
 plugins:
   - search
