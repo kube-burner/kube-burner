@@ -128,6 +128,14 @@ func (hm *HookManager) prepareCommand(hook config.Hook) (*exec.Cmd, io.ReadClose
 	return cmd, scriptReader, nil
 }
 
+func openHookOutputFile(path string) (*os.File, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create output file %q: %w", path, err)
+	}
+	return f, nil
+}
+
 func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 	var stdout, stderr bytes.Buffer
 	log.Infof("Starting Background hook at %s , %v", hook.When, hook.Cmd)
@@ -138,9 +146,12 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 
 	var outputFile *os.File
 	if hook.OutputFile != "" {
-		outputFile, err = os.Create(hook.OutputFile)
+		outputFile, err = openHookOutputFile(hook.OutputFile)
 		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
+			if scriptReader != nil {
+				scriptReader.Close()
+			}
+			return err
 		}
 		cmd.Stdout = outputFile
 		cmd.Stderr = outputFile
@@ -222,34 +233,51 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 	if err != nil {
 		return err
 	}
+
+	var stdout, stderr bytes.Buffer
+	var outputFile *os.File
+	if hook.OutputFile != "" {
+		outputFile, err = openHookOutputFile(hook.OutputFile)
+		if err != nil {
+			if scriptReader != nil {
+				scriptReader.Close()
+			}
+			return err
+		}
+		defer outputFile.Close()
+		cmd.Stdout = outputFile
+		cmd.Stderr = outputFile
+	} else {
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+	}
+
 	if scriptReader != nil {
 		defer scriptReader.Close()
 	}
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 
 	start := time.Now()
 	err = cmd.Run()
 	duration := time.Since(start)
 
-	if stdout.Len() > 0 {
-		log.Debugf("Hook stdout: %s", stdout.String())
-	}
-	if stderr.Len() > 0 {
-		log.Debugf("Hook stderr: %s", stderr.String())
+	if outputFile == nil {
+		if stdout.Len() > 0 {
+			log.Debugf("Hook stdout: %s", stdout.String())
+		}
+		if stderr.Len() > 0 {
+			log.Debugf("Hook stderr: %s", stderr.String())
+		}
 	}
 
 	if err != nil {
 		// Check if the command was canceled via the context
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(hm.ctx.Err(), context.Canceled) {
-			return fmt.Errorf("hook canceled at '%s' after %v: %w", hook.When, duration, err)
+			return fmt.Errorf("hook canceled at %q after %v: %w", hook.When, duration, err)
 		}
-		return fmt.Errorf("hook failed at '%s' after %v: %w", hook.When, duration, err)
+		return fmt.Errorf("hook failed at %q after %v: %w", hook.When, duration, err)
 	}
 
-	log.Infof("Hook completed at '%s' in %v", hook.When, duration)
+	log.Infof("Hook completed at %q in %v", hook.When, duration)
 	return nil
 }
 
