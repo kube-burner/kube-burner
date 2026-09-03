@@ -15,6 +15,7 @@
 package measurements
 
 import (
+	"fmt"
 	"sync"
 
 	"dario.cat/mergo"
@@ -69,16 +70,27 @@ var measurementFactoryMap = map[string]NewMeasurementFactory{
 	"scaledObjectLatency":   newScaledObjectLatencyMeasurementFactory,
 }
 
-func isIndexerOk(configSpec config.Spec, measurement types.Measurement) bool {
-	if measurement.QuantilesIndexer != "" || measurement.TimeseriesIndexer != "" {
-		for _, indexer := range configSpec.MetricsEndpoints {
-			if indexer.Alias == measurement.QuantilesIndexer || indexer.Alias == measurement.TimeseriesIndexer {
-				return true
-			}
+// aliasExists reports whether the given indexer alias is configured
+func aliasExists(configSpec config.Spec, alias string) bool {
+	for _, indexer := range configSpec.MetricsEndpoints {
+		if indexer.Alias == alias {
+			return true
 		}
-		return false
 	}
-	return true
+	return false
+}
+
+// validateIndexers checks that every indexer alias referenced by the measurement
+// is configured. Each alias is validated independently, so a valid alias in one
+// field cannot mask a missing one in the other.
+func validateIndexers(configSpec config.Spec, measurement types.Measurement) error {
+	if measurement.TimeseriesIndexer != "" && !aliasExists(configSpec, measurement.TimeseriesIndexer) {
+		return fmt.Errorf("measurement %s: timeseriesIndexer %q not found in configured metricsEndpoints", measurement.Name, measurement.TimeseriesIndexer)
+	}
+	if measurement.QuantilesIndexer != "" && !aliasExists(configSpec, measurement.QuantilesIndexer) {
+		return fmt.Errorf("measurement %s: quantilesIndexer %q not found in configured metricsEndpoints", measurement.Name, measurement.QuantilesIndexer)
+	}
+	return nil
 }
 
 // NewMeasurementsFactory initializes the measurement facture
@@ -120,8 +132,8 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 		}
 	}
 	for name, measurement := range mergedMeasurements {
-		if !isIndexerOk(msf.ConfigSpec, measurement) {
-			log.Fatalf("One of the indexers for measurement %s has not been found", measurement.Name)
+		if err := validateIndexers(msf.ConfigSpec, measurement); err != nil {
+			log.Fatal(err)
 		}
 		newMeasurementFactoryFunc, exists := measurementFactoryMap[name]
 		if !exists {
