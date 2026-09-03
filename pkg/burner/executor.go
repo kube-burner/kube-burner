@@ -17,10 +17,12 @@ package burner
 import (
 	"context"
 	"sync"
+	"time"
 
 	"maps"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
 	log "github.com/sirupsen/logrus"
@@ -155,4 +157,41 @@ func (ex *JobExecutor) renderTemplateForObjectMultiple(obj *object, iteration, r
 
 	objects, gvks := yamlToUnstructuredMultiple(obj.ObjectTemplate, renderedObj)
 	return objects, gvks
+}
+
+// JobOption configures a prometheus.Job
+type JobOption func(*prometheus.Job)
+
+// WithEnd sets end timestamp
+func WithEnd(end time.Time) JobOption {
+	return func(j *prometheus.Job) {
+		j.End = end
+	}
+}
+
+// WithIncrementalUUID sets incremental step UUID
+func WithIncrementalUUID(uuid string) JobOption {
+	return func(j *prometheus.Job) {
+		j.IncrementalLoadUUID = uuid
+	}
+}
+
+// WithGCJob overrides config with garbage collection job
+func WithGCJob() JobOption {
+	return func(j *prometheus.Job) {
+		j.JobConfig = config.Job{Name: garbageCollectionJob}
+	}
+}
+
+// newScrapeJob creates prometheus.Job with options
+func (ex *JobExecutor) newScrapeJob(start time.Time, opts ...JobOption) prometheus.Job {
+	job := prometheus.Job{
+		Start:     start,
+		JobConfig: ex.Job,
+		UUID:      ex.uuid,
+	}
+	for _, opt := range opts {
+		opt(&job)
+	}
+	return job
 }

@@ -139,11 +139,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if jobExecutor.JobType == config.CreationJob && config.IsGroupedEnabled(jobExecutor.Job) {
 				jobExecutor.GroupWindows = &[]config.GroupWindow{}
 			}
-			executedJobs = append(executedJobs, prometheus.Job{
-				Start:     time.Now().UTC(),
-				JobConfig: jobExecutor.Job,
-				UUID:      jobExecutor.uuid,
-			})
+			executedJobs = append(executedJobs, jobExecutor.newScrapeJob(time.Now().UTC()))
 			watcherManager := watchers.NewWatcherManager(restConfig, rate.NewLimiter(rate.Limit(jobExecutor.QPS), jobExecutor.Burst))
 			for idx, watcher := range jobExecutor.Watchers {
 				for replica := range watcher.Replicas {
@@ -180,11 +176,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					executedJobs = append(executedJobs, stepJobs...)
 					executedJobs[jobIdx].End = stepJobs[0].Start
 					jobIdx = len(executedJobs)
-					executedJobs = append(executedJobs, prometheus.Job{
-						Start:     stepJobs[len(stepJobs)-1].End,
-						JobConfig: jobExecutor.Job,
-						UUID:      jobExecutor.uuid,
-					})
+					executedJobs = append(executedJobs, jobExecutor.newScrapeJob(stepJobs[len(stepJobs)-1].End))
 				}
 				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
 
@@ -291,13 +283,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 				}
 				// We add an extra dummy job to executedJobs to index metrics from this stage
-				executedJobs = append(executedJobs, prometheus.Job{
-					Start: cleanupStart,
-					End:   time.Now().UTC(),
-					JobConfig: config.Job{
-						Name: garbageCollectionJob,
-					},
-				})
+				if len(jobExecutors) > 0 {
+					executedJobs = append(executedJobs, jobExecutors[0].newScrapeJob(cleanupStart, WithEnd(time.Now().UTC()), WithGCJob()))
+				}
 			}
 		}
 		// Make sure that measurements have indexed their stuff before we index metrics
@@ -409,7 +397,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 	var jobSummaries []JobSummary
 
 	for _, job := range executedJobs {
-		if !job.JobConfig.SkipIndexing {
+		if !job.JobConfig.SkipIndexing && !job.MetricsScraped {
 			if value, exists := returnMap[job.JobConfig.Name]; exists && !isTimeout {
 				innerRC = value.innerRC == 0
 				executionErrors = value.executionErrors
@@ -435,9 +423,16 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 	for _, indexer := range metricsScraper.IndexerList {
 		IndexJobSummary(jobSummaries, indexer)
 	}
-	// Scrape prometheus metrics for all executed jobs
+	var unscrapedJobs []prometheus.Job
+	for _, job := range executedJobs {
+		if !job.MetricsScraped {
+			unscrapedJobs = append(unscrapedJobs, job)
+		}
+	}
 	for _, prometheusClient := range metricsScraper.PrometheusClients {
-		prometheusClient.ScrapeJobsMetrics(executedJobs...)
+		if err := prometheusClient.ScrapeJobsMetrics(unscrapedJobs...); err != nil {
+			log.Warnf("Error scraping job metrics: %v", err)
+		}
 	}
 	for _, indexer := range configSpec.MetricsEndpoints {
 		if util.IsLocalIndexer(indexer.Type) && indexer.CreateTarball {
