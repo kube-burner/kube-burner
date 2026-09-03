@@ -390,6 +390,7 @@ const (
 	KubeBurnerLabelGroup                    = "kube-burner.io/group"
 	KubeBurnerLabelServiceLatency           = "kube-burner.io/service-latency"
 	KubeBurnerLabelSkipNetworkPolicyLatency = "kube-burner.io/skip-networkpolicy-latency"
+	KubeBurnerLabelSkipPodLatency           = "kube-burner.io/skip-pod-latency"
 )
 
 // MetricsCLosing strategy

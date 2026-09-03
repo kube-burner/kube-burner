@@ -142,6 +142,37 @@ WARN[2020-12-15 12:37:08] P99 Ready latency (2929ms) higher than configured thre
 
 In case of not meeting any of the configured thresholds, like the example above, **kube-burner return code will be 1**.
 
+### Skipping specific pods
+
+It is possible to exclude specific pods from pod latency tracking by adding the label `kube-burner.io/skip-pod-latency: "true"` to the pod template. This is useful when:
+
+- Pods are created temporarily and cleaned up before job completion (e.g., setup pods in staged execution)
+- Certain pods should not contribute to latency metrics (e.g., infrastructure pods, DaemonSet pods)
+
+Example pod template with skip label:
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{.Name}}
+spec:
+  selector:
+    matchLabels:
+      app: {{.Name}}
+  template:
+    metadata:
+      labels:
+        app: {{.Name}}
+        kube-burner.io/skip-pod-latency: "true"
+    spec:
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+```
+
+Pods with this label will be excluded from latency measurement and will not cause verification failures if they are deleted before job completion.
+
 ## Job latency
 
 Collects latencies from the different job stages, these **latency metrics are in ms**. It can be enabled with:
