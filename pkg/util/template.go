@@ -128,6 +128,6 @@ func CreateFile(fileName string, fileContent []byte) error {
 		return err
 	}
 	defer fd.Close()
-	fd.Write(fileContent)
-	return nil
+	_, err = fd.Write(fileContent)
+	return err
 }

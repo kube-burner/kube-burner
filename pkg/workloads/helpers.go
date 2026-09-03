@@ -133,7 +133,9 @@ func extractDirectory(subFS fs.FS, dirPath string) error {
 			if err != nil {
 				return err
 			}
-			extractDirectory(subFS, path.Join(dirPath, f.Name()))
+			if err := extractDirectory(subFS, path.Join(dirPath, f.Name())); err != nil {
+				return err
+			}
 			continue
 		}
 		filePath := path.Join(dirPath, f.Name())
@@ -141,7 +143,7 @@ func extractDirectory(subFS fs.FS, dirPath string) error {
 		if err != nil {
 			return err
 		}
-		if util.CreateFile(filePath, fileContent) != nil {
+		if err := util.CreateFile(filePath, fileContent); err != nil {
 			return err
 		}
 	}
