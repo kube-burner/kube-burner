@@ -285,12 +285,19 @@ func measureCmd() *cobra.Command {
 				log.Fatal(err.Error())
 			}
 			for pos, indexer := range configSpec.MetricsEndpoints {
+				if indexer.Type == "" {
+					continue
+				}
 				log.Infof("📁 Creating indexer: %s", indexer.Type)
 				idx, err := indexers.NewIndexer(indexer.IndexerConfig)
 				if err != nil {
 					log.Fatalf("Error creating indexer %d: %v", pos, err.Error())
 				}
-				indexerList[indexer.Alias] = *idx
+				indexerAlias := indexer.Alias
+				if indexerAlias == "" {
+					indexerAlias = fmt.Sprintf("indexer-%d", pos)
+				}
+				indexerList[indexerAlias] = *idx
 			}
 			if userMetadata != "" {
 				metadata, err = util.ReadUserMetadata(userMetadata)
