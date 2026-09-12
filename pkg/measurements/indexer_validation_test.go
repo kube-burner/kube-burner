@@ -18,6 +18,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloud-bulldozer/go-commons/v2/indexers"
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/measurements/types"
 )
@@ -25,8 +26,16 @@ import (
 func TestValidateIndexers(t *testing.T) {
 	configSpec := config.Spec{
 		MetricsEndpoints: []config.MetricsEndpoint{
-			{Alias: "local-indexer"},
-			{Alias: "os-indexer"},
+			{
+				IndexerConfig: indexers.IndexerConfig{Type: indexers.LocalIndexer},
+				Alias:         "local-indexer",
+			},
+			{
+				IndexerConfig: indexers.IndexerConfig{Type: indexers.OpenSearchIndexer},
+				Alias:         "os-indexer",
+			},
+			{Alias: "alerts-only"},
+			{IndexerConfig: indexers.IndexerConfig{Type: indexers.LocalIndexer}},
 		},
 	}
 
@@ -54,6 +63,22 @@ func TestValidateIndexers(t *testing.T) {
 				Name:              "podLatency",
 				TimeseriesIndexer: "local-indexer",
 			},
+		},
+		{
+			name: "generated indexer alias is valid",
+			measurement: types.Measurement{
+				Name:              "podLatency",
+				TimeseriesIndexer: "indexer-3",
+			},
+		},
+		{
+			name: "alias without an indexer is invalid",
+			measurement: types.Measurement{
+				Name:              "podLatency",
+				TimeseriesIndexer: "alerts-only",
+			},
+			wantErr:     true,
+			errContains: "timeseriesIndexer",
 		},
 		{
 			name: "unknown timeseriesIndexer while quantilesIndexer is valid",

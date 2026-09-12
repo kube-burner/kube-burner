@@ -70,10 +70,17 @@ var measurementFactoryMap = map[string]NewMeasurementFactory{
 	"scaledObjectLatency":   newScaledObjectLatencyMeasurementFactory,
 }
 
-// aliasExists reports whether the given indexer alias is configured
-func aliasExists(configSpec config.Spec, alias string) bool {
-	for _, indexer := range configSpec.MetricsEndpoints {
-		if indexer.Alias == alias {
+// indexerAliasExists reports whether the given alias belongs to a configured indexer.
+func indexerAliasExists(configSpec config.Spec, alias string) bool {
+	for pos, endpoint := range configSpec.MetricsEndpoints {
+		if endpoint.Type == "" {
+			continue
+		}
+		indexerAlias := endpoint.Alias
+		if indexerAlias == "" {
+			indexerAlias = fmt.Sprintf("indexer-%d", pos)
+		}
+		if indexerAlias == alias {
 			return true
 		}
 	}
@@ -84,10 +91,10 @@ func aliasExists(configSpec config.Spec, alias string) bool {
 // is configured. Each alias is validated independently, so a valid alias in one
 // field cannot mask a missing one in the other.
 func validateIndexers(configSpec config.Spec, measurement types.Measurement) error {
-	if measurement.TimeseriesIndexer != "" && !aliasExists(configSpec, measurement.TimeseriesIndexer) {
+	if measurement.TimeseriesIndexer != "" && !indexerAliasExists(configSpec, measurement.TimeseriesIndexer) {
 		return fmt.Errorf("measurement %s: timeseriesIndexer %q not found in configured metricsEndpoints", measurement.Name, measurement.TimeseriesIndexer)
 	}
-	if measurement.QuantilesIndexer != "" && !aliasExists(configSpec, measurement.QuantilesIndexer) {
+	if measurement.QuantilesIndexer != "" && !indexerAliasExists(configSpec, measurement.QuantilesIndexer) {
 		return fmt.Errorf("measurement %s: quantilesIndexer %q not found in configured metricsEndpoints", measurement.Name, measurement.QuantilesIndexer)
 	}
 	return nil
