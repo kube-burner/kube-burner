@@ -123,11 +123,5 @@ func EnvToMap() map[string]any {
 
 // CreateFile creates a new file and writes content into it
 func CreateFile(fileName string, fileContent []byte) error {
-	fd, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer fd.Close()
-	_, err = fd.Write(fileContent)
-	return err
+	return os.WriteFile(fileName, fileContent, 0o666)
 }

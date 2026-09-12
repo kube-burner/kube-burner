@@ -15,8 +15,11 @@
 package util
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"testing"
 )
 
@@ -38,11 +41,14 @@ func TestCreateFile(t *testing.T) {
 }
 
 func TestCreateFileReturnsWriteError(t *testing.T) {
-	// Writes to /dev/full always fail with ENOSPC
-	if _, err := os.Stat("/dev/full"); err != nil {
-		t.Skip("/dev/full is not available")
+	if runtime.GOOS != "linux" {
+		t.Skip("/dev/full test is Linux-specific")
 	}
-	if err := CreateFile("/dev/full", []byte("kind: Pod\n")); err == nil {
-		t.Fatal("CreateFile returned no error, want a write error")
+	if _, err := os.Stat("/dev/full"); err != nil {
+		t.Skipf("/dev/full is unavailable: %v", err)
+	}
+	err := CreateFile("/dev/full", []byte("kind: Pod\n"))
+	if !errors.Is(err, syscall.ENOSPC) {
+		t.Fatalf("CreateFile error = %v, want ENOSPC", err)
 	}
 }
