@@ -165,9 +165,8 @@ teardown_file() {
   sleep 1m # Sleep is required to prevent collecting metrics right after spinning up the cluster, which can lead to missing datapoints
   run_cmd ${KUBE_BURNER} index --uuid=${UUID} -u http://localhost:9090 -m "metrics-profile.yaml,metrics-profile.yaml" --tarball-name=metrics.tgz --start="$(date -d "-30 seconds" +%s)" --metrics-directory=${METRICS_FOLDER}
   check_file_list ${METRICS_FOLDER}/top2PrometheusCPU.json ${METRICS_FOLDER}/top2PrometheusCPU-start.json ${METRICS_FOLDER}/prometheusRSS.json
-  run_cmd ${KUBE_BURNER} import --tarball=metrics.tgz --es-server=${ES_SERVER} --es-index=${ES_INDEX} --metrics-directory ${METRICS_FOLDER}
   rm -rf ${METRICS_FOLDER:?}/*
-  run_cmd ${KUBE_BURNER} index --uuid=${UUID} -e metrics-endpoints.yaml --es-server=${ES_SERVER} --es-index=${ES_INDEX} --start="$(date -d "-30 seconds" +%s)" --metrics-directory ${METRICS_FOLDER}
+  run_cmd ${KUBE_BURNER} import --tarball=metrics.tgz --metrics-directory ${METRICS_FOLDER}
   check_file_list ${METRICS_FOLDER}/top2PrometheusCPU.json ${METRICS_FOLDER}/prometheusRSS.json ${METRICS_FOLDER}/prometheusRSS.json
   rm -rf ${METRICS_FOLDER:?}/*
 }
