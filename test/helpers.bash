@@ -2,7 +2,7 @@
 # vi: ft=bash
 # shellcheck disable=SC2086,SC2068
 
-KIND_VERSION=${KIND_VERSION:-v0.19.0}
+KIND_VERSION=${KIND_VERSION:-v0.32.0}
 K8S_VERSION=${K8S_VERSION:-v1.31.0}
 OCI_BIN=${OCI_BIN:-podman}
 ARCH=$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
