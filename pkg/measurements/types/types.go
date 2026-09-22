@@ -56,6 +56,8 @@ type Measurement struct {
 	QuantilesIndexer string `yaml:"quantilesIndexer"`
 	// Defines the indexer for timeseries
 	TimeseriesIndexer string `yaml:"timeseriesIndexer"`
+	// BaselinePhase overrides the latency baseline for vmiLatency (e.g. "vmiPending" to exclude pre-boot wait)
+	BaselinePhase string `yaml:"baselinePhase"`
 }
 
 // LatencyThreshold holds the thresholds configuration
