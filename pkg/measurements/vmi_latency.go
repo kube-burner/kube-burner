@@ -376,18 +376,22 @@ func (vmi *vmiLatency) normalizeMetrics() float64 {
 			log.Tracef("VMI %v latency ignored as it did not reach Running state", m.VMIName)
 			return true
 		}
-		m.VMReadyLatency = m.vmReady.Sub(m.Timestamp).Milliseconds()
-		m.VMICreatedLatency = m.vmiCreated.Sub(m.Timestamp).Milliseconds()
-		m.VMIPendingLatency = m.vmiPending.Sub(m.Timestamp).Milliseconds()
-		m.VMISchedulingLatency = m.vmiScheduling.Sub(m.Timestamp).Milliseconds()
-		m.VMIScheduledLatency = m.vmiScheduled.Sub(m.Timestamp).Milliseconds()
-		m.VMIRunningLatency = m.vmiRunning.Sub(m.Timestamp).Milliseconds()
-		m.PodCreatedLatency = m.podCreated.Sub(m.Timestamp).Milliseconds()
-		m.PodScheduledLatency = m.podScheduled.Sub(m.Timestamp).Milliseconds()
-		m.PodInitializedLatency = m.podInitialized.Sub(m.Timestamp).Milliseconds()
-		m.PodContainersReadyLatency = m.podContainersReady.Sub(m.Timestamp).Milliseconds()
-		m.PodReadyLatency = m.podReady.Sub(m.Timestamp).Milliseconds()
-		m.PodReadyToStartContainersLatency = m.podReadyToStartContainers.Sub(m.Timestamp).Milliseconds()
+		baseline := m.Timestamp
+		if vmi.Config.BaselinePhase == "vmiPending" && !m.vmiPending.IsZero() {
+			baseline = m.vmiPending
+		}
+		m.VMReadyLatency = m.vmReady.Sub(baseline).Milliseconds()
+		m.VMICreatedLatency = m.vmiCreated.Sub(baseline).Milliseconds()
+		m.VMIPendingLatency = m.vmiPending.Sub(baseline).Milliseconds()
+		m.VMISchedulingLatency = m.vmiScheduling.Sub(baseline).Milliseconds()
+		m.VMIScheduledLatency = m.vmiScheduled.Sub(baseline).Milliseconds()
+		m.VMIRunningLatency = m.vmiRunning.Sub(baseline).Milliseconds()
+		m.PodCreatedLatency = m.podCreated.Sub(baseline).Milliseconds()
+		m.PodScheduledLatency = m.podScheduled.Sub(baseline).Milliseconds()
+		m.PodInitializedLatency = m.podInitialized.Sub(baseline).Milliseconds()
+		m.PodContainersReadyLatency = m.podContainersReady.Sub(baseline).Milliseconds()
+		m.PodReadyLatency = m.podReady.Sub(baseline).Milliseconds()
+		m.PodReadyToStartContainersLatency = m.podReadyToStartContainers.Sub(baseline).Milliseconds()
 		m.UUID = vmi.Uuid
 		m.JobName = vmi.JobConfig.Name
 		m.Metadata = vmi.Metadata
