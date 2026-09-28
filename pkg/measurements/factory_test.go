@@ -63,7 +63,7 @@ func (f *fakeMeasurement) GetMetrics() *sync.Map {
 	return &f.metrics
 }
 
-func TestMeasurementsStopSkipsFailedStarts(t *testing.T) {
+func TestMeasurementsStartRemovesFailedMeasurements(t *testing.T) {
 	var logOutput bytes.Buffer
 	logger := log.StandardLogger()
 	previousOutput := logger.Out
@@ -82,6 +82,12 @@ func TestMeasurementsStopSkipsFailedStarts(t *testing.T) {
 	}
 
 	ms.Start()
+	if _, exists := ms.MeasurementsMap["failed"]; exists {
+		t.Fatal("failed measurement was not removed from MeasurementsMap after Start()")
+	}
+	if _, exists := ms.MeasurementsMap["started"]; !exists {
+		t.Fatal("started measurement was removed from MeasurementsMap after Start()")
+	}
 	if err := ms.Stop(); err != nil {
 		t.Fatalf("unexpected stop error: %v", err)
 	}
@@ -97,9 +103,6 @@ func TestMeasurementsStopSkipsFailedStarts(t *testing.T) {
 	}
 	if !strings.Contains(logOutput.String(), "Failed to start measurement [failed]: discovery unavailable") {
 		t.Fatalf("startup failure was not logged: %s", logOutput.String())
-	}
-	if !strings.Contains(logOutput.String(), "Skipping measurement [failed] because it failed to start: discovery unavailable") {
-		t.Fatalf("failed measurement skip was not logged: %s", logOutput.String())
 	}
 }
 
