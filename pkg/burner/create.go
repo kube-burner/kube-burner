@@ -350,6 +350,8 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 		config.KubeBurnerLabelRunID: ex.runid,
 	}
 	var wg sync.WaitGroup
+	// On timeout, let in-flight replica creations finish before final GC starts.
+	defer wg.Wait()
 	var ns string
 	var waitErrors []error
 	var namespacesWaited = make(map[string]bool)
@@ -458,6 +460,8 @@ func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, 
 		config.KubeBurnerLabelRunID: ex.runid,
 	}
 	var wg sync.WaitGroup
+	// On timeout, let in-flight replica creations finish before final GC starts.
+	defer wg.Wait()
 	var waitErrors []error
 	var hookErrors []error
 	maps.Copy(nsLabels, ex.NamespaceLabels)
