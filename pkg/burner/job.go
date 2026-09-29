@@ -85,8 +85,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	globalConfig := configSpec.GlobalConfig
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
-	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
-	gcCtx, gcCancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout+10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), globalConfig.Timeout)
+	gcGracePeriod := globalConfig.GCGracePeriod
+	if gcGracePeriod <= 0 {
+		gcGracePeriod = config.DefaultGCGracePeriod
+	}
+	gcCtx, gcCancel := context.WithTimeout(context.Background(), globalConfig.Timeout+gcGracePeriod)
 	defer cancel()
 	defer gcCancel()
 	clientSet, restConfig := kubeClientProvider.DefaultClientSet()

@@ -115,6 +115,8 @@ type GlobalConfig struct {
 	ClusterHealth bool `yaml:"clusterHealth"`
 	// Global Benchmark timeout
 	Timeout time.Duration `yaml:"timeout"`
+	// GCGracePeriod is the additional time allowed for cleanup after the benchmark timeout
+	GCGracePeriod time.Duration `yaml:"gcGracePeriod" json:"gcGracePeriod,omitempty"`
 	// Function templates to render at runtime
 	FunctionTemplates []string `yaml:"functionTemplates"`
 	// DeletionStrategy global deletion strategy for all created objects
