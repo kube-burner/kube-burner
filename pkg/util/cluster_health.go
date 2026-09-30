@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -60,17 +61,21 @@ func areNodesHealthy(ctx context.Context, clientset kubernetes.Interface) bool {
 	}
 
 	for _, node := range nodes.Items {
-		// Check condition for node health check status as Ready, MemoryPressure, DiskPressure, PIDPressure
+		// Only standard node conditions determine health. Vendors may add
+		// conditions whose True status indicates successful provisioning.
 		for _, condition := range node.Status.Conditions {
-			if condition.Type == "Ready" && condition.Status != "True" {
-				isHealthy = false
-				log.Errorf("Node %s is not Ready", node.Name)
+			switch condition.Type {
+			case corev1.NodeReady:
+				if condition.Status != corev1.ConditionTrue {
+					isHealthy = false
+					log.Errorf("Node %s is not Ready", node.Name)
+				}
+			case corev1.NodeMemoryPressure, corev1.NodeDiskPressure, corev1.NodePIDPressure, corev1.NodeNetworkUnavailable:
+				if condition.Status != corev1.ConditionFalse {
+					isHealthy = false
+					log.Errorf("Node %s is experiencing %s", node.Name, condition.Type)
+				}
 			}
-			if condition.Type != "Ready" && condition.Status != "False" { //nolint:goconst
-				isHealthy = false
-				log.Errorf("Node %s is experiencing %s", node.Name, condition.Type)
-			}
-
 		}
 	}
 	return isHealthy
