@@ -72,6 +72,7 @@ var (
 func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, metricsScraper metrics.Scraper, additionalMeasurementFactoryMap map[string]measurements.NewMeasurementFactory, embedCfg *fileutils.EmbedConfiguration) (int, error) {
 	var err error
 	var rc int
+	var timedOut bool
 	var executedJobs []prometheus.Job
 	var jobExecutors []JobExecutor
 	var msWg, gcWg sync.WaitGroup
@@ -79,12 +80,19 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	var measurementsJobName string
 	errs := []error{}
 	res := make(chan int, 1)
+	workDone := make(chan struct{})
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
-	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), globalConfig.Timeout)
+	gcGracePeriod := globalConfig.GCGracePeriod
+	if gcGracePeriod <= 0 {
+		gcGracePeriod = config.DefaultGCGracePeriod
+	}
+	gcCtx, gcCancel := context.WithTimeout(context.Background(), globalConfig.Timeout+gcGracePeriod)
 	defer cancel()
+	defer gcCancel()
 	clientSet, restConfig := kubeClientProvider.DefaultClientSet()
 	probeCtx, probeCancel := context.WithTimeout(ctx, configSpec.GlobalConfig.RequestTimeout)
 	clusterInfo, err := cluster.Probe(probeCtx, clientSet)
@@ -94,10 +102,22 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	}
 	metricsScraper.SummaryMetadata = clusterInfo.ApplyMetadata(metricsScraper.SummaryMetadata)
 	metricsScraper.MetricsMetadata = clusterInfo.ApplyMetadata(metricsScraper.MetricsMetadata)
+	jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
+	var startGCOnce sync.Once
+	startGC := func() {
+		startGCOnce.Do(func() {
+			for i := range jobExecutors {
+				if globalConfig.GC || jobExecutors[i].GC {
+					gcWg.Add(1)
+					go jobExecutors[i].gc(gcCtx, &gcWg)
+				}
+			}
+		})
+	}
 	go func() {
+		defer close(workDone)
 		var innerRC int
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
-		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
 
 		// Execute global beforeAllJobs hooks
 		if len(globalConfig.Hooks) > 0 {
@@ -128,8 +148,6 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 
 		// Iterate job list
-		var measurementsInstance *measurements.Measurements
-		var measurementsJobName string
 		for _, jobExecutor := range jobExecutors {
 			jobIdx := len(executedJobs) // Track the index where we're appending
 			startJobIdx := jobIdx       // Will work for both incremental and normal jobs
@@ -181,6 +199,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
 
 				if ctx.Err() != nil {
+					errs = append(errs, watcherManager.StopAll()...)
 					return
 				}
 				if config.IsChurnEnabled(jobExecutor.Job) {
@@ -213,6 +232,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
 				if ctx.Err() != nil {
+					errs = append(errs, watcherManager.StopAll()...)
 					return
 				}
 			}
@@ -223,7 +243,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			if jobExecutor.JobPause > 0 {
 				log.Infof("Pausing for %v before finishing job", jobExecutor.JobPause)
-				time.Sleep(jobExecutor.JobPause)
+				select {
+				case <-ctx.Done():
+					errs = append(errs, watcherManager.StopAll()...)
+					return
+				case <-time.After(jobExecutor.JobPause):
+				}
 			}
 			if jobExecutor.MetricsClosing == config.AfterJobPause {
 				executedJobs[jobIdx].End = time.Now().UTC()
@@ -256,8 +281,11 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			watcherStopErrs := watcherManager.StopAll()
 			errs = append(errs, watcherStopErrs...)
 			if jobExecutor.GC {
-				jobExecutor.gc(ctx, nil)
+				jobExecutor.gc(gcCtx, nil)
 				jobExecutor.executeHooksForJobStage(config.HookAfterCleanup, &errs, &innerRC)
+			}
+			if ctx.Err() != nil {
+				return
 			}
 			// Collect all background hook results once after all hook stages are complete for this job.
 			errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
@@ -265,18 +293,20 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		if globalConfig.WaitWhenFinished {
 			runWaitList(ctx, jobExecutors)
 		}
+		if ctx.Err() != nil {
+			return
+		}
 		// We initialize garbage collection as soon as the benchmark finishes
 		if globalConfig.GC {
-			//nolint:govet
-			for _, jobExecutor := range jobExecutors {
-				gcWg.Add(1)
-				go jobExecutor.gc(ctx, &gcWg)
-			}
+			startGC()
 			if globalConfig.GCMetrics {
 				cleanupStart := time.Now().UTC()
 				log.Info("Garbage collection metrics on, waiting for GC")
 				// If gcMetrics is enabled, garbage collection must be blocker
 				gcWg.Wait()
+				if ctx.Err() != nil {
+					return
+				}
 				for _, jobExecutor := range jobExecutors {
 					jobExecutor.executeHooksForJobStage(config.HookAfterCleanup, &errs, &innerRC)
 					// Collect background hook results from the global GC metrics phase.
@@ -290,6 +320,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		}
 		// Make sure that measurements have indexed their stuff before we index metrics
 		msWg.Wait()
+		if ctx.Err() != nil {
+			return
+		}
 		for _, job := range executedJobs {
 			// Declare slice on each iteration
 			var jobAlerts []error
@@ -306,32 +339,36 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			returnMap[job.JobConfig.Name] = returnPair{innerRC: innerRC, executionErrors: executionErrors}
 		}
+		res <- innerRC
+	}()
+	select {
+	case rc = <-res:
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, true, "", false)
-
-		// Execute global afterAllJobs hooks (after metrics indexing)
+		// Execute global afterAllJobs hooks (after metrics indexing).
 		if len(globalConfig.Hooks) > 0 {
 			globalHookManager := NewHookManager(ctx, len(globalConfig.Hooks), embedCfg)
 			if err := globalHookManager.executeHooks(globalConfig.Hooks, config.HookAfterAllJobs); err != nil {
 				log.Errorf("Error executing global afterAllJobs hooks: %v", err)
 				errs = append(errs, err)
-				innerRC = 1
+				rc = 1
 			}
 		}
-
 		log.Infof("Finished execution with UUID: %s", uuid)
-		res <- innerRC
-	}()
-	select {
-	case rc = <-res:
 	// When benchmark times out
-	case <-time.After(configSpec.GlobalConfig.Timeout):
-		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
-		log.Error(err.Error())
+	case <-ctx.Done():
+		timeoutErr := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
+		log.Error(timeoutErr.Error())
+		rc = rcTimeout
+		timedOut = true
+		select {
+		case <-workDone:
+		case <-gcCtx.Done():
+			return rc, fmt.Errorf("%w; workload did not stop before cleanup deadline: %v", timeoutErr, gcCtx.Err())
+		}
+		errs = append(errs, timeoutErr)
 		if len(executedJobs) > 0 {
 			executedJobs[len(executedJobs)-1].End = time.Now().UTC()
 		}
-		errs = append(errs, err)
-		rc = rcTimeout
 		if measurementsInstance != nil {
 			if err := measurementsInstance.Stop(); err != nil {
 				errs = append(errs, err)
@@ -340,15 +377,19 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				measurementsInstance.Index(measurementsJobName, metricsScraper.IndexerList)
 			}
 		}
-		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
+		startGC()
+		msWg.Wait()
 	}
-	if globalConfig.GC {
+	if globalConfig.GC || timedOut {
 		log.Info("Waiting for garbage collection to finish")
 		gcWg.Wait()
 		if ctx.Err() == context.DeadlineExceeded && rc == 0 {
 			errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
 			rc = rcTimeout
 		}
+	}
+	if timedOut {
+		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, false, utilerrors.NewAggregate(errs).Error(), true)
 	}
 	return rc, utilerrors.NewAggregate(errs)
 }
