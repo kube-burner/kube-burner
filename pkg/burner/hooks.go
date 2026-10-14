@@ -57,7 +57,7 @@ func NewHookManager(ctx context.Context, hookCount int, embedCfg *fileutils.Embe
 }
 
 // executeHooks executes hooks based on the specified timing (when)
-func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobHook) error {
+func (hm *HookManager) executeHooks(hooks []config.Hook, when config.JobStage) error {
 	if len(hooks) == 0 {
 		return nil
 	}
