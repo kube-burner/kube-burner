@@ -37,7 +37,7 @@ type MeasurementsFactory struct {
 
 type Measurements struct {
 	MeasurementsMap map[string]Measurement
-	failedStarts    sync.Map // map[string]error
+	m               sync.Mutex // guards failedMeasurements slice in Start()
 }
 
 type MeasurementFactory interface {
@@ -52,6 +52,11 @@ type Measurement interface {
 	IsCompatible() bool
 	Index(string, map[string]indexers.Indexer)
 	GetMetrics() *sync.Map
+}
+
+// JobStageAware is implemented by measurements that react to job lifecycle stages.
+type JobStageAware interface {
+	OnJobStage(stage config.JobStage)
 }
 
 var measurementFactoryMap = map[string]NewMeasurementFactory{
@@ -147,15 +152,17 @@ func (msf *MeasurementsFactory) NewMeasurements(jobConfig *config.Job, kubeClien
 func (ms *Measurements) Start() {
 	var measurementWg sync.WaitGroup
 	var startResultWg sync.WaitGroup
+	var failedMeasurements []string
 	for name, measurement := range ms.MeasurementsMap {
-		ms.failedStarts.Delete(name)
 		measurementWg.Add(1)
 		startResultWg.Add(1)
 		go func(name string, measurement Measurement) {
 			defer startResultWg.Done()
 			if err := measurement.Start(&measurementWg); err != nil {
 				log.Errorf("Failed to start measurement [%s]: %v", name, err)
-				ms.failedStarts.Store(name, err)
+				ms.m.Lock()
+				failedMeasurements = append(failedMeasurements, name)
+				ms.m.Unlock()
 			}
 		}(name, measurement)
 	}
@@ -163,6 +170,22 @@ func (ms *Measurements) Start() {
 	// implementations, then wait for wrappers to record returned errors.
 	measurementWg.Wait()
 	startResultWg.Wait()
+	// Remove failed measurements from MeasurementsMap
+	for _, name := range failedMeasurements {
+		delete(ms.MeasurementsMap, name)
+	}
+}
+
+// NotifyJobStage notifies stage-aware measurements; blocks until they finish handling the stage.
+func (ms *Measurements) NotifyJobStage(stage config.JobStage) {
+	if ms == nil {
+		return
+	}
+	for _, measurement := range ms.MeasurementsMap {
+		if aware, ok := measurement.(JobStageAware); ok {
+			aware.OnJobStage(stage)
+		}
+	}
 }
 
 func (ms *Measurements) Collect() {
@@ -179,10 +202,6 @@ func (ms *Measurements) Collect() {
 func (ms *Measurements) Stop() error {
 	errs := []error{}
 	for name, measurement := range ms.MeasurementsMap {
-		if startErr, failed := ms.failedStarts.Load(name); failed {
-			log.Warnf("Skipping measurement [%s] because it failed to start: %v", name, startErr)
-			continue
-		}
 		log.Infof("Stopping measurement: %s", name)
 		errs = append(errs, measurement.Stop())
 	}

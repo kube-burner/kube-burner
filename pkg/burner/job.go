@@ -102,7 +102,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// Execute global beforeAllJobs hooks
 		if len(globalConfig.Hooks) > 0 {
 			globalHookManager := NewHookManager(ctx, len(globalConfig.Hooks), embedCfg)
-			if err := globalHookManager.executeHooks(globalConfig.Hooks, config.HookBeforeAllJobs); err != nil {
+			if err := globalHookManager.executeHooks(globalConfig.Hooks, config.BeforeAllJobs); err != nil {
 				log.Errorf("Error executing global beforeAllJobs hooks: %v", err)
 				errs = append(errs, err)
 				innerRC = 1
@@ -119,10 +119,10 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if jobExecutor.JobType == config.CreationJob && jobExecutor.Cleanup {
 				log.Infof("Cleaning up previous runs for job: %s", jobExecutor.Name)
 				// Before GC
-				jobExecutor.executeHooksForJobStage(config.HookBeforeGC, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.BeforeGC, &errs, &innerRC)
 				jobExecutor.gc(ctx, nil)
 				// After GC
-				jobExecutor.executeHooksForJobStage(config.HookAfterGC, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.AfterGC, &errs, &innerRC)
 
 			}
 		}
@@ -156,6 +156,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					measurementsInstance.Start()
 				}
 			}
+			jobExecutor.stageNotifier = measurementsInstance
 			log.Infof("Triggering job: %s", jobExecutor.Name)
 			if jobExecutor.JobType == config.CreationJob {
 				if config.IsChurnEnabled(jobExecutor.Job) {
@@ -167,7 +168,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					log.Infof("Churn delete delay: %v", jobExecutor.ChurnConfig.DeleteDelay)
 					log.Infof("Churn type: %v", jobExecutor.ChurnConfig.Mode)
 				}
-				jobExecutor.executeHooksForJobStage(config.HookBeforeJobExecution, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.BeforeJobExecution, &errs, &innerRC)
 
 				if jobCreateErrs, stepJobs := runCreateOrIncremental(ctx, jobExecutor, measurementsFactory, kubeClientProvider, embedCfg, measurementsJobName, metricsScraper, configSpec); jobCreateErrs != nil {
 					errs = append(errs, jobCreateErrs...)
@@ -178,7 +179,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					jobIdx = len(executedJobs)
 					executedJobs = append(executedJobs, jobExecutor.newScrapeJob(stepJobs[len(stepJobs)-1].End))
 				}
-				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.AfterJobExecution, &errs, &innerRC)
 
 				if ctx.Err() != nil {
 					return
@@ -205,18 +206,18 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 					}
 				}
 			} else {
-				jobExecutor.executeHooksForJobStage(config.HookBeforeJobExecution, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.BeforeJobExecution, &errs, &innerRC)
 
 				if jobErrs := jobExecutor.Run(ctx); len(jobErrs) > 0 {
 					errs = append(errs, jobErrs...)
 					innerRC = 1
 				}
-				jobExecutor.executeHooksForJobStage(config.HookAfterJobExecution, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.AfterJobExecution, &errs, &innerRC)
 				if ctx.Err() != nil {
 					return
 				}
 			}
-			jobExecutor.executeHooksForJobStage(config.HookBeforeCleanup, &errs, &innerRC)
+			jobExecutor.executeHooksForJobStage(config.BeforeCleanup, &errs, &innerRC)
 			jobEnd := time.Now().UTC()
 			if jobExecutor.MetricsClosing == config.AfterJob {
 				executedJobs[jobIdx].End = jobEnd
@@ -235,6 +236,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			if !jobExecutor.MetricsAggregate {
 				// We stop and index measurements per job (skip for incremental jobs handled per-step)
 				if measurementsInstance != nil {
+					jobExecutor.stageNotifier = nil
 					if err = measurementsInstance.Stop(); err != nil {
 						errs = append(errs, err)
 						log.Error(err.Error())
@@ -257,7 +259,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			errs = append(errs, watcherStopErrs...)
 			if jobExecutor.GC {
 				jobExecutor.gc(ctx, nil)
-				jobExecutor.executeHooksForJobStage(config.HookAfterCleanup, &errs, &innerRC)
+				jobExecutor.executeHooksForJobStage(config.AfterCleanup, &errs, &innerRC)
 			}
 			// Collect all background hook results once after all hook stages are complete for this job.
 			errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
@@ -278,7 +280,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				// If gcMetrics is enabled, garbage collection must be blocker
 				gcWg.Wait()
 				for _, jobExecutor := range jobExecutors {
-					jobExecutor.executeHooksForJobStage(config.HookAfterCleanup, &errs, &innerRC)
+					jobExecutor.executeHooksForJobStage(config.AfterCleanup, &errs, &innerRC)
 					// Collect background hook results from the global GC metrics phase.
 					errs, innerRC = jobExecutor.CollectAndLogBackgroundHookResults(errs, innerRC)
 				}
@@ -311,7 +313,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		// Execute global afterAllJobs hooks (after metrics indexing)
 		if len(globalConfig.Hooks) > 0 {
 			globalHookManager := NewHookManager(ctx, len(globalConfig.Hooks), embedCfg)
-			if err := globalHookManager.executeHooks(globalConfig.Hooks, config.HookAfterAllJobs); err != nil {
+			if err := globalHookManager.executeHooks(globalConfig.Hooks, config.AfterAllJobs); err != nil {
 				log.Errorf("Error executing global afterAllJobs hooks: %v", err)
 				errs = append(errs, err)
 				innerRC = 1
@@ -353,12 +355,18 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	return rc, utilerrors.NewAggregate(errs)
 }
 
-func (ex *JobExecutor) executeHooksForJobStage(stage config.JobHook, errs *[]error, innerRC *int) {
+func (ex *JobExecutor) executeHooksForJobStage(stage config.JobStage, errs *[]error, innerRC *int) {
 	if err := ex.hookManager.executeHooks(ex.Hooks, stage); err != nil {
 		log.Errorf("Error executing hooks for %s: %v", stage, err)
 		*errs = append(*errs, err)
-		*innerRC = 1
+		if innerRC != nil {
+			*innerRC = 1
+		}
 		return
+	}
+	// Skip onEachIteration — too frequent for stage-triggered measurements such as pprof
+	if ex.stageNotifier != nil && stage != config.OnEachIteration {
+		ex.stageNotifier.NotifyJobStage(stage)
 	}
 }
 

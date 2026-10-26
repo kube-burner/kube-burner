@@ -22,22 +22,23 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// JobHook type of hook command
-type JobHook string
+// JobStage type of hook command
+type JobStage string
 
 const (
-	HookBeforeJobExecution JobHook = "beforeJobExecution"
-	HookAfterJobExecution  JobHook = "afterJobExecution"
-	HookBeforeChurn        JobHook = "beforeChurn"
-	HookAfterChurn         JobHook = "afterChurn"
-	HookBeforeCleanup      JobHook = "beforeCleanup"
-	HookAfterCleanup       JobHook = "afterCleanup"
-	HookBeforeGC           JobHook = "beforeGC"
-	HookAfterGC            JobHook = "afterGC"
-	HookOnEachIteration    JobHook = "onEachIteration"
+	BeforeJobExecution JobStage = "beforeJobExecution"
+	AfterJobExecution  JobStage = "afterJobExecution"
+	BeforeChurn        JobStage = "beforeChurn"
+	AfterChurn         JobStage = "afterChurn"
+	BeforeCleanup      JobStage = "beforeCleanup"
+	AfterCleanup       JobStage = "afterCleanup"
+	BeforeGC           JobStage = "beforeGC"
+	AfterGC            JobStage = "afterGC"
+	OnEachIteration    JobStage = "onEachIteration"
+	MidPoint           JobStage = "midPoint"
 	// Global hooks - not tied to any specific job
-	HookBeforeAllJobs JobHook = "beforeAllJobs"
-	HookAfterAllJobs  JobHook = "afterAllJobs"
+	BeforeAllJobs JobStage = "beforeAllJobs"
+	AfterAllJobs  JobStage = "afterAllJobs"
 )
 
 // JobType type of job
@@ -269,7 +270,7 @@ type Hook struct {
 	// CMD command to execute
 	Cmd []string `yaml:"cmd" json:"cmd,omitempty"`
 	// When specifies when to execute the command
-	When JobHook `yaml:"when" json:"when,omitempty"`
+	When JobStage `yaml:"when" json:"when,omitempty"`
 	// Background indicates whether to run the command in background
 	Background bool `yaml:"background" json:"background,omitempty"`
 	// OutputFile specifies the file to write the command output to

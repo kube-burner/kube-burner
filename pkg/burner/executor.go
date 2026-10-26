@@ -17,11 +17,13 @@ package burner
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"maps"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
+	"github.com/kube-burner/kube-burner/v2/pkg/measurements"
 	"github.com/kube-burner/kube-burner/v2/pkg/prometheus"
 	"github.com/kube-burner/kube-burner/v2/pkg/util"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -39,6 +41,14 @@ import (
 // Executor contains the information required to execute a job
 type ItemHandler func(ctx context.Context, ex *JobExecutor, obj *object, originalItem unstructured.Unstructured, iteration int, objectTimeUTC int64, wg *sync.WaitGroup)
 type ObjectFinalizer func(ctx context.Context, ex *JobExecutor, obj *object)
+
+// midPointTracker holds MidPoint stage state. Kept behind a pointer so JobExecutor
+// remains safe to copy (atomic.Int64 and sync.Once must not be copied).
+type midPointTracker struct {
+	totalReplicas   int
+	createdReplicas atomic.Int64
+	once            sync.Once
+}
 
 type JobExecutor struct {
 	config.Job
@@ -61,6 +71,8 @@ type JobExecutor struct {
 	deletionStrategy  string
 	nsChurning        bool
 	hookManager       *HookManager
+	stageNotifier     *measurements.Measurements
+	midPoint          *midPointTracker
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {

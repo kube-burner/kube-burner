@@ -432,16 +432,20 @@ func jobIsDuped() error {
 }
 
 func HookBeforeWorkload() error {
-	validWhen := map[JobHook]bool{
-		HookBeforeJobExecution: true,
-		HookAfterJobExecution:  true,
-		HookBeforeChurn:        true,
-		HookAfterChurn:         true,
-		HookBeforeCleanup:      true,
-		HookAfterCleanup:       true,
-		HookBeforeGC:           true,
-		HookAfterGC:            true,
-		HookOnEachIteration:    true,
+	validWhen := map[JobStage]bool{
+		BeforeJobExecution: true,
+		AfterJobExecution:  true,
+		BeforeChurn:        true,
+		AfterChurn:         true,
+		BeforeCleanup:      true,
+		AfterCleanup:       true,
+		BeforeGC:           true,
+		AfterGC:            true,
+		OnEachIteration:    true,
+	}
+	globalValidWhen := map[JobStage]bool{
+		BeforeAllJobs: true,
+		AfterAllJobs:  true,
 	}
 
 	for _, job := range configSpec.Jobs {
@@ -454,7 +458,14 @@ func HookBeforeWorkload() error {
 			}
 		}
 	}
-
+	for _, hook := range configSpec.GlobalConfig.Hooks {
+		if !globalValidWhen[hook.When] {
+			return fmt.Errorf("unsupported when value in global hook: %v, (supported: %v)", hook.When, maps.Keys(globalValidWhen))
+		}
+		if len(hook.Cmd) == 0 {
+			return fmt.Errorf("global hook %s has empty command", hook.When)
+		}
+	}
 	return nil
 }
 
