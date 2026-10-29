@@ -372,7 +372,7 @@ func (p *KubeClientProvider) ClientSet(QPS float32, burst int) (kubernetes.Inter
 	return kubernetes.NewForConfigOrDie(&restConfig), &restConfig
 }
 
-// FetchConfigMap Fetchs the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
+// FetchConfigMap Fetches the specified configmap and looks for config.yml, metrics.yml and alerts.yml files
 func FetchConfigMap(configMap, namespace string) (string, string, error) {
 	log.Infof("Fetching configmap %s", configMap)
 	var kubeconfig, metricProfile, alertProfile string

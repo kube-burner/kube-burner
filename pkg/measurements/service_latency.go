@@ -123,7 +123,7 @@ func (s *serviceLatency) handleCreateSvc(obj any) {
 		}
 		// This conditionals prevents a nil pointer dereference panic that can happen when the
 		// measurement is stopped by end of job J, and then the benchmark continues with job J+1,
-		// so this goroutine can still be runnning in the background as it performs polling
+		// so this goroutine can still be running in the background as it performs polling
 		if s.epsLister == nil {
 			return
 		}

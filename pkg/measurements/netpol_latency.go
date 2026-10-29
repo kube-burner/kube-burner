@@ -443,7 +443,7 @@ func (n *netpolLatency) processResults() {
 					npResults[netpolName] = []float64{}
 				}
 				if connLatency < 0 {
-					log.Warnf("🚨 Network policy %s has negitive latency %v for connection test from %v to %v", netpolName, connLatency, pod, res.Address)
+					log.Warnf("🚨 Network policy %s has negative latency %v for connection test from %v to %v", netpolName, connLatency, pod, res.Address)
 				}
 				npResults[netpolName] = append(npResults[netpolName], connLatency)
 			}

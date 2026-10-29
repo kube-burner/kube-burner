@@ -44,7 +44,7 @@ CONTAINER_HOST=unix://run/podman/podman.sock make test-k8s
 ### Running test with an External Cluster
 
 By default, the tests start a local cluster using [kind](https://kind.sigs.k8s.io/).
-Instead, you can use an already existsing cluster.
+Instead, you can use an already existing cluster.
 
 #### Prerequisites
 
@@ -69,10 +69,10 @@ TEST_FILTER="datavolume" make test-k8s
 
 ### Running local Kind to use as an External Cluster
 
-Starting Kind seperately from the test will reduce test setup and teardown time during development
+Starting Kind separately from the test will reduce test setup and teardown time during development
 
 #### Prerequisites
-Follow the instuctions in [Running test with Podman](#running-test-with-podman)
+Follow the instructions in [Running test with Podman](#running-test-with-podman)
 
 #### Create Kind
 
@@ -86,5 +86,5 @@ hack/start_kind.sh
 Customize Kind and Kubernetes versions by setting `KIND_VERSION` and/or `K8S_VERSION`
 
 #### Run the tests
-Follow the instuctions in [Running test with an External Cluster](#running-test-with-an-external-cluster)
+Follow the instructions in [Running test with an External Cluster](#running-test-with-an-external-cluster)
 using the `kubeconfig` file created by the Kind installation
