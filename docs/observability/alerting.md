@@ -12,7 +12,7 @@ Alerting is configured through a configuration file pointed by the flag `--alert
   severity: error
 
 - expr: avg_over_time(histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket[5m]))[5m:]) > 0.1
-  description: 5 minutes avg. etcd netowrk peer round trip on {{$labels.pod}} higher than 100ms {{$value}}
+  description: 5 minutes avg. etcd network peer round trip on {{$labels.pod}} higher than 100ms {{$value}}
   severity: error
 
 - expr: increase(etcd_server_leader_changes_seen_total[2m]) > 0

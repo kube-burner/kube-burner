@@ -157,7 +157,7 @@ type Object struct {
 	Wait bool `yaml:"wait" json:"wait"`
 	// WaitOptions define custom behaviors when waiting for objects creation
 	WaitOptions WaitOptions `yaml:"waitOptions" json:"waitOptions"`
-	// Run Once to create the object only once incase of multiple iterative jobs
+	// Run Once to create the object only once in case of multiple iterative jobs
 	RunOnce bool `yaml:"runOnce" json:"runOnce,omitempty"`
 	// KubeVirt Operation
 	KubeVirtOp KubeVirtOpType `yaml:"kubeVirtOp" json:"kubeVirtOp,omitempty"`
