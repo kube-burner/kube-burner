@@ -65,7 +65,8 @@ func ProcessMetricsScraperConfig(scraperConfig ScraperConfig) Scraper {
 	if scraperConfig.MetricsEndpoint != "" {
 		scraperConfig.ConfigSpec.MetricsEndpoints = DecodeMetricsEndpoint(scraperConfig.MetricsEndpoint)
 	}
-	for pos, metricsEndpoint := range scraperConfig.ConfigSpec.MetricsEndpoints {
+	for pos := range scraperConfig.ConfigSpec.MetricsEndpoints {
+		metricsEndpoint := &scraperConfig.ConfigSpec.MetricsEndpoints[pos]
 		indexer = nil
 		if metricsEndpoint.Type != "" {
 			if metricsEndpoint.Alias == "" {
