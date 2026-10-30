@@ -43,6 +43,7 @@ import (
 const (
 	DefaultDeletionStrategy = "default"
 	GVRDeletionStrategy     = "gvr"
+	DefaultGCGracePeriod    = 10 * time.Minute
 )
 
 var configSpec = Spec{
@@ -53,6 +54,7 @@ var configSpec = Spec{
 		Measurements:      []mtypes.Measurement{},
 		WaitWhenFinished:  false,
 		Timeout:           4 * time.Hour,
+		GCGracePeriod:     DefaultGCGracePeriod,
 		FunctionTemplates: []string{},
 		DeletionStrategy:  DefaultDeletionStrategy,
 	},
@@ -298,6 +300,9 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	}
 	if err := validateGC(); err != nil {
 		return configSpec, err
+	}
+	if configSpec.GlobalConfig.GCGracePeriod < 0 {
+		return configSpec, fmt.Errorf("global.gcGracePeriod must not be negative")
 	}
 	if err := validateRepeatEveryNIterations(); err != nil {
 		return configSpec, err
