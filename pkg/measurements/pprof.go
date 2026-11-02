@@ -237,6 +237,10 @@ func (p *pprof) getPProf(suffix string) {
 				exec, err := remotecommand.NewSPDYExecutor(p.RestConfig, "POST", pprofReq.URL())
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
+					// Close before removing: Windows refuses to delete an open file
+					f.Close()
+					os.Remove(f.Name())
+					return
 				}
 				err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 					Stdin:  nil,
