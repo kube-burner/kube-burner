@@ -159,7 +159,7 @@ func (so *scaledObjectLatency) handleUpdateScaledObject(obj any) {
 	// Use typed KEDA Conditions to detect Active=True
 	activeCondition := soObj.Status.Conditions.GetActiveCondition()
 	if activeCondition.Status == metav1.ConditionTrue {
-		m.scaledObjectActive = time.Now().UTC()
+		m.scaledObjectActive = activeCondition.LastTransitionTime.Time
 		// Also capture the HPA name from the ScaledObject status if available
 		if soObj.Status.HpaName != "" && m.HPAName == "" {
 			m.HPAName = soObj.Status.HpaName

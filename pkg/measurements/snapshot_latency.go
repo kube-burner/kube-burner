@@ -132,7 +132,7 @@ func (vsl *volumeSnapshotLatency) handleUpdateVolumeSnapshot(obj any) {
 		if vsm.vsReady.IsZero() {
 			if volumeSnapshot.Status != nil && ptr.Deref(volumeSnapshot.Status.ReadyToUse, false) {
 				log.Debugf("Updated ready time for volumeSnapshot [%s]", volumeSnapshot.Name)
-				vsm.vsReady = time.Now().UTC()
+				vsm.vsReady = volumeSnapshot.Status.CreationTime.Time
 			}
 		}
 		vsl.Metrics.Store(string(volumeSnapshot.UID), vsm)
