@@ -23,8 +23,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -34,6 +37,72 @@ import (
 type hookResult struct {
 	err      error
 	duration time.Duration
+	hook     config.Hook
+	stderr   string
+}
+
+// hookFailureOutputLimit matches the harness subprocess stderr capture window (32 KiB).
+const hookFailureOutputLimit = 32 << 10
+
+var ansiEscapeSequence = regexp.MustCompile(`\x1b\[[0-9;]*[ -/]*[@-~]`)
+
+// hookStderrSink forwards hook stderr to the process stderr while buffering for failure logs.
+func hookStderrSink(buf *bytes.Buffer) io.Writer {
+	return io.MultiWriter(os.Stderr, buf)
+}
+
+// sanitizeHookLogText makes hook output safe to print on stderr for log collectors:
+// valid UTF-8, no terminal escape sequences, no C0 control bytes (except \n, \r, \t).
+func sanitizeHookLogText(s string) string {
+	if s == "" {
+		return s
+	}
+	s = strings.ToValidUTF8(s, "\uFFFD")
+	s = ansiEscapeSequence.ReplaceAllString(s, "")
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch r {
+		case '\n', '\r', '\t':
+			b.WriteRune(r)
+		default:
+			if r < utf8.RuneSelf && (r < ' ' || r == 0x7f) {
+				b.WriteByte(' ')
+				continue
+			}
+			b.WriteRune(r)
+		}
+	}
+	s = strings.TrimSpace(b.String())
+	if len(s) > hookFailureOutputLimit {
+		s = s[:hookFailureOutputLimit] + "\n... (hook output truncated)"
+	}
+	return s
+}
+
+func emitHookFailure(hook config.Hook, stdout, stderr, outputPath string, runErr error) {
+	if runErr == nil {
+		return
+	}
+	label := fmt.Sprintf("kube-burner hook failure when=%s cmd=%v", hook.When, hook.Cmd)
+	stderr = sanitizeHookLogText(stderr)
+	stdout = sanitizeHookLogText(stdout)
+	if stderr != "" {
+		fmt.Fprintf(os.Stderr, "%s:\n%s\n", label, stderr)
+	}
+	if stdout != "" {
+		fmt.Fprintf(os.Stderr, "%s stdout:\n%s\n", label, stdout)
+	}
+	if outputPath != "" {
+		if payload, err := os.ReadFile(outputPath); err == nil {
+			if text := sanitizeHookLogText(string(payload)); text != "" {
+				fmt.Fprintf(os.Stderr, "%s output-file %s:\n%s\n", label, outputPath, text)
+			}
+		}
+	}
+	if stderr == "" && stdout == "" {
+		fmt.Fprintf(os.Stderr, "%s: %v\n", label, runErr)
+	}
 }
 
 type HookManager struct {
@@ -157,7 +226,7 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 		cmd.Stderr = outputFile
 	} else {
 		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
+		cmd.Stderr = hookStderrSink(&stderr)
 	}
 
 	// Set process group for proper cleanup on Unix systems
@@ -198,9 +267,14 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 	select {
 	case err := <-errChan:
 		duration := time.Since(startTime)
+		if err != nil {
+			emitHookFailure(hook, stdout.String(), stderr.String(), hook.OutputFile, err)
+		}
 		result := hookResult{
 			err:      err,
 			duration: duration,
+			hook:     hook,
+			stderr:   stderr.String(),
 		}
 
 		// Send result to channel (non-blocking)
@@ -210,9 +284,7 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 		default:
 			if err != nil {
 				log.Errorf("Background hook at '%s' failed after %v: %v", hook.When, duration, err)
-				if stderr.String() != "" {
-					log.Errorf("Hook stderr: %s", stderr.String())
-				}
+				emitHookFailure(hook, stdout.String(), stderr.String(), hook.OutputFile, err)
 			} else {
 				log.Infof("Background hook at '%s' completed successfully in %v", hook.When, duration)
 				if stdout.String() != "" {
@@ -249,7 +321,7 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 		cmd.Stderr = outputFile
 	} else {
 		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
+		cmd.Stderr = hookStderrSink(&stderr)
 	}
 
 	if scriptReader != nil {
@@ -270,6 +342,7 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 	}
 
 	if err != nil {
+		emitHookFailure(hook, stdout.String(), stderr.String(), hook.OutputFile, err)
 		// Check if the command was canceled via the context
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(hm.ctx.Err(), context.Canceled) {
 			return fmt.Errorf("hook canceled at %q after %v: %w", hook.When, duration, err)

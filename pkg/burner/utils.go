@@ -363,6 +363,7 @@ func (ex *JobExecutor) CollectAndLogBackgroundHookResults(errs []error, innerRC 
 		for _, result := range backgroundResults {
 			if result.err != nil {
 				log.Errorf("Background hook failed: %v (duration: %v)", result.err, result.duration)
+				emitHookFailure(result.hook, "", result.stderr, result.hook.OutputFile, result.err)
 				errs = append(errs, result.err)
 				innerRC = 1
 			} else {
