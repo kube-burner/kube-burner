@@ -154,7 +154,7 @@ func (ex *JobExecutor) resolveObjectMapping(obj *object) {
 }
 
 // Verify verifies the number of created objects
-func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool {
+func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int, iterationStart int) bool {
 	var objList *unstructured.UnstructuredList
 	var replicas int
 	success := true
@@ -162,6 +162,11 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 	for objectIndex, obj := range ex.objects {
 		if obj.Group.GC {
 			log.Debugf("Skipping verification for %s (gc enabled, objects already deleted)", obj.gvr.Resource)
+			continue
+		}
+		// Skip runOnce objects in incremental append mode after the first step
+		if obj.RunOnce && iterationStart > 0 {
+			log.Debugf("Skipping verification for %s (runOnce object created in earlier incremental step)", obj.gvr.Resource)
 			continue
 		}
 		selector := labels.Set{
@@ -208,7 +213,19 @@ func (ex *JobExecutor) Verify(ctx context.Context, expectedIterations *int) bool
 			effectiveIterations := iterations
 			// Calculate effective iterations accounting for RepeatEveryNIterations.
 			if obj.RepeatEveryNIterations > 1 {
-				effectiveIterations = (iterations + obj.RepeatEveryNIterations - 1) / obj.RepeatEveryNIterations
+				// Count multiples of N in [iterationStart, iterationStart + iterations)
+				iterationEnd := iterationStart + iterations
+				N := obj.RepeatEveryNIterations
+
+				// First multiple >= iterationStart
+				firstMultiple := ((iterationStart + N - 1) / N) * N
+				if firstMultiple >= iterationEnd {
+					effectiveIterations = 0
+				} else {
+					// Last multiple < iterationEnd
+					lastMultiple := ((iterationEnd - 1) / N) * N
+					effectiveIterations = (lastMultiple-firstMultiple)/N + 1
+				}
 			}
 			objectsExpected = obj.Replicas * effectiveIterations
 		}

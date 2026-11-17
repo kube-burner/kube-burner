@@ -177,6 +177,7 @@ Examples of valid configuration files can be found in the [examples folder](http
 | `totalIterations` | Total number of iterations to reach. If omitted, no increase beyond `startIterations` is performed. | Integer | same as `startIterations` |
 | `stepDelay` | Delay between incremental steps (Go duration, e.g., `30s`). | Duration | `0s` |
 | `pattern.type` | Load pattern: `linear` or `exponential`. | String | `linear` |
+| `pattern.mode` | Step resource strategy: `recreate` or `append`. See [recreate vs append mode](#recreate-vs-append-mode). | String | `recreate` |
 | `pattern.linear.minSteps` | Minimum number of steps for linear pattern. | Integer | `0` |
 | `pattern.linear.stepSize` | Fixed step size (iterations) for linear pattern. When set, steps will increment by this value. | Integer | `1` |
 | `pattern.exponential.base` | Base of the exponential increase. | Float | `2.0` |
@@ -212,6 +213,35 @@ Simple examples:
   - Step 5 runs 80 (×2).
   - Step 6 would be 160, but it is capped at the configured target, so it runs 100.
   - Progression: `5 → 10 → 20 → 40 → 80 → 100`.
+
+#### Recreate vs append mode
+
+`pattern.mode` controls what happens to previously created objects when the runner moves to the next step:
+
+- `recreate` (default): every step deletes all objects created by the job (garbage collection runs after each step) and recreates the full cumulative total from `0` up to the step's target. This keeps each step self-contained and reflects behavior prior to the introduction of `pattern.mode`.
+- `append`: every step keeps the objects created by previous steps and only creates the new delta (from the previous step's target up to the new one). No garbage collection runs between steps, so resources accumulate on the cluster until the job's normal cleanup (`cleanup`/`gc` settings) runs at the end of the whole benchmark.
+
+In both modes each step still generates its own unique run ID, used to scope that step's measurements, Prometheus scraping window, and object-count verification to just the objects created during that step. In `recreate` mode this covers the full cumulative total (everything was just recreated); in `append` mode it covers only the new delta (earlier objects still carry earlier steps' run IDs and are intentionally excluded from that step's verification/measurement).
+
+Append mode example (`startIterations=10`, `totalIterations=50`, `pattern.linear.stepSize=10`, `pattern.mode=append`):
+
+- Step 1 creates iterations `0-10`.
+- Step 2 creates iterations `10-20`, leaving the first 10 in place.
+- Step 3 creates iterations `20-30`, leaving the first 20 in place.
+- Step 4 creates iterations `30-40`, leaving the first 30 in place.
+- Step 5 creates iterations `40-50`, reaching the target with all 50 iterations' objects present on the cluster.
+
+```yaml
+incrementalLoad:
+  startIterations: 10
+  totalIterations: 50
+  stepDelay: 30s
+  pattern:
+    type: linear
+    mode: append
+    linear:
+      stepSize: 10
+```
 
 ### Watchers
 

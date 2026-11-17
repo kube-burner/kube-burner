@@ -155,6 +155,27 @@ func (e *exponentialCalculator) Next(current int) (start, end int, done bool) {
 	return current, candidate, false
 }
 
+// incrementalMode returns the effective LoadPatternMode for this job's incremental load,
+// defaulting empty/unset values to RecreateLoadMode so existing configs are unaffected.
+func (ex *JobExecutor) incrementalMode() config.LoadPatternMode {
+	if ex.IncrementalLoad.Pattern.Mode == config.AppendLoadMode {
+		return config.AppendLoadMode
+	}
+	return config.RecreateLoadMode
+}
+
+// incrementalStepIterationStart returns the iteration index that a step's ex.RunCreateJob
+// call should start from, given the step's calculator-provided start/end window:
+//   - recreate mode: always 0, so the full cumulative total is (re)created under the step's new run-id.
+//   - append mode: the calculator's start (i.e. the previous step's end), so only the new delta is
+//     created and objects from earlier steps (under their own run-ids) are left untouched.
+func incrementalStepIterationStart(mode config.LoadPatternMode, calculatorStart int) int {
+	if mode == config.AppendLoadMode {
+		return calculatorStart
+	}
+	return 0
+}
+
 // RunIncrementalCreateJob executes incremental steps using the provided calculator.
 func (ex *JobExecutor) RunIncrementalCreateJob(
 	ctx context.Context,
@@ -169,15 +190,19 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 
 	current := 0
 	stepDelay := ex.IncrementalLoad.StepDelay
+	mode := ex.incrementalMode()
 	var allErrs []error
 	var stepJobs []prometheus.Job
+	stepNumber := 0
 
 	originalUUID := ex.uuid
 	originalRunID := ex.runid
 	originalIterations := ex.JobIterations
 
+	log.Infof("Running incremental load in %q mode", mode)
+
 	for {
-		_, end, done := calculator.Next(current)
+		start, end, done := calculator.Next(current)
 		if done {
 			log.Infof("Incremental creation completed")
 			// Restore original UUID and run_id
@@ -188,7 +213,9 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 			return allErrs, stepJobs
 		}
 
-		log.Infof("Running incremental cumulative step: total iterations = %d", end)
+		stepNumber++
+		iterationStart := incrementalStepIterationStart(mode, start)
+		log.Infof("Running incremental step %d: creating iterations [%d, %d)", stepNumber, iterationStart, end)
 
 		// Generate unique step-specific run_id for measurements and incremental load marker
 		stepRunID := uuid.New().String()
@@ -213,8 +240,7 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 
 		stepStart := time.Now().UTC()
 
-		// For cumulative behavior, always create from 0 to end (so total becomes end)
-		if errs := ex.RunCreateJob(ctx, 0, end); len(errs) > 0 {
+		if errs := ex.RunCreateJob(ctx, iterationStart, end); len(errs) > 0 {
 			allErrs = append(allErrs, errs...)
 			if err := msInstance.Stop(); err != nil {
 				allErrs = append(allErrs, err)
@@ -222,13 +248,18 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 			return allErrs, stepJobs
 		}
 
-		if ex.VerifyObjects && !ex.Verify(ctx, &end) {
-			err := errors.New("object verification failed at total iterations: " + fmt.Sprint(end))
-			if ex.ErrorOnVerify {
-				allErrs = append(allErrs, err)
+		if ex.VerifyObjects {
+			// In recreate mode iterationStart=0, so this is the full cumulative total (end).
+			// In append mode iterationStart>0, so this is just the new delta (end - iterationStart).
+			expectedIterations := end - iterationStart
+			if !ex.Verify(ctx, &expectedIterations, iterationStart) {
+				err := errors.New("object verification failed at total iterations: " + fmt.Sprint(end))
+				if ex.ErrorOnVerify {
+					allErrs = append(allErrs, err)
+				}
+				log.Error(err.Error())
+				return allErrs, stepJobs
 			}
-			log.Error(err.Error())
-			return allErrs, stepJobs
 		}
 
 		// Health check
@@ -275,14 +306,18 @@ func (ex *JobExecutor) RunIncrementalCreateJob(
 		workJob := ex.newScrapeJob(stepStart, WithEnd(stepEnd), WithIncrementalUUID(stepRunID))
 		scrapeAndAppendStepJob(ex, &stepJobs, workJob, stepMetadata, metricsScraper, end)
 
-		log.Infof("Running garbage collection for job %s (uuid=%s) after incremental step", ex.Name, ex.uuid)
-		gcStart := time.Now().UTC()
-		ex.gc(ctx, nil)
-		gcEnd := time.Now().UTC()
+		if mode == config.AppendLoadMode {
+			log.Debugf("Append mode: skipping inter-step garbage collection for job %s", ex.Name)
+		} else {
+			log.Infof("Running garbage collection for job %s (uuid=%s) after incremental step", ex.Name, ex.uuid)
+			gcStart := time.Now().UTC()
+			ex.gc(ctx, nil)
+			gcEnd := time.Now().UTC()
 
-		if configSpec.GlobalConfig.GCMetrics {
-			gcJob := ex.newScrapeJob(gcStart, WithEnd(gcEnd), WithIncrementalUUID(stepRunID), WithGCJob())
-			scrapeAndAppendStepJob(ex, &stepJobs, gcJob, stepMetadata, metricsScraper, end)
+			if configSpec.GlobalConfig.GCMetrics {
+				gcJob := ex.newScrapeJob(gcStart, WithEnd(gcEnd), WithIncrementalUUID(stepRunID), WithGCJob())
+				scrapeAndAppendStepJob(ex, &stepJobs, gcJob, stepMetadata, metricsScraper, end)
+			}
 		}
 
 		if stepDelay > 0 {

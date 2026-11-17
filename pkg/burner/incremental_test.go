@@ -222,6 +222,153 @@ func TestRunIncrementalCreateJobPreservesPerStepScrapeState(t *testing.T) {
 	}
 }
 
+// TestIncrementalModeDefault verifies an unset Pattern.Mode resolves to RecreateLoadMode.
+func TestIncrementalModeDefault(t *testing.T) {
+	ex := newTestExecutor(randomJobName(), randomUUID())
+	if got := ex.incrementalMode(); got != config.RecreateLoadMode {
+		t.Errorf("expected default mode %q, got %q", config.RecreateLoadMode, got)
+	}
+}
+
+// TestIncrementalModeExplicitRecreate verifies an explicit "recreate" mode resolves correctly.
+func TestIncrementalModeExplicitRecreate(t *testing.T) {
+	ex := newTestExecutor(randomJobName(), randomUUID())
+	ex.IncrementalLoad.Pattern.Mode = config.RecreateLoadMode
+	if got := ex.incrementalMode(); got != config.RecreateLoadMode {
+		t.Errorf("expected mode %q, got %q", config.RecreateLoadMode, got)
+	}
+}
+
+// TestIncrementalModeAppend verifies an explicit "append" mode resolves correctly.
+func TestIncrementalModeAppend(t *testing.T) {
+	ex := newTestExecutor(randomJobName(), randomUUID())
+	ex.IncrementalLoad.Pattern.Mode = config.AppendLoadMode
+	if got := ex.incrementalMode(); got != config.AppendLoadMode {
+		t.Errorf("expected mode %q, got %q", config.AppendLoadMode, got)
+	}
+}
+
+// TestIncrementalStepIterationStart covers the RunCreateJob range decision per mode.
+func TestIncrementalStepIterationStart(t *testing.T) {
+	tests := []struct {
+		name            string
+		mode            config.LoadPatternMode
+		calculatorStart int
+		want            int
+	}{
+		{"recreate always starts at zero", config.RecreateLoadMode, 0, 0},
+		{"recreate ignores non-zero calculator start", config.RecreateLoadMode, 20, 0},
+		{"append first step starts at zero", config.AppendLoadMode, 0, 0},
+		{"append later step starts at calculator start", config.AppendLoadMode, 10, 10},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := incrementalStepIterationStart(tt.mode, tt.calculatorStart); got != tt.want {
+				t.Errorf("incrementalStepIterationStart(%v, %d) = %d, want %d", tt.mode, tt.calculatorStart, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestRunIncrementalCreateJobAppendModeSkipsGC verifies that append mode never emits a
+// garbage-collection scrape job between steps, even when GCMetrics is enabled, while an
+// equivalent recreate-mode run does emit one per step.
+func TestRunIncrementalCreateJobAppendModeSkipsGC(t *testing.T) {
+	runWithMode := func(t *testing.T, mode config.LoadPatternMode) []prometheus.Job {
+		t.Helper()
+		ex := newTestExecutor(randomJobName(), randomUUID())
+		ex.IncrementalLoad = &config.IncrementalLoad{
+			StartIterations: 1,
+			TotalIterations: 2,
+			Pattern: config.LoadPattern{
+				Type:   config.LinearPattern,
+				Mode:   mode,
+				Linear: &config.LinearLoadConfig{StepSize: 1},
+			},
+		}
+		provider := newTestKubeClientProvider(t)
+		ex.clientSet, _ = provider.DefaultClientSet()
+		ex.createdNamespaces = make(map[string]bool)
+
+		configSpec := config.Spec{GlobalConfig: config.GlobalConfig{GCMetrics: true}}
+		scraper := metrics.Scraper{}
+		_, jobs := ex.RunIncrementalCreateJob(context.Background(), NewIterationCalculator(ex), nil, provider, nil, ex.Name, scraper, configSpec)
+		return jobs
+	}
+
+	t.Run("recreate mode emits a gc job per step", func(t *testing.T) {
+		jobs := runWithMode(t, config.RecreateLoadMode)
+		var gcJobs int
+		for _, j := range jobs {
+			if j.JobConfig.Name == garbageCollectionJob {
+				gcJobs++
+			}
+		}
+		if gcJobs == 0 {
+			t.Errorf("expected at least one gc job in recreate mode, got 0 (total jobs=%d)", len(jobs))
+		}
+	})
+
+	t.Run("append mode never emits a gc job", func(t *testing.T) {
+		jobs := runWithMode(t, config.AppendLoadMode)
+		for _, j := range jobs {
+			if j.JobConfig.Name == garbageCollectionJob {
+				t.Errorf("expected no gc jobs in append mode, found one: %+v", j)
+			}
+		}
+		if len(jobs) == 0 {
+			t.Fatalf("expected at least one work job, got 0")
+		}
+	})
+}
+
+// TestRunIncrementalCreateJobUniqueRunIDPerStep verifies each step gets its own unique
+// run-id/incrementalLoadUUID in both modes.
+func TestRunIncrementalCreateJobUniqueRunIDPerStep(t *testing.T) {
+	for _, mode := range []config.LoadPatternMode{config.RecreateLoadMode, config.AppendLoadMode} {
+		t.Run(string(mode), func(t *testing.T) {
+			ex := newTestExecutor(randomJobName(), randomUUID())
+			originalRunID := ex.runid
+			ex.IncrementalLoad = &config.IncrementalLoad{
+				StartIterations: 1,
+				TotalIterations: 2,
+				Pattern: config.LoadPattern{
+					Type:   config.LinearPattern,
+					Mode:   mode,
+					Linear: &config.LinearLoadConfig{StepSize: 1},
+				},
+			}
+			provider := newTestKubeClientProvider(t)
+			ex.clientSet, _ = provider.DefaultClientSet()
+			ex.createdNamespaces = make(map[string]bool)
+
+			configSpec := config.Spec{}
+			scraper := metrics.Scraper{}
+			_, jobs := ex.RunIncrementalCreateJob(context.Background(), NewIterationCalculator(ex), nil, provider, nil, ex.Name, scraper, configSpec)
+
+			seen := map[string]bool{}
+			for _, j := range jobs {
+				if j.IncrementalLoadUUID == "" {
+					t.Errorf("expected non-empty IncrementalLoadUUID for job %+v", j)
+					continue
+				}
+				if seen[j.IncrementalLoadUUID] {
+					t.Errorf("duplicate IncrementalLoadUUID %q across steps", j.IncrementalLoadUUID)
+				}
+				seen[j.IncrementalLoadUUID] = true
+			}
+			if len(seen) != 2 {
+				t.Errorf("expected 2 unique step run-ids, got %d", len(seen))
+			}
+
+			// run-id/uuid are restored after completion regardless of mode
+			if ex.runid != originalRunID {
+				t.Errorf("expected ex.runid restored to %q after completion, got %q", originalRunID, ex.runid)
+			}
+		})
+	}
+}
+
 func newTestKubeClientProvider(t *testing.T) *config.KubeClientProvider {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
