@@ -2,7 +2,7 @@
 
 All of the magic that `kube-burner` does is described in its configuration file. As previously mentioned, the location of this configuration file is provided by the flag `-c`. This flag points to a YAML-formatted file that consists of several sections.
 
-## Templating the configuraion file
+## Templating the configuration file
 
 [go-template](https://pkg.go.dev/text/template) semantics may be used within the configuration file.
 The input for the templates is taken from a user data file (using the `--user-data` parameter) and/or environment variables.
@@ -215,7 +215,7 @@ Simple examples:
 
 ### Watchers
 
-We have watchers support during the benchmark workload. It is at a job level and will be usefull in scenarios where we want to monitor overhead created by watchers on a cluster.
+We have watchers support during the benchmark workload. It is at a job level and will be useful in scenarios where we want to monitor overhead created by watchers on a cluster.
 
 !!! note
     This feature doesn't effect the overall QPS/Burst as it uses its own client instance.
@@ -866,18 +866,18 @@ Additional parameters may be set using the `inputVars` field:
 ##### `pause`
 
 Execute `virtctl pause` on the VMs mapped by the `labelSelector`.
-No additional parametes are supported.
+No additional parameters are supported.
 
 ##### `unpause`
 
 Execute `virtctl unpause` on the VMs mapped by the `labelSelector`.
-No additional parametes are supported.
+No additional parameters are supported.
 
 
 ##### `migrate`
 
 Execute `virtctl migrate` on the VMs mapped by the `labelSelector`.
-No additional parametes are supported.
+No additional parameters are supported.
 
 ##### `add-volume`
 

@@ -1,9 +1,9 @@
 # Kube-burner workloads
 
-This directory structure holds several working kube-burner worloads that can be used as reference:
+This directory structure holds several working kube-burner workloads that can be used as reference:
 
 - api-intensive: This workload is meant to load kube-apiserver by creating pods mounting secrets and configmaps, and then delete them. You'll need to tweak QPS/Burst and jobIterations parameters according to the cluster size.
-- service-latency-example: Showcases service latency measurment using a series of deloyments and services.
+- service-latency-example: Showcases service latency measurement using a series of deloyments and services.
 - kubelet-density: This is the most simple workload possible. It basically creates pods using an sleep image. Useful to verify max-pods in worker nodes.
 - kubelet-density-profiling: Similar to the previous one, but with the addition of pprof measurements.
 - kubelet-density-heavy: Similar to the previous one, with the difference that the pods it creates are actually a client/server application consisting of a basic application which performes queries in a pod running PostgreSQL and uses a k8s service to communicate with it.
