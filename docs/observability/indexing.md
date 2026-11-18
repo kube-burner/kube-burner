@@ -127,6 +127,7 @@ The job summary document includes the following fields:
 | `churnEndTimestamp`    | End timestamp of the churn phase (only present if churn is enabled)                                  | String (ISO 8601) | No             |
 | `elapsedTime`          | Total execution time in seconds                                                                      | Float            | Yes            |
 | `uuid`                 | Unique identifier for this benchmark run                                                              | String           | Yes            |
+| `name`                 | Workload name from `global.name`, which defaults to the config file name without extension. Useful to tell which config produced each summary in multi-job runs | String | No |
 | `metricName`           | Always set to `"jobSummary"` for identification                                                     | String           | Yes            |
 | `version`               | kube-burner version and git commit in format `version@gitCommit`                                      | String           | No             |
 | `passed`                | Whether the job execution passed (true) or failed (false)                                            | Boolean          | Yes            |
@@ -145,6 +146,7 @@ Example job summary document:
   "churnEndTimestamp": "2023-08-29T00:18:00.000000000Z",
   "elapsedTime": 48.0,
   "uuid": "83bfcb20-54f1-43f4-b2ad-ad04c2f4fd16",
+  "name": "cluster-density-v2",
   "metricName": "jobSummary",
   "version": "v1.10.0@4c9c3f43db83",
   "passed": true,

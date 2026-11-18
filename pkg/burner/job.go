@@ -413,6 +413,7 @@ func indexMetrics(uuid string, executedJobs []prometheus.Job, returnMap map[stri
 			elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
 			jobSummaries = append(jobSummaries, JobSummary{
 				UUID:                uuid,
+				Name:                configSpec.GlobalConfig.Name,
 				IncrementalLoadUUID: job.IncrementalLoadUUID,
 				Timestamp:           job.Start,
 				EndTimestamp:        job.End,

@@ -371,3 +371,33 @@ func assertJobsEqual(t *testing.T, label string, got, want prometheus.Job) {
 		t.Errorf("%s: JobConfig.Name mismatch: got=%q want=%q", label, got.JobConfig.Name, want.JobConfig.Name)
 	}
 }
+
+// TestScrapeStepMetricsSetsWorkloadName verifies step summaries carry the global workload name
+func TestScrapeStepMetricsSetsWorkloadName(t *testing.T) {
+	ex := newTestExecutor(randomJobName(), randomUUID())
+	ex.workloadName = "node-density"
+	ex.IncrementalLoad.ScrapeMetricsPerStep = true
+
+	mockIdx := &mockIndexer{}
+	scraper := metrics.Scraper{
+		IndexerList: map[string]indexers.Indexer{"mock": mockIdx},
+	}
+
+	start := time.Now().UTC()
+	job := &prometheus.Job{
+		Start:     start,
+		End:       start.Add(5 * time.Second),
+		JobConfig: ex.Job,
+		UUID:      ex.uuid,
+	}
+
+	scrapeStepMetrics(&ex, job, map[string]any{}, scraper, 10)
+
+	if len(mockIdx.docs) != 1 {
+		t.Fatalf("expected 1 index call, got %d", len(mockIdx.docs))
+	}
+	doc := mockIdx.docs[0][0].(map[string]any)
+	if doc["name"] != "node-density" {
+		t.Errorf("expected name node-density, got %v", doc["name"])
+	}
+}

@@ -133,6 +133,13 @@ func initCmd() *cobra.Command {
 				fmt.Printf("%s", err.Error())
 				os.Exit(1)
 			}
+			if configSpec.GlobalConfig.Name == "" {
+				if configMap != "" {
+					configSpec.GlobalConfig.Name = configMap
+				} else {
+					configSpec.GlobalConfig.Name = config.NameFromConfigPath(configFile)
+				}
+			}
 			metricsScraper := metrics.ProcessMetricsScraperConfig(metrics.ScraperConfig{
 				ConfigSpec:      &configSpec,
 				MetricsEndpoint: metricsEndpoint,

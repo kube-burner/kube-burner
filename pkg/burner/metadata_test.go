@@ -265,3 +265,47 @@ func TestIndexMetricsSkipsScrapedGCJobSummary(t *testing.T) {
 		t.Errorf("expected parent job summary for job1, got %v", doc["jobConfig"])
 	}
 }
+
+func TestIndexMetricsSetsWorkloadName(t *testing.T) {
+	now := time.Now().UTC()
+	mock := &mockIndexer{}
+	executedJobs := []prometheus.Job{
+		{Start: now, End: now.Add(10 * time.Second), JobConfig: config.Job{Name: "job1"}, UUID: "uuid-1"},
+		{Start: now.Add(10 * time.Second), End: now.Add(20 * time.Second), JobConfig: config.Job{Name: "job2"}, UUID: "uuid-1"},
+	}
+	scraper := metrics.Scraper{
+		IndexerList: map[string]indexers.Indexer{"mock": mock},
+	}
+	configSpec := config.Spec{GlobalConfig: config.GlobalConfig{Name: "cluster-density"}}
+
+	indexMetrics("uuid-1", executedJobs, map[string]returnPair{}, scraper, configSpec, true, "", false)
+
+	docs := mock.docs[0]
+	if len(docs) != 2 {
+		t.Fatalf("expected 2 job summaries, got %d", len(docs))
+	}
+	for _, d := range docs {
+		doc := d.(map[string]any)
+		if doc["name"] != "cluster-density" {
+			t.Errorf("expected name cluster-density in every job summary, got %v", doc["name"])
+		}
+	}
+}
+
+func TestIndexMetricsOmitsEmptyWorkloadName(t *testing.T) {
+	now := time.Now().UTC()
+	mock := &mockIndexer{}
+	executedJobs := []prometheus.Job{
+		{Start: now, End: now.Add(10 * time.Second), JobConfig: config.Job{Name: "job1"}, UUID: "uuid-1"},
+	}
+	scraper := metrics.Scraper{
+		IndexerList: map[string]indexers.Indexer{"mock": mock},
+	}
+
+	indexMetrics("uuid-1", executedJobs, map[string]returnPair{}, scraper, config.Spec{}, true, "", false)
+
+	doc := mock.docs[0][0].(map[string]any)
+	if _, ok := doc["name"]; ok {
+		t.Errorf("expected no name field when global name is empty, got %v", doc["name"])
+	}
+}

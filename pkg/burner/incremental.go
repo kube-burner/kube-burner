@@ -324,6 +324,7 @@ func scrapeStepMetrics(ex *JobExecutor, job *prometheus.Job, stepMetadata map[st
 		elapsedTime := job.End.Sub(job.Start).Round(time.Second).Seconds()
 		stepSummary := JobSummary{
 			UUID:                job.UUID,
+			Name:                ex.workloadName,
 			IncrementalLoadUUID: job.IncrementalLoadUUID,
 			Timestamp:           job.Start,
 			EndTimestamp:        job.End,

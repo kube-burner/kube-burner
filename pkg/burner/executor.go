@@ -56,6 +56,7 @@ type JobExecutor struct {
 	createdNamespaces map[string]bool
 	uuid              string
 	runid             string
+	workloadName      string
 	limiter           *rate.Limiter
 	waitLimiter       *rate.Limiter
 	nsRequired        bool
@@ -82,6 +83,7 @@ func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientPr
 		limiter:           rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		uuid:              configSpec.GlobalConfig.UUID,
 		runid:             configSpec.GlobalConfig.RUNID,
+		workloadName:      configSpec.GlobalConfig.Name,
 		waitLimiter:       rate.NewLimiter(rate.Limit(job.QPS), job.Burst),
 		functionTemplates: configSpec.GlobalConfig.FunctionTemplates,
 		embedCfg:          embedCfg,

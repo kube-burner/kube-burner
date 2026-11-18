@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -323,6 +325,23 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	configSpec.GlobalConfig.Timeout = timeout
 	configSpec.GlobalConfig.RUNID = uid.NewString()
 	return configSpec, nil
+}
+
+// NameFromConfigPath returns a default workload name for the given config file path or URL,
+// which is the base name of the file without its extension. For example, both
+// "workloads/cluster-density.yml" and "https://example.com/cluster-density.yml?ref=main"
+// return "cluster-density". It returns an empty string when no file name can be derived.
+func NameFromConfigPath(configPath string) string {
+	var base string
+	if u, err := url.Parse(configPath); err == nil && u.Scheme != "" && u.Host != "" {
+		base = path.Base(u.Path)
+	} else {
+		base = filepath.Base(configPath)
+	}
+	if base == "." || base == "/" || base == string(filepath.Separator) {
+		return ""
+	}
+	return strings.TrimSuffix(base, path.Ext(base))
 }
 
 func NewKubeClientProvider(config, context string) *KubeClientProvider {
