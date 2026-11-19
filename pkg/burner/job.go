@@ -195,7 +195,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 				}
 				if jobExecutor.IncrementalLoad == nil {
 					// If object verification is enabled
-					if jobExecutor.VerifyObjects && !jobExecutor.Verify(ctx, nil) {
+					if jobExecutor.VerifyObjects && !jobExecutor.Verify(ctx, nil, 0) {
 						err := errors.New("object verification failed")
 						// If errorOnVerify is enabled. Set RC to 1 and append error
 						if jobExecutor.ErrorOnVerify {

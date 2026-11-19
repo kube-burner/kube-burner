@@ -306,6 +306,10 @@ type IncrementalLoad struct {
 type LoadPattern struct {
 	// Type types of load
 	Type LoadPatternType `yaml:"type" json:"type,omitempty"`
+	// Mode controls whether each incremental step deletes and recreates all objects
+	// from scratch ("recreate", default) or keeps previously created objects and
+	// only creates the new delta ("append").
+	Mode LoadPatternMode `yaml:"mode" json:"mode,omitempty"`
 	// Linear equation
 	Linear *LinearLoadConfig `yaml:"linear,omitempty" json:"linear,omitempty"`
 	// Exponential equation
@@ -319,6 +323,16 @@ type LoadPatternType string
 const (
 	LinearPattern      LoadPatternType = "linear"
 	ExponentialPattern LoadPatternType = "exponential"
+)
+
+// LoadPatternMode controls whether resources are deleted and recreated or kept between incremental steps.
+type LoadPatternMode string
+
+const (
+	// RecreateLoadMode deletes and recreates all objects from 0 to the new target on every step (default).
+	RecreateLoadMode LoadPatternMode = "recreate"
+	// AppendLoadMode keeps previously created objects and only creates the new delta on every step.
+	AppendLoadMode LoadPatternMode = "append"
 )
 
 type LinearLoadConfig struct {
