@@ -51,6 +51,8 @@ type Measurement struct {
 	PProfStageCollection bool `yaml:"pprofStageCollection"`
 	// PProfDirectory output directory
 	PProfDirectory string `yaml:"pprofDirectory"`
+	// PProfTimeout max time a single pprof collection can take; 0 derives it from the target URL
+	PProfTimeout time.Duration `yaml:"pprofTimeout"`
 	// NodeAffinity node affinity configuration
 	NodeAffinity map[string]string `yaml:"nodeAffinity"`
 	// Service latency endpoint timeout
