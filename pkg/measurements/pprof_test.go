@@ -43,9 +43,9 @@ func TestPProfTimeout(t *testing.T) {
 		configured time.Duration
 		want       time.Duration
 	}{
-		{"heap profile uses the default", "http://localhost:6060/debug/pprof/heap", 0, defaultPProfTimeout},
-		{"cpu profile adds the sampling window", "http://localhost:6060/debug/pprof/profile?seconds=30", 0, defaultPProfTimeout + 30*time.Second},
-		{"bogus seconds is ignored", "http://localhost:6060/debug/pprof/profile?seconds=abc", 0, defaultPProfTimeout},
+		{"heap profile uses the default", "http://localhost:6060/debug/pprof/heap", 0, config.DefaultPProfTimeout},
+		{"cpu profile adds the sampling window", "http://localhost:6060/debug/pprof/profile?seconds=30", 0, config.DefaultPProfTimeout + 30*time.Second},
+		{"bogus seconds is ignored", "http://localhost:6060/debug/pprof/profile?seconds=abc", 0, config.DefaultPProfTimeout},
 		{"explicit timeout wins", "http://localhost:6060/debug/pprof/profile?seconds=30", 10 * time.Second, 10 * time.Second},
 	}
 	for _, tt := range tests {
@@ -63,7 +63,7 @@ func TestBuildPProfRequestSetsCurlMaxTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &pprof{BaseMeasurement: BaseMeasurement{ClientSet: clientSet}}
+	p := &pprof{BaseMeasurement: BaseMeasurement{ClientSet: clientSet, Config: types.Measurement{PProfTimeout: 90 * time.Second}}}
 	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns"}}
 	targets := []types.PProftarget{
 		{URL: "http://svc:6060/debug/pprof/heap", LabelSelector: map[string]string{"app": "x"}},
@@ -71,10 +71,13 @@ func TestBuildPProfRequestSetsCurlMaxTime(t *testing.T) {
 		{URL: "http://svc:6060/debug/pprof/heap", LabelSelector: map[string]string{"app": "x"}, Cert: "c", Key: "k"},
 	}
 	for _, target := range targets {
-		command, _ := p.buildPProfRequest(target, pod, 90*time.Second)
+		command, _, execTimeout := p.buildPProfRequest(target, pod)
 		i := slices.Index(command, "--max-time")
 		if i < 0 || i+1 >= len(command) || command[i+1] != "90" {
 			t.Fatalf("expected --max-time 90 in %v", command)
+		}
+		if want := 90*time.Second + pprofExecGracePeriod; execTimeout != want {
+			t.Fatalf("exec timeout = %v, want %v", execTimeout, want)
 		}
 	}
 }

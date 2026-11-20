@@ -46,12 +46,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// defaultPProfTimeout bounds a single pprof collection when the target URL doesn't ask for a
-// sampling window (heap, goroutine, etc.).
-const defaultPProfTimeout = 2 * time.Minute
-
 // pprofExecGracePeriod is how long we wait for the exec stream past curl's own deadline.
-var pprofExecGracePeriod = 30 * time.Second
+var pprofExecGracePeriod = config.DefaultPProfExecGracePeriod
 
 type pprof struct {
 	BaseMeasurement
@@ -233,8 +229,7 @@ func (p *pprof) getPProf(suffix string) {
 				}
 				defer f.Close()
 
-				timeout := pprofTimeout(target, p.Config.PProfTimeout)
-				command, pprofReq := p.buildPProfRequest(target, pod, timeout)
+				command, pprofReq, execTimeout := p.buildPProfRequest(target, pod)
 
 				log.Tracef("Collecting pprof using URL: %s", pprofReq.URL())
 				pprofReq.VersionedParams(&corev1.PodExecOptions{
@@ -249,8 +244,6 @@ func (p *pprof) getPProf(suffix string) {
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
 				}
-				// curl gives up on its own after timeout, the extra grace covers a stuck exec stream
-				execTimeout := timeout + pprofExecGracePeriod
 				ctx, cancel := context.WithTimeout(context.Background(), execTimeout)
 				defer cancel()
 				err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
@@ -282,7 +275,7 @@ func pprofTimeout(target types.PProftarget, configured time.Duration) time.Durat
 	if configured > 0 {
 		return configured
 	}
-	timeout := defaultPProfTimeout
+	timeout := config.DefaultPProfTimeout
 	if u, err := url.Parse(target.URL); err == nil {
 		if seconds, err := strconv.Atoi(u.Query().Get("seconds")); err == nil && seconds > 0 {
 			timeout += time.Duration(seconds) * time.Second
@@ -291,9 +284,13 @@ func pprofTimeout(target types.PProftarget, configured time.Duration) time.Durat
 	return timeout
 }
 
-func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod, timeout time.Duration) ([]string, *rest.Request) {
+// buildPProfRequest returns the command to run in the pod, the exec request and how long the exec
+// stream may take. curl gives up on its own after the collection timeout, the extra grace covers a
+// stuck exec stream.
+func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod) ([]string, *rest.Request, time.Duration) {
 	var pprofReq *rest.Request
 	var command []string
+	timeout := pprofTimeout(target, p.Config.PProfTimeout)
 	maxTime := strconv.FormatFloat(timeout.Seconds(), 'f', -1, 64)
 
 	// Build command based on target type
@@ -325,7 +322,7 @@ func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod, time
 		Name(pod.Name).
 		Namespace(pod.Namespace).
 		SubResource("exec")
-	return command, pprofReq
+	return command, pprofReq, timeout + pprofExecGracePeriod
 }
 
 func (p *pprof) Collect(measurementWg *sync.WaitGroup) {

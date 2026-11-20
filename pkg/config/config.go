@@ -43,6 +43,12 @@ import (
 const (
 	DefaultDeletionStrategy = "default"
 	GVRDeletionStrategy     = "gvr"
+
+	// DefaultPProfTimeout bounds a single pprof collection when the target URL doesn't ask for a
+	// sampling window (heap, goroutine, etc.).
+	DefaultPProfTimeout = 2 * time.Minute
+	// DefaultPProfExecGracePeriod is how long we wait for the exec stream past curl's own deadline.
+	DefaultPProfExecGracePeriod = 30 * time.Second
 )
 
 var configSpec = Spec{
