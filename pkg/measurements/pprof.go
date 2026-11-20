@@ -18,11 +18,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +45,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 )
+
+// defaultPProfTimeout bounds a single pprof collection when the target URL doesn't ask for a
+// sampling window (heap, goroutine, etc.).
+const defaultPProfTimeout = 2 * time.Minute
+
+// pprofExecGracePeriod is how long we wait for the exec stream past curl's own deadline.
+var pprofExecGracePeriod = 30 * time.Second
 
 type pprof struct {
 	BaseMeasurement
@@ -223,7 +233,8 @@ func (p *pprof) getPProf(suffix string) {
 				}
 				defer f.Close()
 
-				command, pprofReq := p.buildPProfRequest(target, pod)
+				timeout := pprofTimeout(target, p.Config.PProfTimeout)
+				command, pprofReq := p.buildPProfRequest(target, pod, timeout)
 
 				log.Tracef("Collecting pprof using URL: %s", pprofReq.URL())
 				pprofReq.VersionedParams(&corev1.PodExecOptions{
@@ -238,13 +249,22 @@ func (p *pprof) getPProf(suffix string) {
 				if err != nil {
 					log.Errorf("Failed to execute pprof command on %s: %s", target.Name, err)
 				}
-				err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
+				// curl gives up on its own after timeout, the extra grace covers a stuck exec stream
+				execTimeout := timeout + pprofExecGracePeriod
+				ctx, cancel := context.WithTimeout(context.Background(), execTimeout)
+				defer cancel()
+				err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 					Stdin:  nil,
 					Stdout: f,
 					Stderr: &stderr,
 				})
 				if err != nil {
-					log.Errorf("Failed to get pprof from %s: %s", pod.Name, stderr.String())
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+						log.Errorf("Timed out after %v getting pprof from %s, is %s reachable from the pod?", execTimeout, pod.Name, target.URL)
+					} else {
+						log.Errorf("Failed to get pprof from %s: %v: %s", pod.Name, err, stderr.String())
+					}
+					f.Close()
 					os.Remove(f.Name())
 				} else {
 					log.Debugf("Successfully collected pprof data: %s", pprofFile)
@@ -255,30 +275,47 @@ func (p *pprof) getPProf(suffix string) {
 	wg.Wait()
 }
 
-func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod) ([]string, *rest.Request) {
+// pprofTimeout returns how long a single collection from target may take. An explicit
+// pprofTimeout wins, otherwise profiles that sample for a while (e.g. ?seconds=30) get that
+// window on top of the default so they aren't cut short.
+func pprofTimeout(target types.PProftarget, configured time.Duration) time.Duration {
+	if configured > 0 {
+		return configured
+	}
+	timeout := defaultPProfTimeout
+	if u, err := url.Parse(target.URL); err == nil {
+		if seconds, err := strconv.Atoi(u.Query().Get("seconds")); err == nil && seconds > 0 {
+			timeout += time.Duration(seconds) * time.Second
+		}
+	}
+	return timeout
+}
+
+func (p *pprof) buildPProfRequest(target types.PProftarget, pod corev1.Pod, timeout time.Duration) ([]string, *rest.Request) {
 	var pprofReq *rest.Request
 	var command []string
+	maxTime := strconv.FormatFloat(timeout.Seconds(), 'f', -1, 64)
 
 	// Build command based on target type
 	if p.getPprofNodeTargets(target) != nil {
 		// Node-level collection via DaemonSet
 		if target.UnixSocketPath != "" {
-			command = []string{"curl", "-fsSLk",
+			command = []string{"curl", "-fsSLk", "--max-time", maxTime,
 				"--unix-socket", path.Join("/mnt", target.UnixSocketPath), target.URL}
 		} else {
 			// HTTPS endpoint (kubelet) - use insecure since kubelet typically uses self-signed certs
 			command = []string{"sh", "-c",
-				fmt.Sprintf("curl -fsSLkH \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" %s", target.URL),
+				fmt.Sprintf("curl -fsSLk --max-time %s -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" %s", maxTime, target.URL),
 			}
 		}
 	} else {
 		// Pod-level collection (etcd, api-server, etc.)
 		if target.BearerToken != "" {
-			command = []string{"curl", "-fsSLkH", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
+			command = []string{"curl", "-fsSLk", "--max-time", maxTime, "-H", fmt.Sprintf("Authorization: Bearer %s", target.BearerToken), target.URL}
 		} else if target.Cert != "" && target.Key != "" {
-			command = []string{"curl", "-fsSLk", "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
+			command = []string{"curl", "-fsSLk", "--max-time", maxTime, "--cert", "/tmp/pprof.crt", "--key", "/tmp/pprof.key", target.URL}
 		} else {
-			command = []string{"curl", "-fsSLk", target.URL}
+			command = []string{"curl", "-fsSLk", "--max-time", maxTime, target.URL}
 		}
 	}
 	pprofReq = p.ClientSet.CoreV1().

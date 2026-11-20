@@ -1031,6 +1031,8 @@ Stage collection triggers at:
 !!! note
     `onEachIteration` does not trigger pprof collection. Stage collection and `pprofInterval` can be used together.
 
+Each collection is bounded by `pprofTimeout`. When it isn't set, kube-burner allows 2 minutes, plus the sampling window for URLs that ask for one (e.g. `?seconds=30`). A target that doesn't answer in time, for example because its URL can't be resolved from the pod, is logged and skipped instead of blocking the job.
+
 Each `pprofTarget` accepts an optional `replicas` field that limits how many matching instances are collected. The default is `0`, which means collect from all matching pods (or DaemonSet pods for node targets).
 
 As some components require authentication to get profiling information, `kube-burner` provides two different modalities to address it:
