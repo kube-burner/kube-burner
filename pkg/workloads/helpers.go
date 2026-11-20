@@ -81,6 +81,9 @@ func (wh *WorkloadHelper) Run(configFile string) int {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if ConfigSpec.GlobalConfig.Name == "" {
+		ConfigSpec.GlobalConfig.Name = config.NameFromConfigPath(configFile)
+	}
 	// Overwrite credentials
 	for pos := range ConfigSpec.MetricsEndpoints {
 		ConfigSpec.MetricsEndpoints[pos].Endpoint = wh.PrometheusURL

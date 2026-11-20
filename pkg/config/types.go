@@ -97,6 +97,8 @@ type MetricsEndpoint struct {
 
 // GlobalConfig holds the global configuration
 type GlobalConfig struct {
+	// Name identifies the workload this configuration belongs to. It's added to every jobSummary document
+	Name string `yaml:"name" json:"name,omitempty"`
 	// Benchmark UUID
 	UUID string
 	// Benchmark RUNID

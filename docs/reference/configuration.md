@@ -35,6 +35,7 @@ In this section is described global job configuration, it holds the following pa
 
 | Option           | Description                                                                                              | Type           | Default      |
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|--------------|
+| `name`             | Workload name added to every job summary document. `kube-burner init` defaults it to the config file name without extension, or to the configmap name when `--configmap` is used | String | config file name |
 | `measurements`     | List of measurements. Detailed in the [measurements section](../measurements/index.md)                 | List          | []          |
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 60s         |
 | `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
