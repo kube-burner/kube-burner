@@ -180,14 +180,17 @@ func TestHookStderrSinkTeesToBuffer(t *testing.T) {
 	if _, err := sink.Write([]byte("tee-me\n")); err != nil {
 		t.Fatal(err)
 	}
-	if buf.String() != "tee-me" {
+	if err := sink.(*hookStderrWriter).Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != "tee-me\n" {
 		t.Fatalf("buffer got %q", buf.String())
 	}
 	_ = w.Close()
 	if _, err := io.Copy(&dst, r); err != nil {
 		t.Fatal(err)
 	}
-	if dst.String() != "tee-me" {
+	if dst.String() != "tee-me\n" {
 		t.Fatalf("stderr got %q", dst.String())
 	}
 }
@@ -223,5 +226,108 @@ func TestTruncateHookTextPreservesUTF8(t *testing.T) {
 	got := truncateHookText(s, hookFailureOutputLimit)
 	if !utf8.ValidString(got) {
 		t.Fatal("truncation produced invalid UTF-8")
+	}
+}
+
+func TestHookStderrSinkPreservesMultipleWrites(t *testing.T) {
+	var buf bytes.Buffer
+	sink := &hookStderrWriter{dst: &buf, buf: &bytes.Buffer{}}
+	if _, err := sink.Write([]byte("first\n")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sink.Write([]byte("second\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if got := buf.String(); got != "first\nsecond\n" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestHookStderrSinkPreservesSplitUTF8(t *testing.T) {
+	var buf bytes.Buffer
+	sink := &hookStderrWriter{dst: &buf, buf: &bytes.Buffer{}}
+	input := []byte("prefix é suffix")
+	cut := strings.Index(string(input), "é") + 1
+	if _, err := sink.Write(input[:cut]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sink.Write(input[cut:]); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if got := buf.String(); got != string(input) {
+		t.Fatalf("got %q, want %q", got, input)
+	}
+}
+
+func TestHookStderrSinkPreservesSplitFourByteUTF8(t *testing.T) {
+	var buf bytes.Buffer
+	sink := &hookStderrWriter{dst: &buf, buf: &bytes.Buffer{}}
+	input := []byte("prefix 😀 suffix")
+	cut := strings.Index(string(input), "😀") + 2
+	if _, err := sink.Write(input[:cut]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sink.Write(input[cut:]); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if got := buf.String(); got != string(input) {
+		t.Fatalf("got %q, want %q", got, input)
+	}
+}
+
+func TestHookStderrSinkPreservesSplitANSISequence(t *testing.T) {
+	var buf bytes.Buffer
+	sink := &hookStderrWriter{dst: &buf, buf: &bytes.Buffer{}}
+	if _, err := sink.Write([]byte("before \x1b[3")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sink.Write([]byte("1mred\x1b[0m after")); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if got := buf.String(); got != "before red after" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestHookStderrSinkTruncatesAtLimit(t *testing.T) {
+	var buf bytes.Buffer
+	sink := &hookStderrWriter{dst: &buf, buf: &bytes.Buffer{}}
+	if _, err := sink.Write([]byte(strings.Repeat("x", hookFailureOutputLimit))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sink.Write([]byte("more")); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if len(buf.String()) > hookFailureOutputLimit {
+		t.Fatalf("output exceeded limit: %d", len(buf.String()))
+	}
+}
+
+func TestEmitHookFailureSkipsNonRegularOutputFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "missing-or-stream")
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out := captureStderr(t, func() {
+		emitHookFailure(config.Hook{OutputFile: path}, "", "", path, errors.New("failed"))
+	})
+	if !strings.Contains(out, "failed") {
+		t.Fatalf("expected failure, got %q", out)
 	}
 }
