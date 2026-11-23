@@ -16,12 +16,14 @@ package burner
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
@@ -301,6 +303,37 @@ func TestHookStderrSinkPreservesSplitANSISequence(t *testing.T) {
 	}
 }
 
+func TestHookStderrSinkDoesNotRetainInvalidUTF8(t *testing.T) {
+	var buf bytes.Buffer
+	sink := &hookStderrWriter{dst: &buf, buf: &bytes.Buffer{}}
+	if _, err := sink.Write([]byte{'a', 0xff, 'b'}); err != nil {
+		t.Fatal(err)
+	}
+	if len(sink.pending) != 0 {
+		t.Fatalf("invalid byte retained: %d bytes", len(sink.pending))
+	}
+	if got := buf.String(); got != "a�b" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestHookStderrSinkBoundsUnterminatedANSI(t *testing.T) {
+	var buf bytes.Buffer
+	sink := &hookStderrWriter{dst: &buf, buf: &bytes.Buffer{}}
+	if _, err := sink.Write([]byte("\x1b[" + strings.Repeat("1", hookFailureOutputLimit*2))); err != nil {
+		t.Fatal(err)
+	}
+	if len(sink.pending) > hookFailureOutputLimit {
+		t.Fatalf("pending output exceeded limit: %d", len(sink.pending))
+	}
+	if err := sink.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if len(buf.String()) > hookFailureOutputLimit {
+		t.Fatalf("output exceeded limit: %d", len(buf.String()))
+	}
+}
+
 func TestHookStderrSinkTruncatesAtLimit(t *testing.T) {
 	var buf bytes.Buffer
 	sink := &hookStderrWriter{dst: &buf, buf: &bytes.Buffer{}}
@@ -329,5 +362,22 @@ func TestEmitHookFailureSkipsNonRegularOutputFile(t *testing.T) {
 	})
 	if !strings.Contains(out, "failed") {
 		t.Fatalf("expected failure, got %q", out)
+	}
+}
+
+func TestCollectBackgroundHookResultsDoesNotReemitDiagnostics(t *testing.T) {
+	ex := &JobExecutor{
+		Job:         config.Job{Hooks: []config.Hook{{Background: true}}},
+		hookManager: NewHookManager(context.Background(), 1, nil),
+	}
+	ex.hookManager.resultChan <- hookResult{err: errors.New("background failed"), duration: time.Second}
+	out := captureStderr(t, func() {
+		errs, rc := ex.CollectAndLogBackgroundHookResults(nil, 0)
+		if len(errs) != 1 || rc != 1 {
+			t.Fatalf("got errors=%d rc=%d", len(errs), rc)
+		}
+	})
+	if strings.Contains(out, "kube-burner hook failure") {
+		t.Fatalf("diagnostic was re-emitted: %q", out)
 	}
 }
