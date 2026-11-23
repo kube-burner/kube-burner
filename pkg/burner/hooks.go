@@ -46,9 +46,41 @@ const hookFailureOutputLimit = 32 << 10
 
 var ansiEscapeSequence = regexp.MustCompile(`\x1b\[[0-9;]*[ -/]*[@-~]`)
 
+type hookStderrWriter struct {
+	dst       io.Writer
+	buf       *bytes.Buffer
+	written   int
+	truncated bool
+}
+
 // hookStderrSink forwards hook stderr to the process stderr while buffering for failure logs.
 func hookStderrSink(buf *bytes.Buffer) io.Writer {
-	return io.MultiWriter(os.Stderr, buf)
+	return &hookStderrWriter{dst: os.Stderr, buf: buf}
+}
+
+func (w *hookStderrWriter) Write(p []byte) (int, error) {
+	text := sanitizeHookText(string(p))
+	if w.truncated || text == "" {
+		return len(p), nil
+	}
+	remaining := hookFailureOutputLimit - w.written
+	if len(text) > remaining {
+		const suffix = "\n... (hook output truncated)"
+		budget := remaining - len(suffix)
+		if budget < 0 {
+			budget = 0
+		}
+		text = truncateUTF8(text, budget) + suffix
+		w.truncated = true
+	}
+	if text == "" {
+		return len(p), nil
+	}
+	if _, err := io.MultiWriter(w.dst, w.buf).Write([]byte(text)); err != nil {
+		return 0, err
+	}
+	w.written += len(text)
+	return len(p), nil
 }
 
 // sanitizeHookLogText makes hook output safe to print on stderr for log collectors:
@@ -57,6 +89,11 @@ func sanitizeHookLogText(s string) string {
 	if s == "" {
 		return s
 	}
+	s = sanitizeHookText(s)
+	return truncateHookText(s, hookFailureOutputLimit)
+}
+
+func sanitizeHookText(s string) string {
 	s = strings.ToValidUTF8(s, "\uFFFD")
 	s = ansiEscapeSequence.ReplaceAllString(s, "")
 	var b strings.Builder
@@ -73,11 +110,29 @@ func sanitizeHookLogText(s string) string {
 			b.WriteRune(r)
 		}
 	}
-	s = strings.TrimSpace(b.String())
-	if len(s) > hookFailureOutputLimit {
-		s = s[:hookFailureOutputLimit] + "\n... (hook output truncated)"
+	return strings.TrimSpace(b.String())
+}
+
+func truncateHookText(s string, limit int) string {
+	if len(s) <= limit {
+		return s
 	}
-	return s
+	const suffix = "\n... (hook output truncated)"
+	if limit <= len(suffix) {
+		return suffix[:limit]
+	}
+	return truncateUTF8(s, limit-len(suffix)) + suffix
+}
+
+func truncateUTF8(s string, limit int) string {
+	cut := limit
+	if cut > len(s) {
+		cut = len(s)
+	}
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
 }
 
 func emitHookFailure(hook config.Hook, stdout, stderr, outputPath string, runErr error) {
@@ -283,11 +338,10 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 		// Send result to channel (non-blocking)
 		select {
 		case hm.resultChan <- result:
-			// Result sent successfully
+		// Result sent successfully
 		default:
 			if err != nil {
 				log.Errorf("Background hook at '%s' failed after %v: %v", hook.When, duration, err)
-				emitHookFailure(hook, stdout.String(), stderr.String(), hook.OutputFile, err)
 			} else {
 				log.Infof("Background hook at '%s' completed successfully in %v", hook.When, duration)
 				if stdout.String() != "" {

@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 )
@@ -167,11 +168,60 @@ func TestEmitHookFailureSanitizesStderr(t *testing.T) {
 
 func TestHookStderrSinkTeesToBuffer(t *testing.T) {
 	var buf bytes.Buffer
+	var dst bytes.Buffer
+	orig := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = orig; _ = r.Close() })
 	sink := hookStderrSink(&buf)
 	if _, err := sink.Write([]byte("tee-me\n")); err != nil {
 		t.Fatal(err)
 	}
-	if buf.String() != "tee-me\n" {
+	if buf.String() != "tee-me" {
 		t.Fatalf("buffer got %q", buf.String())
+	}
+	_ = w.Close()
+	if _, err := io.Copy(&dst, r); err != nil {
+		t.Fatal(err)
+	}
+	if dst.String() != "tee-me" {
+		t.Fatalf("stderr got %q", dst.String())
+	}
+}
+
+func TestHookStderrSinkSanitizesAndBoundsOutput(t *testing.T) {
+	var buf bytes.Buffer
+	orig := os.Stderr
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = write
+	t.Cleanup(func() { os.Stderr = orig; _ = read.Close() })
+	sink := hookStderrSink(&buf)
+	if _, err := sink.Write([]byte("\x1b[31m" + strings.Repeat("x", hookFailureOutputLimit+100) + "\x1b[0m")); err != nil {
+		t.Fatal(err)
+	}
+	_ = write.Close()
+	var streamed bytes.Buffer
+	if _, err := io.Copy(&streamed, read); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(streamed.String(), "\x1b") || len(streamed.String()) > hookFailureOutputLimit {
+		t.Fatalf("unsafe or oversized stream: len=%d", streamed.Len())
+	}
+	if buf.String() != streamed.String() {
+		t.Fatal("stream and buffer differ")
+	}
+}
+
+func TestTruncateHookTextPreservesUTF8(t *testing.T) {
+	s := strings.Repeat("a", hookFailureOutputLimit-1) + "é"
+	got := truncateHookText(s, hookFailureOutputLimit)
+	if !utf8.ValidString(got) {
+		t.Fatal("truncation produced invalid UTF-8")
 	}
 }
