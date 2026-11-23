@@ -97,9 +97,10 @@ func (w *hookStderrWriter) Write(p []byte) (int, error) {
 }
 
 func splitHookStreamTail(data []byte) ([]byte, []byte) {
-	validEnd := len(data)
-	for validEnd > 0 && !utf8.Valid(data[:validEnd]) {
-		validEnd--
+	validEnd := 0
+	for validEnd < len(data) && utf8.FullRune(data[validEnd:]) {
+		_, size := utf8.DecodeRune(data[validEnd:])
+		validEnd += size
 	}
 	data, tail := data[:validEnd], data[validEnd:]
 	if esc := bytes.LastIndexByte(data, '\x1b'); esc >= 0 {
@@ -112,7 +113,7 @@ func splitHookStreamTail(data []byte) ([]byte, []byte) {
 					break
 				}
 			}
-			if !complete {
+			if !complete && len(sequence)+len(tail) <= hookFailureOutputLimit {
 				tail = append(append([]byte(nil), sequence...), tail...)
 				data = data[:esc]
 			}
