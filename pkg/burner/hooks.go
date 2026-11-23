@@ -65,12 +65,7 @@ func (w *hookStderrWriter) Write(p []byte) (int, error) {
 	}
 	remaining := hookFailureOutputLimit - w.written
 	if len(text) > remaining {
-		const suffix = "\n... (hook output truncated)"
-		budget := remaining - len(suffix)
-		if budget < 0 {
-			budget = 0
-		}
-		text = truncateUTF8(text, budget) + suffix
+		text = truncateHookText(text, remaining)
 		w.truncated = true
 	}
 	if text == "" {
