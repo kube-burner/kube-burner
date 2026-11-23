@@ -287,6 +287,7 @@ func ParseWithUserdata(uuid string, timeout time.Duration, configFileReader, use
 	cfgReader := bytes.NewReader(renderedCfg)
 	yamlDec := yaml.NewDecoder(cfgReader)
 	yamlDec.KnownFields(true)
+	configSpec.GlobalConfig.ResourceInventory = false
 	if err = yamlDec.Decode(&configSpec); err != nil {
 		return configSpec, errors.EnhanceYAMLParseError("configuration file", err)
 	}

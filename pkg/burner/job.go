@@ -81,6 +81,13 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	res := make(chan int, 1)
 	uuid := configSpec.GlobalConfig.UUID
 	globalConfig := configSpec.GlobalConfig
+	var inventory *resourceInventory
+	if globalConfig.ResourceInventory {
+		inventory = &resourceInventory{}
+	}
+	writeInventory := sync.OnceValue(func() error {
+		return inventory.write(configSpec)
+	})
 	returnMap := make(map[string]returnPair)
 	log.Infof("🔥 Starting kube-burner (%s@%s) with UUID %s", version.Version, version.GitCommit, uuid)
 	ctx, cancel := context.WithTimeout(context.Background(), configSpec.GlobalConfig.Timeout)
@@ -98,6 +105,9 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		var innerRC int
 		measurementsFactory := measurements.NewMeasurementsFactory(configSpec, metricsScraper.MetricsMetadata, additionalMeasurementFactoryMap)
 		jobExecutors = newExecutorList(configSpec, kubeClientProvider, embedCfg)
+		for i := range jobExecutors {
+			jobExecutors[i].inventory = inventory
+		}
 
 		// Execute global beforeAllJobs hooks
 		if len(globalConfig.Hooks) > 0 {
@@ -308,6 +318,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 			}
 			returnMap[job.JobConfig.Name] = returnPair{innerRC: innerRC, executionErrors: executionErrors}
 		}
+		writeInventory()
 		indexMetrics(uuid, executedJobs, returnMap, metricsScraper, configSpec, true, "", false)
 
 		// Execute global afterAllJobs hooks (after metrics indexing)
@@ -327,6 +338,7 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 	case rc = <-res:
 	// When benchmark times out
 	case <-time.After(configSpec.GlobalConfig.Timeout):
+		writeInventory()
 		err := fmt.Errorf("%v timeout reached", configSpec.GlobalConfig.Timeout)
 		log.Error(err.Error())
 		if len(executedJobs) > 0 {
@@ -350,6 +362,12 @@ func Run(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, 
 		if ctx.Err() == context.DeadlineExceeded && rc == 0 {
 			errs = append(errs, fmt.Errorf("garbage collection timeout reached"))
 			rc = rcTimeout
+		}
+	}
+	if err := writeInventory(); err != nil {
+		errs = append(errs, err)
+		if rc == 0 {
+			rc = 1
 		}
 	}
 	return rc, utilerrors.NewAggregate(errs)

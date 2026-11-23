@@ -50,17 +50,22 @@ var (
 	commonUnderlyingObjectLabelsPath = []string{"spec", "template", "metadata", "labels"}
 
 	kindToLabelPaths = map[string][][]string{
-		DaemonSet:      {commonUnderlyingObjectLabelsPath},
-		Deployment:     {commonUnderlyingObjectLabelsPath},
-		ReplicaSet:     {commonUnderlyingObjectLabelsPath},
-		StatefulSet:    {commonUnderlyingObjectLabelsPath, []string{"spec", "selector", "matchLabels"}},
-		VirtualMachine: {commonUnderlyingObjectLabelsPath},
+		DaemonSet:                        {commonUnderlyingObjectLabelsPath},
+		Deployment:                       {commonUnderlyingObjectLabelsPath},
+		Job:                              {commonUnderlyingObjectLabelsPath},
+		ReplicaSet:                       {commonUnderlyingObjectLabelsPath},
+		StatefulSet:                      {commonUnderlyingObjectLabelsPath, []string{"spec", "selector", "matchLabels"}},
+		VirtualMachine:                   {commonUnderlyingObjectLabelsPath},
+		VirtualMachineInstanceReplicaSet: {commonUnderlyingObjectLabelsPath},
+		CronJob: {
+			{"spec", "jobTemplate", "metadata", "labels"},
+			{"spec", "jobTemplate", "spec", "template", "metadata", "labels"},
+		},
 	}
 
 	kindToLabelPathsInArray = map[string][][][]string{
-		VirtualMachine: {[][]string{
-			{"spec", "dataVolumeTemplates"}, {"metadata", "labels"}},
-		},
+		StatefulSet:    {{{"spec", "volumeClaimTemplates"}, {"metadata", "labels"}}},
+		VirtualMachine: {{{"spec", "dataVolumeTemplates"}, {"metadata", "labels"}}},
 	}
 )
 

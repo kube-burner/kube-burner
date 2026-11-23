@@ -36,6 +36,7 @@ In this section is described global job configuration, it holds the following pa
 | Option           | Description                                                                                              | Type           | Default      |
 |------------------|----------------------------------------------------------------------------------------------------------|----------------|--------------|
 | `measurements`     | List of measurements. Detailed in the [measurements section](../measurements/index.md)                 | List          | []          |
+| `resourceInventory` | Write a JSON inventory of resources created by workload jobs. | Boolean | false |
 | `requestTimeout`   | Client-go request timeout                                                                                | Duration      | 60s         |
 | `gc`               | Garbage collect created namespaces                                                                       | Boolean        | false      |
 | `gcMetrics`        | Flag to collect metrics during garbage collection                                                        | Boolean        |      false      |
@@ -57,6 +58,34 @@ kube-burner connects k8s clusters using the following methods in this order:
 - `KUBECONFIG` environment variable
 - `$HOME/.kube/config`
 - In-cluster config (Used when kube-burner runs inside a pod)
+
+### Resource inventory
+
+Set `global.resourceInventory: true` to write `resource-inventory.json` in each
+configured local or TSDB metrics directory. With no filesystem indexer, the file
+goes in `collected-metrics-<UUID>`. Each run replaces the inventory in its
+output directory. Metrics tarballs include the file for later inspection.
+
+The file lists successful workload creates, including workload namespaces,
+KubeVirt live migration requests, and resources later deleted by churn or
+garbage collection. Kubernetes controllers, hooks, image preloading, and
+measurements can create additional resources outside that scope. For timed-out
+runs, the file contains the creates recorded by the time kube-burner starts
+writing the inventory.
+
+Each row contains the API group, version, and plural resource name in `gvr`,
+along with `namespace`, `name`, `uid`, and `job`. The namespace is empty for
+cluster-scoped resources. In Go, decode the array into
+`[]burner.ResourceReference`, then use `schema.GroupVersionResource(ref.GVR)`
+with the Kubernetes dynamic client. Call `Get` by name, using
+`Namespace(ref.Namespace)` for namespaced objects. Compare the returned UID
+with `ref.UID` to detect when the same name belongs to a replacement object.
+
+Kube-burner reserves `kube-burner.io/runid` on resources it creates and
+propagates it through supported child templates, including StatefulSet
+volume claims and CronJob jobs and pods. Kubernetes and CSI controllers may
+create additional objects such as PersistentVolumes and VolumeAttachments
+without copying this label.
 
 ### Function templating example
 Using function templates we can define a block of code as function and reuse it in any parts of our configuration. For the purpose of this example, lets assume we have a configuration like below in our **deployment.yaml**

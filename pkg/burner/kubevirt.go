@@ -194,7 +194,11 @@ func kubeOpHandler(ctx context.Context, ex *JobExecutor, obj *object, item unstr
 				VMIName: item.GetName(),
 			},
 		}
-		_, err = ex.kubeVirtClient.VirtualMachineInstanceMigration(item.GetNamespace()).Create(ctx, vmim, metav1.CreateOptions{})
+		var created *kubevirtV1.VirtualMachineInstanceMigration
+		created, err = ex.kubeVirtClient.VirtualMachineInstanceMigration(item.GetNamespace()).Create(ctx, vmim, metav1.CreateOptions{})
+		if err == nil {
+			ex.inventory.record(ex.Name, kubevirtV1.SchemeGroupVersion.WithResource("virtualmachineinstancemigrations"), created)
+		}
 	case config.KubeVirtOpAddVolume:
 		err = addVolume(ctx, ex, item.GetName(), item.GetNamespace(), obj.InputVars)
 	case config.KubeVirtOpRemoveVolume:

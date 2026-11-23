@@ -28,11 +28,18 @@ import (
 )
 
 func CreateNamespace(clientSet kubernetes.Interface, name string, nsLabels map[string]string, nsAnnotations map[string]string) error {
+	_, err := CreateNamespaceWithResult(clientSet, name, nsLabels, nsAnnotations)
+	return err
+}
+
+// CreateNamespaceWithResult returns the new namespace, or nil when it already existed.
+func CreateNamespaceWithResult(clientSet kubernetes.Interface, name string, nsLabels map[string]string, nsAnnotations map[string]string) (*corev1.Namespace, error) {
 	ns := corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: nsLabels, Annotations: nsAnnotations},
 	}
-	return RetryWithExponentialBackOff(func() (done bool, err error) {
-		_, err = clientSet.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
+	var created *corev1.Namespace
+	err := RetryWithExponentialBackOff(func() (done bool, err error) {
+		result, err := clientSet.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
 		if errors.IsForbidden(err) {
 			log.Fatalf("authorization error creating namespace %s: %s", ns.Name, err)
 		}
@@ -48,9 +55,11 @@ func CreateNamespace(clientSet kubernetes.Interface, name string, nsLabels map[s
 			log.Errorf("unexpected error creating namespace %s: %v", name, err)
 			return false, nil
 		}
+		created = result
 		log.Debugf("Created namespace: %s", ns.Name)
 		return true, err
 	}, 5*time.Second, 3, 0, 5*time.Hour)
+	return created, err
 }
 
 // CleanupNamespacesByLabel deletes namespaces with the given selector

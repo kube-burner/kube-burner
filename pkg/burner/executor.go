@@ -73,6 +73,7 @@ type JobExecutor struct {
 	hookManager       *HookManager
 	stageNotifier     *measurements.Measurements
 	midPoint          *midPointTracker
+	inventory         *resourceInventory
 }
 
 func newExecutor(configSpec config.Spec, kubeClientProvider *config.KubeClientProvider, job config.Job, embedCfg *fileutils.EmbedConfiguration) JobExecutor {

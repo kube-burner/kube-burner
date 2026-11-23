@@ -104,6 +104,8 @@ type GlobalConfig struct {
 	// Measurements describes a list of measurements kube-burner
 	// will take along with job
 	Measurements []mtypes.Measurement `yaml:"measurements"`
+	// ResourceInventory enables the workload resource inventory artifact.
+	ResourceInventory bool `yaml:"resourceInventory" json:"resourceInventory,omitempty"`
 	// RequestTimeout of restclient
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
 	// GC garbage collect created namespaces

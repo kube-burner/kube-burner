@@ -6,6 +6,7 @@ const (
 	DaemonSet                        = "DaemonSet"
 	ReplicaSet                       = "ReplicaSet"
 	Job                              = "Job"
+	CronJob                          = "CronJob"
 	Pod                              = "Pod"
 	ReplicationController            = "ReplicationController"
 	Build                            = "Build"

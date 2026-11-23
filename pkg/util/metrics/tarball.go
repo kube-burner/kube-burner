@@ -29,6 +29,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const ResourceInventoryFilename = "resource-inventory.json"
+
 func CreateTarball(indexerConfig indexers.IndexerConfig) error {
 	tarball, err := os.Create(indexerConfig.TarballName)
 	if err != nil {
@@ -102,6 +104,12 @@ func ImportTarball(tarball string, indexer *indexers.Indexer) error {
 		// io.EOF returned at the end of file
 		if err == io.EOF {
 			break
+		}
+		if err != nil {
+			return fmt.Errorf("tarball read error: %w", err)
+		}
+		if hdr.Name == ResourceInventoryFilename {
+			continue
 		}
 		_, err = io.Copy(&rawData, tr)
 		json.Unmarshal(rawData.Bytes(), &metrics)

@@ -351,9 +351,8 @@ func (ex *JobExecutor) RunCreateJob(ctx context.Context, iterationStart, iterati
 func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, iterationEnd int) []error {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
-		config.KubeBurnerLabelJob:   ex.Name,
-		config.KubeBurnerLabelUUID:  ex.uuid,
-		config.KubeBurnerLabelRunID: ex.runid,
+		config.KubeBurnerLabelJob:  ex.Name,
+		config.KubeBurnerLabelUUID: ex.uuid,
 	}
 	var wg sync.WaitGroup
 	var ns string
@@ -361,6 +360,7 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 	var namespacesWaited = make(map[string]bool)
 	var hookErrors []error
 	maps.Copy(nsLabels, ex.NamespaceLabels)
+	nsLabels[config.KubeBurnerLabelRunID] = ex.runid
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 	ex.resolveDynamicObjects(iterationStart)
 	if ex.nsRequired {
@@ -458,14 +458,14 @@ func (ex *JobExecutor) runCreateJobDefault(ctx context.Context, iterationStart, 
 func (ex *JobExecutor) runCreateJobGrouped(ctx context.Context, iterationStart, iterationEnd int) []error {
 	nsAnnotations := make(map[string]string)
 	nsLabels := map[string]string{
-		config.KubeBurnerLabelJob:   ex.Name,
-		config.KubeBurnerLabelUUID:  ex.uuid,
-		config.KubeBurnerLabelRunID: ex.runid,
+		config.KubeBurnerLabelJob:  ex.Name,
+		config.KubeBurnerLabelUUID: ex.uuid,
 	}
 	var wg sync.WaitGroup
 	var waitErrors []error
 	var hookErrors []error
 	maps.Copy(nsLabels, ex.NamespaceLabels)
+	nsLabels[config.KubeBurnerLabelRunID] = ex.runid
 	maps.Copy(nsAnnotations, ex.NamespaceAnnotations)
 
 	ex.resolveDynamicObjects(iterationStart)
@@ -668,6 +668,7 @@ func (ex *JobExecutor) replicaHandler(ctx context.Context, labels map[string]str
 			objectLabels := make(map[string]string)
 			maps.Copy(objectLabels, copiedLabels)
 			maps.Copy(objectLabels, newObject.GetLabels())
+			objectLabels[config.KubeBurnerLabelRunID] = ex.runid
 			newObject.SetLabels(objectLabels)
 			updateChildLabels(newObject, objectLabels)
 
@@ -814,6 +815,7 @@ func (ex *JobExecutor) createRequest(ctx context.Context, gvr schema.GroupVersio
 		} else {
 			log.Debugf("Created %s/%s", uns.GetKind(), uns.GetName())
 		}
+		ex.inventory.record(ex.Name, gvr, uns)
 		ex.notifyMidpoint()
 		return true, err
 	}, 1*time.Second, 3, 0, timeout)
@@ -823,8 +825,12 @@ func (ex *JobExecutor) createNamespace(ns string, nsLabels, nsAnnotations map[st
 	if ex.createdNamespaces[ns] {
 		return ns
 	}
-	if err := util.CreateNamespace(ex.clientSet, ns, nsLabels, nsAnnotations); err != nil {
+	created, err := util.CreateNamespaceWithResult(ex.clientSet, ns, nsLabels, nsAnnotations)
+	if err != nil {
 		log.Error(err.Error())
+	}
+	if created != nil {
+		ex.inventory.record(ex.Name, schema.GroupVersionResource{Version: APIVersionV1, Resource: "namespaces"}, created)
 	}
 	ex.createdNamespaces[ns] = true
 	return ns
