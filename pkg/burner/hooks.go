@@ -94,9 +94,12 @@ func emitHookFailure(hook config.Hook, stdout, stderr, outputPath string, runErr
 		fmt.Fprintf(os.Stderr, "%s stdout:\n%s\n", label, stdout)
 	}
 	if outputPath != "" {
-		if payload, err := os.ReadFile(outputPath); err == nil {
-			if text := sanitizeHookLogText(string(payload)); text != "" {
-				fmt.Fprintf(os.Stderr, "%s output-file %s:\n%s\n", label, outputPath, text)
+		if f, err := os.Open(outputPath); err == nil {
+			defer f.Close()
+			if payload, err := io.ReadAll(io.LimitReader(f, hookFailureOutputLimit+1)); err == nil {
+				if text := sanitizeHookLogText(string(payload)); text != "" {
+					fmt.Fprintf(os.Stderr, "%s output-file %s:\n%s\n", label, outputPath, text)
+				}
 			}
 		}
 	}
