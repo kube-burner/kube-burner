@@ -448,6 +448,7 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 
 	var stdout, stderr bytes.Buffer
 	var outputFile *os.File
+	var stderrSink *hookStderrWriter
 	if hook.OutputFile != "" {
 		outputFile, err = openHookOutputFile(hook.OutputFile)
 		if err != nil {
@@ -458,10 +459,12 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 		}
 		defer outputFile.Close()
 		cmd.Stdout = outputFile
-		cmd.Stderr = outputFile
+		stderrSink = hookStderrSink(&stderr).(*hookStderrWriter)
+		cmd.Stderr = io.MultiWriter(outputFile, stderrSink)
 	} else {
 		cmd.Stdout = &stdout
-		cmd.Stderr = hookStderrSink(&stderr)
+		stderrSink = hookStderrSink(&stderr).(*hookStderrWriter)
+		cmd.Stderr = stderrSink
 	}
 
 	if scriptReader != nil {
@@ -470,8 +473,8 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 
 	start := time.Now()
 	err = cmd.Run()
-	if sink, ok := cmd.Stderr.(*hookStderrWriter); ok {
-		_ = sink.Flush()
+	if stderrSink != nil {
+		_ = stderrSink.Flush()
 	}
 	duration := time.Since(start)
 

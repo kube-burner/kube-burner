@@ -101,6 +101,33 @@ func TestEmitHookFailureOutputFile(t *testing.T) {
 	}
 }
 
+func TestForegroundHookOutputFileTeesStderr(t *testing.T) {
+	const stderrOutput = "foreground hook failure\n"
+
+	path := filepath.Join(t.TempDir(), "hook.out")
+	hook := config.Hook{
+		When:       config.BeforeCleanup,
+		Cmd:        []string{"sh", "-c", "printf '%s' \"$1\" >&2", "sh", stderrOutput},
+		OutputFile: path,
+	}
+	hm := NewHookManager(context.Background(), 1, nil)
+	defer hm.cancel()
+
+	var hookErr error
+	stderr := captureStderr(t, func() {
+		hookErr = hm.executeForegroundHook(hook)
+	})
+	if hookErr != nil {
+		t.Fatalf("executeForegroundHook() error = %v", hookErr)
+	}
+	if got, err := os.ReadFile(path); err != nil || string(got) != stderrOutput {
+		t.Fatalf("output file = %q, err = %v", got, err)
+	}
+	if !strings.Contains(stderr, stderrOutput) {
+		t.Fatalf("process stderr = %q, want %q", stderr, stderrOutput)
+	}
+}
+
 func TestEmitHookFailureErrorOnly(t *testing.T) {
 	hook := config.Hook{When: config.AfterJobExecution, Cmd: []string{"true"}}
 	runErr := errors.New("signal killed")
