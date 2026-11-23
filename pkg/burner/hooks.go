@@ -23,8 +23,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/kube-burner/kube-burner/v2/pkg/config"
 	"github.com/kube-burner/kube-burner/v2/pkg/util/fileutils"
@@ -34,6 +37,207 @@ import (
 type hookResult struct {
 	err      error
 	duration time.Duration
+	hook     config.Hook
+	stderr   string
+}
+
+// hookFailureOutputLimit matches the harness subprocess stderr capture window (32 KiB).
+const hookFailureOutputLimit = 32 << 10
+
+var ansiEscapeSequence = regexp.MustCompile(`\x1b\[[0-9;]*[ -/]*[@-~]`)
+
+type hookStderrWriter struct {
+	dst       io.Writer
+	buf       *bytes.Buffer
+	pending   []byte
+	written   int
+	truncated bool
+}
+
+// hookStderrSink forwards hook stderr to the process stderr while buffering for failure logs.
+func hookStderrSink(buf *bytes.Buffer) io.Writer {
+	return &hookStderrWriter{dst: os.Stderr, buf: buf}
+}
+
+func (w *hookStderrWriter) Write(p []byte) (int, error) {
+	w.pending = append(w.pending, p...)
+	data, tail := splitHookStreamTail(w.pending)
+	w.pending = tail
+	text := sanitizeHookStreamText(string(data))
+	if w.truncated || text == "" {
+		return len(p), nil
+	}
+	remaining := hookFailureOutputLimit - w.written
+	if len(text) > remaining {
+		const suffix = "\n... (hook output truncated)"
+		if remaining <= 0 {
+			w.truncated = true
+			return len(p), nil
+		}
+		if remaining < len(suffix) {
+			text = truncateUTF8(text, remaining)
+			w.truncated = true
+		} else {
+			budget := remaining - len(suffix)
+			if budget < 0 {
+				budget = 0
+			}
+			text = truncateUTF8(text, budget) + suffix
+			w.truncated = true
+		}
+	}
+	if text == "" {
+		return len(p), nil
+	}
+	if _, err := io.MultiWriter(w.dst, w.buf).Write([]byte(text)); err != nil {
+		return 0, err
+	}
+	w.written += len(text)
+	return len(p), nil
+}
+
+func splitHookStreamTail(data []byte) ([]byte, []byte) {
+	validEnd := 0
+	for validEnd < len(data) && utf8.FullRune(data[validEnd:]) {
+		_, size := utf8.DecodeRune(data[validEnd:])
+		validEnd += size
+	}
+	data, tail := data[:validEnd], data[validEnd:]
+	if esc := bytes.LastIndexByte(data, '\x1b'); esc >= 0 {
+		sequence := data[esc:]
+		if len(sequence) > 1 && sequence[1] == '[' {
+			complete := false
+			for _, r := range sequence[2:] {
+				if r >= '@' && r <= '~' {
+					complete = true
+					break
+				}
+			}
+			if !complete && len(sequence)+len(tail) <= hookFailureOutputLimit {
+				tail = append(append([]byte(nil), sequence...), tail...)
+				data = data[:esc]
+			}
+		}
+	}
+	return data, tail
+}
+
+func (w *hookStderrWriter) Flush() error {
+	text := sanitizeHookStreamText(string(w.pending))
+	w.pending = nil
+	if text == "" {
+		return nil
+	}
+	remaining := hookFailureOutputLimit - w.written
+	if remaining <= 0 {
+		return nil
+	}
+	if len(text) > remaining {
+		text = truncateUTF8(text, remaining)
+		w.truncated = true
+	}
+	_, err := io.MultiWriter(w.dst, w.buf).Write([]byte(text))
+	w.written += len(text)
+	return err
+}
+
+func sanitizeHookStreamText(s string) string {
+	s = strings.ToValidUTF8(s, "\uFFFD")
+	s = ansiEscapeSequence.ReplaceAllString(s, "")
+	var b strings.Builder
+	for _, r := range s {
+		if r < utf8.RuneSelf && (r < ' ' || r == 0x7f) && r != '\n' && r != '\r' && r != '\t' {
+			b.WriteByte(' ')
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// sanitizeHookLogText makes hook output safe to print on stderr for log collectors:
+// valid UTF-8, no terminal escape sequences, no C0 control bytes (except \n, \r, \t).
+func sanitizeHookLogText(s string) string {
+	if s == "" {
+		return s
+	}
+	s = sanitizeHookText(s)
+	return truncateHookText(s, hookFailureOutputLimit)
+}
+
+func sanitizeHookText(s string) string {
+	s = strings.ToValidUTF8(s, "\uFFFD")
+	s = ansiEscapeSequence.ReplaceAllString(s, "")
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch r {
+		case '\n', '\r', '\t':
+			b.WriteRune(r)
+		default:
+			if r < utf8.RuneSelf && (r < ' ' || r == 0x7f) {
+				b.WriteByte(' ')
+				continue
+			}
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func truncateHookText(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	const suffix = "\n... (hook output truncated)"
+	if limit <= len(suffix) {
+		return suffix[:limit]
+	}
+	return truncateUTF8(s, limit-len(suffix)) + suffix
+}
+
+func truncateUTF8(s string, limit int) string {
+	cut := limit
+	if cut > len(s) {
+		cut = len(s)
+	}
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
+}
+
+func emitHookFailure(hook config.Hook, stdout, stderr, outputPath string, runErr error) {
+	if runErr == nil {
+		return
+	}
+	label := fmt.Sprintf(
+		"kube-burner hook failure when=%s cmd=%s", hook.When,
+		strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(sanitizeHookLogText(fmt.Sprint(hook.Cmd))),
+	)
+	stderr = sanitizeHookLogText(stderr)
+	stdout = sanitizeHookLogText(stdout)
+	if stderr != "" {
+		fmt.Fprintf(os.Stderr, "%s:\n%s\n", label, stderr)
+	}
+	if stdout != "" {
+		fmt.Fprintf(os.Stderr, "%s stdout:\n%s\n", label, stdout)
+	}
+	if outputPath != "" {
+		if info, err := os.Stat(outputPath); err == nil && info.Mode().IsRegular() {
+			if f, err := os.Open(outputPath); err == nil {
+				defer f.Close()
+				if payload, err := io.ReadAll(io.LimitReader(f, hookFailureOutputLimit+1)); err == nil {
+					if text := sanitizeHookLogText(string(payload)); text != "" {
+						fmt.Fprintf(os.Stderr, "%s output-file %s:\n%s\n", label, strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(sanitizeHookLogText(outputPath)), text)
+					}
+				}
+			}
+		}
+	}
+	if stderr == "" && stdout == "" {
+		fmt.Fprintf(os.Stderr, "%s: %v\n", label, runErr)
+	}
 }
 
 type HookManager struct {
@@ -145,6 +349,7 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 	}
 
 	var outputFile *os.File
+	var stderrSink *hookStderrWriter
 	if hook.OutputFile != "" {
 		outputFile, err = openHookOutputFile(hook.OutputFile)
 		if err != nil {
@@ -154,10 +359,12 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 			return err
 		}
 		cmd.Stdout = outputFile
-		cmd.Stderr = outputFile
+		stderrSink = hookStderrSink(&stderr).(*hookStderrWriter)
+		cmd.Stderr = io.MultiWriter(outputFile, stderrSink)
 	} else {
 		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
+		stderrSink = hookStderrSink(&stderr).(*hookStderrWriter)
+		cmd.Stderr = stderrSink
 	}
 
 	// Set process group for proper cleanup on Unix systems
@@ -173,13 +380,13 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 		return fmt.Errorf("failed to start background hook: %w", err)
 	}
 	hm.backgrounWg.Add(1)
-	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr, scriptReader, outputFile)
+	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr, scriptReader, outputFile, stderrSink)
 
 	return nil
 }
 
 // monitorBackgroundHook monitors a background hook with proper error handling
-func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer, scriptReader io.ReadCloser, outputFile *os.File) {
+func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer, scriptReader io.ReadCloser, outputFile *os.File, stderrSink *hookStderrWriter) {
 	defer hm.backgrounWg.Done()
 	defer func() {
 		if outputFile != nil {
@@ -198,21 +405,26 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 	select {
 	case err := <-errChan:
 		duration := time.Since(startTime)
+		if stderrSink != nil {
+			_ = stderrSink.Flush()
+		}
+		if err != nil {
+			emitHookFailure(hook, stdout.String(), stderr.String(), hook.OutputFile, err)
+		}
 		result := hookResult{
 			err:      err,
 			duration: duration,
+			hook:     hook,
+			stderr:   stderr.String(),
 		}
 
 		// Send result to channel (non-blocking)
 		select {
 		case hm.resultChan <- result:
-			// Result sent successfully
+		// Result sent successfully
 		default:
 			if err != nil {
 				log.Errorf("Background hook at '%s' failed after %v: %v", hook.When, duration, err)
-				if stderr.String() != "" {
-					log.Errorf("Hook stderr: %s", stderr.String())
-				}
 			} else {
 				log.Infof("Background hook at '%s' completed successfully in %v", hook.When, duration)
 				if stdout.String() != "" {
@@ -236,6 +448,7 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 
 	var stdout, stderr bytes.Buffer
 	var outputFile *os.File
+	var stderrSink *hookStderrWriter
 	if hook.OutputFile != "" {
 		outputFile, err = openHookOutputFile(hook.OutputFile)
 		if err != nil {
@@ -246,10 +459,12 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 		}
 		defer outputFile.Close()
 		cmd.Stdout = outputFile
-		cmd.Stderr = outputFile
+		stderrSink = hookStderrSink(&stderr).(*hookStderrWriter)
+		cmd.Stderr = io.MultiWriter(outputFile, stderrSink)
 	} else {
 		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
+		stderrSink = hookStderrSink(&stderr).(*hookStderrWriter)
+		cmd.Stderr = stderrSink
 	}
 
 	if scriptReader != nil {
@@ -258,6 +473,9 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 
 	start := time.Now()
 	err = cmd.Run()
+	if stderrSink != nil {
+		_ = stderrSink.Flush()
+	}
 	duration := time.Since(start)
 
 	if outputFile == nil {
@@ -270,6 +488,7 @@ func (hm *HookManager) executeForegroundHook(hook config.Hook) error {
 	}
 
 	if err != nil {
+		emitHookFailure(hook, stdout.String(), stderr.String(), hook.OutputFile, err)
 		// Check if the command was canceled via the context
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(hm.ctx.Err(), context.Canceled) {
 			return fmt.Errorf("hook canceled at %q after %v: %w", hook.When, duration, err)
