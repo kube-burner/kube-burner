@@ -168,6 +168,46 @@ func TestEmitHookFailureSanitizesStderr(t *testing.T) {
 	}
 }
 
+func TestHookStderrSinkWithOutputFileTeesToFileAndStderr(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hook.out")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buffered bytes.Buffer
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig := os.Stderr
+	os.Stderr = write
+	t.Cleanup(func() { os.Stderr = orig; _ = read.Close() })
+	sink := hookStderrSink(&buffered)
+	if _, err := io.MultiWriter(file, sink).Write([]byte("background failure\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := sink.(*hookStderrWriter).Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(path); err != nil || string(got) != "background failure\n" {
+		t.Fatalf("output file = %q, err = %v", got, err)
+	}
+	if err := write.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var live bytes.Buffer
+	if _, err := io.Copy(&live, read); err != nil {
+		t.Fatal(err)
+	}
+	if live.String() != "background failure\n" || buffered.String() != "background failure\n" {
+		t.Fatalf("live=%q buffered=%q", live.String(), buffered.String())
+	}
+}
+
 func TestHookStderrSinkTeesToBuffer(t *testing.T) {
 	var buf bytes.Buffer
 	var dst bytes.Buffer

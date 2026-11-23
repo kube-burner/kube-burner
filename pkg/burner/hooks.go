@@ -211,7 +211,10 @@ func emitHookFailure(hook config.Hook, stdout, stderr, outputPath string, runErr
 	if runErr == nil {
 		return
 	}
-label := fmt.Sprintf("kube-burner hook failure when=%s cmd=%s", hook.When, strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(sanitizeHookLogText(fmt.Sprint(hook.Cmd))))
+	label := fmt.Sprintf(
+		"kube-burner hook failure when=%s cmd=%s", hook.When,
+		strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(sanitizeHookLogText(fmt.Sprint(hook.Cmd))),
+	)
 	stderr = sanitizeHookLogText(stderr)
 	stdout = sanitizeHookLogText(stdout)
 	if stderr != "" {
@@ -226,7 +229,7 @@ label := fmt.Sprintf("kube-burner hook failure when=%s cmd=%s", hook.When, strin
 				defer f.Close()
 				if payload, err := io.ReadAll(io.LimitReader(f, hookFailureOutputLimit+1)); err == nil {
 					if text := sanitizeHookLogText(string(payload)); text != "" {
-fmt.Fprintf(os.Stderr, "%s output-file %s:\n%s\n", label, strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(sanitizeHookLogText(outputPath)), text)
+						fmt.Fprintf(os.Stderr, "%s output-file %s:\n%s\n", label, strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(sanitizeHookLogText(outputPath)), text)
 					}
 				}
 			}
@@ -346,6 +349,7 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 	}
 
 	var outputFile *os.File
+	var stderrSink *hookStderrWriter
 	if hook.OutputFile != "" {
 		outputFile, err = openHookOutputFile(hook.OutputFile)
 		if err != nil {
@@ -355,10 +359,12 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 			return err
 		}
 		cmd.Stdout = outputFile
-		cmd.Stderr = outputFile
+		stderrSink = hookStderrSink(&stderr).(*hookStderrWriter)
+		cmd.Stderr = io.MultiWriter(outputFile, stderrSink)
 	} else {
 		cmd.Stdout = &stdout
-		cmd.Stderr = hookStderrSink(&stderr)
+		stderrSink = hookStderrSink(&stderr).(*hookStderrWriter)
+		cmd.Stderr = stderrSink
 	}
 
 	// Set process group for proper cleanup on Unix systems
@@ -374,13 +380,13 @@ func (hm *HookManager) executeBackgroundHook(hook config.Hook) error {
 		return fmt.Errorf("failed to start background hook: %w", err)
 	}
 	hm.backgrounWg.Add(1)
-	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr, scriptReader, outputFile)
+	go hm.monitorBackgroundHook(cmd, hook, time.Now(), &stdout, &stderr, scriptReader, outputFile, stderrSink)
 
 	return nil
 }
 
 // monitorBackgroundHook monitors a background hook with proper error handling
-func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer, scriptReader io.ReadCloser, outputFile *os.File) {
+func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, startTime time.Time, stdout, stderr *bytes.Buffer, scriptReader io.ReadCloser, outputFile *os.File, stderrSink *hookStderrWriter) {
 	defer hm.backgrounWg.Done()
 	defer func() {
 		if outputFile != nil {
@@ -399,8 +405,8 @@ func (hm *HookManager) monitorBackgroundHook(cmd *exec.Cmd, hook config.Hook, st
 	select {
 	case err := <-errChan:
 		duration := time.Since(startTime)
-		if sink, ok := cmd.Stderr.(*hookStderrWriter); ok {
-			_ = sink.Flush()
+		if stderrSink != nil {
+			_ = stderrSink.Flush()
 		}
 		if err != nil {
 			emitHookFailure(hook, stdout.String(), stderr.String(), hook.OutputFile, err)
