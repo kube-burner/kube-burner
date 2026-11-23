@@ -211,7 +211,7 @@ func emitHookFailure(hook config.Hook, stdout, stderr, outputPath string, runErr
 	if runErr == nil {
 		return
 	}
-	label := fmt.Sprintf("kube-burner hook failure when=%s cmd=%v", hook.When, hook.Cmd)
+label := fmt.Sprintf("kube-burner hook failure when=%s cmd=%s", hook.When, strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(sanitizeHookLogText(fmt.Sprint(hook.Cmd))))
 	stderr = sanitizeHookLogText(stderr)
 	stdout = sanitizeHookLogText(stdout)
 	if stderr != "" {
@@ -226,7 +226,7 @@ func emitHookFailure(hook config.Hook, stdout, stderr, outputPath string, runErr
 				defer f.Close()
 				if payload, err := io.ReadAll(io.LimitReader(f, hookFailureOutputLimit+1)); err == nil {
 					if text := sanitizeHookLogText(string(payload)); text != "" {
-						fmt.Fprintf(os.Stderr, "%s output-file %s:\n%s\n", label, outputPath, text)
+fmt.Fprintf(os.Stderr, "%s output-file %s:\n%s\n", label, strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(sanitizeHookLogText(outputPath)), text)
 					}
 				}
 			}
