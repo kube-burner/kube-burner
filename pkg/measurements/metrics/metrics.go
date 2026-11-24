@@ -68,6 +68,10 @@ func NewLatencySummary(input []float64, name string) LatencyQuantiles {
 		QuantileName: name,
 		Timestamp:    time.Now().UTC(),
 	}
+	if len(input) == 0 {
+		log.Warnf("Latency summary %s has no samples", name)
+		return latencyQuantiles
+	}
 	val, _ := stats.Percentile(input, 50)
 	latencyQuantiles.P50 = int(val)
 	val, _ = stats.Percentile(input, 95)
