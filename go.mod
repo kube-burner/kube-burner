@@ -168,3 +168,5 @@ replace (
 )
 
 replace github.com/elastic/go-elasticsearch/v7 => github.com/elastic/go-elasticsearch/v7 v7.13.1
+
+replace github.com/cloud-bulldozer/go-commons/v2 => /Users/vchalla/myforks/go-commons
