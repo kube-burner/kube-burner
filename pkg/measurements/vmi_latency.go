@@ -147,7 +147,7 @@ func (vmi *vmiLatency) handleUpdateVM(obj any) {
 		if vmMetric.vmReady.IsZero() {
 			for _, c := range vm.Status.Conditions {
 				if c.Status == corev1.ConditionTrue && c.Type == kvv1.VirtualMachineReady {
-					vmMetric.vmReady = time.Now().UTC()
+					vmMetric.vmReady = c.LastTransitionTime.UTC()
 					log.Debugf("VM %s is ready", vm.Name)
 					break
 				}
